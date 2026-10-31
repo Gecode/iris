@@ -94,9 +94,9 @@ elsewhere but is not permitted after `...`. A `{` inside quoted capture-type
 text still starts part of the text that ends at the first `}`; quoting
 inside a type does not introduce balanced-brace scanning.
 
-Chapter 7, `07-structure.md` (planned), defines matching, whitespace
-requirements, capture conversion, and current-value substitution. Pattern
-syntax in the grammar does not define those execution effects.
+[§7.2](07-structure.md#72-line-patterns-and-captures) defines matching,
+whitespace requirements, capture conversion, and current-value substitution.
+Pattern syntax in the grammar does not define those execution effects.
 
 ## A.5 Syntax and other parse-time checks
 
@@ -106,7 +106,8 @@ necessary but not sufficient for a reader spec to parse and resolve.
 Definitions with reserved names, function requirements, type compatibility,
 name conflicts, and record-scope rules can still fail. Their codes are in
 [chapter 11](errors.md#114-parse-time-codes); their semantic definitions
-belong to [chapter 6](06-types-and-values.md) and chapters 7–9 (planned).
+belong to [chapter 6](06-types-and-values.md),
+[chapter 7](07-structure.md), and chapters 8–9 (planned).
 
 An unknown bare type name fails during type dispatch rather than forming
 a valid range. A grammar checker can therefore reject that source while

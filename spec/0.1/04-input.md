@@ -3,7 +3,7 @@
 This chapter defines input scanning and coordinate counting. Settings are
 specified here only by their effect on input; [chapter 5](05-reader-specs.md)
 defines their syntax. [Chapter 6](06-types-and-values.md) defines
-value-reading statements, and chapter 7 (`07-structure.md`, planned)
+value-reading statements, and [chapter 7](07-structure.md)
 defines line patterns and input structure.
 
 ## 4.1 Bytes and physical lines
@@ -609,7 +609,8 @@ Line-pattern captures have a separate boundary rule. A word capture without
 an immediately following literal MUST stop at NUL: `line "{x:word}"` fails
 to match `a`, NUL, `b`. A word capture immediately followed by a literal
 uses that literal's first byte as its stopping byte instead. A rest capture
-retains NUL. Chapter 7 will define the full pattern rules.
+retains NUL. [§7.2](07-structure.md#72-line-patterns-and-captures) defines
+the full pattern rules.
 
 ## 4.10 UTF-8 validity
 

@@ -5,8 +5,8 @@ format metadata, and parser limits. The formal productions are in
 [grammar.ebnf](grammar.ebnf); [appendix A](appendix-a-grammar.md) explains
 its layers and named predicates. [Chapter 6](06-types-and-values.md)
 defines types and value reads.
-Further execution rules belong to chapter 7 (`07-structure.md`, planned:
-input structure and patterns), chapter 8 (`08-expressions-and-checks.md`,
+Further execution rules belong to [chapter 7](07-structure.md)
+(input structure and patterns), chapter 8 (`08-expressions-and-checks.md`,
 planned: evaluation, checks, and record names), and chapter 9
 (`09-params-and-instances.md`, planned: parameters, instances, and catalog).
 Chapter 10 (`10-work-budgets.md`, planned) defines work budgets.
@@ -208,8 +208,11 @@ Pattern names use the ordinary-name form, not this special token form.
 name of `let`, `param`, or `type`, or as a comprehension binding; these
 fail with `E-SPEC-NAME`. It is not universally discarded: `store _`
 stores an entry named `_`. [§6.3](06-types-and-values.md#63-names-discarded-reads-and-replacement)
-defines declaration and list discards. Chapters 7–8 (planned) define
-capture discards and record-name effects.
+defines declaration and list discards.
+[§7.2](07-structure.md#72-line-patterns-and-captures) defines capture discards;
+[§7.6](07-structure.md#76-logical-records-and-names) defines record structure.
+Chapter 8, `08-expressions-and-checks.md` (planned), defines record-name
+resolution and use in expressions.
 
 Reserved/discard definition checks occur after consuming the name. Their
 reported line MAY therefore be the following token's line; implementations
@@ -313,8 +316,9 @@ The statement forms and their semantic chapters are:
 | Forms | Defining chapter |
 |---|---|
 | Declarations, `list`, `type` | [6, types and value reads](06-types-and-values.md) |
-| `expect`, `line`, `find`, `skip`, `index`, `repeat`, `each`, `sections`, `if` | 7, `07-structure.md` (planned): input structure |
-| `let`, `check` | 8, `08-expressions-and-checks.md` (planned): expressions and checks |
+| `expect`, `line`, `find`, `skip`, `index`, `repeat`, `each`, `sections`, `if` | [7, input structure](07-structure.md) |
+| `let` | [§7.9, execution](07-structure.md#79-conditional-execution-and-let); chapter 8, `08-expressions-and-checks.md` (planned): expressions |
+| `check` | 8, `08-expressions-and-checks.md` (planned): expressions and checks |
 | `param`, `instances` | 9, `09-params-and-instances.md` (planned): parameters and instances |
 
 A block MUST be a brace-enclosed sequence of statements. It MAY be empty.
@@ -447,7 +451,8 @@ more strings and optional `store` name, and `skip other`. Terminator strings
 MUST accumulate, a later store name MUST replace the previous store name,
 and `skip other` remains enabled once present. Arm modifiers MUST occur
 as optional `optional`, then optional `last`, then an optional body.
-Chapter 7 defines their matching and execution effects.
+[§7.8](07-structure.md#78-sections) defines their matching and execution
+effects.
 [Chapter 6](06-types-and-values.md) defines range evaluation, layouts,
 offsets, alphabets, and lists.
 

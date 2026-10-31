@@ -33,7 +33,8 @@ MUST produce depth k; a list MUST produce depth 1. A successful value read
 MUST store its name, value type, depth, and complete value as an entry,
 except for a discarded read (§6.3). A type definition MUST NOT produce an
 entry. Repeat collection adds array structure around these local results;
-chapter 7 (`07-structure.md`, planned) defines that collection.
+[§7.5](07-structure.md#75-column-construction-and-missing-rows) defines
+that collection.
 
 ## 6.2 Scalar reading and numeric promotion
 
@@ -121,9 +122,9 @@ x:int y:word _:int x[2]:float list _:int until 0
 
 Named types instead obey §6.5: a visible type MUST NOT be redefined.
 Types and ordinary value definitions MUST NOT share a name anywhere in a
-reader spec. A type and a record-list name MAY coincide. Chapter 7 (`07-structure.md`,
-planned) defines record names and record-list names; they are not value
-entries.
+reader spec. A type and a record-list name MAY coincide.
+[§7.6](07-structure.md#76-logical-records-and-names) defines record names
+and record-list names; they are not value entries.
 
 ## 6.4 Integer ranges
 
@@ -603,8 +604,9 @@ a[0]:int b[0]:float c[0]:word d[2][0]:float e[0][3]:num list f:float until 0 lis
 ]}
 ```
 
-Empty rows can also be read using an immediate sentinel. Chapter 7
-(`07-structure.md`, planned) defines their collection by repeat.
+Empty rows can also be read using an immediate sentinel.
+[§7.5](07-structure.md#75-column-construction-and-missing-rows) defines
+their collection by repeat.
 
 ```iris example
 id: values-empty-rows
@@ -1373,7 +1375,8 @@ b
 Alphabet reading types MUST have exactly two dimensions and MUST NOT be
 used as scalars, lists, or with layout or offset. These are parse-time
 `E-SPEC-TYPE` restrictions. Captures MUST reject alphabet types with
-`E-SPEC-PATTERN`; chapter 7 (`07-structure.md`, planned) defines captures.
+`E-SPEC-PATTERN`; [§7.2](07-structure.md#72-line-patterns-and-captures)
+defines captures.
 
 ```iris example
 id: values-type-alphabet-shape
@@ -1407,8 +1410,10 @@ to a token's start.
 `E-VALUE-TYPE-MIX` guards attempts to combine strings and numbers. A single
 fixed reading type cannot produce that mixture in an ordinary array or
 list; the direct value-construction guard is defensive. Repeat columns can
-encounter it through different reading statements. Chapter 7
-(`07-structure.md`, planned) owns that behavior and its example.
+encounter it through different reading statements.
+[§7.5](07-structure.md#75-column-construction-and-missing-rows) defines
+that behavior; [§7.10](07-structure.md#710-errors-and-execution-context)
+includes the `structure-value-type-mix` example.
 `E-TYPE-UNDEFINED` remains the conditional runtime guard described in §6.5,
 without a verified public reproducer.
 

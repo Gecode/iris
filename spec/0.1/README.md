@@ -13,7 +13,7 @@ do not yet exist; their names and chapter numbers are reserved.
 | 4 | [04-input.md](04-input.md) | Input text |
 | 5 | [05-reader-specs.md](05-reader-specs.md) | Reader specs |
 | 6 | [06-types-and-values.md](06-types-and-values.md) | Types and value-reading statements |
-| 7 | `07-structure.md` (planned) | Input structure |
+| 7 | [07-structure.md](07-structure.md) | Input structure |
 | 8 | `08-expressions-and-checks.md` (planned) | Expressions, checks, and record names |
 | 9 | `09-params-and-instances.md` (planned) | Parameters, instances, and catalog |
 | 10 | `10-work-budgets.md` (planned) | Work budgets |
