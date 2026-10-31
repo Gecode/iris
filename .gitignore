@@ -1,0 +1,20 @@
+# Caches and build output
+.cache/
+target/
+build/
+dist/
+node_modules/
+
+# Python
+__pycache__/
+.venv/
+*.egg-info/
+
+# Gradle
+.gradle/
+
+# macOS
+.DS_Store
+
+# Untracked logo concepts (see brand/README.md)
+/brand/concepts/
