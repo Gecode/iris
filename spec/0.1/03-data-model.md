@@ -266,13 +266,10 @@ implementations MUST NOT infer additional indices from context text.
 A failed check without record or element indices has path `[]`. Other
 errors have null path. Null and `[]` have distinct meanings.
 
-The [error schema](../schema/error.schema.json) checks this shape. The full
-code inventory and error ordering belong to chapter 11, `errors.md`
-(planned; spec-002). **The `E-PENDING-*` codes below are placeholders, not
-registry assignments. Spec-002 MUST replace them with registered codes and
-update these examples before extraction into conformance cases.** The schema
-checks code syntax, not registry membership. Examples use the logical origins
-`spec.iris` and `input.bin`.
+The [error schema](../schema/error.schema.json) checks this shape. The
+[error registry](errors.md) assigns codes, location availability, and error
+ordering. The schema checks code syntax, not registry membership. Examples
+use the logical origins `spec.iris` and `input.bin`.
 
 ### 3.7.1 Parse error
 
@@ -287,7 +284,7 @@ n: int
 a[2: int
 --- expected error
 {
-  "code": "E-PENDING-PARSE",
+  "code": "E-SPEC-SYNTAX",
   "message": "unknown statement 'a'",
   "input_location": null,
   "spec_location": {"origin": "spec.iris", "line": 2, "column": null},
@@ -312,7 +309,7 @@ x: int
 {"surprise": "1"}
 --- expected error
 {
-  "code": "E-PENDING-UNKNOWN-PARAM",
+  "code": "E-PARAM-UNKNOWN",
   "message": "the spec has no parameter 'surprise'",
   "input_location": null,
   "spec_location": {"origin": "spec.iris", "line": null, "column": null},
@@ -334,7 +331,7 @@ x: int
 oops
 --- expected error
 {
-  "code": "E-PENDING-EXPECTED-INT",
+  "code": "E-EXPECTED-VALUE",
   "message": "expected int, found 'oops'",
   "input_location": {"origin": "input.bin", "line": 1, "column": 1},
   "spec_location": {"origin": "spec.iris", "line": 1, "column": null},
@@ -358,7 +355,7 @@ repeat 2 as rows {
 3 oops
 --- expected error
 {
-  "code": "E-PENDING-EXPECTED-INT",
+  "code": "E-EXPECTED-VALUE",
   "message": "expected int, found 'oops'",
   "input_location": {"origin": "input.bin", "line": 2, "column": 3},
   "spec_location": {"origin": "spec.iris", "line": 2, "column": null},
@@ -389,7 +386,7 @@ check x > 0 "positive"
 4 5 0
 --- expected error
 {
-  "code": "E-PENDING-CHECK-FAILED",
+  "code": "E-CHECK-FAILED",
   "message": "check failed for record 3 of 'steps' in record 2 of 'jobs': positive",
   "input_location": {"origin": "input.bin", "line": 3, "column": 5},
   "spec_location": {"origin": "spec.iris", "line": 6, "column": null},
@@ -413,7 +410,7 @@ check all(r in a: all(x in r: x > 0)) "positive"
 4 5 0
 --- expected error
 {
-  "code": "E-PENDING-CHECK-FAILED",
+  "code": "E-CHECK-FAILED",
   "message": "check failed for element 3 of 'r' in element 2 of 'a': positive",
   "input_location": {"origin": "input.bin", "line": 2, "column": 6},
   "spec_location": {"origin": "spec.iris", "line": 2, "column": null},

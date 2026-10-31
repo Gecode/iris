@@ -17,7 +17,7 @@ do not yet exist; their names and chapter numbers are reserved.
 | 8 | `08-expressions-and-checks.md` (planned) | Expressions, checks, and record names |
 | 9 | `09-params-and-instances.md` (planned) | Parameters, instances, and catalog |
 | 10 | `10-work-budgets.md` (planned) | Work budgets |
-| 11 | `errors.md` (planned) | Error reporting and code registry |
+| 11 | [errors.md](errors.md) | Error reporting and code registry |
 | A | `appendix-a-grammar.md`, `grammar.ebnf` (planned) | Formal grammar |
 | B | `appendix-b-dzn.md` (planned) | dzn output |
 | C | [appendix-c-differences.md](appendix-c-differences.md) | Differences from Gecode 6.5.0 |
