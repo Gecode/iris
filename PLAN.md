@@ -642,6 +642,9 @@ dark mode.
   7. Gecode 6.5 keeps its own implementation. The C++ library is designed
      so that Gecode 7 can adopt it.
   8. Monorepo layout.
+  9. C++23 and Java 27 are the language baselines.
+  10. The MIT license.
+  11. Iris 0.1 strings are UTF-8.
 
 ---
 
@@ -685,7 +688,7 @@ Dependencies flow downward. Work in the same row can run in parallel.
 
 | # | Milestone | Contents | Done when |
 |---|---|---|---|
-| M0 | Foundations | Repository skeleton, `CONTEXT.md`, ADRs 1 to 8, license, CI scaffolding, brand concepts | The layout exists and builds empty, and a logo direction is chosen |
+| M0 | Foundations | Repository skeleton, `CONTEXT.md`, ADRs 1 to 11, license, CI scaffolding, brand concepts | The layout exists and builds empty, and a logo direction is chosen |
 | M1 | 0.1 Specification | Chapters from §6, grammar, data model, JSON schemas, error code registry, answers to §6.2 | Every item in §6.2 is decided, with a case planned for each |
 | M2 | 0.1 conformance suite | Gecode tests ported, example formats, the runner, the Gecode adapter | The suite runs green against Gecode 6.5.0, apart from documented Gecode bugs |
 | M3 | Rust core and CLI | `iris-syntax`, `iris-sema`, `iris-core`, `iris-cli` | 100% conformance, performance target met, fuzzing in CI |
