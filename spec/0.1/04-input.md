@@ -2,9 +2,9 @@
 
 This chapter defines input scanning and coordinate counting. Settings are
 specified here only by their effect on input; [chapter 5](05-reader-specs.md)
-defines their syntax. Chapter 6, `06-types-and-values.md`
-(planned), defines value-reading statements, and chapter 7,
-`07-structure.md` (planned), defines line patterns and input structure.
+defines their syntax. [Chapter 6](06-types-and-values.md) defines
+value-reading statements, and chapter 7 (`07-structure.md`, planned)
+defines line patterns and input structure.
 
 ## 4.1 Bytes and physical lines
 

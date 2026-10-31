@@ -12,7 +12,7 @@ do not yet exist; their names and chapter numbers are reserved.
 | 3 | [03-data-model.md](03-data-model.md) | Data model and canonical JSON |
 | 4 | [04-input.md](04-input.md) | Input text |
 | 5 | [05-reader-specs.md](05-reader-specs.md) | Reader specs |
-| 6 | `06-types-and-values.md` (planned) | Types and value-reading statements |
+| 6 | [06-types-and-values.md](06-types-and-values.md) | Types and value-reading statements |
 | 7 | `07-structure.md` (planned) | Input structure |
 | 8 | `08-expressions-and-checks.md` (planned) | Expressions, checks, and record names |
 | 9 | `09-params-and-instances.md` (planned) | Parameters, instances, and catalog |

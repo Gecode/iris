@@ -3,12 +3,13 @@
 This chapter defines reader-spec source, lexical structure, syntax, placement,
 format metadata, and parser limits. The formal productions are in
 [grammar.ebnf](grammar.ebnf); [appendix A](appendix-a-grammar.md) explains
-its layers and named predicates. Statement execution is defined in chapters
-6–9: `06-types-and-values.md` (types and value reads), `07-structure.md`
-(input structure and patterns), `08-expressions-and-checks.md` (evaluation,
-checks, and record names), and `09-params-and-instances.md` (parameters,
-instances, and catalog). Chapter 10, `10-work-budgets.md`, defines work budgets.
-Those chapters are planned.
+its layers and named predicates. [Chapter 6](06-types-and-values.md)
+defines types and value reads.
+Further execution rules belong to chapter 7 (`07-structure.md`, planned:
+input structure and patterns), chapter 8 (`08-expressions-and-checks.md`,
+planned: evaluation, checks, and record names), and chapter 9
+(`09-params-and-instances.md`, planned: parameters, instances, and catalog).
+Chapter 10 (`10-work-budgets.md`, planned) defines work budgets.
 
 ## 5.1 Reader specs and parsing
 
@@ -206,8 +207,9 @@ Pattern names use the ordinary-name form, not this special token form.
 `as`, `each`, and `store` positions. It MUST NOT be accepted as the defined
 name of `let`, `param`, or `type`, or as a comprehension binding; these
 fail with `E-SPEC-NAME`. It is not universally discarded: `store _`
-stores an entry named `_`. Chapters 6–8 define the other discard and
-record-name effects.
+stores an entry named `_`. [§6.3](06-types-and-values.md#63-names-discarded-reads-and-replacement)
+defines declaration and list discards. Chapters 7–8 (planned) define
+capture discards and record-name effects.
 
 Reserved/discard definition checks occur after consuming the name. Their
 reported line MAY therefore be the following token's line; implementations
@@ -308,12 +310,12 @@ MUST name a statement. Unknown statements and missing syntax report
 
 The statement forms and their semantic chapters are:
 
-| Forms | Defining chapter (planned) |
+| Forms | Defining chapter |
 |---|---|
-| Declarations, `list`, `type` | 6, `06-types-and-values.md`: types and value reads |
-| `expect`, `line`, `find`, `skip`, `index`, `repeat`, `each`, `sections`, `if` | 7, `07-structure.md`: input structure |
-| `let`, `check` | 8, `08-expressions-and-checks.md`: expressions and checks |
-| `param`, `instances` | 9, `09-params-and-instances.md`: parameters and instances |
+| Declarations, `list`, `type` | [6, types and value reads](06-types-and-values.md) |
+| `expect`, `line`, `find`, `skip`, `index`, `repeat`, `each`, `sections`, `if` | 7, `07-structure.md` (planned): input structure |
+| `let`, `check` | 8, `08-expressions-and-checks.md` (planned): expressions and checks |
+| `param`, `instances` | 9, `09-params-and-instances.md` (planned): parameters and instances |
 
 A block MUST be a brace-enclosed sequence of statements. It MAY be empty.
 Blocks occur as repeat and instances bodies, if/else bodies, and optional
@@ -355,7 +357,9 @@ The grammar MUST permit the base types `int`, `float`, `num`, `word`, and
 and ranges. At a type position, a base-type name MUST take priority, then
 `alphabet`, then a visible named type, then a range expression. Parentheses
 can disambiguate a range bound that has the name of a type.
-Type visibility and type compatibility are chapter-6 requirements, rather
+Type visibility and type compatibility follow
+[§6.1](06-types-and-values.md#61-reading-types-and-resulting-entries) and
+[§6.5](06-types-and-values.md#65-named-types-and-visibility), rather
 than unrestricted alternatives in this dispatch.
 
 An inclusive range MAY omit either bound, but MUST contain at least one.
@@ -443,8 +447,9 @@ more strings and optional `store` name, and `skip other`. Terminator strings
 MUST accumulate, a later store name MUST replace the previous store name,
 and `skip other` remains enabled once present. Arm modifiers MUST occur
 as optional `optional`, then optional `last`, then an optional body.
-Chapter 7 defines their matching and execution effects. Chapter 6 defines
-range evaluation, layouts, offsets, alphabets, and lists.
+Chapter 7 defines their matching and execution effects.
+[Chapter 6](06-types-and-values.md) defines range evaluation, layouts,
+offsets, alphabets, and lists.
 
 ## 5.8 Settings
 

@@ -106,7 +106,7 @@ necessary but not sufficient for a reader spec to parse and resolve.
 Definitions with reserved names, function requirements, type compatibility,
 name conflicts, and record-scope rules can still fail. Their codes are in
 [chapter 11](errors.md#114-parse-time-codes); their semantic definitions
-belong to chapters 6–9 (planned).
+belong to [chapter 6](06-types-and-values.md) and chapters 7–9 (planned).
 
 An unknown bare type name fails during type dispatch rather than forming
 a valid range. A grammar checker can therefore reject that source while
