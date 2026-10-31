@@ -1,4 +1,4 @@
-# 0011. UTF-8 strings
+# 0011. UTF-8 input and strings
 
 ## Status
 
@@ -13,16 +13,24 @@ represented as plain text in canonical JSON
 
 ## Decision
 
-Iris 0.1 strings are Unicode text encoded as UTF-8. A `word` or `rest`
-value that is not valid UTF-8 is an error. This is a deliberate difference
-from Gecode 6.5.0 and belongs in the Specification's differences appendix.
+Iris 0.1 strings are Unicode text encoded as UTF-8. The whole input must
+be valid UTF-8, including comments, skipped lines, and bytes that are never
+read. A `word` or `rest` value that is not valid UTF-8 is also an error,
+because token settings operate on bytes and can split a character. This is
+a deliberate difference from Gecode 6.5.0 and belongs in the
+Specification's differences appendix.
 
 ## Consequences
 
-Canonical JSON keeps strings as plain text. Gecode 6.5.0 can accept string
-values that Iris 0.1 rejects. The input chapter of the Specification still
-needs to decide whether UTF-8 validity covers all input or only string
-values; this record does not settle that scope.
+Canonical JSON keeps strings as plain text. Gecode 6.5.0 accepts input
+that Iris 0.1 rejects. The input chapter of the Specification defines when
+the input is validated, where the error is reported, and how this error is
+ordered relative to others.
+
+The scope was decided on 2026-10-31, after the input chapter's research
+showed that Gecode accepts any bytes in comments, skipped lines, literal
+pattern text, and ignored tails. Validating only string values was the
+narrower alternative.
 
 ## Alternative considered
 

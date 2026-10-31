@@ -644,7 +644,7 @@ dark mode.
   8. Monorepo layout.
   9. C++23 and Java 27 are the language baselines.
   10. The MIT license.
-  11. Iris 0.1 strings are UTF-8.
+  11. Iris 0.1 input and strings are UTF-8.
 
 ---
 
@@ -739,12 +739,16 @@ written.
 - **Java baseline:** Java 27, the newest feature release. Revisit if users
   need an LTS.
 - **License:** MIT, as Gecode.
-- **Strings are UTF-8:** Iris 0.1 strings are Unicode text, and a `word` or
-  `rest` value that is not valid UTF-8 is an error. Gecode 6.5.0 keeps raw
-  bytes, so this is a deliberate difference, recorded in the
-  Specification's differences appendix. It keeps the canonical JSON plain
-  text. The input chapter decides whether the rule covers all input or
-  only string values.
+- **Input is UTF-8:** Iris 0.1 strings are Unicode text, and the whole
+  input must be valid UTF-8, including comments, skipped lines, and
+  ignored tails. A `word` or `rest` value that is not valid UTF-8 is also
+  an error, since token settings work on bytes and can split a character.
+  Gecode 6.5.0 accepts any bytes, so this is a deliberate difference,
+  recorded in the Specification's differences appendix. It keeps the
+  canonical JSON plain text.
+- **Float underflow:** a float token whose value is nonzero but rounds to
+  a subnormal number or to zero is rejected, as the reference build does.
+  This gives every implementation the same portable rule.
 - **Work tracking:** zdev, with personal records (`.zdev/` is not
   committed).
 
