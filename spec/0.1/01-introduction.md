@@ -29,8 +29,9 @@ written; Rust is the project's reference implementation.
 Iris adds stable error codes and canonical JSON for comparisons between
 implementations. Gecode's messages are mapped to those codes by its
 conformance driver; Gecode itself need not emit them. Iris also requires
-Unicode strings: a `word` or `rest` value that is not valid UTF-8 MUST be
-rejected, as specified in appendix C.
+UTF-8 input and Unicode strings: the whole input and each `word` or `rest`
+value actually read MUST be valid UTF-8, as specified in
+[§4.10](04-input.md#410-utf-8-validity) and appendix C.
 
 ## 1.3 Conformance
 

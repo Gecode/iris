@@ -26,15 +26,16 @@ message before applying the phase's patterns in §§11.4–11.5. An
 MUST NOT replace the primary code or create a check witness. Dynamic strings
 can contain quotes, newlines, and diagnostic-looking text without unambiguous
 escaping; the driver MUST NOT assume that every apparent suffix inside such
-text is an envelope boundary. Chapter 4 (`04-input.md`, planned) defines
+text is an envelope boundary. [§4.6](04-input.md#46-input-positions) defines
 input coordinate counting. Implementations MUST preserve reported coordinates
 and MUST NOT move a check's location to the final input cursor.
 
 ## 11.2 Error order
 
-Implementations MUST report the first error encountered in the pinned
-parse, resolve, and execution order, subject to the deferral rules below.
-They MUST NOT choose an error by sorting candidate input coordinates.
+Implementations MUST report the first error encountered in the order below,
+subject to the deferral rules. This preserves the pinned parse, resolve,
+and execution order while adding Iris input validation. Implementations
+MUST NOT choose an error by sorting candidate input coordinates.
 
 1. Parse the reader spec before reading input. Lex the complete reader spec,
    parse statements, check global name conflicts, then resolve names. A later
@@ -42,16 +43,21 @@ They MUST NOT choose an error by sorting candidate input coordinates.
    precede the expression traversal they guard; earliest reader-spec line
    alone does not determine the error.
 2. Before statement execution, reject unknown parameters in supplied parameter
-   order. Execute statements in order along the selected control-flow path.
+   order, then validate the whole input as UTF-8 under
+   [§4.10](04-input.md#410-utf-8-validity). Input-wide `E-UTF8` precedes every
+   execution error, even one at an earlier input coordinate. Parse-only
+   operations do not validate input.
+3. Execute statements in order along the selected control-flow path.
    Reads encounter tokens in consumption order; checks run where written.
-3. Evaluate expression operands from left to right, with short-circuit `&&`
+   Value-level UTF-8 checks follow this execution order and are hard errors.
+4. Evaluate expression operands from left to right, with short-circuit `&&`
    and `||`. For a scalar subscript, check that the base is an array before
    evaluating the index. Visit repeat iterations and check record/element
    indices in increasing traversal order, stopping at the first failing
    witness.
-4. Try sections arms in declaration order; the first matching arm handles the
+5. Try sections arms in declaration order; the first matching arm handles the
    line. Check missing required arms in declaration order when sections ends.
-5. Check trailing input only after successful execution, unless explicit
+6. Check trailing input only after successful execution, unless explicit
    instance selection already returned or `ignore trailing` applies.
 
 ### 11.2.1 Deferred instance failures and catalog
@@ -76,10 +82,11 @@ sections line MUST be reported immediately if no more data remains, even
 during catalog or in an otherwise skipped instance. Its saved location is
 the sections terminator, last matching line, or end of input.
 
-Explicit selection returns after the selected instance, without examining
-later input. Without selection, reading continues to determine whether the
-file contains more than one instance, and reports `E-INSTANCE-SELECTION`
-when necessary.
+Explicit selection returns after the selected instance, without executing
+statements against later input. Input-wide UTF-8 validation has already
+examined all supplied bytes. Without selection, reading continues to
+determine whether the file contains more than one instance, and reports
+`E-INSTANCE-SELECTION` when necessary.
 
 Catalog reads all instances and returns the first rejection summary for each
 in the string array `failed`, using an empty string for a valid instance.
@@ -139,22 +146,26 @@ contain quotes; `{A}` MUST NOT be implemented as `.*` or as a negated-quote char
 
 ### 11.3.2 Location profiles
 
-Every Gecode-backed code selects one of these profiles. Origins come from
-the supplied source identities and are null when unavailable. Implementations
-MUST follow [chapter 3](03-data-model.md#37-canonical-error-document) for
-canonical representation and primary-location selection.
+Registered codes use these location profiles. For Gecode-backed errors,
+availability follows the reference; §11.6 defines Iris-only availability.
+Origins come from the supplied source identities and are null when
+unavailable. Implementations MUST follow
+[chapter 3](03-data-model.md#37-canonical-error-document) for canonical
+representation and primary-location selection.
 
-| Profile | Gecode supplies; null fields |
+| Profile | Location availability; null fields |
 |---|---|
 | P — parse-time | No input location. Reader-spec origin and line, with null column. Null context and path. |
 | R — read-time | Input origin, positive line and column; reader-spec origin and line, with null column. Active execution-context text when present, otherwise null. Null path. |
 | C — failed check | Locations and context as R. Path is the reported witness converted to outermost-first indices starting at 0, or `[]` without witness indices. |
 | U — unknown parameter | No input location. Reader-spec origin, with null line and column. Null context and path. |
-| T — trailing input | Input origin, positive line and column. Null reader-spec location, context, and path. |
+| T — input only | Input origin, positive line and column. Null reader-spec location, context, and path. Used for trailing input and Iris input-wide UTF-8 validation. |
 
 Preserve the reported reader-spec line, including a nested statement's line.
 Only `E-CHECK-FAILED` uses C; errors evaluating its condition use R.
 `Interpreter::run` resets the reader-spec line before `E-TRAILING-INPUT`.
+For `E-UTF8`, Iris defines availability using T or R as specified in §11.6;
+Gecode supplies no corresponding diagnostic.
 
 ### 11.3.3 Adding a code
 
@@ -204,7 +215,7 @@ The location column selects the profile in §11.3.2.
 | `E-COUNT` | A size/count/base expression is not a permitted count. `{A} must be an integer`; `{A} is negative ({I})`; `{A} is too large ({I})`, restricting the initial description to `array size`, `number of lines`, `index base`, or `repeat count` | R | e:708,710,712 | chapter 6 (`06-types-and-values.md`, planned): arrays; chapter 7 (`07-structure.md`, planned): skip and expect, repeats, index |
 | `E-DIVISION-ZERO` | Integer division/remainder by zero. `division by zero` | R | e:462 | chapter 8 (`08-expressions-and-checks.md`, planned): arithmetic |
 | `E-EXPECTED-TOKEN` | Required literal token absent or different. `expected {Q}, found {F}` | R | i:812,857,862 | chapter 6 (`06-types-and-values.md`, planned): lists; chapter 7 (`07-structure.md`, planned): skip and expect |
-| `E-EXPECTED-VALUE` | Input cannot satisfy the required reading type/domain, including a range, or the required line of values is absent. `expected {D}, found {F}`; `expected a line of values, found end of input` | R | i:259,260,318,765 | chapter 6 (`06-types-and-values.md`, planned): reading types, ranges, arrays, lists |
+| `E-EXPECTED-VALUE` | Input cannot satisfy the required reading type/domain, including a range, or the required line of values is absent. Includes overflow on numeric input conversion and rejected float underflow. `expected {D}, found {F}`; `expected a line of values, found end of input` | R | i:259,260,318,765 | [§4.4](04-input.md#44-integer-tokens), [§4.5](04-input.md#45-floating-point-tokens): numeric conversion; chapter 6 (`06-types-and-values.md`, planned): reading types, ranges, arrays, lists |
 | `E-EXPONENT` | Integer exponent is negative. `negative exponent in '^'` | R | e:456 | chapter 8 (`08-expressions-and-checks.md`, planned): arithmetic |
 | `E-FIELD-UNDEFINED` | A field is unavailable in the selected runtime record. `'{N}' is not defined in this record of '{N}'` | R | e:358 | chapter 8 (`08-expressions-and-checks.md`, planned): value lookup |
 | `E-FIND-MATCH` | No remaining line matches a find pattern. `no line matching {P} found` | R | i:840 | chapter 7 (`07-structure.md`, planned): line and find |
@@ -240,7 +251,7 @@ The location column selects the profile in §11.3.2.
 | `E-SIZE-LIMIT` | Array/matrix cell count exceeds the supported structural bound. `array is too large`; `matrix is too large` | R | i:386,453,1205 | chapter 6 (`06-types-and-values.md`, planned): arrays, layouts, alphabets |
 | `E-SKIP-EOF` | A requested line cannot be skipped at end of input. `cannot skip a line at end of input` | R | i:849 | chapter 7 (`07-structure.md`, planned): skip and expect |
 | `E-SYMBOL` | Alphabet reading encounters end of input or an unrecognized symbol. `expected a symbol for row {U}, column {U}, found end of input`; `unexpected symbol {Q}, expected one of {Q}` | R | i:1215,1231 | chapter 6 (`06-types-and-values.md`, planned): alphabets |
-| `E-TRAILING-INPUT` | Disallowed input remains after execution finishes. `unexpected input after the end of the spec: {Q}` | T | i:152 | chapter 4 (`04-input.md`, planned): ignore trailing |
+| `E-TRAILING-INPUT` | Disallowed input remains after execution finishes. `unexpected input after the end of the spec: {Q}` | T | i:152 | [§4.8](04-input.md#48-end-of-input-and-trailing-input): ignore trailing |
 | `E-TYPE-UNDEFINED` | A parsed named type has not been evaluated on the executed path. `the type '{N}' is not defined yet` | R | i:344 | chapter 6 (`06-types-and-values.md`, planned): named types |
 | `E-VALUE-TYPE-MIX` | Repeated/list values mix strings and numbers. `'{N}' mixes strings and numbers`; `'{N}': strings and numbers are mixed` | R | d:161; h:328 | chapter 6 (`06-types-and-values.md`, planned): arrays, lists; chapter 7 (`07-structure.md`, planned): repeats |
 
@@ -265,14 +276,24 @@ branch.
 
 | Code | Meaning and recommended message | Phase and locations | Defining place | Gecode pattern |
 |---|---|---|---|---|
-| `E-UTF8` | A string value required to be Unicode text contains invalid UTF-8. `string value is not valid UTF-8` | Read-time for `word`/`rest` string values. Gecode locations: not applicable. Iris coordinate selection remains reserved for chapter 4. | [§3.6](03-data-model.md#36-strings), [appendix C.1](appendix-c-differences.md#c1-unicode-strings); chapter 4 (`04-input.md`, planned): UTF-8 validation | None — Iris-only. |
+| `E-UTF8` | The supplied input or an actually read word/rest value contains invalid UTF-8. `input is not valid UTF-8`; `string value is not valid UTF-8` | Input validation after parsing/resolution and unknown parameters, before execution: T. Value-level validation during execution: R. Both locate the first byte of the first ill-formed subsequence. Availability is defined by Iris; Gecode locations are not applicable. | [§4.10](04-input.md#410-utf-8-validity), [§3.6](03-data-model.md#36-strings), [appendix C.1](appendix-c-differences.md#c1-unicode-strings) | None — Iris-only. |
 
 Gecode accepts `x: word` with input hex `ff0a` and preserves the byte; it
-raises no corresponding error. No Gecode error object or all-null location
-profile is defined for this code. Chapter 4 decides coordinates and whether
-UTF-8 validation extends beyond string values. The Gecode adapter does not
-emulate this error; if a result cannot be serialized as Unicode JSON, it
-reports a distinct adapter diagnostic.
+raises no corresponding error. Iris validates all input bytes, including
+ignored bytes, in its input-validation phase. Its value-level check also
+covers discarded reads and committed captures because byte-wise settings
+can split valid UTF-8. Failed speculative pattern captures do not cause
+value-level errors. A value-level `E-UTF8` is a hard error, including in
+skipped instances. For a truncated sequence, locate its initial byte.
+
+Input-wide failures use T: the input origin and byte-counted line/column,
+with null reader-spec location, context, and path. Value-level failures use
+R: the invalid subsequence's input position, active reader-spec origin and
+line with null column, current execution context when present, and null
+path. [§4.6](04-input.md#46-input-positions) defines coordinate counting.
+No Gecode error object is defined for either case. The Gecode adapter does
+not emulate this error; if a result cannot be serialized as Unicode JSON,
+it reports a distinct adapter diagnostic.
 
 ## 11.7 Exclusions and source coverage
 

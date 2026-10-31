@@ -10,7 +10,7 @@ do not yet exist; their names and chapter numbers are reserved.
 | 1 | [01-introduction.md](01-introduction.md) | Introduction |
 | 2 | [02-notation.md](02-notation.md) | Notation and executable examples |
 | 3 | [03-data-model.md](03-data-model.md) | Data model and canonical JSON |
-| 4 | `04-input.md` (planned) | Input text |
+| 4 | [04-input.md](04-input.md) | Input text |
 | 5 | `05-reader-specs.md` (planned) | Reader specs |
 | 6 | `06-types-and-values.md` (planned) | Types and value-reading statements |
 | 7 | `07-structure.md` (planned) | Input structure |

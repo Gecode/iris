@@ -227,10 +227,12 @@ quotation marks, backslashes, and control characters as JSON requires.
 NUL is valid and is encoded as `\u0000`; see the
 [byte example](02-notation.md#25-complete-examples).
 
-A `word` or `rest` value that is not valid UTF-8 MUST be an error. This is a
-deliberate [difference from Gecode 6.5.0](appendix-c-differences.md).
-Whether validation also covers bytes outside string values is reserved for
-chapter 4, `04-input.md` (planned; spec-003).
+The whole supplied input MUST be valid UTF-8, including comments, skipped
+lines, and unread tails. Each `word` or `rest` value actually read MUST also
+be valid UTF-8: byte-wise token settings can split a character in valid
+input. [§4.10](04-input.md#410-utf-8-validity) defines both checks, their
+order, and their errors. This is a deliberate
+[difference from Gecode 6.5.0](appendix-c-differences.md#c1-unicode-strings).
 
 ## 3.7 Canonical error document
 
@@ -253,7 +255,8 @@ and columns are positive integers counted from 1, or null when unavailable.
 Implementations MUST retain the distinction between the input location and
 the reader-spec location and MUST NOT fabricate missing coordinates. A
 parser that reports only a reader-spec line MUST report a null column.
-Chapter 4 will specify how bytes and tabs affect input coordinates.
+[§4.6](04-input.md#46-input-positions) defines how bytes and tabs affect
+input coordinates.
 
 The context string preserves the reported outer-to-inner execution context,
 including its human-facing iteration numbers. It MUST NOT be converted to

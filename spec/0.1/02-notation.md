@@ -118,8 +118,8 @@ An extractor MUST use this splitting algorithm:
 
 Backslashes in literal byte parts are bytes for the reader spec or input;
 the extractor MUST NOT interpret them as escapes. JSON escapes apply only
-within JSON parts. This format describes example transport; chapter 4,
-`04-input.md` (planned), defines input lexing and coordinate counting.
+within JSON parts. This format describes example transport;
+[chapter 4](04-input.md) defines input lexing and coordinate counting.
 
 ## 2.5 Complete examples
 
