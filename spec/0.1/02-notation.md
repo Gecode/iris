@@ -65,8 +65,8 @@ Any operation MAY have `expected error` instead. A `parse` example MAY omit
 input; if present, the operation MUST NOT read it. Its params MUST be absent
 or empty. Parse-success examples are reserved until conformance-001 defines
 their result and extends this notation. Empty read data MUST NOT stand in
-for parse success. Chapter 9, `09-params-and-instances.md` (planned), defines
-catalog entries.
+for parse success. [§9.6](09-params-and-instances.md#96-catalog-results) defines catalog
+entries using chapter 3's ordinary data document.
 
 A params part is a JSON object mapping strings to strings. Omission means
 an empty map. An extractor MUST preserve each value exactly, including leading

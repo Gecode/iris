@@ -7,8 +7,8 @@ its layers and named predicates. [Chapter 6](06-types-and-values.md)
 defines types and value reads.
 Further execution rules belong to [chapter 7](07-structure.md)
 (input structure and patterns), [chapter 8](08-expressions-and-checks.md)
-(evaluation, checks, and record names), and chapter 9
-(`09-params-and-instances.md`, planned: parameters, instances, and catalog).
+(evaluation, checks, and record names), and [chapter 9](09-params-and-instances.md)
+(parameters, instances, and catalog).
 Chapter 10 (`10-work-budgets.md`, planned) defines work budgets.
 
 ## 5.1 Reader specs and parsing
@@ -320,7 +320,7 @@ The statement forms and their semantic chapters are:
 | `expect`, `line`, `find`, `skip`, `index`, `repeat`, `each`, `sections`, `if` | [7, input structure](07-structure.md) |
 | `let` | [§7.9, execution](07-structure.md#79-conditional-execution-and-let); [chapter 8](08-expressions-and-checks.md): expressions |
 | `check` | [§8.13](08-expressions-and-checks.md#813-checks-and-failure-witnesses): checks |
-| `param`, `instances` | 9, `09-params-and-instances.md` (planned): parameters and instances |
+| `param`, `instances` | [9, parameters and instances](09-params-and-instances.md) |
 
 A block MUST be a brace-enclosed sequence of statements. It MAY be empty.
 Blocks occur as repeat and instances bodies, if/else bodies, and optional

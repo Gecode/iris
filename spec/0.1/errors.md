@@ -68,21 +68,31 @@ Only a false check, a repeated sections line, or a missing required sections
 line can reject an instance without immediately stopping reading. An error
 while evaluating a check is a hard error, not a false check.
 
-A rejection MUST be deferred when the current instance may be skipped: during
-catalog, for a different selected number, for a different or not-yet-known
-selected name, or after the first instance when no selection was supplied.
-Store only the first rejection of each instance and continue reading.
-A repeated sections line still supplies captures and executes its arm body;
-a deferred missing-arm rejection returns from that sections statement.
-If name selection later identifies the rejected instance as selected,
-report its stored diagnostic with its original coordinates and witness.
+A rejection MUST follow the predicate in
+[§9.5](09-params-and-instances.md#95-deferred-failures-in-skipped-instances).
+Outside an active instance body it is immediate. Inside one, defer during
+catalog, for a different selected ordinal, after instance 1 without a
+selector, or when the current local derived name differs from the selected
+name. Name derivation includes `""` for absent or unusable names; an empty
+selector therefore already matches an absent name. Recompute the predicate
+at each rejection. Store only the first deferred rejection and continue
+reading. A repeated sections line still supplies captures and executes its
+arm body; a deferred missing-arm rejection returns from that sections statement.
 
-A hard error MUST stop reading even in a skipped instance. If that instance
-already has a deferred rejection, the hard error remains primary and Gecode
-appends an `after an earlier error in the instance` summary. A missing required
-sections line MUST be reported immediately if no more data remains, even
-during catalog or in an otherwise skipped instance. Its saved location is
-the sections terminator, last matching line, or end of input.
+At matching name-selected completion, implementations MUST report any stored
+diagnostic with its original coordinates and witness. Assigning the name
+does not itself rethrow it. A later rejection after the name matches throws
+immediately and becomes primary, ahead of an earlier deferred rejection.
+The stored diagnostic is rethrown only if matching completion is reached.
+
+A hard error MUST stop reading even in a skipped instance. An error thrown
+during body execution after a deferred rejection remains primary; Gecode
+appends an `after an earlier error in the instance` summary. This includes a
+later immediate rejection but excludes post-body errors such as no progress.
+A missing required sections line MUST be immediate if normal skipping finds
+no data at that rejection site, even during catalog or a skipped instance.
+Data for a later statement of the same instance can permit deferral. Its
+saved location remains the sections terminator, last matching line, or EOF.
 
 Explicit selection returns after the selected instance, without executing
 statements against later input. Input-wide UTF-8 validation has already
@@ -90,16 +100,11 @@ examined all supplied bytes. Without selection, reading continues to
 determine whether the file contains more than one instance, and reports
 `E-INSTANCE-SELECTION` when necessary.
 
-Catalog reads all instances and returns the first rejection summary for each
-in the string array `failed`, using an empty string for a valid instance.
-It MUST omit `failed` if all summaries are empty. A check summary is its
-explicit message, or `check on line N of the spec` when absent. A repeated-line
-summary omits the first-line parenthesis; a missing-line summary is
-`no line matching PATTERN`. These are data strings, not canonical error
-documents. Catalog still aborts on a hard error or the end-of-input missing-arm
-exception. It emits `name` only when every instance has a nonempty usable
-name. Chapter 9 (`09-params-and-instances.md`, planned) defines instance
-selection and catalog data in full.
+[§9.6](09-params-and-instances.md#96-catalog-results) defines catalog entries
+and the exact first-rejection summary strings. They are ordinary data, not
+canonical error documents. Catalog still aborts on hard errors and the
+missing-arm EOF exception. Selection follows
+[§9.4](09-params-and-instances.md#94-instance-selection).
 
 ## 11.3 Registry conventions
 
@@ -211,7 +216,7 @@ The location column selects the profile in §11.3.2.
 | Code | Meaning; recommended messages and Gecode patterns | Location | Source origins | Defining place |
 |---|---|---|---|---|
 | `E-BUDGET` | A work budget is exhausted. `too many repetitions or empty rows without reading input`; `the expressions do too much work for the size of the input` | R | i:230; e:210 | chapter 10 (`10-work-budgets.md`, planned): idle work, expression effort |
-| `E-CHECK-FAILED` | A check condition is false. `check failed`; `check failed: {A}`; `check failed for {A}` | C | e:826 | [§8.13](08-expressions-and-checks.md#813-checks-and-failure-witnesses); chapter 9 (`09-params-and-instances.md`, planned): deferred failures |
+| `E-CHECK-FAILED` | A check condition is false. `check failed`; `check failed: {A}`; `check failed for {A}` | C | e:826 | [§8.13](08-expressions-and-checks.md#813-checks-and-failure-witnesses); [§9.5](09-params-and-instances.md#95-deferred-failures-in-skipped-instances): deferred failures |
 | `E-CHECK-RECORDS` | Runtime record collections cannot be aligned for a check. `'{N}' has no records`; `'{N}' and '{N}' have different numbers of records` | R | e:752,757 | [§8.13](08-expressions-and-checks.md#813-checks-and-failure-witnesses) |
 | `E-COMPARISON-TYPE` | Comparison operands violate scalar/numeric requirements. `'{A}' compares single values, not arrays`; `'{A}' compares numbers` | R | e:476,480 | [§8.6](08-expressions-and-checks.md#86-comparison) |
 | `E-COUNT` | A size/count/base expression is not a permitted count. `{A} must be an integer`; `{A} is negative ({I})`; `{A} is too large ({I})`, restricting the initial description to `array size`, `number of lines`, `index base`, or `repeat count` | R | e:708,710,712 | [§6.6](06-types-and-values.md#66-fixed-size-arrays-and-empty-rows): arrays; [§7.3](07-structure.md#73-line-find-skip-and-expect): skip; [§7.4](07-structure.md#74-repeat-forms-and-termination): repeat counts; [§7.7](07-structure.md#77-index-statements): index bases |
@@ -228,27 +233,27 @@ The location column selects the profile in §11.3.2.
 | `E-INDEX-RANGE` | Array/record-list index is outside its bounds. `index {I} is out of range for {A} (size {U}, indices start at 0)` | R | e:334,610 | [§8.9](08-expressions-and-checks.md#89-indexing) |
 | `E-INDEX-SCALAR` | Attempt to index a scalar. `only arrays can be indexed, not {A}` | R | e:607 | [§8.9](08-expressions-and-checks.md#89-indexing) |
 | `E-INDEX-TYPE` | Index expression is not an integer scalar. `an index must be an integer` | R | e:585 | [§8.9](08-expressions-and-checks.md#89-indexing) |
-| `E-INSTANCE-EMPTY` | Reading requires an instance but none exists. `the file contains no instance` | R | i:1046 | chapter 9 (`09-params-and-instances.md`, planned): instance selection |
-| `E-INSTANCE-NOT-FOUND` | Requested instance number/name does not exist. `there is no instance {Q} (the file has {U} instance{A})`, with the final suffix restricted to empty or `s` | R | i:1048 | chapter 9 (`09-params-and-instances.md`, planned): instance selection |
-| `E-INSTANCE-NUMBER` | Numeric instance selection is below one. `instance numbers start at 1` | R | i:999 | chapter 9 (`09-params-and-instances.md`, planned): instance selection |
-| `E-INSTANCE-SELECTION` | Multiple instances require an explicit selection. `the file has {U} instances; select one with the parameter instance (a number from 1, or a name)` | R | i:1051 | chapter 9 (`09-params-and-instances.md`, planned): instance selection |
+| `E-INSTANCE-EMPTY` | Reading requires an instance but none exists. `the file contains no instance` | R | i:1046 | [§9.4](09-params-and-instances.md#94-instance-selection): instance selection |
+| `E-INSTANCE-NOT-FOUND` | Requested instance number/name does not exist. `there is no instance {Q} (the file has {U} instance{A})`, with the final suffix restricted to empty or `s` | R | i:1048 | [§9.4](09-params-and-instances.md#94-instance-selection): instance selection |
+| `E-INSTANCE-NUMBER` | Numeric instance selection is below one. `instance numbers start at 1` | R | i:999 | [§9.4](09-params-and-instances.md#94-instance-selection): instance selection |
+| `E-INSTANCE-SELECTION` | Multiple instances require an explicit selection. `the file has {U} instances; select one with the parameter instance (a number from 1, or a name)` | R | i:1051 | [§9.4](09-params-and-instances.md#94-instance-selection): instance selection |
 | `E-INTEGER-OVERFLOW` | Checked integer arithmetic or value adjustment overflows. `integer overflow in '{A}'`; `integer overflow in the upper bound of a range`; `integer overflow when applying offset`; `integer overflow in the value of a symbol` | R | e:426,469,526,687; i:356,369,489,1228 | [§6.4](06-types-and-values.md#64-integer-ranges): ranges; [§6.7](06-types-and-values.md#67-offsets-and-evaluation-order): offsets; [§6.10](06-types-and-values.md#610-alphabets): alphabets; [§8.4](08-expressions-and-checks.md#84-integer-arithmetic), [§8.8](08-expressions-and-checks.md#88-functions), [§8.10](08-expressions-and-checks.md#810-comprehensions-and-bindings) |
 | `E-INTEGER-TYPE` | Integer arithmetic requires integer scalar operands. `'{A}' needs integers`, restricting the dynamic operation to the arithmetic operators or `sum` | R | e:367 | [§8.4](08-expressions-and-checks.md#84-integer-arithmetic), [§8.10](08-expressions-and-checks.md#810-comprehensions-and-bindings) |
 | `E-LAYOUT` | Layout value, name, or matrix shape is invalid. `matrix layout must be a string`; `layout {A} needs a square matrix`; `unknown matrix layout {Q}` | R | i:438,450,725 | [§6.8](06-types-and-values.md#68-matrix-layouts): layouts |
-| `E-LINE-MATCH` | A required line-pattern match is unavailable, either for line or for a required sections arm. `expected a line matching {P}`; `expected a line matching {P}, found end of input`; `expected a line matching {P} before {A}`. This grouping is required because line and missing-sections failures can have identical complete diagnostics; see below. | R | i:833,1193 | [§7.3](07-structure.md#73-line-find-skip-and-expect): line; [§7.8](07-structure.md#78-sections): missing required arms; chapter 9 (`09-params-and-instances.md`, planned): deferred failures |
+| `E-LINE-MATCH` | A required line-pattern match is unavailable, either for line or for a required sections arm. `expected a line matching {P}`; `expected a line matching {P}, found end of input`; `expected a line matching {P} before {A}`. This grouping is required because line and missing-sections failures can have identical complete diagnostics; see below. | R | i:833,1193 | [§7.3](07-structure.md#73-line-find-skip-and-expect): line; [§7.8](07-structure.md#78-sections): missing required arms; [§9.5](09-params-and-instances.md#95-deferred-failures-in-skipped-instances): deferred failures |
 | `E-LIST-TERMINATOR` | List terminator has an invalid type/shape. `list terminator must be a single value`; `a list of words needs a string or integer terminator` | R | i:797,802 | [§6.9](06-types-and-values.md#69-sentinel-and-end-of-line-lists): lists |
 | `E-NAME-UNDEFINED` | Referenced value/record collection is not defined yet. `'{N}' is not defined yet` | R | e:259,280,312,347,353; i:615 | [§8.1](08-expressions-and-checks.md#81-values-and-value-lookup); [§7.2](07-structure.md#72-line-patterns-and-captures): patterns |
-| `E-NO-PROGRESS` | An instance or indefinite repeat body consumes no input. `an instance must read some input`; `the body of a repeat until read no input` | R | i:1008,1089 | [§7.4](07-structure.md#74-repeat-forms-and-termination): repeat progress; chapter 9 (`09-params-and-instances.md`, planned): instance selection |
+| `E-NO-PROGRESS` | An instance or indefinite repeat body consumes no input. `an instance must read some input`; `the body of a repeat until read no input` | R | i:1008,1089 | [§7.4](07-structure.md#74-repeat-forms-and-termination): repeat progress; [§9.3](09-params-and-instances.md#93-instance-blocks-and-frames): instance progress |
 | `E-OFFSET-TYPE` | Offset expression is not an integer scalar. `offset must be an integer` | R | i:500 | [§6.7](06-types-and-values.md#67-offsets-and-evaluation-order): offsets |
-| `E-PARAM-MISSING` | Required parameter was not supplied. `parameter '{N}' must be given` | R | i:691 | chapter 9 (`09-params-and-instances.md`, planned): parameters |
-| `E-PARAM-TYPE` | Supplied parameter cannot convert to its default's numeric type. `parameter '{N}' must be an integer, not {Q}`; `parameter '{N}' must be a number, not {Q}` | R | i:702 | chapter 9 (`09-params-and-instances.md`, planned): parameters |
-| `E-PARAM-UNKNOWN` | Caller supplied a parameter not declared by the reader spec. `the spec has no parameter '{A}'` | U | i:146 | chapter 9 (`09-params-and-instances.md`, planned): parameters |
+| `E-PARAM-MISSING` | Required parameter was not supplied. `parameter '{N}' must be given` | R | i:691 | [§9.2](09-params-and-instances.md#92-parameter-evaluation-and-conversion): parameters |
+| `E-PARAM-TYPE` | Supplied parameter cannot convert to its default's numeric value type, including an array default's leaf type. `parameter '{N}' must be an integer, not {Q}`; `parameter '{N}' must be a number, not {Q}` | R | i:702 | [§9.2](09-params-and-instances.md#92-parameter-evaluation-and-conversion): parameters |
+| `E-PARAM-UNKNOWN` | Caller supplied a parameter not declared by the reader spec. `the spec has no parameter '{A}'` | U | i:146 | [§9.1](09-params-and-instances.md#91-caller-parameters): parameters |
 | `E-PATTERN-REFERENCE` | Current-value pattern reference is neither a string nor an integer scalar. `'{N}' must be a string or an integer` | R | i:620 | [§7.2](07-structure.md#72-line-patterns-and-captures): patterns |
 | `E-RANGE-BOUNDS` | Range bound is not an integer scalar. `the bounds of a range must be integers` | R | i:375 | [§6.4](06-types-and-values.md#64-integer-ranges): ranges |
 | `E-REPEAT-DEPTH` | Repeated values have inconsistent depths. `'{N}' has rows of different depths` | R | d:154 | [§7.5](07-structure.md#75-column-construction-and-missing-rows): repeat columns |
 | `E-REPEAT-MISSING` | Required scalar is absent from some/all nonempty repeat iterations. `'{N}' is defined in only some repetitions`; `'{N}' is defined in no repetition` | R | d:133,143,187 | [§7.5](07-structure.md#75-column-construction-and-missing-rows): repeat columns |
 | `E-REPEAT-TERMINATOR` | Required terminating token is absent before input ends. `expected {Q}{A} before end of input`, restricting the middle part to zero or more ` or {Q}` alternatives | R | i:1080 | [§7.4](07-structure.md#74-repeat-forms-and-termination): repeat termination |
-| `E-SECTIONS-REPEATED` | A sections arm matches a second line. `a second line matching {P} (the first is on line {U})` | R | i:1175–1176 | [§7.8](07-structure.md#78-sections): sections; chapter 9 (`09-params-and-instances.md`, planned): deferred failures |
+| `E-SECTIONS-REPEATED` | A sections arm matches a second line. `a second line matching {P} (the first is on line {U})` | R | i:1175–1176 | [§7.8](07-structure.md#78-sections): sections; [§9.5](09-params-and-instances.md#95-deferred-failures-in-skipped-instances): deferred failures |
 | `E-SECTIONS-UNEXPECTED` | No sections arm matches the current line and skip other is absent. `unexpected line; expected one of {A}` | R | i:1171 | [§7.8](07-structure.md#78-sections): sections |
 | `E-SIZE-LIMIT` | Array/matrix cell count exceeds the supported structural bound. `array is too large`; `matrix is too large` | R | i:386,453,1205 | [§6.6](06-types-and-values.md#66-fixed-size-arrays-and-empty-rows): arrays; [§6.8](06-types-and-values.md#68-matrix-layouts): layouts; [§6.10](06-types-and-values.md#610-alphabets): alphabets |
 | `E-SKIP-EOF` | A requested line cannot be skipped at end of input. `cannot skip a line at end of input` | R | i:849 | [§7.3](07-structure.md#73-line-find-skip-and-expect): skip |

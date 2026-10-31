@@ -15,7 +15,7 @@ do not yet exist; their names and chapter numbers are reserved.
 | 6 | [06-types-and-values.md](06-types-and-values.md) | Types and value-reading statements |
 | 7 | [07-structure.md](07-structure.md) | Input structure |
 | 8 | [08-expressions-and-checks.md](08-expressions-and-checks.md) | Expressions, checks, and record names |
-| 9 | `09-params-and-instances.md` (planned) | Parameters, instances, and catalog |
+| 9 | [09-params-and-instances.md](09-params-and-instances.md) | Parameters, instances, and catalog |
 | 10 | `10-work-budgets.md` (planned) | Work budgets |
 | 11 | [errors.md](errors.md) | Error reporting and code registry |
 | A | [appendix-a-grammar.md](appendix-a-grammar.md), [grammar.ebnf](grammar.ebnf) | Formal grammar |

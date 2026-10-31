@@ -1656,8 +1656,8 @@ conditional reference guard; no public reproducer is known.
 
 An error evaluating a condition MUST remain a hard expression error with
 profile R and null `record_path`, not a false check. False-check deferral is
-defined in [§11.2.1](errors.md#1121-deferred-instance-failures-and-catalog)
-and chapter 9, `09-params-and-instances.md` (planned).
+defined in [§9.5](09-params-and-instances.md#95-deferred-failures-in-skipped-instances)
+and [§11.2.1](errors.md#1121-deferred-instance-failures-and-catalog).
 
 Diagnostics SHOULD describe witness indices starting at 1, innermost first.
 When every lifted repeat has an `as` name, each level names its list with
@@ -1922,9 +1922,10 @@ reader spec that reaches them.
 [Chapter 5](05-reader-specs.md) owns syntax and precedence;
 [chapter 6](06-types-and-values.md) owns type visibility, range-bound timing,
 and numeric reading/offset conversion; [chapter 7](07-structure.md) owns
-frames and column construction. Chapter 9, `09-params-and-instances.md`
-(planned), defines parameter conversion, instance selection, and catalog
-results. Expression traversal, including lifted checks and comprehensions,
+frames and column construction. [§9.2](09-params-and-instances.md#92-parameter-evaluation-and-conversion)
+defines parameter conversion, [§9.4](09-params-and-instances.md#94-instance-selection)
+instance selection, and [§9.6](09-params-and-instances.md#96-catalog-results)
+catalog results. Expression traversal, including lifted checks and comprehensions,
 MUST obey the work budget in chapter 10, `10-work-budgets.md` (planned),
 and report `E-BUDGET` when exhausted. Appendix B, `appendix-b-dzn.md`
 (planned), defines dzn rendering.

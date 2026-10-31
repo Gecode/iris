@@ -108,7 +108,7 @@ name conflicts, and record-scope rules can still fail. Their codes are in
 [chapter 11](errors.md#114-parse-time-codes); their semantic definitions
 belong to [chapter 6](06-types-and-values.md),
 [chapter 7](07-structure.md), [chapter 8](08-expressions-and-checks.md),
-and chapter 9, `09-params-and-instances.md` (planned).
+and [chapter 9](09-params-and-instances.md).
 
 An unknown bare type name fails during type dispatch rather than forming
 a valid range. A grammar checker can therefore reject that source while

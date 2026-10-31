@@ -4,12 +4,14 @@
 
 Iris 0.1 strings MUST be Unicode scalar sequences encoded as UTF-8. The
 whole supplied input MUST be valid UTF-8, including comments, skipped lines,
-literal pattern text, bytes after a stop or selected instance, and ignored
-trailing input. Implementations MUST validate it after parsing/resolution
+literal pattern text, bytes after a stop or
+[selected instance](09-params-and-instances.md#94-instance-selection), and
+ignored trailing input. Implementations MUST validate it after parsing/resolution
 and unknown-parameter checks, before executing statements. Each `word` or
 `rest` value actually read MUST also be valid UTF-8, including discarded
 reads and committed captures: byte-wise token settings can split a character
-in valid input. Either failure MUST report
+in valid input. These requirements also apply to
+[catalog](09-params-and-instances.md#96-catalog-results). Either failure MUST report
 [`E-UTF8`](errors.md#116-iris-only-errors), with the scope and order defined
 in [§4.10](04-input.md#410-utf-8-validity). This deliberate difference follows
 [ADR 0011](../../docs/adr/0011-utf8-strings.md).

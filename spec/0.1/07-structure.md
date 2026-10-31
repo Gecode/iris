@@ -917,8 +917,8 @@ position after the last arm's body. It MUST retain the active reader-spec
 line: normally the sections statement's line, but when ending through a
 last arm with an executed body, the body's last executed statement line.
 Deferred instance rejection and its EOF exception are defined only by
-[§11.2.1](errors.md#1121-deferred-instance-failures-and-catalog) and chapter 9,
-`09-params-and-instances.md` (planned).
+[§9.5](09-params-and-instances.md#95-deferred-failures-in-skipped-instances)
+and [§11.2.1](errors.md#1121-deferred-instance-failures-and-catalog).
 
 ## 7.9 Conditional execution and let
 

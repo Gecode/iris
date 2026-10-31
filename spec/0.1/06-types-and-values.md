@@ -1421,7 +1421,7 @@ without a verified public reproducer.
 Expression evaluation and its failures follow
 [§8.14](08-expressions-and-checks.md#814-errors-and-related-chapters);
 parameters and instances belong
-to chapter 9 (`09-params-and-instances.md`, planned). Chapter 10
+to [chapter 9](09-params-and-instances.md). Chapter 10
 (`10-work-budgets.md`, planned) defines work accounting, including empty
 rows. Appendix B (`appendix-b-dzn.md`, planned) defines dzn output. The
 [existing data model](03-data-model.md) defines the complete canonical JSON
