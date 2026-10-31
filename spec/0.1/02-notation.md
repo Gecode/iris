@@ -58,15 +58,18 @@ The operations mean:
 |---|---|---|
 | `read` | Parse the reader spec and read one selected instance. | `expected data` |
 | `parse` | Parse and resolve the reader spec without reading input. | Reserved for the conformance protocol; see below. |
-| `catalog` | Parse the reader spec and catalog the input's instances. | `expected data` |
-| `dzn` | Read as for `read`, then render dzn. | `expected dzn` |
+| `catalog` | Parse the reader spec and catalog the input's instances; render the returned data when expecting dzn. | `expected data` or `expected dzn` |
+| `dzn` | Read as for `read`, then [render dzn](appendix-b-dzn.md#b1-rendering-data-and-operation-boundaries). | `expected dzn` |
 
 Any operation MAY have `expected error` instead. A `parse` example MAY omit
 input; if present, the operation MUST NOT read it. Its params MUST be absent
 or empty. Parse-success examples are reserved until conformance-001 defines
 their result and extends this notation. Empty read data MUST NOT stand in
 for parse success. [§9.6](09-params-and-instances.md#96-catalog-results) defines catalog
-entries using chapter 3's ordinary data document.
+entries using chapter 3's ordinary data document. With `expected dzn`, a
+`catalog` example MUST instead render that same returned data under
+[appendix B.7](appendix-b-dzn.md#b7-catalog-data-and-executable-examples).
+A `read` example MUST NOT use `expected dzn`; use `dzn` for read-then-render.
 
 A params part is a JSON object mapping strings to strings. Omission means
 an empty map. An extractor MUST preserve each value exactly, including leading

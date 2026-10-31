@@ -1935,5 +1935,5 @@ catalog results. Expression traversal MUST obey the
 [lifted-check traversal in §10.4](10-work-budgets.md#104-lifted-check-traversal),
 and report `E-BUDGET` at the
 [location defined in §10.6](10-work-budgets.md#106-exhaustion-and-error-locations)
-when exhausted. Appendix B, `appendix-b-dzn.md`
-(planned), defines dzn rendering.
+when exhausted. Appendix B defines the [rendering operation](appendix-b-dzn.md#b1-rendering-data-and-operation-boundaries)
+and its [floating point text](appendix-b-dzn.md#b3-floating-point-text).

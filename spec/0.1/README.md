@@ -19,7 +19,7 @@ do not yet exist; their names and chapter numbers are reserved.
 | 10 | [10-work-budgets.md](10-work-budgets.md) | Work budgets |
 | 11 | [errors.md](errors.md) | Error reporting and code registry |
 | A | [appendix-a-grammar.md](appendix-a-grammar.md), [grammar.ebnf](grammar.ebnf) | Formal grammar |
-| B | `appendix-b-dzn.md` (planned) | dzn output |
+| B | [appendix-b-dzn.md](appendix-b-dzn.md) | dzn output |
 | C | [appendix-c-differences.md](appendix-c-differences.md) | Differences from Gecode 6.5.0 |
 | D | `appendix-d-pinned-details.md` (planned) | Informative index of decisions for PLAN.md §6.2 |
 

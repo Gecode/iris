@@ -30,6 +30,12 @@ text is an envelope boundary. [§4.6](04-input.md#46-input-positions) defines
 input coordinate counting. Implementations MUST preserve reported coordinates
 and MUST NOT move a check's location to the final input cursor.
 
+[dzn rendering](appendix-b-dzn.md#b1-rendering-data-and-operation-boundaries)
+occurs only after a successful read or catalog; preceding failures retain
+their codes and locations. Rendering introduces no language error code.
+[Appendix B.8](appendix-b-dzn.md#b8-separators-line-endings-and-errors)
+defines output boundaries; catalog rejection summaries remain data.
+
 ## 11.2 Error order
 
 Implementations MUST report the first error encountered in the order below,

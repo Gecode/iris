@@ -74,3 +74,27 @@ Ordinary-sized budget examples in chapter 10 agree with the reference.
 
 The overflow is a Gecode 6.5.0 bug expected to be fixed before release.
 This entry is to be removed once the reference pin includes the fix.
+
+## C.4 dzn floats just below 1e17
+
+Float leaves MUST render using the exact algorithm in
+[appendix B.3](appendix-b-dzn.md#b3-floating-point-text), including when
+99999999999999600 ≤ |f| < 100000000000000000. These are 25 positive
+binary64 values spaced by 16, and their negatives. For example, the first
+positive value MUST render `99999999999999600.0`.
+
+This is a temporary difference from the pinned reference commit
+`5e7bbd5c26b0702c6fd652356b2289da0710ac3c`, which renders each of those
+float leaves as empty text. In `print_real` at
+`gecode/instance/data.cpp:427`, the calculation
+`floor(log10(abs(f))) + 1` rounds the logarithm to 17 and starts the
+precision search at 18. Its loop ends at 17, so no iteration emits text.
+Surrounding assignment or array punctuation is still emitted: an affected
+scalar entry becomes `edge = ;` followed by LF.
+
+The [Iris-only gap example](appendix-b-dzn.md#b3-floating-point-text) uses
+exact decimal arithmetic to check the required output independently of
+the reference. The other dzn examples agree with the pinned reference.
+
+The omission is a Gecode 6.5.0 bug expected to be fixed before release.
+This entry is to be removed once the reference pin includes the fix.

@@ -42,7 +42,8 @@ The counters MUST NOT reset within an operation, including when input
 advances, a value is stored or replaced, a repeat ends, an instance is
 discarded or retained, or a rejection is deferred. A separate read or
 catalog operation MUST start fresh. Parse-only operations MUST NOT run
-these budgets. Rendering dzn MUST add no charges beyond those of the read
+these budgets. [Rendering dzn](appendix-b-dzn.md#b1-rendering-data-and-operation-boundaries)
+MUST add no charges beyond those of the read
 or catalog whose data it renders.
 
 [Input-wide UTF-8 validation](04-input.md#410-utf-8-validity) examines the

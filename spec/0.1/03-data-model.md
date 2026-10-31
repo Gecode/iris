@@ -202,9 +202,9 @@ let y = -x
 ]}
 ```
 
-dzn uses its own numeric spelling, to be defined in appendix B,
-`appendix-b-dzn.md` (planned). The following expected part is byte-exact dzn,
-including its final LF, rather than canonical JSON.
+dzn uses its own [numeric spelling](appendix-b-dzn.md#b3-floating-point-text).
+The following expected part is byte-exact dzn, including its final LF,
+rather than canonical JSON.
 
 ```iris example
 id: data-signed-zero-dzn

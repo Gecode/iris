@@ -914,6 +914,6 @@ and UTF-8 errors in [§4.10](04-input.md#410-utf-8-validity) and
 [§10.1](10-work-budgets.md#101-counters-and-input-byte-length) defines
 operation-wide counters and input byte length;
 [§10.5](10-work-budgets.md#105-evaluation-instances-and-catalog) defines
-accounting across instance selection and catalog execution. Appendix B,
-`appendix-b-dzn.md` (planned), owns dzn rendering of retained read data and
-catalog data.
+accounting across instance selection and catalog execution.
+[Appendix B.7](appendix-b-dzn.md#b7-catalog-data-and-executable-examples)
+owns dzn rendering of catalog data; retained read data uses the same rules.

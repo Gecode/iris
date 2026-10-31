@@ -1424,7 +1424,8 @@ Expression evaluation and its failures follow
 parameters and instances belong
 to [chapter 9](09-params-and-instances.md). [Chapter 10](10-work-budgets.md)
 defines work accounting, including
-[empty rows](10-work-budgets.md#102-idle-work). Appendix B
-(`appendix-b-dzn.md`, planned) defines dzn output. The
+[empty rows](10-work-budgets.md#102-idle-work). Appendix B defines dzn
+output for [rectangular arrays](appendix-b-dzn.md#b5-rectangular-arrays-and-empty-dimensions)
+and [ragged or deeper arrays](appendix-b-dzn.md#b6-ragged-and-deeper-arrays). The
 [existing data model](03-data-model.md) defines the complete canonical JSON
 used in this chapter's examples.
