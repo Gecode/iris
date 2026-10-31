@@ -1,0 +1,11 @@
+{
+  "name": "Iris",
+  "short_name": "Iris",
+  "icons": [
+    { "src": "icon-192.png", "type": "image/png", "sizes": "192x192" },
+    { "src": "icon-512.png", "type": "image/png", "sizes": "512x512" }
+  ],
+  "theme_color": "#27393E",
+  "background_color": "#FFFFFF",
+  "display": "standalone"
+}
