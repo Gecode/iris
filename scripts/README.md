@@ -3,6 +3,49 @@
 These scripts support the repository foundations (M0), the layout in
 `PLAN.md` §5, and the Gecode reference used by §6.1 and §7.3.
 
+## Check repository conventions
+
+Run `./scripts/check-repo.sh` from any directory. It requires Bash (3.2 or
+newer), Git, and standard tools including awk, and works without network
+access on macOS and Linux. The repository workflow runs it on pushes and
+pull requests.
+
+The script checks the required files (`README.md`, `LICENSE`, `AGENTS.md`,
+`CONTEXT.md`, `PLAN.md`, and `docs/adr/README.md`), name spelling in tracked
+text files, and relative links in tracked `.md` files. It reports all
+violations with file names and line numbers where available, then exits
+non-zero if any check fails. Untracked files, including `.zdev/` and
+`.cache/`, are excluded naturally by Git; the script does not read them.
+New files enter these checks once tracked (including intent-to-add files).
+
+The name check uses `git grep -I -nw` to find the whole word in capitals,
+skipping binary files. `name_exceptions` in the script is an empty list of
+`path:pattern` exceptions: an exact repository-relative path and an extended
+regular expression matching an allowed line.
+
+Markdown links follow these conventions:
+
+- Inline links and images are checked relative to the containing Markdown
+  file. Destinations may use angle brackets, escaped punctuation, balanced
+  parentheses, percent encoding, and an optional title.
+- Fragments (`#...`) and query strings (`?...`) are removed before checking
+  the path. Fragment-only links are skipped; heading anchors are not checked.
+  The target may be an existing file or directory, whether tracked or not.
+- Absolute URLs (including `mailto:` and other URI schemes) and paths
+  beginning with `/` are skipped. No network requests are made.
+- Code spans (including matching runs of multiple backticks) and fenced
+  code blocks (backticks or tildes) are skipped. Code spans end at paragraph
+  or block boundaries. Fences may appear in block quotes and space-indented
+  lists; their indentation is measured within the container.
+- Reference-style links are checked at their `[label]: destination`
+  definitions, including definitions whose destination is on the next line.
+  This covers full, collapsed, and shortcut references and also checks unused
+  definitions. Undefined bracketed labels are plain text, not link errors.
+
+This is a pragmatic CommonMark subset. HTML blocks, indented code blocks,
+tab-indented containers, block quotes inside lists, and reference definitions
+inside containers are not supported.
+
 ## Build the Gecode reference
 
 From the repository root:

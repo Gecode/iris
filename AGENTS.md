@@ -64,6 +64,7 @@ the component.
 
 | Component | Commands |
 |---|---|
+| Repository | `scripts/check-repo.sh` checks required files, name spelling, and relative Markdown links (see `scripts/README.md`). |
 | Gecode reference | `scripts/gecode-reference.sh` builds the pinned reference; `eval "$(scripts/gecode-reference.sh --print-env)"` exports its paths (see `scripts/README.md`). |
 | `rust/` | To be added by the Rust area. |
 | `python/` | To be added by the Python area. |
