@@ -746,6 +746,10 @@ written.
   Gecode 6.5.0 accepts any bytes, so this is a deliberate difference,
   recorded in the Specification's differences appendix. It keeps the
   canonical JSON plain text.
+- **Reader specs are UTF-8:** the whole source of a reader spec must be
+  valid UTF-8, including string literals and comments. Gecode 6.5.0
+  accepts any bytes inside strings and comments; this is the same
+  deliberate difference as for input.
 - **Float underflow:** a float token whose value is nonzero but rounds to
   a subnormal number or to zero is rejected, as the reference build does.
   This gives every implementation the same portable rule.

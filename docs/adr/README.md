@@ -18,4 +18,4 @@ the Specification and new conformance cases
 | 0008 | [Monorepo layout](0008-monorepo-layout.md) | Accepted |
 | 0009 | [C++23 and Java 27 baselines](0009-cpp23-and-java27-baselines.md) | Accepted |
 | 0010 | [MIT license](0010-mit-license.md) | Accepted |
-| 0011 | [UTF-8 input and strings](0011-utf8-strings.md) | Accepted |
+| 0011 | [UTF-8 input, reader specs, and strings](0011-utf8-strings.md) | Accepted |
