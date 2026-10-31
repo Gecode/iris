@@ -1,9 +1,8 @@
 # Iris 0.1 Language Specification
 
-This is the chapter index for Iris 0.1, the reader language of Gecode 6.5.0.
-The Specification is being written for milestone M1 in
-[PLAN.md §6](../../PLAN.md#6-the-iris-01-specification). Files marked planned
-do not yet exist; their names and chapter numbers are reserved.
+This directory contains the Iris 0.1 Language Specification, the reader
+language of Gecode 6.5.0, for milestone M1 in
+[PLAN.md §6](../../PLAN.md#6-the-iris-01-specification).
 
 | Chapter | File | Subject |
 |---|---|---|
@@ -21,7 +20,7 @@ do not yet exist; their names and chapter numbers are reserved.
 | A | [appendix-a-grammar.md](appendix-a-grammar.md), [grammar.ebnf](grammar.ebnf) | Formal grammar |
 | B | [appendix-b-dzn.md](appendix-b-dzn.md) | dzn output |
 | C | [appendix-c-differences.md](appendix-c-differences.md) | Differences from Gecode 6.5.0 |
-| D | `appendix-d-pinned-details.md` (planned) | Informative index of decisions for PLAN.md §6.2 |
+| D | [appendix-d-pinned-details.md](appendix-d-pinned-details.md) | Informative index of decisions for PLAN.md §6.2 |
 
 The canonical encodings have schemas for [data](../schema/data.schema.json)
 and [errors](../schema/error.schema.json). The project vocabulary is in

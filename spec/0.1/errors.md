@@ -47,9 +47,9 @@ Implementations MUST NOT choose an error by sorting candidate input coordinates.
    source as UTF-8 under [§5.1](05-reader-specs.md#51-reader-specs-and-parsing);
    `E-SPEC-UTF8` precedes every other parse-time error. Then lex the complete
    reader spec, parse statements, check global name conflicts, then resolve
-   names. A later lexical error can precede an earlier syntax error. Resolver prechecks
-   precede the expression traversal they guard; earliest reader-spec line
-   alone does not determine the error.
+   expressions in the parse-time order below. A later lexical error can
+   precede an earlier syntax error; earliest reader-spec line alone does
+   not determine the error.
 2. Before statement execution, reject unknown parameters in supplied parameter
    order, then validate the whole input as UTF-8 under
    [§4.10](04-input.md#410-utf-8-validity). Input-wide `E-UTF8` precedes every
@@ -67,6 +67,34 @@ Implementations MUST NOT choose an error by sorting candidate input coordinates.
    line. Check missing required arms in declaration order when sections ends.
 6. Check trailing input only after successful execution, unless explicit
    instance selection already returned or `ignore trailing` applies.
+
+After source validation, implementations MUST apply this parse-time order.
+Each phase MUST stop at its first failure before the next phase begins.
+The validity rules remain in the owning chapters; this table determines
+which failure is reported when several rules would be violated.
+
+| Phase | Required traversal and checks |
+|---|---|
+| Complete-source lexing | Lex every token before parsing any statement. |
+| Statement parsing | Parse statements in source traversal order, compiling each pattern when reached. Syntax, type-form, function, constant, local-name, and placement failures discovered during this traversal are immediate. |
+| Comprehension-binding/value conflicts | Check each completed comprehension's binding against ordinary definitions anywhere in the reader spec, in comprehension completion order. Nested comprehensions complete before their enclosing comprehension. |
+| Named-type/value conflicts | Check named types against ordinary definitions anywhere in the reader spec, in type-definition completion order. |
+| Structural-name prechecks | Visit repeats in source traversal order, outer before inner. For each repeat, check its `as` name against preceding structural names and all ordinary definitions; then check whether its `as` and `each` names coincide; then check its `each` name against the same conflicts. These checks precede every expression-resolution failure. |
+| Statement expression resolution | Visit each statement's components before its ordinary body, then its else body, then sections-arm bodies in arm order. Resolve its own type's lower then upper bound; line/find capture bounds in capture order; sections-arm capture bounds in arm and capture order; dimensions from left to right; main expression; sentinel; offset; finally the check's repeat-chain compatibility. |
+
+Within expression resolution, implementations MUST visit ordinary children
+from left to right. Field selection MUST resolve its base before checking
+field membership. Indexing MUST resolve its base and then its index before
+checking whether a statically recognized record can be indexed. This
+static order is separate from the runtime base-type check in
+[§8.9](08-expressions-and-checks.md#89-indexing).
+
+A comprehension MUST first check its binding against structural names,
+then resolve its domain without the new binding, then resolve its body
+with the binding. Ordinary calls MUST resolve arguments in order, applying
+[§8.12's whole-array exceptions and value/record restrictions](08-expressions-and-checks.md#812-record-names-and-field-access)
+to each argument before proceeding to the next. The global conflict scans
+MUST NOT sort failures by reader-spec line.
 
 ### 11.2.1 Deferred instance failures and catalog
 
@@ -187,9 +215,8 @@ failure. A new meaning MUST have one authoritative row here, with its phase,
 location availability, recommended message, defining chapter/topic, pinned
 source sites, and every adapter pattern. Verify a focused example when
 reachable, and mark deliberate differences and no-pattern exceptions
-explicitly. Later chapter tasks MUST update this registry rather than define
-codes locally. References to planned chapters use filenames and topics;
-those tasks replace them with links after choosing their own headings.
+explicitly. Authors MUST update this registry rather than define codes
+locally.
 
 ## 11.4 Parse-time codes
 
@@ -213,7 +240,7 @@ All rows use profile P. Source abbreviations are defined in §11.7.
 | `E-SPEC-RECORD-SCOPE` | Record/list/field reference outside its permitted repeat scope. `'{N}' is inside a repeat without a list name in the records of '{N}'; name that list with 'as' to reach it`; `'{N}' cannot be used inside its own repeat`; `the field '{N}' cannot be used inside the repeat that reads it`; `'{N}' is a list in each record of the repeat around it; {A}`; `'{N}' is each record of a repeat, so only checks can use it outside that repeat` | P | r:256,259,323,459,464,479 | [§8.12](08-expressions-and-checks.md#812-record-names-and-field-access) |
 | `E-SPEC-FIELD` | Invalid field selection or ambiguous field definition. `the records of '{N}' have no field '{A}' ({A})`; `'{N}' is defined inside and outside the repeat of '{N}', so it cannot be a field of its records`; `only records have fields such as '.{A}'; {A}`; `'{N}' is a list of records, so '.{A}' needs one of them: {A}` | P | r:315,319,491,494 | [§8.12](08-expressions-and-checks.md#812-record-names-and-field-access) |
 | `E-SPEC-RECORD-VALUE` | Record/list used as a value, indexable record, or comprehension list where prohibited. `a record of '{N}' is not a value; {A}`; `'{N}' is a list of records, not a value; {A}`; `a record of '{N}' cannot be indexed; {A}`; `a record of '{N}' is not a list; use one of its fields` | P | r:331,333,512,554 | [§8.12](08-expressions-and-checks.md#812-record-names-and-field-access) |
-| `E-SPEC-CHECK-SCOPE` | Check attempts to range over incompatible or ambiguous repeat definitions. `a check can only range over the records of one repeat, but '{N}' and '{N}' are defined in different repeats`; `'{N}' is defined in several repeats, or inside and outside a repeat, so a check here cannot range over its records` | P | r:396,589 | [§8.13](08-expressions-and-checks.md#813-checks-and-failure-witnesses) |
+| `E-SPEC-CHECK-SCOPE` | Check attempts to range over incompatible or ambiguous repeat definitions. `a check can only range over the records of one repeat, but '{N}' and '{N}' are defined in different repeats`; `'{N}' is defined in several repeats, or inside and outside a repeat, so a check here cannot range over its records` | P | r:396,589 | [§8.12](08-expressions-and-checks.md#812-record-names-and-field-access) |
 
 ## 11.5 Read-time codes
 
@@ -464,4 +491,59 @@ check x > 0 "positive"
 4 5 0
 --- expected error
 {"code":"E-CHECK-FAILED","message":"check failed for record 3 of 'steps' in record 2 of 'jobs': positive","input_location":{"origin":"input.bin","line":3,"column":5},"spec_location":{"origin":"spec.iris","line":6,"column":null},"context":null,"record_path":[1,2]}
+```
+
+Complete-source lexing finds the bad escape on line 2 before parsing
+line 1's unknown statement.
+
+```iris example
+id: errors-lex-before-syntax
+operation: parse
+--- spec
+unknown
+let s="\r"
+--- expected error
+{"code": "E-SPEC-STRING", "message": "unknown escape '\\r' in string (use \\n, \\t, \\\\, or \\\")", "input_location": null, "spec_location": {"origin": "spec.iris", "line": 2, "column": null}, "context": null, "record_path": null}
+```
+
+The binding/value conflict on line 4 precedes the type/value conflict
+on line 1.
+
+```iris example
+id: errors-binding-before-type
+operation: parse
+--- spec
+type t=int
+t:int
+a[0]:int
+let z=sum(x in a:x)
+x:int
+--- expected error
+{"code": "E-SPEC-NAME-CONFLICT", "message": "'x' is bound by a comprehension but is also a name in the spec", "input_location": null, "spec_location": {"origin": "spec.iris", "line": 4, "column": null}, "context": null, "record_path": null}
+```
+
+The structural-name precheck on line 2 precedes the field error on line 1.
+
+```iris example
+id: errors-record-precheck-before-field
+operation: parse
+--- spec
+let z=(1).x
+repeat 0 as rows {a:int}
+rows:int
+--- expected error
+{"code": "E-SPEC-NAME-CONFLICT", "message": "'rows' names records, so it cannot also be defined", "input_location": null, "spec_location": {"origin": "spec.iris", "line": 2, "column": null}, "context": null, "record_path": null}
+```
+
+Resolving the range bound finds an invalid field before resolving the
+dimension, which would reject a record list used as a value.
+
+```iris example
+id: errors-resolver-type-before-dimensions
+operation: parse
+--- spec
+a[rows]:0..(2).bad
+repeat 0 as rows {}
+--- expected error
+{"code": "E-SPEC-FIELD", "message": "only records have fields such as '.bad'; to name each record of a repeat, write 'repeat n as nodes { each node ... }' and use 'node.bad' or 'nodes[0].bad'", "input_location": null, "spec_location": {"origin": "spec.iris", "line": 1, "column": null}, "context": null, "record_path": null}
 ```

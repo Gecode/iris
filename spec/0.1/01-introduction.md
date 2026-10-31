@@ -5,8 +5,8 @@
 The Iris Language Specification defines Iris 0.1: the language in which a
 reader spec describes how to read a text instance into named, typed data.
 It defines reader-spec syntax, input reading, the data model, errors, work
-budgets, and dzn output. The [chapter index](README.md) identifies the parts
-still being written.
+budgets, and dzn output. The [chapter index](README.md) lists its chapters
+and appendices.
 
 Iris 0.1 is the language of Gecode 6.5.0, subject to the deliberate
 [differences in appendix C](appendix-c-differences.md). Iris 1.0 develops

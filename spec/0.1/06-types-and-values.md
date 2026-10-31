@@ -156,6 +156,17 @@ exclude hi. An omitted bound MUST leave that end unbounded within the
 signed 64-bit input domain. The permitted omissions are specified by
 [§5.7](05-reader-specs.md#57-types-ranges-and-options).
 
+```iris example
+id: values-range-exclusive-open
+operation: read
+--- spec
+x:..<0
+--- input no-final-newline
+-1
+--- expected data
+{"iris": "0.1", "entries": [{"name": "x", "type": "int", "depth": 0, "value": -1}]}
+```
+
 Implementations MUST evaluate lower then upper bounds as integer scalars.
 Strings, arrays, and floats MUST fail with `E-RANGE-BOUNDS`. For an exclusive
 upper bound, implementations MUST subtract 1 using checked integer

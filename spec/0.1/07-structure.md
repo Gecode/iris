@@ -225,6 +225,17 @@ A 2 Z
 ]}
 ```
 
+An unclosed capture fails during parsing, before any input is read.
+
+```iris example
+id: structure-pattern-unclosed-capture
+operation: parse
+--- spec
+line "{x:int"
+--- expected error
+{"code": "E-SPEC-PATTERN", "message": "unterminated capture in pattern \"{x:int\"", "input_location": null, "spec_location": {"origin": "spec.iris", "line": 1, "column": null}, "context": null, "record_path": null}
+```
+
 ## 7.3 Line, find, skip, and expect
 
 `line` MUST require the rest of the current line, after normal skipping,

@@ -18,7 +18,9 @@ A reader spec MAY be empty. Parsing MUST proceed in this order:
 1. Validate the entire source byte sequence as UTF-8.
 2. Lex the complete source into tokens.
 3. Parse statements, including embedded line patterns and their types.
-4. Check global name conflicts, then resolve names.
+4. Check comprehension-binding/value conflicts, then named-type/value
+   conflicts, then structural-name conflicts, then resolve expressions.
+   [§11.2](errors.md#112-error-order) defines the order within each phase.
 
 Source validation MUST use strict UTF-8: reject malformed continuation
 sequences, truncated sequences, overlong encodings, surrogate encodings,
@@ -99,6 +101,15 @@ position. The complete punctuation inventory is in `grammar.ebnf`.
 An identifier and a number need not be separated by whitespace:
 `let x=1e2foo:int` consists of a float expression followed by a declaration
 named `foo`.
+
+```iris example
+id: reader-unexpected-character
+operation: parse
+--- spec
+let x=@
+--- expected error
+{"code": "E-SPEC-CHARACTER", "message": "unexpected character '@'", "input_location": null, "spec_location": {"origin": "spec.iris", "line": 1, "column": null}, "context": null, "record_path": null}
+```
 
 ## 5.3 Strings
 

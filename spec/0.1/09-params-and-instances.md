@@ -369,6 +369,19 @@ even if an instance has that name. A float-valued name is unusable, whereas
 a string name `"1.0"` is usable.
 
 ```iris example
+id: instances-ordinal-before-name
+operation: read
+--- spec
+instances {n:int name:word}
+--- input no-final-newline
+1 2 7 other
+--- params
+{"instance": "2"}
+--- expected data
+{"iris": "0.1", "entries": [{"name": "n", "type": "int", "depth": 0, "value": 7}, {"name": "name", "type": "string", "depth": 0, "value": "other"}]}
+```
+
+```iris example
 id: instances-single
 operation: read
 --- spec

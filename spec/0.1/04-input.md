@@ -241,6 +241,17 @@ x: int
 {"code": "E-EXPECTED-VALUE", "message": "expected int, found '1e2'", "input_location": {"origin": "input.bin", "line": 1, "column": 1}, "spec_location": {"origin": "spec.iris", "line": 1, "column": null}, "context": "x", "record_path": null}
 ```
 
+```iris example
+id: input-integer-hex
+operation: read
+--- spec
+x:int
+--- input no-final-newline
+0x10
+--- expected error
+{"code": "E-EXPECTED-VALUE", "message": "expected int, found '0x10'", "input_location": {"origin": "input.bin", "line": 1, "column": 1}, "spec_location": {"origin": "spec.iris", "line": 1, "column": null}, "context": "x", "record_path": null}
+```
+
 Token settings change the tokens presented to conversion. A digit made a
 one-byte token is independently readable as an integer; a sign made a
 one-byte token is invalid by itself.
