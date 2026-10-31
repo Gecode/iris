@@ -213,8 +213,8 @@ reference in `gecode/instance.hh` (`TaskInstanceSpec`), the parser
 the reader (`reader.cpp`), and the tests (`test/instance.cpp`). Where the
 Doxygen text and the code disagree, we record the difference and decide.
 Each decision gets an entry in a "Differences from Gecode 6.5.0" appendix.
-That appendix should stay empty, or report Gecode bugs that are fixed in a
-6.5.x release.
+That appendix should stay short. It holds the deliberate difference on
+UTF-8 (§12) and Gecode bugs that are fixed in a 6.5.x release.
 
 ### 6.2 What the Doxygen text leaves open
 
@@ -736,6 +736,12 @@ written.
 - **Java baseline:** Java 27, the newest feature release. Revisit if users
   need an LTS.
 - **License:** MIT, as Gecode.
+- **Strings are UTF-8:** Iris 0.1 strings are Unicode text, and a `word` or
+  `rest` value that is not valid UTF-8 is an error. Gecode 6.5.0 keeps raw
+  bytes, so this is a deliberate difference, recorded in the
+  Specification's differences appendix. It keeps the canonical JSON plain
+  text. The input chapter decides whether the rule covers all input or
+  only string values.
 - **Work tracking:** zdev, with personal records (`.zdev/` is not
   committed).
 
