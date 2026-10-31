@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Iris 0.1 canonical error",
+  "type": "object",
+  "required": ["code", "message", "input_location", "spec_location", "context", "record_path"],
+  "additionalProperties": false,
+  "properties": {
+    "code": {"type": "string", "pattern": "^E-[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*(?![\\s\\S])"},
+    "message": {"type": "string"},
+    "input_location": {"$ref": "#/$defs/location"},
+    "spec_location": {"$ref": "#/$defs/location"},
+    "context": {"type": ["string", "null"]},
+    "record_path": {
+      "type": ["array", "null"],
+      "items": {"type": "integer", "minimum": 0}
+    }
+  },
+  "$defs": {
+    "coordinate": {"type": ["integer", "null"], "minimum": 1},
+    "location": {
+      "type": ["object", "null"],
+      "required": ["origin", "line", "column"],
+      "additionalProperties": false,
+      "properties": {
+        "origin": {"type": ["string", "null"]},
+        "line": {"$ref": "#/$defs/coordinate"},
+        "column": {"$ref": "#/$defs/coordinate"}
+      }
+    }
+  }
+}

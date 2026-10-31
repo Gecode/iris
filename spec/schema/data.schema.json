@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Iris 0.1 canonical data",
+  "type": "object",
+  "required": ["iris", "entries"],
+  "additionalProperties": false,
+  "properties": {
+    "iris": {"const": "0.1"},
+    "entries": {"type": "array", "items": {"$ref": "#/$defs/entry"}}
+  },
+  "$defs": {
+    "int": {
+      "type": "integer",
+      "minimum": -9223372036854775808,
+      "maximum": 9223372036854775807
+    },
+    "intTree": {
+      "anyOf": [
+        {"$ref": "#/$defs/int"},
+        {"type": "array", "items": {"$ref": "#/$defs/intTree"}}
+      ]
+    },
+    "floatTree": {
+      "anyOf": [
+        {"type": "number"},
+        {"type": "array", "items": {"$ref": "#/$defs/floatTree"}}
+      ]
+    },
+    "stringTree": {
+      "anyOf": [
+        {"type": "string"},
+        {"type": "array", "items": {"$ref": "#/$defs/stringTree"}}
+      ]
+    },
+    "entry": {
+      "type": "object",
+      "required": ["name", "type", "depth", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string"},
+        "type": {"enum": ["int", "float", "string"]},
+        "depth": {"type": "integer", "minimum": 0},
+        "value": {}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"depth": {"const": 0}}},
+          "then": {"properties": {"value": {"type": ["number", "string"]}}},
+          "else": {"properties": {"value": {"type": "array"}}}
+        },
+        {
+          "if": {"properties": {"type": {"const": "int"}}},
+          "then": {"properties": {"value": {"$ref": "#/$defs/intTree"}}}
+        },
+        {
+          "if": {"properties": {"type": {"const": "float"}}},
+          "then": {"properties": {"value": {"$ref": "#/$defs/floatTree"}}}
+        },
+        {
+          "if": {"properties": {"type": {"const": "string"}}},
+          "then": {"properties": {"value": {"$ref": "#/$defs/stringTree"}}}
+        }
+      ]
+    }
+  }
+}
