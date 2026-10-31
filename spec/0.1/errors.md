@@ -215,7 +215,7 @@ The location column selects the profile in §11.3.2.
 
 | Code | Meaning; recommended messages and Gecode patterns | Location | Source origins | Defining place |
 |---|---|---|---|---|
-| `E-BUDGET` | A work budget is exhausted. `too many repetitions or empty rows without reading input`; `the expressions do too much work for the size of the input` | R | i:230; e:210 | chapter 10 (`10-work-budgets.md`, planned): idle work, expression effort |
+| `E-BUDGET` | A work budget is exhausted. `too many repetitions or empty rows without reading input`; `the expressions do too much work for the size of the input` | R | i:230; e:210 | [§10.2](10-work-budgets.md#102-idle-work): idle work; [§10.3](10-work-budgets.md#103-expression-effort): expression effort; [§10.6](10-work-budgets.md#106-exhaustion-and-error-locations): locations and hard-error order |
 | `E-CHECK-FAILED` | A check condition is false. `check failed`; `check failed: {A}`; `check failed for {A}` | C | e:826 | [§8.13](08-expressions-and-checks.md#813-checks-and-failure-witnesses); [§9.5](09-params-and-instances.md#95-deferred-failures-in-skipped-instances): deferred failures |
 | `E-CHECK-RECORDS` | Runtime record collections cannot be aligned for a check. `'{N}' has no records`; `'{N}' and '{N}' have different numbers of records` | R | e:752,757 | [§8.13](08-expressions-and-checks.md#813-checks-and-failure-witnesses) |
 | `E-COMPARISON-TYPE` | Comparison operands violate scalar/numeric requirements. `'{A}' compares single values, not arrays`; `'{A}' compares numbers` | R | e:476,480 | [§8.6](08-expressions-and-checks.md#86-comparison) |

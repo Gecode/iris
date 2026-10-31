@@ -47,3 +47,30 @@ Valid UTF-8 non-ASCII characters outside strings and comments still fail
 lexing with `E-SPEC-CHARACTER`, as in Gecode; valid UTF-8 does not make
 Unicode names or a leading BOM legal syntax. Literal CR and NUL inside a
 string remain accepted because they are valid Unicode scalar values.
+
+## C.3 Exact budget arithmetic
+
+The [work budgets](10-work-budgets.md#101-counters-and-input-byte-length)
+MUST use exact mathematical nonnegative integers for limits, charges,
+accumulation, and comparisons. Overflow MUST NOT change acceptance or the
+point of exhaustion.
+
+This is a temporary difference from the pinned reference commit
+`5e7bbd5c26b0702c6fd652356b2289da0710ac3c`, which has signed-overflow
+undefined behavior in budget arithmetic. In `gecode/instance/eval.cpp`,
+lines 360, 613, 676, and 770 compute `1 + leaves()` in `int` before passing
+the result to the wider charge function. `Value::leaves()` returns `int`
+at `gecode/instance/impl.hpp:302`. A permitted row with 2147483647 leaves
+therefore makes this addition overflow on the reference's 32-bit `int`.
+The evaluator constructor at `gecode/instance/eval.cpp:160` also computes
+`base_effort + 16 * static_cast<long long int>(text.size())` in signed
+arithmetic, which can overflow for sufficiently large input. Accumulation
+must likewise avoid overflow before comparing a charge with its limit.
+
+These sites were identified from source and an isolated arithmetic probe;
+no full reader/input reproduction at those sizes was run. No particular
+acceptance result for the undefined reference arithmetic is specified.
+Ordinary-sized budget examples in chapter 10 agree with the reference.
+
+The overflow is a Gecode 6.5.0 bug expected to be fixed before release.
+This entry is to be removed once the reference pin includes the fix.

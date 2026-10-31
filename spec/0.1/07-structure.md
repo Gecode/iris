@@ -469,9 +469,10 @@ repeat until eof {x:int}
 
 An indefinite repeat body MUST advance the input cursor on each iteration.
 Otherwise it MUST report `E-NO-PROGRESS` before column collection. Counted
-repeats MAY consume no input, subject to chapter 10, `10-work-budgets.md`
-(planned). Nested repeats MUST apply these rules independently and add
-array levels to their field columns.
+repeats MAY consume no input, subject to
+[§10.2](10-work-budgets.md#102-idle-work). Their idle charge MUST occur after
+body execution and before column collection. Nested repeats MUST apply
+these rules independently and add array levels to their field columns.
 
 ## 7.5 Column construction and missing rows
 
@@ -562,8 +563,10 @@ finishing the column. All three failures MUST report `E-REPEAT-MISSING`.
 Looking up an enclosing scalar does not supply a local row (§7.1).
 
 A zero-iteration repeat MUST produce an empty column at fallback depth plus
-one, even for scalar fallbacks. An entirely unexecuted repeat outside
-another repeat MUST create nothing. All actual local rows of a column
+one, even for scalar fallbacks. Column collection and missing-row filling
+add no independent [idle charges](10-work-budgets.md#102-idle-work).
+An entirely unexecuted repeat outside another repeat MUST create nothing.
+All actual local rows of a column
 MUST have the same depth, including empty arrays; otherwise implementations
 MUST report `E-REPEAT-DEPTH`.
 
@@ -997,7 +1000,8 @@ Malformed patterns and forbidden alphabet captures MUST report
 `E-SPEC-PATTERN` with profile P under
 [appendix A.4](appendix-a-grammar.md#a4-decoded-line-patterns).
 [Iris-only E-UTF8](04-input.md#410-utf-8-validity) applies to selected
-captures. Chapter 10, `10-work-budgets.md` (planned), defines `E-BUDGET`.
+captures. [§10.6](10-work-budgets.md#106-exhaustion-and-error-locations)
+defines `E-BUDGET`, including post-body idle exhaustion locations.
 
 Execution context MUST retain outer-to-inner text: finite repeats use
 `repeat [r of n]`, indefinite repeats use `repeat [r]`, sections arm bodies

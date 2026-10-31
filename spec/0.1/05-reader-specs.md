@@ -9,7 +9,7 @@ Further execution rules belong to [chapter 7](07-structure.md)
 (input structure and patterns), [chapter 8](08-expressions-and-checks.md)
 (evaluation, checks, and record names), and [chapter 9](09-params-and-instances.md)
 (parameters, instances, and catalog).
-Chapter 10 (`10-work-budgets.md`, planned) defines work budgets.
+[Chapter 10](10-work-budgets.md) defines work budgets.
 
 ## 5.1 Reader specs and parsing
 
@@ -675,7 +675,7 @@ accepted column means it reaches name resolution, which can still fail.
 | Additional else-if arms after an initial if | 255 | 256 |
 
 These limits MUST NOT be substituted for runtime array/count bounds or
-the work budgets in chapter 10, `10-work-budgets.md` (planned). There is
+the [work budgets in chapter 10](10-work-budgets.md). There is
 no separate language limit on source bytes, tokens, statements, string
 length, or the number of separate array dimensions.
 

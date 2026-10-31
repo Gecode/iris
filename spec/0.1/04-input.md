@@ -631,7 +631,8 @@ ill-formed subsequence, using [§4.6](#46-input-positions). It MUST have null
 ([profile T](errors.md#1132-location-profiles)). Thus parse/resolve
 errors precede unknown parameters, which precede input-wide `E-UTF8`, which
 precedes execution errors. A parse-only operation does not read or validate
-input.
+input. This validation adds no work charge and leaves the original byte
+length unchanged for [§10.1](10-work-budgets.md#101-counters-and-input-byte-length).
 
 Iris-only UTF-8 requirement; Gecode accepts these bytes. The invalid byte
 is in a comment that execution would otherwise skip.

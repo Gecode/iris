@@ -506,7 +506,9 @@ right; leaves MUST be visited with the last array level varying fastest.
 A nonempty float or string argument MUST report `E-FUNCTION-TYPE`. Empty
 arrays of those types MUST contribute no leaves and MUST be accepted.
 `distinct` MUST evaluate all arguments before deciding whether duplicates
-exist; an argument failure still stops evaluation. Scalar arguments to
+exist; an argument failure still stops evaluation.
+[§10.3](10-work-budgets.md#103-expression-effort) defines each argument's
+leaf charge before processing it. Scalar arguments to
 `size` or `count` MUST report `E-FUNCTION-TYPE`.
 
 The examples show flattening versus outer length, empty-array identities,
@@ -758,7 +760,8 @@ A comprehension MUST evaluate its domain once, then visit outer elements
 in increasing index order. An array element is a scalar or row value; an
 explicit record-list element is a record denotation requiring field access.
 The binding MUST exist only in the body, not in its own domain or after
-the comprehension.
+the comprehension. Each reached element MUST incur
+[§10.3's charge](10-work-budgets.md#103-expression-effort) before its body.
 
 | Form | Body requirement; int result | Empty domain |
 |---|---|---|
@@ -1653,6 +1656,8 @@ An empty available collection supplies no records, so its condition is not
 evaluated. If runtime collections to be aligned are scalar or have different
 outer lengths, implementations MUST report `E-CHECK-RECORDS`. This is a
 conditional reference guard; no public reproducer is known.
+[§10.4](10-work-budgets.md#104-lifted-check-traversal) defines the ordered
+dependency selections and their charges before condition evaluation.
 
 An error evaluating a condition MUST remain a hard expression error with
 profile R and null `record_path`, not a false check. False-check deferral is
@@ -1925,7 +1930,10 @@ and numeric reading/offset conversion; [chapter 7](07-structure.md) owns
 frames and column construction. [§9.2](09-params-and-instances.md#92-parameter-evaluation-and-conversion)
 defines parameter conversion, [§9.4](09-params-and-instances.md#94-instance-selection)
 instance selection, and [§9.6](09-params-and-instances.md#96-catalog-results)
-catalog results. Expression traversal, including lifted checks and comprehensions,
-MUST obey the work budget in chapter 10, `10-work-budgets.md` (planned),
-and report `E-BUDGET` when exhausted. Appendix B, `appendix-b-dzn.md`
+catalog results. Expression traversal MUST obey the
+[charges in §10.3](10-work-budgets.md#103-expression-effort) and
+[lifted-check traversal in §10.4](10-work-budgets.md#104-lifted-check-traversal),
+and report `E-BUDGET` at the
+[location defined in §10.6](10-work-budgets.md#106-exhaustion-and-error-locations)
+when exhausted. Appendix B, `appendix-b-dzn.md`
 (planned), defines dzn rendering.

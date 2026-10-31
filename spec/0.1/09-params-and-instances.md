@@ -64,7 +64,8 @@ Executing a `param` MUST perform these steps:
 
 1. If it has a default expression, evaluate it under [chapter 8](08-expressions-and-checks.md),
    even when the caller supplied a value. An expression error MUST precede
-   conversion and retain its own code and location.
+   conversion and retain its own code and location. This includes the
+   [work charges in §10.5](10-work-budgets.md#105-evaluation-instances-and-catalog).
 2. If no caller value exists, store the default unchanged, including its
    value type and depth. With neither a caller value nor a default, report
    `E-PARAM-MISSING`.
@@ -633,8 +634,10 @@ instances {
 
 All other errors MUST abort reading, including conversion, range, shape,
 undefined-name, expression, work-budget, unexpected-line, and value-level
-UTF-8 failures. An error thrown during body execution after a deferred
-rejection MUST remain primary. The reference's secondary text,
+UTF-8 failures. [§10.6](10-work-budgets.md#106-exhaustion-and-error-locations)
+defines hard budget exhaustion and its locations. An error thrown during
+body execution after a deferred rejection MUST remain primary. The
+reference's secondary text,
 `after an earlier error in the instance: SUMMARY`, MUST NOT change its code
 or path. This also applies to a later immediate rejection. Post-body errors,
 such as no progress, occur outside that wrapper.
@@ -689,8 +692,8 @@ A
 Catalog MUST parse and resolve, admit parameters, validate input, and execute
 under the same phase order as read (§9.1). It MUST execute the prefix and
 all instance bodies, performing actual reads, expressions, checks, progress
-checks, and work accounting. Required ordinary parameters remain required,
-including inside traversed bodies.
+checks, and [work accounting](10-work-budgets.md#105-evaluation-instances-and-catalog).
+Required ordinary parameters remain required, including inside traversed bodies.
 
 A valid caller `instance` selector MUST NOT restrict traversal and need not
 match an instance. Catalog MUST still validate its integer form at block
@@ -908,6 +911,9 @@ remain in [§8.14](08-expressions-and-checks.md#814-errors-and-related-chapters)
 reading errors in [§6.11](06-types-and-values.md#611-errors-and-related-chapters),
 and UTF-8 errors in [§4.10](04-input.md#410-utf-8-validity) and
 [§5.1](05-reader-specs.md#51-reader-specs-and-parsing).
-Chapter 10, `10-work-budgets.md` (planned), owns work budgets, including
-catalog execution. Appendix B, `appendix-b-dzn.md` (planned), owns dzn
-rendering of retained read data and catalog data.
+[§10.1](10-work-budgets.md#101-counters-and-input-byte-length) defines
+operation-wide counters and input byte length;
+[§10.5](10-work-budgets.md#105-evaluation-instances-and-catalog) defines
+accounting across instance selection and catalog execution. Appendix B,
+`appendix-b-dzn.md` (planned), owns dzn rendering of retained read data and
+catalog data.
