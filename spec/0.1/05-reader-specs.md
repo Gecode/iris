@@ -6,8 +6,8 @@ format metadata, and parser limits. The formal productions are in
 its layers and named predicates. [Chapter 6](06-types-and-values.md)
 defines types and value reads.
 Further execution rules belong to [chapter 7](07-structure.md)
-(input structure and patterns), chapter 8 (`08-expressions-and-checks.md`,
-planned: evaluation, checks, and record names), and chapter 9
+(input structure and patterns), [chapter 8](08-expressions-and-checks.md)
+(evaluation, checks, and record names), and chapter 9
 (`09-params-and-instances.md`, planned: parameters, instances, and catalog).
 Chapter 10 (`10-work-budgets.md`, planned) defines work budgets.
 
@@ -200,7 +200,7 @@ Definitions using the `gecode.` prefix MUST report
 [`E-SPEC-NAME`](errors.md#114-parse-time-codes). This applies to declarations,
 `let`, `param`, `type`, lists, `as`, `each`, `store`, and comprehension
 bindings. The two known host constants and errors for unknown constants
-are defined in chapter 8, `08-expressions-and-checks.md` (planned).
+are defined in [§8.11](08-expressions-and-checks.md#811-host-constants).
 Pattern names use the ordinary-name form, not this special token form.
 
 `_` MUST be accepted as a declaration, list, or capture name, and in
@@ -211,8 +211,9 @@ stores an entry named `_`. [§6.3](06-types-and-values.md#63-names-discarded-rea
 defines declaration and list discards.
 [§7.2](07-structure.md#72-line-patterns-and-captures) defines capture discards;
 [§7.6](07-structure.md#76-logical-records-and-names) defines record structure.
-Chapter 8, `08-expressions-and-checks.md` (planned), defines record-name
-resolution and use in expressions.
+[§8.12](08-expressions-and-checks.md#812-record-names-and-field-access) defines
+record-name resolution;
+[§8.10](08-expressions-and-checks.md#810-comprehensions-and-bindings) defines comprehension bindings.
 
 Reserved/discard definition checks occur after consuming the name. Their
 reported line MAY therefore be the following token's line; implementations
@@ -317,8 +318,8 @@ The statement forms and their semantic chapters are:
 |---|---|
 | Declarations, `list`, `type` | [6, types and value reads](06-types-and-values.md) |
 | `expect`, `line`, `find`, `skip`, `index`, `repeat`, `each`, `sections`, `if` | [7, input structure](07-structure.md) |
-| `let` | [§7.9, execution](07-structure.md#79-conditional-execution-and-let); chapter 8, `08-expressions-and-checks.md` (planned): expressions |
-| `check` | 8, `08-expressions-and-checks.md` (planned): expressions and checks |
+| `let` | [§7.9, execution](07-structure.md#79-conditional-execution-and-let); [chapter 8](08-expressions-and-checks.md): expressions |
+| `check` | [§8.13](08-expressions-and-checks.md#813-checks-and-failure-witnesses): checks |
 | `param`, `instances` | 9, `09-params-and-instances.md` (planned): parameters and instances |
 
 A block MUST be a brace-enclosed sequence of statements. It MAY be empty.
@@ -562,8 +563,10 @@ expressions, and `)`. A host-constant token cannot be called. For callees
 `in` immediately after `(` MUST instead select comprehension syntax:
 a binding name, `in`, an expression, `:`, another expression, and `)`.
 This is token lookahead; intervening whitespace and comments are permitted.
-Function names, arities, bindings, and evaluation are defined in chapter 8,
-`08-expressions-and-checks.md` (planned).
+Function names, arities, and bindings are defined in
+[§8.8](08-expressions-and-checks.md#88-functions) and
+[§8.10](08-expressions-and-checks.md#810-comprehensions-and-bindings);
+[chapter 8](08-expressions-and-checks.md) defines evaluation.
 
 Implementations MUST use this precedence, from loosest to tightest:
 
@@ -581,7 +584,8 @@ Implementations MUST use this precedence, from loosest to tightest:
 | 10 | Literals, names, calls, comprehensions, parenthesized expressions | Primary |
 
 Thus `-2^2` groups as `-(2^2)`, `2^3^2` as `2^(3^2)`, and `2^-1`
-as `2^(-1)`. Parsing the last form succeeds; chapter 8 defines its
+as `2^(-1)`. Parsing the last form succeeds;
+[§8.4](08-expressions-and-checks.md#84-integer-arithmetic) defines its
 runtime exponent error. Chained comparisons group left, rather than
 introducing a special comparison-chain form.
 

@@ -24,8 +24,8 @@ as rows of columns (§7.5), then discard its frame. Looking up an enclosing
 value MUST NOT supply an omitted local row. On completion, the repeat MUST
 publish its columns in the enclosing frame. Column order follows possible
 body definitions, as specified in §7.5, rather than the order definitions
-first execute. General lookup and expression resolution belong to chapter 8,
-`08-expressions-and-checks.md` (planned).
+first execute. General lookup follows [§8.1](08-expressions-and-checks.md#81-values-and-value-lookup);
+record-name resolution follows [§8.12](08-expressions-and-checks.md#812-record-names-and-field-access).
 
 ## 7.2 Line patterns and captures
 
@@ -689,9 +689,11 @@ repeat 1 {each row a:int}
 
 In the nested example, each job has n and a steps list; each step has x.
 The data contains n at depth 1 and x at depth 2. It contains no objects or
-entries named jobs, job, steps, or step. Chapter 8,
-`08-expressions-and-checks.md` (planned), defines field selection, checks,
-record quantification, comprehensions, name conflicts, and scope rules.
+entries named jobs, job, steps, or step.
+[§8.12](08-expressions-and-checks.md#812-record-names-and-field-access) defines
+field selection, record
+quantification, name conflicts, and scope rules; [§8.10](08-expressions-and-checks.md#810-comprehensions-and-bindings) defines
+comprehensions, and [§8.13](08-expressions-and-checks.md#813-checks-and-failure-witnesses) defines checks.
 
 ```iris example
 id: structure-nested-records
@@ -925,8 +927,9 @@ body. With a false condition and no `else`, it MUST execute no body.
 Else-if is nested conditional execution. Branches MUST NOT introduce
 a frame. Unselected bodies MUST NOT read input or define values, although
 repeat field discovery MUST still visit their possible definitions (§7.5).
-Chapter 8, `08-expressions-and-checks.md` (planned), defines truth conversion
-and expression errors. This example shows if, else-if, else, `let`, and
+[§8.3](08-expressions-and-checks.md#83-truth-conversion) defines truth
+conversion; [§8.14](08-expressions-and-checks.md#814-errors-and-related-chapters)
+defines expression errors. This example shows if, else-if, else, `let`, and
 replacement without changing entry order.
 
 ```iris example
@@ -944,7 +947,7 @@ let x=1 if 0 {let x=9} else if 1 {let y="yes"} else {let y="no"} let x=2
 
 A `let` MUST evaluate its expression at that statement and define or replace
 its name in the current frame without reading input. It MAY retain a scalar
-or an array result. It MUST NOT automatically range over records; chapter 8
+or an array result. It MUST NOT automatically range over records; [chapter 8](08-expressions-and-checks.md)
 defines expression and record-name interpretation. Replacement MUST retain
 entry position. In a repeat, its final local result MUST be collected under
 §7.5. The example retains an array result.
@@ -1007,8 +1010,9 @@ removed. Nested statements MUST retain their own reader-spec lines.
 
 Execution context MUST NOT be converted to a check witness path.
 [§3.7](03-data-model.md#37-canonical-error-document) defines record_path;
-ordinary structural errors have null paths. Chapter 8,
-`08-expressions-and-checks.md` (planned), defines check witnesses, which can
+ordinary structural errors have null paths.
+[§8.13](08-expressions-and-checks.md#813-checks-and-failure-witnesses) defines
+check witnesses, which can
 omit surrounding active iteration indices.
 
 The following failures cover the chapter's error codes, missing scalar

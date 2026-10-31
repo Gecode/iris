@@ -103,8 +103,8 @@ offsets, or their errors.
 A later successful value read with the same name MUST replace the earlier
 value, including its type and depth, while retaining its original entry
 position under [§3.1](03-data-model.md#31-entries-and-definition-order).
-General value lookup and scope belong to chapter 8
-(`08-expressions-and-checks.md`, planned).
+General value lookup follows [§8.1](08-expressions-and-checks.md#81-values-and-value-lookup);
+record-name scope follows [§8.12](08-expressions-and-checks.md#812-record-names-and-field-access).
 
 ```iris example
 id: values-discard-redefine
@@ -182,8 +182,9 @@ each execution of the declaration or list, before reading values, including
 when its result is empty. They MUST NOT reevaluate bounds for each array
 or list element. Reexecuting a statement reevaluates its anonymous range.
 A named range instead uses the bounds saved by its executed definition
-(§6.5). Chapter 8 (`08-expressions-and-checks.md`, planned) defines the
-expressions used as bounds.
+(§6.5). [§8.1](08-expressions-and-checks.md#81-values-and-value-lookup) and
+[§8.4](08-expressions-and-checks.md#84-integer-arithmetic) define lookup
+and arithmetic for expressions used as bounds.
 
 ```iris example
 id: values-range-empty-evaluates
@@ -1417,8 +1418,9 @@ includes the `structure-value-type-mix` example.
 `E-TYPE-UNDEFINED` remains the conditional runtime guard described in §6.5,
 without a verified public reproducer.
 
-Expression evaluation and its failures belong to chapter 8
-(`08-expressions-and-checks.md`, planned); parameters and instances belong
+Expression evaluation and its failures follow
+[§8.14](08-expressions-and-checks.md#814-errors-and-related-chapters);
+parameters and instances belong
 to chapter 9 (`09-params-and-instances.md`, planned). Chapter 10
 (`10-work-budgets.md`, planned) defines work accounting, including empty
 rows. Appendix B (`appendix-b-dzn.md`, planned) defines dzn output. The

@@ -426,6 +426,8 @@ supplied bytes. A later required read can therefore report end of input
 beyond the stop line. [Chapter 11](errors.md#111-reporting-and-comparison)
 defines which current or saved position belongs to each error; an
 implementation MUST NOT relocate saved check positions to the final cursor.
+[§8.13](08-expressions-and-checks.md#813-checks-and-failure-witnesses) defines saved check
+witnesses and their positions.
 
 ## 4.7 Comment and stop prefixes
 
