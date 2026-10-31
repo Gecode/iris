@@ -34,12 +34,14 @@ and MUST NOT move a check's location to the final input cursor.
 
 Implementations MUST report the first error encountered in the order below,
 subject to the deferral rules. This preserves the pinned parse, resolve,
-and execution order while adding Iris input validation. Implementations
-MUST NOT choose an error by sorting candidate input coordinates.
+and execution order while adding Iris source and input validation.
+Implementations MUST NOT choose an error by sorting candidate input coordinates.
 
-1. Parse the reader spec before reading input. Lex the complete reader spec,
-   parse statements, check global name conflicts, then resolve names. A later
-   lexical error can precede an earlier syntax error. Resolver prechecks
+1. Parse the reader spec before reading input. First validate its whole
+   source as UTF-8 under [§5.1](05-reader-specs.md#51-reader-specs-and-parsing);
+   `E-SPEC-UTF8` precedes every other parse-time error. Then lex the complete
+   reader spec, parse statements, check global name conflicts, then resolve
+   names. A later lexical error can precede an earlier syntax error. Resolver prechecks
    precede the expression traversal they guard; earliest reader-spec line
    alone does not determine the error.
 2. Before statement execution, reject unknown parameters in supplied parameter
@@ -184,17 +186,17 @@ All rows use profile P. Source abbreviations are defined in §11.7.
 
 | Code | Meaning; recommended messages and Gecode patterns | Location | Source origins | Defining place |
 |---|---|---|---|---|
-| `E-SPEC-STRING` | Invalid reader-spec string. `unterminated string`; `unknown escape '{A}' in string (use {A})` | P | s:122,124,176,187 | chapter 5 (`05-reader-specs.md`, planned): lexical structure and names |
-| `E-SPEC-NUMBER` | Invalid or unrepresentable reader-spec numeric literal. `bad number {A}` | P | s:204 | chapter 5 (`05-reader-specs.md`, planned): lexical structure and names |
-| `E-SPEC-CHARACTER` | Unrecognized reader-spec character. `unexpected character '{A}'` | P | s:222 | chapter 5 (`05-reader-specs.md`, planned): lexical structure and names |
+| `E-SPEC-STRING` | Invalid reader-spec string. `unterminated string`; `unknown escape '{A}' in string (use {A})` | P | s:122,124,176,187 | [§5.3](05-reader-specs.md#53-strings): strings |
+| `E-SPEC-NUMBER` | Invalid or unrepresentable reader-spec numeric literal. `bad number {A}` | P | s:204 | [§5.5](05-reader-specs.md#55-numbers): numbers |
+| `E-SPEC-CHARACTER` | Unrecognized reader-spec character. `unexpected character '{A}'` | P | s:222 | [§5.2](05-reader-specs.md#52-white-space-and-comments): source lexing |
 | `E-SPEC-PATTERN` | Malformed pattern/capture or invalid capture type. `unterminated capture in pattern {P}`; `missing or bad name in pattern {P}`; `capture name {Q} in pattern {P} is not a name`; `'...' must end the pattern {P}`; `a capture cannot be of an alphabet type`; `a capture needs a type after ':'`; `unexpected {T} in the capture type {Q}` | P | s:299,306,314,320,495,505,511 | chapter 7 (`07-structure.md`, planned): patterns |
-| `E-SPEC-SYNTAX` | Required syntactic item absent or unrecognized statement. `expected {A}, found {T}`; `missing '}'`; `unknown statement '{A}'`; `'..<' needs an upper bound`; `a range needs a lower or an upper bound` | P | s:369,455,460,465,477,529,632,640,749,758,760,777,918,1172 | chapter 5 (`05-reader-specs.md`, planned): statement syntax; chapter 6 (`06-types-and-values.md`, planned): ranges |
-| `E-SPEC-PLACEMENT` | Statement/setting used in a prohibited position. `'instances' must be the last statement of the spec`; `the setting '{N}' must be at the top level of the spec`; `'each' must be the first statement of a repeat, and comes at most once`; `'instances' must be at the top level of the spec` | P | s:378,642,894,900 | chapter 5 (`05-reader-specs.md`, planned): placement restrictions |
-| `E-SPEC-NAME` | Reserved or discard name used where a real definition/binding is required. `'{A}' cannot be defined: names starting with 'gecode.' are Gecode constants`; `'_' cannot be defined here`; `'_' cannot be bound` | P | s:472,667,1108 | chapter 5 (`05-reader-specs.md`, planned): lexical structure and names; chapter 8 (`08-expressions-and-checks.md`, planned): comprehensions |
+| `E-SPEC-SYNTAX` | Required syntactic item absent or unrecognized statement. `expected {A}, found {T}`; `missing '}'`; `unknown statement '{A}'`; `'..<' needs an upper bound`; `a range needs a lower or an upper bound` | P | s:369,455,460,465,477,529,632,640,749,758,760,777,918,1172 | [§§5.6–5.7](05-reader-specs.md#56-statements-declarations-and-blocks): statement and type syntax; chapter 6 (`06-types-and-values.md`, planned): ranges |
+| `E-SPEC-PLACEMENT` | Statement/setting used in a prohibited position. `'instances' must be the last statement of the spec`; `the setting '{N}' must be at the top level of the spec`; `'each' must be the first statement of a repeat, and comes at most once`; `'instances' must be at the top level of the spec` | P | s:378,642,894,900 | [§5.11](05-reader-specs.md#511-placement-restrictions): placement |
+| `E-SPEC-NAME` | Reserved or discard name used where a real definition/binding is required. `'{A}' cannot be defined: names starting with 'gecode.' are Gecode constants`; `'_' cannot be defined here`; `'_' cannot be bound` | P | s:472,667,1108 | [§5.4](05-reader-specs.md#54-names): names; chapter 8 (`08-expressions-and-checks.md`, planned): comprehensions |
 | `E-SPEC-NAME-CONFLICT` | Conflicting type, value, record, or comprehension names. `'{N}' is bound by a comprehension but is also a name in the spec`; `'{N}' names a type, so it cannot also name a value`; `'{N}' is a base type`; `the type '{N}' is already defined`; `'{N}' is already bound by an enclosing comprehension`; `'{N}' already names records`; `'{N}' names records, so it cannot also be defined`; `'{N}' cannot name both the list and each record`; `'{N}' is bound by a comprehension but names records` | P | s:388,392,835,837,1111; r:208,211,220,550 | chapter 6 (`06-types-and-values.md`, planned): named types; chapter 8 (`08-expressions-and-checks.md`, planned): comprehensions, record-name resolution |
 | `E-SPEC-UNKNOWN-TYPE` | Reading type name is not known at this point. `unknown type '{N}'` | P | s:748 | chapter 6 (`06-types-and-values.md`, planned): named types |
 | `E-SPEC-TYPE` | Reading type incompatible with a declaration/list/option. `'offset' needs numbers`; `'rest' values cannot be arrays`; `an alphabet type needs a two-dimensional array`; `'layout' needs a two-dimensional array of numbers`; `a list cannot be of 'rest' or of an alphabet type` | P | s:793,807,809,812,823 | chapter 6 (`06-types-and-values.md`, planned): arrays, layouts, offsets, lists, alphabets |
-| `E-SPEC-NESTING` | Reader-spec structural/expression nesting limit exceeded. `blocks are nested too deeply`; `expressions are nested too deeply` | P | s:519 | chapter 5 (`05-reader-specs.md`, planned): nesting limits |
+| `E-SPEC-NESTING` | Reader-spec structural/expression nesting limit exceeded. `blocks are nested too deeply`; `expressions are nested too deeply` | P | s:519 | [§5.12](05-reader-specs.md#512-parser-limits): parser limits |
 | `E-SPEC-FUNCTION` | Unknown function or invalid call form/arity. `'{N}' needs the form {N}(x in a: e)`; `unknown function '{N}'`; `wrong arguments for function '{N}'` | P | s:1069,1071,1073 | chapter 8 (`08-expressions-and-checks.md`, planned): functions, comprehensions |
 | `E-SPEC-CONSTANT` | Unknown Gecode host constant. `unknown Gecode constant '{A}' (known: gecode.int_max, gecode.int_min)` | P | s:1089 | chapter 8 (`08-expressions-and-checks.md`, planned): value lookup |
 | `E-SPEC-RECORD-SCOPE` | Record/list/field reference outside its permitted repeat scope. `'{N}' is inside a repeat without a list name in the records of '{N}'; name that list with 'as' to reach it`; `'{N}' cannot be used inside its own repeat`; `the field '{N}' cannot be used inside the repeat that reads it`; `'{N}' is a list in each record of the repeat around it; {A}`; `'{N}' is each record of a repeat, so only checks can use it outside that repeat` | P | r:256,259,323,459,464,479 | chapter 8 (`08-expressions-and-checks.md`, planned): record-name resolution |
@@ -276,7 +278,15 @@ branch.
 
 | Code | Meaning and recommended message | Phase and locations | Defining place | Gecode pattern |
 |---|---|---|---|---|
+| `E-SPEC-UTF8` | The reader-spec source contains invalid UTF-8. `reader spec is not valid UTF-8` | Source validation before lexing or any other parse-time check. Reader-spec origin, LF-counted line and 1-based byte column at the first byte of the first ill-formed subsequence. Null input location, context, and path. Availability is defined by Iris; this extends profile P with a byte column. | [§5.1](05-reader-specs.md#51-reader-specs-and-parsing), [appendix C.2](appendix-c-differences.md#c2-reader-spec-source) | None — Iris-only. |
 | `E-UTF8` | The supplied input or an actually read word/rest value contains invalid UTF-8. `input is not valid UTF-8`; `string value is not valid UTF-8` | Input validation after parsing/resolution and unknown parameters, before execution: T. Value-level validation during execution: R. Both locate the first byte of the first ill-formed subsequence. Availability is defined by Iris; Gecode locations are not applicable. | [§4.10](04-input.md#410-utf-8-validity), [§3.6](03-data-model.md#36-strings), [appendix C.1](appendix-c-differences.md#c1-unicode-strings) | None — Iris-only. |
+
+A source-wide `E-SPEC-UTF8` locates the initial byte of a truncated
+sequence as well as other ill-formed subsequences. Source columns count
+bytes, including tabs as one byte, and reset to 1 after LF. Unlike
+Gecode-backed parse errors, this Iris-only parse-time error has a column.
+Gecode accepts ill-formed bytes inside reader-spec strings and comments;
+its adapter does not emulate `E-SPEC-UTF8`.
 
 Gecode accepts `x: word` with input hex `ff0a` and preserves the byte; it
 raises no corresponding error. Iris validates all input bytes, including
@@ -323,8 +333,8 @@ count the same underlying origin twice.
 | instance.hh | 0 | 0 | 0 | 0 |
 | **Total** | **153** | **14** | **15** | **182** |
 
-The 153 language origins map to 63 Gecode-backed codes. With `E-UTF8`, the
-registry has 64 codes. All 182 sites are assigned exactly once.
+The 153 language origins map to 63 Gecode-backed codes. With `E-UTF8`
+and `E-SPEC-UTF8`, the registry has 65 codes. All 182 sites are assigned exactly once.
 
 ### 11.7.1 Excluded host/API sites
 

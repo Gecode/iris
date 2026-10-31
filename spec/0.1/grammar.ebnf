@@ -1,0 +1,214 @@
+(* Iris 0.1. Notation: 02-notation.md section 2.2. Normative explanations:
+   05-reader-specs.md and appendix-a-grammar.md. This is the sole grammar.
+
+   There are three layers: UTF-8 source bytes, tokens, and decoded patterns.
+   Quoted terminals in the token grammar match IDENT or PUNCT tokens only;
+   STRING contents never act as keywords or punctuation. All lookahead
+   predicates consume nothing. Static name/type/function checks are separate
+   from syntax recognition; see chapters 6-9 and errors.md.
+
+   Source validity is checked before the complete source is lexed. *)
+reader_spec = ? valid UTF-8 source ?, { format_setting | top_statement },
+              [ instances_stmt, { format_setting } ], end ;
+(* valid UTF-8 source: the whole source MUST strictly decode into Unicode
+   scalar values, before any other parse-time check (section 5.1). *)
+
+format_setting = 'format', ( ident | string ), { format_join } ;
+format_join = ? glued format join ?, ( '-' | '.' ), ( ident | integer ) ;
+(* glued format join: both the joiner and the following IDENT or INT have
+   no intervening whitespace or comment before them. Joins are maximal. *)
+
+top_statement = ? ordinary top-level dispatch ?, statement_or_setting ;
+(* ordinary top-level dispatch: the next token is not IDENT format, and
+   is not IDENT instances unless declaration lookahead succeeds. Thus format
+   bypasses declaration dispatch, even for format:int. *)
+statement_or_setting = declaration | ? no declaration ?, ( setting | ordinary_stmt ) ;
+statement = declaration | ? no declaration ?, ordinary_stmt ;
+(* no declaration: negate declaration lookahead, defined at declaration.
+   This makes declaration dispatch take priority over every statement keyword. *)
+block = '{', ? block counter entry ?, { statement }, '}' ;
+repeat_block = '{', ? block counter entry ?, [ each_stmt ], { statement }, '}' ;
+(* block counter entry: hold one block-counter entry through the closing
+   brace. The counter starts at zero; entry 257 reports E-SPEC-NESTING. *)
+each_stmt = ? no declaration ?, 'each', ident ;
+instances_stmt = ? no declaration ?, 'instances', block ;
+(* These productions enforce placement: each occurs only first in a repeat;
+   instances occurs only at the top level and ends executable statements.
+   A sections outer brace pair does not enter the block counter. *)
+
+setting = ( 'comment' | 'stop' ), strings
+        | ( 'tokens' | 'separators' ), string
+        | 'ignore', 'trailing' ;
+ordinary_stmt = expect_stmt | param_stmt | list_stmt | line_stmt | skip_stmt
+              | index_stmt | repeat_stmt | sections_stmt | if_stmt
+              | let_stmt | check_stmt | type_stmt ;
+expect_stmt = 'expect', strings ;
+param_stmt = 'param', ident, [ '=', expression ] ;
+
+declaration = ? declaration ahead ?, ident, { '[', expression, ']' }, ':', type,
+              [ ? option ahead ?, 'layout', expression ],
+              [ ? option ahead ?, 'offset', expression ] ;
+(* declaration ahead: IDENT, then zero or more balanced square-bracket token
+   groups, then colon. Only PUNCT brackets balance; STRING brackets do not.
+   option ahead: no declaration ahead. It guards the adjacent option word,
+   including alphabet options below. A declaration with that name ends options. *)
+list_stmt = 'list', ident, ':', type, 'until', list_end,
+            [ ? option ahead ?, 'offset', expression ] ;
+list_end = 'eol' | ? not eol ?, expression ;
+(* not eol: the next token is not IDENT eol; eol has priority over expressions. *)
+type_stmt = 'type', ident, '=', type ;
+type = ? base type ahead ?, base_type
+     | ? alphabet type ahead ?, alphabet_type
+     | ? named type ahead ?, ident
+     | ? range type ahead ?, range ;
+(* Type dispatch is ordered: a base-type IDENT, then IDENT alphabet, then
+   a visible named-type IDENT, otherwise a range. The four predicates select
+   exactly those cases, without consuming. Type visibility is chapter 6:
+   a definition becomes visible after its type, through the containing block
+   and its nested blocks. Unknown bare type names fail E-SPEC-UNKNOWN-TYPE. *)
+base_type = 'int' | 'float' | 'num' | 'word' | 'rest' ;
+alphabet_type = 'alphabet', string, { alphabet_option } ;
+alphabet_option = ? option ahead ?, ( ( 'blank' | 'strip' ), string
+                                    | 'base', [ '-' ], integer ) ;
+range = expression, '..', ( upper_bound | ? no upper bound ahead ? )
+      | '..', upper_bound
+      | [ expression ], '..<', upper_bound ;
+upper_bound = ? upper bound ahead ?, expression ;
+(* upper bound ahead: INT, FLOAT or STRING; PUNCT (, - or !; or an IDENT
+   which is neither a declaration start nor in this exact stop set:
+   comment stop expect tokens separators ignore param list line find skip
+   index repeat each instances sections if let check type layout offset until.
+   END never starts an upper bound. no upper bound ahead negates this test.
+   In particular, format is not in the stop set. *)
+
+line_stmt = ( 'line' | 'find' ), pattern ;
+skip_stmt = 'skip', ( 'line' | ? not line ?, expression, 'lines' ) ;
+(* not line: the next token is not IDENT line; skip line takes priority. *)
+index_stmt = 'index', expression ;
+repeat_stmt = 'repeat', repeat_count, [ 'as', ident ], repeat_block ;
+repeat_count = 'until', repeat_end | ? not until ?, expression ;
+repeat_end = 'eof' | ? not eof ?, terminators ;
+(* not until and not eof negate the corresponding IDENT keyword test. *)
+terminators = strings, [ 'store', ident ] ;
+sections_stmt = 'sections', { 'until', terminators | 'skip', 'other' },
+                '{', { arm }, '}' ;
+arm = pattern, [ 'optional' ], [ 'last' ], [ block ] ;
+if_stmt = 'if', expression, block, [ 'else', else_body ] ;
+else_body = block | ? else if ahead ?, ? else-if counter entry ?, statement ;
+(* else if ahead: next token is IDENT if. It is parsed as an ordinary
+   declaration-first statement, so else if:int is allowed.
+   else-if counter entry: hold one block-counter entry for this statement,
+   in addition to any entries for its bodies; release it afterwards. *)
+let_stmt = 'let', ident, '=', expression ;
+check_stmt = 'check', expression, [ string ] ;
+strings = string, { string } ;
+
+(* Expressions MUST consume maximally: a following operator, postfix suffix,
+   or call opener continues the expression even across source line endings.
+   expression counters are operational constraints, not an AST-depth limit;
+   the named constraint below is defined precisely in section 5.12. *)
+expression = ? maximal expression and expression counter ?, disjunction ;
+(* maximal expression and expression counter: require maximal consumption
+   and apply section 5.12's unary, binary and postfix counter entries. *)
+disjunction = conjunction, { '||', conjunction } ;
+conjunction = equality, { '&&', equality } ;
+equality = relation, { ( '==' | '!=' ), relation } ;
+relation = additive, { ( '<' | '>' | '<=' | '>=' ), additive } ;
+additive = multiplicative, { ( '+' | '-' ), multiplicative } ;
+multiplicative = unary, { ( '*' | '/' | '%' ), unary } ;
+unary = ( '-' | '!' ), unary | power ;
+power = postfix, [ '^', unary ] ;
+postfix = primary, { '[', expression, ']' | '.', ident } ;
+primary = integer | float | string | '(', expression, ')'
+        | ? host constant ahead ?, ident
+        | ? ordinary expression name ahead ?, ident, [ '(', call_body, ')' ] ;
+(* host constant ahead selects an IDENT starting gecode.; ordinary expression
+   name ahead selects every other IDENT. Constants cannot be called. *)
+call_body = ? comprehension ahead ?, comprehension
+          | ? no comprehension ahead ?, [ expression, { ',', expression } ] ;
+(* comprehension ahead: the callee is all, any, sum or count, and the next
+   two tokens are IDENT then IDENT in. no comprehension ahead negates it.
+   Callee validity and argument requirements remain static semantic checks. *)
+comprehension = ident, 'in', expression, ':', expression ;
+
+ident = ? IDENT token ? ;
+integer = ? INT token ? ;
+float = ? FLOAT token ? ;
+string = ? STRING token ? ;
+end = ? end of tokens ? ;
+(* IDENT token, INT token, FLOAT token and STRING token each consume one
+   token of the named class, defined below. end of tokens consumes nothing
+   and requires that no token remains. *)
+
+(* Lexical layer: source is a sequence of Unicode scalar values encoded in
+   UTF-8. Non-ASCII characters occur only in strings and comments. Ignored
+   whitespace and comments separate tokens. The next token is chosen by its
+   first byte: quote, digit, name-start, otherwise longest punctuation.
+   All repetitions in this layer consume maximally. *)
+source = { whitespace | source_comment | lexical_token } ;
+whitespace = ? ASCII whitespace byte ? ;
+(* ASCII whitespace byte consumes one of 20, 09, 0a, 0d, 0b, 0c (hex). *)
+source_comment = '#', { comment_character } ;
+comment_character = ? scalar other than LF ? ;
+(* scalar other than LF consumes one Unicode scalar value except U+000A. *)
+lexical_token = ? lexical dispatch ?, ( source_string | number_token | name_token | punctuation ) ;
+(* lexical dispatch selects source_string at a quote, number_token at a
+   digit, name_token at an ASCII letter or underscore, and punctuation
+   otherwise; a selected malformed token cannot fall back to another kind. *)
+source_string = '"', { string_character | escape }, '"' ;
+string_character = ? scalar other than quote backslash or LF ? ;
+(* scalar other than quote backslash or LF consumes one scalar except
+   U+0022, U+005C and U+000A. Literal CR and NUL are included. *)
+escape = '\', ( 'n' | 't' | '\' | '"' ) ;
+name_token = ? maximal identifier ?, ( host_name | ordinary_name ) ;
+(* maximal identifier selects the glued host form when it starts here,
+   otherwise the longest ordinary name. It consumes nothing. *)
+ordinary_name = name_start, { name_character } ;
+host_name = 'gecode.', name_character, { name_character } ;
+(* A glued gecode. with a nonempty name-character suffix is one IDENT,
+   taking priority over ordinary_name followed by a dot. *)
+name_start = ? ASCII letter or underscore ? ;
+name_character = name_start | digit ;
+(* ASCII letter or underscore consumes A-Z, a-z or _. *)
+digit = ? ASCII digit ? ;
+(* ASCII digit consumes 0-9. *)
+number_token = ? maximal numeric candidate ?, ( float_text | integer_text ) ;
+(* maximal numeric candidate: starting at a digit, scan digits, dots, e/E,
+   and a sign only immediately after e/E; truncate before the first .. .
+   The entire candidate MUST match and convert. Integers are 0 through
+   9223372036854775807. Floats obey section 4.5 conversion, with
+   E-SPEC-NUMBER on failure, and are FLOAT iff not all candidate bytes
+   are digits. This predicate constrains consumption, consuming nothing. *)
+integer_text = digit, { digit } ;
+float_text = digit, { digit }, ( '.', { digit }, [ exponent ] | exponent ) ;
+exponent = ( 'e' | 'E' ), [ '+' | '-' ], digit, { digit } ;
+punctuation = ? longest punctuation ?, ( '..<' | '..' | '==' | '!=' | '<=' | '>=' | '&&' | '||'
+            | '{' | '}' | '[' | ']' | '(' | ')' | '=' | '<' | '>'
+            | '+' | '-' | '*' | '/' | '%' | '^' | '!' | ',' | '.' | ':'
+            | ? NUL character ? ) ;
+(* longest punctuation selects the longest listed token at this position,
+   consuming nothing. NUL character consumes U+0000. The reference lexer
+   admits it as PUNCT, but it has no token-level production and therefore fails syntax parsing. *)
+
+(* Decoded pattern layer. pattern consumes one STRING token and requires
+   that its decoded value match decoded_pattern in full. Source whitespace
+   is NOT skipped in this layer. Capture text ends at the FIRST closing
+   brace, even inside quoted type text; a lone closing brace is literal. *)
+pattern = ? decoded pattern STRING token ? ;
+(* decoded pattern STRING token consumes STRING and recognizes its decoded
+   contents with decoded_pattern; all capture types are re-lexed below. *)
+decoded_pattern = { pattern_blank | capture | pattern_literal },
+                  [ '...', { ' ' | ? tab character ? } ] ;
+pattern_blank = ' ' | ? tab character ? | ? CR character ? ;
+(* tab character and CR character each consume U+0009 and U+000D respectively. *)
+pattern_literal = ? pattern literal character ? ;
+(* pattern literal character consumes one scalar except {, space, tab or
+   CR, and only when ... does not start here. LF and } can be literal. *)
+capture = '{', ( '$', ordinary_name | [ ordinary_name ], [ ':', capture_type ] ), '}' ;
+capture_type = ? re-lexed capture type ? ;
+(* re-lexed capture type consumes all decoded text through, but excluding,
+   the first }. Lex it with the source lexer, using the pattern token's
+   source line as its starting line. Require a nonempty token stream and
+   exactly type followed by end. Use visible named types; reject alphabet
+   reading types (including aliases) with E-SPEC-PATTERN. The capture name
+   has no whitespace trimming. A missing colon means the type word. *)

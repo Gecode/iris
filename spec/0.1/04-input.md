@@ -1,8 +1,8 @@
 # 4 Input text
 
 This chapter defines input scanning and coordinate counting. Settings are
-specified here only by their effect on input; chapter 5, `05-reader-specs.md`
-(planned), defines their syntax. Chapter 6, `06-types-and-values.md`
+specified here only by their effect on input; [chapter 5](05-reader-specs.md)
+defines their syntax. Chapter 6, `06-types-and-values.md`
 (planned), defines value-reading statements, and chapter 7,
 `07-structure.md` (planned), defines line patterns and input structure.
 
@@ -694,7 +694,8 @@ sequences, overlong encodings, surrogate encodings, and encodings above
 U+10FFFF. For a truncated sequence, the error position is its initial byte.
 NUL, noncharacters, and U+FEFF MUST be accepted as ordinary characters.
 Implementations MUST NOT strip a BOM or normalize Unicode. These rules
-concern input and read values; chapter 5 defines reader-spec source lexing.
+concern input and read values; [chapter 5](05-reader-specs.md) defines
+reader-spec source validation and lexing.
 
 ```iris example
 id: input-valid-utf8

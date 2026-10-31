@@ -234,6 +234,11 @@ input. [§4.10](04-input.md#410-utf-8-validity) defines both checks, their
 order, and their errors. This is a deliberate
 [difference from Gecode 6.5.0](appendix-c-differences.md#c1-unicode-strings).
 
+The whole reader-spec source MUST also be valid UTF-8, including string
+literals and comments. [§5.1](05-reader-specs.md#51-reader-specs-and-parsing)
+defines source validation before lexing and `E-SPEC-UTF8`. The four
+[string escapes](05-reader-specs.md#53-strings) yield Unicode characters.
+
 ## 3.7 Canonical error document
 
 An error MUST be encoded as a JSON object with exactly the six members

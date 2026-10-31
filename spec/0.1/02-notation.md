@@ -9,8 +9,8 @@ marked informative explains it without adding requirements.
 
 ## 2.2 Grammar notation
 
-The planned `grammar.ebnf` uses the following EBNF dialect. A production has
-the form `name = expression ;`. Juxtaposition means concatenation, `|`
+The [formal grammar](grammar.ebnf) uses the following EBNF dialect. A production has
+the form `name = expression ;`. Juxtaposition or a comma means concatenation, `|`
 separates alternatives, parentheses group expressions, brackets enclose an
 optional expression, and braces enclose zero or more repetitions. Single
 or double quotes delimit literal terminals; the other quote may occur
@@ -21,7 +21,7 @@ in quoted terminals; a terminal needing both quote characters uses an
 explained special sequence.
 
 Whitespace between grammar symbols separates notation and does not imply
-input whitespace. Chapter 5, `05-reader-specs.md` (planned), defines
+input whitespace. [Chapter 5](05-reader-specs.md) defines
 reader-spec whitespace and lexical rules.
 
 ## 2.3 Example headers and parts
