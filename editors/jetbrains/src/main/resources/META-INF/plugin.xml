@@ -1,0 +1,15 @@
+<idea-plugin>
+    <id>org.gecode.iris</id>
+    <name>Iris</name>
+    <vendor url="https://www.gecode.org/">Gecode</vendor>
+    <description>File type registration and a configurable Iris language server.</description>
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.lsp</depends>
+    <extensions defaultExtensionNs="com.intellij">
+        <fileType name="Iris" language="Iris" extensions="iris"
+                  implementationClass="org.gecode.iris.IrisFileType" fieldName="INSTANCE"/>
+        <projectConfigurable id="org.gecode.iris.settings" displayName="Iris"
+                             parentId="language" instance="org.gecode.iris.IrisLspConfigurable"/>
+        <platform.lsp.serverSupportProvider implementation="org.gecode.iris.IrisLspSupportProvider"/>
+    </extensions>
+</idea-plugin>

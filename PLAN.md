@@ -926,10 +926,103 @@ before M4e.
    (open source, runs in every IntelliJ-based IDE, but users install a
    second plugin). *Recommendation:* the platform API; switch only if a
    spike finds a missing feature we need.
+
+   **Spike evidence (2026-11-01; no decision).** The past-year major
+   release lines are 2025.3, 2026.1, and 2026.2. JetBrains documents the
+   platform API in IntelliJ IDEA, CLion, PyCharm, and RustRover, as well
+   as WebStorm, PhpStorm, DataSpell, RubyMine, DataGrip, GoLand, and Rider;
+   Android Studio and open-source IDEA builds are excluded. Unified IDEA
+   exposes it without a paid subscription from 2025.3, and unified PyCharm
+   from 2025.1. See the [SDK's supported IDEs](https://plugins.jetbrains.com/docs/intellij/language-server-protocol.html#supported-ides)
+   and [JetBrains' IDEA announcement](https://blog.jetbrains.com/platform/2025/09/the-lsp-api-is-now-available-to-all-intellij-idea-users-and-plugin-developers/).
+
+   This table applies to all four named IDEs and the other supported
+   IntelliJ-based products. Dates are the platform API's documented
+   introduction, not evidence of an Iris feature test. Sources:
+   [JetBrains feature history](https://plugins.jetbrains.com/docs/intellij/language-server-protocol.html#supported-features)
+   and [LSP4IJ feature support](https://github.com/redhat-developer/lsp4ij/blob/main/docs/LSPSupport.md).
+
+   | §8.7 feature | Platform 2025.3 | Platform 2026.1 / 2026.2 | Current LSP4IJ |
+   |---|---|---|---|
+   | Diagnostics | Yes | Yes | Yes |
+   | Diagnostic code links (`codeDescription.href`) | Not explicitly documented | Not explicitly documented | Not explicitly documented |
+   | Code actions | Yes | Yes | Yes |
+   | Completion | Yes | Yes | Yes |
+   | Hover | Yes | Yes | Yes |
+   | Definition | Yes | Yes | Yes |
+   | References | Yes | Yes | Yes |
+   | Rename | No | From 2026.1.1 | Yes |
+   | Document symbols | Yes | Yes | Yes |
+   | Folding | Yes | Yes | Yes |
+   | Semantic tokens | Yes | Yes | Experimental; full requests only |
+   | Inlay hints | Yes | Yes | Yes |
+   | Document formatting | Yes | Yes | Yes |
+   | Range formatting | No | From 2026.1 | Yes |
+   | Live-reading summary as hover and inlay hint | Both transports present | Both transports present | Both transports present |
+
+   Diagnostic hyperlinks still need a visual test in each candidate;
+   generic diagnostics or document-link support does not establish that
+   diagnostic code links work. The stub sends a code and link for that
+   check. Live reading uses ordinary hover/inlay payloads, so the table
+   establishes transport support only; the Iris server owns sample reading.
+
+   [LSP4IJ's requirements](https://github.com/redhat-developer/lsp4ij#requirements)
+   currently say IDEA 2024.2+ and an attempt to support the last four major
+   releases; its client covers all IntelliJ flavours, including Android
+   Studio. Its [developer guide](https://github.com/redhat-developer/lsp4ij/blob/main/docs/DeveloperGuide.md#reference-lsp4ij)
+   requires the `com.redhat.devtools.lsp4ij` plugin dependency. Current
+   documentation describes a candidate version, not every historical
+   LSP4IJ release. A selected version still needs the product/release
+   verifier matrix. The platform API needs no second client plugin, but
+   [renamed its server APIs to client/integration APIs in 2026.1.4](https://platform.jetbrains.com/t/summer-2026-intellij-platform-changes-for-plugin-developers/5041).
+   The spike uses the older names to compile on 2025.3. See
+   [the plugin README](editors/jetbrains/README.md) for measured validation
+   and the remaining visual check. Neither option is selected here.
 4. **How the JetBrains plugin gets `iris`.** Bundle a binary for each
    platform (works offline, larger plugin) or download on first use.
    *Recommendation:* use `PATH` or a configured path, else download the
    matching release binary with a checksum check.
+
+   **Spike evidence (2026-11-01; no decision).** No release `iris lsp`
+   binary exists yet. As a size proxy, [Taplo CLI 0.10.0](https://github.com/tamasfe/taplo/releases/tag/0.10.0)
+   is a release-built Rust formatter/validator with an LSP server. Its
+   macOS arm64 executable measures 10,522,288 bytes (10.03 MiB), or
+   4,616,507 bytes (4.40 MiB) when put in a deflated ZIP, measured from
+   `taplo-darwin-aarch64.gz`. Its release downloads for macOS arm64/x64,
+   Linux arm64/x64, and Windows x64 span 4.40–4.94 MiB compressed.
+   The server-free spike ZIP is 9,847 bytes (9.62 KiB). Estimate roughly
+   5 MiB of plugin ZIP per bundled target and 10–12 MiB
+   installed per executable. Five targets would add about 25 MiB to the
+   plugin download and 50–60 MiB installed. These are planning estimates,
+   not Iris measurements or a chosen target list; measure the real release
+   before deciding. Bundling works offline and requires shipping each
+   target's updates and notices with the plugin. Downloading keeps those
+   bytes out of the plugin and needs connectivity on first use.
+
+   A first-use download offer would require:
+
+   - A version-to-release mapping, supported OS/architecture assets and
+     checksums published with the Iris release; match the server host
+     rather than the frontend in remote development. Keep configured
+     commands and `PATH` usable for offline/manual installation.
+   - An explicit offer naming the version, source, target, and size, with
+     download, configure-existing, and decline actions. Do not download
+     or execute a command taken from a reader spec.
+   - HTTPS using the IDE's proxy settings, a trusted expected SHA-256,
+     safe extraction, executable permissions, and a versioned user-writable
+     cache outside the plugin directory. Verify before atomic installation
+     and execution; never run a partial or mismatched file.
+   - Cancellable background progress, cleanup on failure/cancellation,
+     and useful retry/manual-install messages for offline, unsupported,
+     checksum, and permission failures. JetBrains documents
+     [background progress and cancellation](https://plugins.jetbrains.com/docs/intellij/background-processes.html).
+   - A server compatibility check, reuse of a verified cached version,
+     and a clear update/removal policy. Include the binary's license
+     notices and account for platform signing requirements when publishing.
+
+   These are implementation requirements if download is chosen, not an
+   implemented downloader. This spike launches a configured local command
+   and neither bundles nor downloads a server.
 5. **Whether to build a linter.** Decided at M6b from the evidence in
    `docs/lint-candidates.md`, by the rule in §8.13. *Recommendation:* no
    linter unless at least three candidates meet that rule.
