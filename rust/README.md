@@ -9,7 +9,10 @@ resolution, and conservative value facts; [iris-cli](iris-cli/README.md) provide
 uses the [conformance protocol](../conformance/README.md) and has no dependency
 on implementation crates.
 
-Later work adds `iris-core`, `iris-lsp`, `iris-wasm` and, if built, `iris-lint`,
+[iris-lsp](iris-lsp/README.md) provides `iris lsp`, the stdio language server
+with parse and resolution diagnostics (milestone M4b).
+
+Later work adds `iris-core`, `iris-wasm` and, if built, `iris-lint`,
 published under `gecode-iris`.
 [PLAN.md §4.2](../PLAN.md#42-the-rust-reference-implementation-is-layered)
 describes the layers; §8.1, §8.7, §8.12 and §8.13 describe the crates. Milestones

@@ -10,6 +10,7 @@ reader-spec expressions, including parameter defaults.
 From `rust/`:
 
 ```sh
+cargo run --locked -p iris-cli -- lsp
 cargo run --locked -p iris-cli -- check path/to/spec.iris
 cargo run --locked -p iris-cli -- fmt path/to/spec.iris
 cargo run --locked -p iris-cli -- fmt --check --diff path/to/directory
@@ -26,6 +27,13 @@ virtual capture lines remain in the header; the excerpt uses the raw source.
 The renderer escapes control characters in diagnostic text and excerpts.
 Usage errors exit 2; file acquisition and resource failures exit 1.
 `iris --version` reports package 0.1.0 and language 0.1.
+
+## Language server
+
+`iris lsp` serves framed LSP over stdin/stdout through
+[iris-lsp](../iris-lsp/README.md), with parse and resolution diagnostics.
+See that crate's README for editor startup, synchronization, and encodings.
+Errors go to stderr; the server exits 0 after shutdown/exit, or 1 on failure.
 
 ## Formatting
 

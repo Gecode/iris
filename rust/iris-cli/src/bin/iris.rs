@@ -20,11 +20,20 @@ enum Command {
     },
     /// Format reader specs in place, or preview changes.
     Fmt(fmt::Arguments),
+    /// Serve the Iris language server over stdio.
+    Lsp,
 }
 fn main() -> ExitCode {
     match Arguments::parse().command {
         Command::Check { spec } => check(spec),
         Command::Fmt(arguments) => fmt::run(arguments),
+        Command::Lsp => match iris_lsp::run_stdio() {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("iris lsp: {error}");
+                ExitCode::FAILURE
+            }
+        },
     }
 }
 
