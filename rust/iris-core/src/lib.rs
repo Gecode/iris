@@ -51,6 +51,11 @@ impl Spec {
         })
     }
 
+    /// The reader spec's format name, if declared.
+    pub fn format_name(&self) -> Option<String> {
+        self.parsed.format_name()
+    }
+
     pub fn read(&self, input: &[u8], origin: &str, params: &Params) -> Result<Data, Failure> {
         reader::Interpreter::new(self, self.input(input, origin, params)?)
             .with_params(params)

@@ -18,6 +18,7 @@ name = "iris-driver"
 path = "src/bin/iris-driver.rs"
 
 [dependencies]
+iris-conformance = { path = "../iris-conformance" }
 iris-core = { path = "../iris-core" }
 iris-lsp = { path = "../iris-lsp" }
 iris-syntax = { path = "../iris-syntax", features = ["editorconfig"] }
@@ -30,4 +31,3 @@ similar = "2.7"
 [dev-dependencies]
 lsp-server = "0.10.0"
 tempfile = "3"
-iris-conformance = { path = "../iris-conformance" }

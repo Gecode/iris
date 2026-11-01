@@ -37,24 +37,5 @@ pub fn check_spec(bytes: &[u8], origin: &str) -> Result<CheckedSpec, CheckFailur
 }
 
 pub fn format_name(parsed: &Parse) -> Option<String> {
-    use iris_syntax::SyntaxKind as K;
-    parsed
-        .syntax()
-        .children()
-        .filter(|n| n.kind() == K::Format)
-        .filter_map(|node| {
-            let tokens: Vec<_> = node
-                .children_with_tokens()
-                .filter_map(|e| e.into_token())
-                .filter(|t| !matches!(t.kind(), K::Whitespace | K::Comment))
-                .skip(1)
-                .collect();
-            let first = tokens.first()?;
-            if first.kind() == K::String {
-                Some(iris_syntax::DecodedString::new(first.text()).text)
-            } else {
-                Some(tokens.iter().map(|t| t.text()).collect())
-            }
-        })
-        .last()
+    parsed.format_name()
 }

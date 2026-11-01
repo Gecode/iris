@@ -220,7 +220,6 @@ fn read_json_and_instance_caret() {
     Outcome::decode(OutcomeKind::Error, &output.stdout, "0.1").unwrap();
     for args in [
         vec!["read", &path],
-        vec!["read", &path, input],
         vec!["read", &path, input, "--json", "--dzn"],
     ] {
         assert_eq!(check(&args).status.code(), Some(2));

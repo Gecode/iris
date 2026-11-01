@@ -7,13 +7,16 @@ use std::{
 };
 
 #[derive(Args)]
-#[group(id = "output", required = true, multiple = false, args = ["json", "dzn"])]
+#[group(id = "output", multiple = false, args = ["summary", "json", "dzn"])]
 pub struct Arguments {
     spec: PathBuf,
     #[arg(required = true, num_args = 1..)]
     input: Vec<PathBuf>,
     #[command(flatten)]
     params: Parameters,
+    /// Print names, types, scalar values, and array shapes (the default).
+    #[arg(long)]
+    summary: bool,
     /// Print canonical JSON.
     #[arg(long)]
     json: bool,
@@ -63,13 +66,25 @@ fn read(arguments: &Arguments) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         std::fs::read(&arguments.spec).map_err(|e| format!("{}: {e}", arguments.spec.display()))?;
     let spec = Spec::parse(&source, &arguments.spec.to_string_lossy())?;
     let params = arguments.params.params();
+    let format = if arguments.json || arguments.dzn {
+        None
+    } else {
+        spec.format_name().filter(|name| !name.is_empty())
+    };
     let mut document = vec![];
     for input in &arguments.input {
         let data = spec.read_path(input, &params)?;
         if arguments.dzn {
             data.write_dzn(&mut document)?;
-        } else {
+        } else if arguments.json {
             document.extend(data.to_json()?);
+        } else {
+            super::summary::write_summary(
+                &mut document,
+                &input.to_string_lossy(),
+                format.as_deref(),
+                &data,
+            )?;
         }
     }
     Ok(document)

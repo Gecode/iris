@@ -225,6 +225,11 @@ impl<'a> ValueRef<'a> {
     pub fn value_type(self) -> &'static str {
         self.value.value_type()
     }
+    /// Number of elements in this array row; scalars return `ExpectedArray`.
+    /// This reads stored offsets in constant time, independent of depth.
+    pub fn size(self) -> Result<usize, AccessError> {
+        Ok(self.children()?.len())
+    }
     pub fn as_int(self) -> Result<i64, AccessError> {
         self.require_scalar()?;
         match &self.value.leaves {

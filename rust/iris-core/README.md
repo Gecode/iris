@@ -18,6 +18,7 @@ assert_eq!(dzn, b"x = 7;\nsquare = 49;\n");
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
+`Spec::format_name` returns the decoded format name when declared.
 `Spec::parse` selects language 0.1; `parse_version` takes an explicit
 `LanguageVersion`. A valid `Spec` can read several inputs independently.
 `read` borrows bytes only for the duration of execution; `read_path` acquires
@@ -51,6 +52,8 @@ Values store typed contiguous leaves and cumulative offsets for each array
 level, preserving ragged rows, empty arrays, value types, and depths.
 `Data::value(name, path)` selects a borrowed value; `int(name)` reads an
 integer scalar, and `ints(name, path)` returns a borrowed integer row.
+`ValueRef::size` returns an array row's element count in constant time from its
+stored offsets, and returns `AccessError::ExpectedArray` for scalars.
 Expression evaluation retains borrowed row views internally; only a result
 stored by a statement copies its selected subtree and rebases its offsets.
 Comprehension bindings use semantic definition identities, and free names

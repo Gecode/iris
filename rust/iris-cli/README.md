@@ -11,8 +11,11 @@ requests never execute expressions or parameter defaults.
 From `rust/`:
 
 ```sh
+cargo run --locked -p iris-cli -- --version
 cargo run --locked -p iris-cli -- lsp
 cargo run --locked -p iris-cli -- check path/to/spec.iris
+cargo run --locked -p iris-cli -- read path/to/spec.iris path/to/input.txt
+cargo run --locked -p iris-cli -- read path/to/spec.iris path/to/input.txt --summary
 cargo run --locked -p iris-cli -- read path/to/spec.iris path/to/input.txt --json --param instance=2
 cargo run --locked -p iris-cli -- read path/to/spec.iris path/to/input.txt --dzn
 cargo run --locked -p iris-cli -- list path/to/spec.iris path/to/input.txt
@@ -20,7 +23,9 @@ cargo run --locked -p iris-cli -- list path/to/spec.iris path/to/input.txt --dzn
 cargo run --locked -p iris-cli -- fmt path/to/spec.iris
 cargo run --locked -p iris-cli -- fmt --check --diff path/to/directory
 cargo run --locked -p iris-cli --bin iris-driver -- parse path/to/spec.iris --version 0.1
+cargo run --locked -p iris-cli -- conformance target/debug/iris-driver ../conformance/cases/0.1/smoke
 cargo test --locked -p iris-cli
+cargo test --locked -p iris-cli --test complete
 cargo test --locked -p iris-cli --test parse_conformance -- --nocapture
 ```
 
@@ -31,22 +36,31 @@ presentation choice: Gecode's parse diagnostics have only the header. Reported
 virtual capture lines remain in the header; the excerpt uses the raw source.
 The renderer escapes control characters in diagnostic text and excerpts.
 Usage errors exit 2; file acquisition and resource failures exit 1.
-`iris --version` reports package 0.1.0 and language 0.1.
+`iris --version` reports the Cargo package version and supported language versions
+(currently `iris 0.1.0 (languages: 0.1)`).
 
 ## Reading input
 
-`iris read SPEC FILE... (--json|--dzn) [--param NAME=VALUE]` prints one data
-document per input file. Exactly one output option is required: `--json` uses
+`iris read SPEC FILE... [--summary|--json|--dzn] [--param NAME=VALUE]...`
+defaults to `--summary`. Each file has a header with its path and optional
+format name. Entries follow in definition order: name, value type, scalar
+value or array shape. As in `gecode-instance -summary`, arrays show the outer
+size, then the minimum and maximum second-level row lengths (0 for an empty
+outer array), then `x ...` for every deeper dimension. Scalar strings use
+escaped quotes and control characters. Rendering is iterative, takes linear
+work in stored data and output bytes, and copies no subtrees.
+
+Output options are mutually exclusive. `--json` uses
 canonical JSON; `--dzn` uses the exact bytes in [Specification appendix
 B](../../spec/0.1/appendix-b-dzn.md), including its float spelling, type
-comments, and final LF rules. Multiple files concatenate documents without
-headers or extra separators. Output is buffered until all files have been read
-successfully. Split assignments at the first `=`; the remainder is the exact
+comments, and final LF rules. Multiple files concatenate JSON or dzn documents
+without headers or extra separators; summaries retain each file's header.
+Output is buffered until all files have been read successfully. Split assignments at the first `=`; the remainder is the exact
 string value. Repeated keys replace their earlier values without moving their
 supplied positions. Parameters apply to every file. Runtime language errors
 exit 1 with an input location, bounded excerpt, byte-position caret, and active
 reader-spec line. No partial read data is printed. File/serialization failures
-exit 1; usage errors exit 2. Summary output belongs to a later task.
+exit 1; usage errors exit 2.
 
 `iris list SPEC FILE... [--param NAME=VALUE]` matches Gecode's `-list`: print
 each file's instance count, then numbered names when all are usable, with first
@@ -57,6 +71,28 @@ same writer as `iris-driver catalog --format dzn`, without listing headers. The
 plain listing keeps Gecode's command-line behavior; catalog dzn is an
 additional CLI representation (Gecode's `-list` and `-dzn` select separate
 modes).
+
+## Conformance
+
+`iris conformance DRIVER [ROOTS...] [--driver-id ID] [--filter TEXT]
+[--version 0.1] [--timeout SECONDS]` reuses the `iris-conformance` library.
+It prints the same case lines and final report as `iris-conformance run`.
+The driver is a command string split using shell quoting, with no shell
+execution or expansion; quote paths with spaces inside the string. Roots are
+relative to the invocation directory. With none, the default is
+`conformance/cases/0.1`, intended for invocation from the repository root;
+from `rust/` or an installed binary, supply explicit roots.
+
+The language version defaults to `0.1` (the only supported version), and the
+positive timeout defaults to 30 seconds per case. `--filter` selects a path
+substring. `--driver-id` selects that driver's precise known-failure annotations;
+without it, no exemptions apply. Exemptions cannot hide arbitrary differences;
+stale annotations produce XPASS and fail the run. These options mirror
+`iris-conformance run`, with its `--driver` supplied positionally.
+Exit 0 means no FAIL or XPASS, exit 1 means at least one, and exit 2 means a
+usage, configuration, loading, or zero-selection error. See the
+[runner contract](../../conformance/README.md#running-cases) for exemptions and
+driver protocol details.
 
 ## Language server
 

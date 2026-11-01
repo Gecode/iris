@@ -1,17 +1,21 @@
 use clap::{Parser, Subcommand};
 use iris_cli::{CheckFailure, check_spec, format_name, render_error};
 use std::{path::PathBuf, process::ExitCode};
+#[path = "iris/conformance.rs"]
+mod conformance;
 #[path = "iris/fmt.rs"]
 mod fmt;
 #[path = "iris/list.rs"]
 mod list;
 #[path = "iris/read.rs"]
 mod read;
+#[path = "iris/summary.rs"]
+mod summary;
 #[derive(Parser)]
 #[command(
     name = "iris",
-    version = "0.1.0 (language 0.1)",
-    about = "Check and format Iris reader specs"
+    version = concat!(env!("CARGO_PKG_VERSION"), " (languages: 0.1)"),
+    about = "Read inputs, check and format Iris reader specs, and run conformance cases"
 )]
 struct Arguments {
     #[command(subcommand)]
@@ -19,20 +23,22 @@ struct Arguments {
 }
 #[derive(Subcommand)]
 enum Command {
-    /// Read input and print canonical JSON.
+    /// Read input and print a summary, canonical JSON, or MiniZinc data.
     Read(read::Arguments),
     /// List instances, names, and rejection summaries.
     List(list::Arguments),
-    Check {
-        spec: PathBuf,
-    },
+    /// Check a reader spec without reading input.
+    Check { spec: PathBuf },
     /// Format reader specs in place, or preview changes.
     Fmt(fmt::Arguments),
     /// Serve the Iris language server over stdio.
     Lsp,
+    /// Run conformance cases against an implementation driver.
+    Conformance(conformance::Arguments),
 }
 fn main() -> ExitCode {
     match Arguments::parse().command {
+        Command::Conformance(arguments) => conformance::run(arguments),
         Command::Read(arguments) => read::run(arguments),
         Command::List(arguments) => list::run(arguments),
         Command::Check { spec } => check(spec),

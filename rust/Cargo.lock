@@ -175,6 +175,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "gecode-iris"
+version = "0.1.0"
+dependencies = [
+ "iris-core",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

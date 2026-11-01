@@ -43,6 +43,29 @@ impl Parse {
     pub fn version(&self) -> LanguageVersion {
         self.version
     }
+    /// The last declared format name, decoded from the reader spec.
+    pub fn format_name(&self) -> Option<String> {
+        use SyntaxKind as K;
+        self.syntax()
+            .children()
+            .filter(|n| n.kind() == K::Format)
+            .filter_map(|node| {
+                let tokens: Vec<_> = node
+                    .children_with_tokens()
+                    .filter_map(|e| e.into_token())
+                    .filter(|t| !matches!(t.kind(), K::Whitespace | K::Comment))
+                    .skip(1)
+                    .collect();
+                let first = tokens.first()?;
+                if first.kind() == K::String {
+                    Some(DecodedString::new(first.text()).text)
+                } else {
+                    Some(tokens.iter().map(|t| t.text()).collect())
+                }
+            })
+            .last()
+    }
+
     pub fn origin(&self) -> &str {
         &self.origin
     }
