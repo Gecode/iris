@@ -131,6 +131,24 @@ impl<'a> Input<'a> {
             }
         }
     }
+    /// Skip separators on this physical line, leaving its LF unconsumed.
+    pub fn skip_to_line_data(&mut self) -> bool {
+        let mut end = self.offset;
+        while end < self.bytes.len()
+            && self.bytes[end] != b'\n'
+            && self.settings.classes[self.bytes[end] as usize] == Class::Separator
+        {
+            end += 1;
+        }
+        self.advance_to(end);
+        end < self.bytes.len() && self.bytes[end] != b'\n'
+    }
+    pub fn peek_byte(&self) -> Option<u8> {
+        self.bytes.get(self.offset).copied()
+    }
+    pub fn consume_byte(&mut self) {
+        self.advance_to(self.offset + 1);
+    }
     pub fn next_token(&mut self) -> Option<Token<'a>> {
         self.skip_to_data();
         if self.offset == self.bytes.len() {

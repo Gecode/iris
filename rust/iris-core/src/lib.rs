@@ -1,4 +1,4 @@
-//! Input reading, scalar evaluation, and owned column data for Iris 0.1.
+//! Input reading, expression evaluation, and owned column data for Iris 0.1.
 mod error;
 mod eval;
 mod input;

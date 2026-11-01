@@ -3,9 +3,9 @@
 The `iris` command and Rust conformance driver, part of milestone M3 in
 [PLAN.md §8.1](../../PLAN.md#81-rust-rust) and the
 [§4.2 layers](../../PLAN.md#42-the-rust-reference-implementation-is-layered).
-The user command checks and formats reader specs, reads scalar inputs through
+The user command checks and formats reader specs, reads inputs through
 [iris-core](../iris-core/README.md), and starts the language server. The driver
-implements parse-and-resolve and scalar reading. Parse-only requests never
+implements parse-and-resolve and reading. Parse-only requests never
 execute expressions or parameter defaults.
 
 From `rust/`:
@@ -30,7 +30,7 @@ The renderer escapes control characters in diagnostic text and excerpts.
 Usage errors exit 2; file acquisition and resource failures exit 1.
 `iris --version` reports package 0.1.0 and language 0.1.
 
-## Reading scalar input
+## Reading input
 
 `iris read SPEC FILE --json` prints the canonical data document. It currently
 requires one input file and `--json`. Runtime language errors exit 1 with an
@@ -129,21 +129,25 @@ single-byte message can be invalid Unicode and cannot always be reproduced
 byte for byte in canonical JSON. Codes and locations follow the Specification.
 
 The `read_conformance` progress test discovers both case roots, validates the
-exact pending list and its rust-004 through rust-010 owners, and excludes those
+exact pending list and its rust-005 through rust-010 owners, and excludes those
 paths before driver invocation. Newly discovered cases run automatically.
-The initial selection is 320 cases (155 parse, 165 read), with 612 pending;
+The selection is 442 cases (155 parse, 287 read), with 490 pending;
 counts follow inventory changes. No known-failure driver ID is used.
 
 ```sh
 cargo test --locked -p iris-cli --test read_conformance -- --nocapture
 ```
 
-The ignored scalar differential test runs 256 bounded probes with fixed seed
-73003, decoding both drivers through the independent canonical validator.
-It covers scalar input spellings, arithmetic boundaries, frozen types, settings,
-control flow, functions, comparisons, and error order. It preserves a temporary
-reproducer and prints commands on the first mismatch. Build the pinned adapter
-from the repository root, then run from `rust/`:
+The ignored differential test runs 256 bounded scalar probes with fixed seed
+73003 and 384 array/read probes with seed 73004, decoding both drivers through
+the independent canonical validator. Scalar probes cover input spellings,
+arithmetic boundaries, frozen types, settings, control flow, functions,
+comparisons, and error order. Array/read probes cover ranks 1–4, zeros,
+subtree copies, offsets and promotion, all nine layouts, byte alphabets,
+sentinel/eol lists, aggregates, indexing, and comprehensions. Per-family counts
+are printed. The test preserves a temporary reproducer and prints commands on
+the first mismatch. Build the pinned adapter from the repository root, then
+run from `rust/`:
 
 ```sh
 adapter=$(../conformance/adapters/gecode/build.sh)

@@ -185,6 +185,68 @@ fn read_json_and_instance_caret() {
         assert_eq!(output.status.code(), Some(2));
         assert!(output.stdout.is_empty());
     }
+    for (source, bytes, code, column) in [
+        (
+            "b:int\na[2]:int offset\n1",
+            "7 9223372036854775807 0",
+            "E-INTEGER-OVERFLOW",
+            24usize,
+        ),
+        (
+            "b:int\nlist a:int until eol offset\n1.0",
+            "7 1 2  \n3",
+            "E-OFFSET-TYPE",
+            8usize,
+        ),
+    ] {
+        std::fs::write(&path, source).unwrap();
+        std::fs::write(input, bytes).unwrap();
+        let spec = iris_core::Spec::parse(source.as_bytes(), &path).unwrap();
+        let iris_core::Failure::Language(error) = spec
+            .read(bytes.as_bytes(), input, &iris_core::Params::new())
+            .unwrap_err()
+        else {
+            panic!("expected a language error")
+        };
+        assert_eq!(error.code.as_str(), code);
+        assert_eq!(error.context(), Some("a"));
+        assert_eq!(error.spec_location().unwrap().line, Some(2));
+        assert_eq!(error.input_span().unwrap().bytes, column - 1..column - 1);
+        let output = check(&["read", &path, input, "--json"]);
+        assert_eq!(output.status.code(), Some(1));
+        assert!(output.stdout.is_empty());
+        let rendered = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            rendered.starts_with(&format!("{input}:1:{column}:")),
+            "{rendered}"
+        );
+        assert!(
+            rendered.contains(&format!("       | {}^\n", " ".repeat(column - 1))),
+            "{rendered}"
+        );
+        assert!(
+            rendered.ends_with(&format!("while reading: a\nspec: {path}:2\n")),
+            "{rendered}"
+        );
+    }
+}
+#[test]
+fn deeply_dimensional_arrays_serialize() {
+    // §5.12 allows any number of dimensions; deep enough to overflow a
+    // recursive writer.
+    const DEPTH: usize = 16384;
+    let (dir, path) = fixture(format!("a{}:int", "[1]".repeat(DEPTH)).as_bytes());
+    let input = dir.path().join("input.bin");
+    let input = input.to_str().unwrap();
+    std::fs::write(input, b"7").unwrap();
+    let output = check(&["read", &path, input, "--json"]);
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    let expected = format!(
+        "{{\"iris\":\"0.1\",\"entries\":[{{\"name\":\"a\",\"type\":\"int\",\"depth\":{DEPTH},\"value\":{}7{}}}]}}\n",
+        "[".repeat(DEPTH),
+        "]".repeat(DEPTH)
+    );
+    assert_eq!(String::from_utf8(output.stdout).unwrap(), expected);
 }
 #[test]
 fn ordered_parameter_admission_precedes_input_validation() {

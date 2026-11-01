@@ -1,6 +1,7 @@
 use crate::{
     ErrorCode, Failure, Value, numeric,
     reader::{Interpreter, expression, tokens, truth, unsupported},
+    value::LeafStorage,
 };
 use iris_syntax::{DecodedString, SyntaxKind as K, SyntaxNode};
 use std::{cmp::Ordering, collections::HashSet};
@@ -48,11 +49,8 @@ impl Interpreter<'_, '_> {
             K::Unary => self.eval_unary(node),
             K::Binary | K::Power => self.eval_binary(node),
             K::Call => self.eval_call(node),
-            K::IndexExpression | K::Comprehension => Err(unsupported(
-                node.text_range(),
-                "indexing and comprehensions",
-                "rust-004",
-            )),
+            K::IndexExpression => self.eval_index(node),
+            K::Comprehension => self.eval_comprehension(node),
             K::Field => Err(unsupported(
                 node.text_range(),
                 "record field evaluation",
@@ -142,6 +140,14 @@ impl Interpreter<'_, '_> {
         })
     }
     fn compare(&self, operator: &str, left: &Value, right: &Value) -> Result<Value, Failure> {
+        if left.depth() > 0 || right.depth() > 0 {
+            return Err(self
+                .error(
+                    ErrorCode::ComparisonType,
+                    format!("'{operator}' compares single values, not arrays"),
+                )
+                .into());
+        }
         let a = left.root();
         let b = right.root();
         let order = match (a.as_int(), b.as_int()) {
@@ -198,6 +204,13 @@ impl Interpreter<'_, '_> {
                 self.lookup(tokens(&argument)[0].text()).is_some(),
             )));
         }
+        if matches!(name, "size" | "count") {
+            let value = self.eval(&expression(node))?;
+            let children = value.root().children().map_err(|_| {
+                self.error(ErrorCode::FunctionType, format!("'{name}' needs an array"))
+            })?;
+            return Ok(Value::int(children.len() as i64));
+        }
         let mut minimum: Option<i64> = None;
         let mut maximum: Option<i64> = None;
         let mut sum = 0i64;
@@ -205,29 +218,30 @@ impl Interpreter<'_, '_> {
         let mut distinct = true;
         for argument in node.children() {
             let value = self.eval(&argument)?;
-            let integer = if matches!(name, "size" | "count") {
-                None
-            } else {
-                value.root().as_int().ok()
+            if value.leaf_count() > 0 && value.value_type() != "int" {
+                return Err(self
+                    .error(
+                        ErrorCode::FunctionType,
+                        format!("'{name}' has an invalid argument type"),
+                    )
+                    .into());
             }
-            .ok_or_else(|| {
-                self.error(
-                    ErrorCode::FunctionType,
-                    format!("'{name}' has an invalid argument type"),
-                )
-            })?;
-            // Scalar aggregate arguments cost one leaf, after type validation (§10.3).
-            self.charge_expression(1)?;
-            match name {
-                "min" => minimum = Some(minimum.map_or(integer, |v| v.min(integer))),
-                "max" => maximum = Some(maximum.map_or(integer, |v| v.max(integer))),
-                "sum" => {
-                    sum = sum.checked_add(integer).ok_or_else(|| {
-                        self.error(ErrorCode::IntegerOverflow, "integer overflow in 'sum'")
-                    })?
+            self.charge_expression(value.leaf_count() as u128)?;
+            let LeafStorage::Int(integers) = value.leaves else {
+                continue;
+            };
+            for integer in integers {
+                match name {
+                    "min" => minimum = Some(minimum.map_or(integer, |v| v.min(integer))),
+                    "max" => maximum = Some(maximum.map_or(integer, |v| v.max(integer))),
+                    "sum" => {
+                        sum = sum.checked_add(integer).ok_or_else(|| {
+                            self.error(ErrorCode::IntegerOverflow, "integer overflow in 'sum'")
+                        })?
+                    }
+                    "distinct" => distinct &= seen.insert(integer),
+                    _ => unreachable!("validated aggregate function"),
                 }
-                "distinct" => distinct &= seen.insert(integer),
-                _ => unreachable!("validated ordinary function"),
             }
         }
         let result = match name {
@@ -244,5 +258,68 @@ impl Interpreter<'_, '_> {
             )
             .into()
         })
+    }
+    fn eval_index(&mut self, node: &SyntaxNode) -> Result<Value, Failure> {
+        let mut operands = node.children();
+        let base = self.eval(&operands.next().expect("index base"))?;
+        let length = base
+            .root()
+            .children()
+            .map_err(|_| self.error(ErrorCode::IndexScalar, "cannot index a scalar"))?
+            .len();
+        let index = self.eval(&operands.next().expect("index operand"))?;
+        let index = index
+            .root()
+            .as_int()
+            .map_err(|_| self.error(ErrorCode::IndexType, "array index must be an integer"))?;
+        if index < 0 || index as u64 >= length as u64 {
+            return Err(self
+                .error(ErrorCode::IndexRange, "array index out of range")
+                .into());
+        }
+        let selected = base.select(&[index as usize]).expect("validated index");
+        self.charge_expression(1 + selected.leaf_range().len() as u128)?;
+        Ok(selected.to_owned())
+    }
+
+    fn eval_comprehension(&mut self, node: &SyntaxNode) -> Result<Value, Failure> {
+        let parts = tokens(node);
+        let function = parts[0].text();
+        let binding = parts[2].text();
+        let mut expressions = node.children();
+        let domain = self.eval(&expressions.next().expect("comprehension domain"))?;
+        let length = domain
+            .root()
+            .children()
+            .map_err(|_| self.error(ErrorCode::FunctionType, "comprehension needs an array"))?
+            .len();
+        let body = expressions.next().expect("comprehension body");
+        let mut result = i64::from(function == "all");
+        for index in 0..length {
+            let selected = domain.select(&[index]).expect("domain element");
+            self.charge_expression(1 + selected.leaf_range().len() as u128)?;
+            self.bindings
+                .push((binding.to_owned(), selected.to_owned()));
+            let value = self.eval(&body);
+            self.bindings.pop();
+            let value = value?;
+            match function {
+                "all" if !truth(&value) => return Ok(Value::int(0)),
+                "any" if truth(&value) => return Ok(Value::int(1)),
+                "all" | "any" => {}
+                "count" => result += i64::from(truth(&value)),
+                "sum" => {
+                    let integer = value
+                        .root()
+                        .as_int()
+                        .map_err(|_| self.error(ErrorCode::IntegerType, "'sum' needs integers"))?;
+                    result = result.checked_add(integer).ok_or_else(|| {
+                        self.error(ErrorCode::IntegerOverflow, "integer overflow in 'sum'")
+                    })?;
+                }
+                _ => unreachable!("comprehension function"),
+            }
+        }
+        Ok(Value::int(result))
     }
 }

@@ -87,6 +87,52 @@ impl Entry {
     }
 }
 impl Value {
+    pub(crate) fn empty(value_type: &str) -> Self {
+        Self {
+            leaves: match value_type {
+                "float" => LeafStorage::Float(vec![]),
+                "string" => LeafStorage::String(vec![]),
+                _ => LeafStorage::Int(vec![]),
+            },
+            levels: vec![],
+        }
+    }
+    pub(crate) fn leaf_count(&self) -> usize {
+        match &self.leaves {
+            LeafStorage::Int(v) => v.len(),
+            LeafStorage::Float(v) => v.len(),
+            LeafStorage::String(v) => v.len(),
+        }
+    }
+    pub(crate) fn append(&mut self, scalar: Value) -> Result<(), crate::ErrorCode> {
+        match (&mut self.leaves, scalar.leaves) {
+            (LeafStorage::Int(a), LeafStorage::Int(b)) => a.extend(b),
+            (LeafStorage::Float(a), LeafStorage::Float(b)) => a.extend(b),
+            (LeafStorage::String(a), LeafStorage::String(b)) => a.extend(b),
+            (LeafStorage::Float(a), LeafStorage::Int(b)) => {
+                a.extend(b.into_iter().map(|n| n as f64))
+            }
+            (LeafStorage::Int(a), LeafStorage::Float(b)) => {
+                let mut promoted: Vec<f64> = a.iter().map(|&n| n as f64).collect();
+                promoted.extend(b);
+                self.leaves = LeafStorage::Float(promoted);
+            }
+            _ => return Err(crate::ErrorCode::ValueTypeMix),
+        }
+        Ok(())
+    }
+    /// Attach rectangular structure only after all input leaves have been read.
+    pub(crate) fn set_dimensions(&mut self, dimensions: &[usize]) {
+        let mut rows = 1;
+        self.levels = dimensions
+            .iter()
+            .map(|&width| {
+                let offsets = (0..=rows).map(|i| i * width).collect();
+                rows *= width;
+                ArrayLevel { offsets }
+            })
+            .collect();
+    }
     pub fn depth(&self) -> usize {
         self.levels.len()
     }
@@ -140,6 +186,34 @@ impl Value {
     }
 }
 impl<'a> ValueRef<'a> {
+    pub(crate) fn leaf_range(self) -> std::ops::Range<usize> {
+        let mut rows = self.row..self.row + 1;
+        for level in &self.value.levels[self.level..] {
+            rows = level.offsets[rows.start]..level.offsets[rows.end];
+        }
+        rows
+    }
+    pub(crate) fn to_owned(self) -> Value {
+        let mut rows = self.row..self.row + 1;
+        let mut levels = vec![];
+        for level in &self.value.levels[self.level..] {
+            let start = level.offsets[rows.start];
+            let end = level.offsets[rows.end];
+            levels.push(ArrayLevel {
+                offsets: level.offsets[rows.start..=rows.end]
+                    .iter()
+                    .map(|n| n - start)
+                    .collect(),
+            });
+            rows = start..end;
+        }
+        let leaves = match &self.value.leaves {
+            LeafStorage::Int(v) => LeafStorage::Int(v[rows].to_vec()),
+            LeafStorage::Float(v) => LeafStorage::Float(v[rows].to_vec()),
+            LeafStorage::String(v) => LeafStorage::String(v[rows].to_vec()),
+        };
+        Value { leaves, levels }
+    }
     pub fn depth(self) -> usize {
         self.value.depth() - self.level
     }
@@ -218,7 +292,7 @@ mod tests {
     use super::*;
     #[test]
     fn borrowed_ragged_rows_and_empty_depth() {
-        let data = Data {
+        let mut data = Data {
             entries: vec![
                 Entry {
                     name: "rows".into(),
@@ -261,10 +335,38 @@ mod tests {
             data.value("empty", &[0]),
             Err(AccessError::IndexOutOfBounds)
         ));
+        let copy = data.value("rows", &[2]).unwrap().to_owned();
+        assert_eq!(copy.depth(), 1);
+        assert_eq!(copy.levels[0].offsets, [0, 1]);
+        assert_eq!(copy.root().as_ints().unwrap(), &[3]);
+        let empty = data.value("empty", &[]).unwrap().to_owned();
+        assert_eq!(empty.depth(), 2);
+        assert_eq!(empty.value_type(), "float");
+        assert_eq!(empty.levels[0].offsets, [0, 0]);
+        assert_eq!(empty.levels[1].offsets, [0]);
+        // An empty selected row retains the deeper, nonexistent rows.
+        let mut nested = Value::empty("float");
+        nested.set_dimensions(&[2, 0, 3]);
+        let row = nested.select(&[1]).unwrap().to_owned();
+        assert_eq!(row.depth(), 2);
+        assert_eq!(row.levels[0].offsets, [0, 0]);
+        assert_eq!(row.levels[1].offsets, [0]);
+        let LeafStorage::Int(original) = &mut data.entries[0].value.leaves else {
+            unreachable!()
+        };
+        original[2] = 99;
+        assert_eq!(copy.root().as_ints().unwrap(), &[3]);
         assert_eq!(data.int("rows"), Err(AccessError::ExpectedScalar));
         assert!(matches!(
             data.int("missing"),
             Err(AccessError::UnknownEntry(_))
         ));
+    }
+    #[test]
+    fn incompatible_leaf_append() {
+        assert_eq!(
+            Value::empty("int").append(Value::string("x".into())),
+            Err(crate::ErrorCode::ValueTypeMix)
+        );
     }
 }

@@ -1,6 +1,6 @@
 # iris-core
 
-Input reading, scalar expression evaluation, column data, and canonical JSON
+Input reading, expression evaluation, column data, and canonical JSON
 for Iris 0.1. This is the runtime layer in
 [PLAN.md §4.2](../../PLAN.md#42-the-rust-reference-implementation-is-layered),
 part of milestone M3 ([§8.1](../../PLAN.md#81-rust-rust)). It depends on
@@ -22,19 +22,24 @@ let json = data.to_json()?;
 a file and calls it. Returned data and errors own their retained content.
 The byte-slice interface also permits a future caller to use a memory map.
 
-Execution supports scalar int, float, num, word, rest, and integer ranges;
-named scalar types with frozen bounds and aliases; settings in statement
-order; scalar if/else and let; and scalar operators, comparisons, truth,
-functions, and host constants. Integers use checked 64-bit arithmetic.
+Execution supports int, float, num, word, rest, and integer ranges;
+named types with frozen bounds, alphabet options, and aliases; fixed arrays,
+including empty rows; numeric offsets; every matrix layout; sentinel and
+end-of-line lists; and byte alphabets. Settings execute in statement order.
+The evaluator supports if/else and let, scalar operators and comparisons,
+array truth, flattened integer aggregates, size/count, indexing, and ordinary
+array comprehensions with scoped bindings. Integers use checked 64-bit
+arithmetic. Numeric reads promote the complete value before applying offsets.
 Whole-input UTF-8 validation follows unknown-parameter admission; consumed
 word/rest values are validated again after byte-wise tokenization.
 
 `Data::entries` preserves first-definition order through replacement.
 Values store typed contiguous leaves and cumulative offsets for each array
-level. `Data::value(name, path)` selects a borrowed value; `int(name)` reads
-an integer scalar, and `ints(name, path)` returns a borrowed integer row.
-Array execution arrives in rust-004; the representation already preserves
-ragged rows, empty arrays, value types, and depths. Accessor misuse returns
+level, preserving ragged rows, empty arrays, value types, and depths.
+`Data::value(name, path)` selects a borrowed value; `int(name)` reads an
+integer scalar, and `ints(name, path)` returns a borrowed integer row.
+Expression indexing copies the selected subtree and rebases its offsets;
+let owns its result before replacing an entry. Accessor misuse returns
 `AccessError`, separate from language failures.
 
 `Failure` distinguishes language `Error`, host acquisition/resource failures,
@@ -44,13 +49,12 @@ Its display renders runtime excerpts and byte-position carets; `to_json`
 renders the canonical error envelope. Data JSON uses shortest round-tripping
 float digits with the Specification's notation choice and signed-zero rule.
 
-Later tasks add arrays, offsets, layouts, alphabets, indexing and comprehensions
-(rust-004), repeat/records (005), line patterns and sections (006), checks and
-record expressions (007), parameter execution and instances/catalog (008),
-budget enforcement (009), and dzn output (010). Supplied parameter strings
-are transported and unknown names rejected now; declarations/defaults do not
-execute yet. The scalar aggregate work hook is fallible but imposes no limit.
-No idle-work hook is needed until a statement can create idle work.
+Later tasks add repeat/records (rust-005), line patterns and sections (006),
+checks and record expressions (007), parameter execution and instances/catalog
+(008), budget enforcement (009), and dzn output (010). Supplied parameter
+strings are transported and unknown names rejected; declarations/defaults do
+not execute yet. Expression and idle-work hooks are fallible and impose no
+limit. They mark the work events defined by Specification §10.
 
 From `rust/`:
 
@@ -60,6 +64,7 @@ cargo test --locked -p iris-cli --test read_conformance -- --nocapture
 ```
 
 Conformance is the main semantic coverage. A focused column-access test checks
-borrowed ragged rows and empty depth/type preservation. The CLI's ignored
-`scalar_differential` test compares bounded generated probes with the pinned
-Gecode adapter; see the [CLI README](../iris-cli/README.md#conformance-driver).
+borrowed ragged rows, selected-subtree copying, and empty depth/type
+preservation. The CLI's ignored `scalar_differential` test compares 256 scalar
+and 384 array/read probes with the pinned Gecode adapter; see the
+[CLI README](../iris-cli/README.md#conformance-driver).

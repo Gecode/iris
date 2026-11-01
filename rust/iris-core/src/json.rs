@@ -3,6 +3,7 @@ use crate::{
     value::{LeafStorage, ValueRef},
 };
 use serde::Serialize;
+use std::ops::Range;
 
 impl Data {
     pub fn to_json(&self) -> Result<Vec<u8>, serde_json::Error> {
@@ -25,33 +26,53 @@ impl Data {
         Ok(out)
     }
 }
-fn write_value(out: &mut Vec<u8>, selected: ValueRef<'_>) -> Result<(), serde_json::Error> {
-    if selected.depth() > 0 {
-        out.push(b'[');
-        for (index, row) in selected.children().expect("array selection").enumerate() {
-            if index > 0 {
-                out.push(b',');
+/// Writes `root` with an explicit stack: §5.12 allows any number of
+/// dimensions, so recursion could exhaust the call stack.
+fn write_value(out: &mut Vec<u8>, root: ValueRef<'_>) -> Result<(), serde_json::Error> {
+    // For each open array: the level of its rows, the rows still to write, and
+    // whether a row has been written.
+    let mut open: Vec<(usize, Range<usize>, bool)> = Vec::new();
+    let mut next = Some(root);
+    loop {
+        if let Some(selected) = next.take() {
+            if selected.depth() > 0 {
+                out.push(b'[');
+                let rows = selected.children().expect("array selection");
+                open.push((selected.level + 1, rows, false));
+            } else {
+                write_leaf(out, selected)?;
             }
-            write_value(
-                out,
-                ValueRef {
-                    value: selected.value,
-                    level: selected.level + 1,
+        }
+        let Some((level, rows, started)) = open.last_mut() else {
+            return Ok(());
+        };
+        match rows.next() {
+            Some(row) => {
+                if std::mem::replace(started, true) {
+                    out.push(b',');
+                }
+                next = Some(ValueRef {
+                    value: root.value,
+                    level: *level,
                     row,
-                },
-            )?;
-        }
-        out.push(b']');
-    } else {
-        match &selected.value.leaves {
-            LeafStorage::Int(values) => {
-                out.extend_from_slice(values[selected.row].to_string().as_bytes())
+                });
             }
-            LeafStorage::Float(values) => {
-                out.extend_from_slice(canonical_float(values[selected.row]).as_bytes())
+            None => {
+                out.push(b']');
+                open.pop();
             }
-            LeafStorage::String(values) => serde_json::to_writer(out, &values[selected.row])?,
         }
+    }
+}
+fn write_leaf(out: &mut Vec<u8>, selected: ValueRef<'_>) -> Result<(), serde_json::Error> {
+    match &selected.value.leaves {
+        LeafStorage::Int(values) => {
+            out.extend_from_slice(values[selected.row].to_string().as_bytes())
+        }
+        LeafStorage::Float(values) => {
+            out.extend_from_slice(canonical_float(values[selected.row]).as_bytes())
+        }
+        LeafStorage::String(values) => serde_json::to_writer(out, &values[selected.row])?,
     }
     Ok(())
 }

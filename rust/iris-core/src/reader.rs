@@ -2,11 +2,9 @@ use crate::{
     Error, ErrorCode, Failure, Spec, UnsupportedFeature, Value,
     input::{Input, Position, Token},
     numeric,
-    value::Frame,
+    value::{Frame, LeafStorage},
 };
-use iris_sema::{
-    DefinitionId, DefinitionKind, ReadingKind, ReferenceId, Resolution, SemanticModel,
-};
+use iris_sema::{DefinitionId, DefinitionKind, ReferenceId, Resolution, SemanticModel};
 use iris_syntax::{DecodedString, SyntaxKind as K, SyntaxNode, SyntaxToken, TextRange};
 use std::collections::HashMap;
 
@@ -34,17 +32,43 @@ impl ModelIndex {
         }
     }
 }
-#[derive(Clone, Copy)]
-struct EvaluatedType {
-    kind: ReadingKind,
-    lower: Option<i64>,
-    upper: Option<i64>,
+mod reads;
+
+#[derive(Clone)]
+enum EvaluatedType {
+    Int,
+    Float,
+    Num,
+    Word,
+    Rest,
+    Range {
+        lower: Option<i64>,
+        upper: Option<i64>,
+    },
+    Alphabet(Alphabet),
+}
+#[derive(Clone)]
+struct Alphabet {
+    symbols: Vec<u8>,
+    blank: Vec<u8>,
+    strip: Vec<u8>,
+    base: i64,
+}
+impl EvaluatedType {
+    fn empty_value(&self) -> Value {
+        Value::empty(match self {
+            Self::Float => "float",
+            Self::Word | Self::Rest => "string",
+            _ => "int",
+        })
+    }
 }
 pub(crate) struct Interpreter<'s, 'i> {
     pub spec: &'s Spec,
     pub input: Input<'i>,
     pub frames: Vec<Frame>,
     types: HashMap<DefinitionId, EvaluatedType>,
+    pub bindings: Vec<(String, Value)>,
     statement: Option<(usize, TextRange)>,
     context: Option<String>,
 }
@@ -55,6 +79,7 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             input,
             frames: vec![Frame::default()],
             types: HashMap::new(),
+            bindings: vec![],
             statement: None,
             context: None,
         }
@@ -124,7 +149,7 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             }
             K::If => self.execute_if(node),
             K::Block => self.execute_block(node),
-            K::List => Err(unsupported(node.text_range(), "list reading", "rust-004")),
+            K::List => self.execute_list(node),
             K::Repeat | K::Each | K::Index => Err(unsupported(
                 node.text_range(),
                 "repeat and index execution",
@@ -180,26 +205,23 @@ impl<'s, 'i> Interpreter<'s, 'i> {
     fn execute_declaration(&mut self, node: &SyntaxNode) -> Result<(), Failure> {
         let name = tokens(node)[0].text().to_owned();
         self.context = Some(name.clone());
-        // Explicit offsets precede domains; domain failures precede dimensions.
-        if node.children().any(|n| n.kind() == K::Offset) {
-            return Err(unsupported(
-                node.text_range(),
-                "explicit offsets",
-                "rust-004",
-            ));
-        }
+        let offset = self.evaluate_offset(node)?;
         let domain = self.evaluate_domain(&child(node, K::Type))?;
-        if node
-            .children()
-            .any(|n| matches!(n.kind(), K::Dimension | K::Layout))
-        {
-            return Err(unsupported(
-                node.text_range(),
-                "array reading and layouts",
-                "rust-004",
-            ));
-        }
-        let value = self.read_scalar(domain)?;
+        let dimensions = self.evaluate_dimensions(node)?;
+        let value = match &domain {
+            EvaluatedType::Alphabet(alphabet) => self.read_alphabet(alphabet, &dimensions)?,
+            _ => {
+                if let Some(layout) = node.children().find(|n| n.kind() == K::Layout) {
+                    self.read_layout(&domain, &dimensions, &layout, offset)?
+                } else {
+                    self.read_array(&domain, &dimensions, offset)?
+                }
+            }
+        };
+        self.publish(name, value);
+        Ok(())
+    }
+    fn publish(&mut self, name: String, value: Value) {
         if name != "_" {
             self.frames
                 .last_mut()
@@ -207,30 +229,21 @@ impl<'s, 'i> Interpreter<'s, 'i> {
                 .set(name, value);
         }
         self.context = None;
-        Ok(())
     }
     fn evaluate_domain(&mut self, node: &SyntaxNode) -> Result<EvaluatedType, Failure> {
         let contents = node.children().next().expect("valid type has contents");
-        let mut domain = EvaluatedType {
-            kind: ReadingKind::Int,
-            lower: None,
-            upper: None,
-        };
-        match contents.kind() {
-            K::BaseType => {
-                domain.kind = match tokens(&contents)[0].text() {
-                    "int" => ReadingKind::Int,
-                    "float" => ReadingKind::Float,
-                    "num" => ReadingKind::Num,
-                    "word" => ReadingKind::Word,
-                    "rest" => ReadingKind::Rest,
-                    _ => unreachable!("base type"),
-                }
-            }
+        Ok(match contents.kind() {
+            K::BaseType => match tokens(&contents)[0].text() {
+                "int" => EvaluatedType::Int,
+                "float" => EvaluatedType::Float,
+                "num" => EvaluatedType::Num,
+                "word" => EvaluatedType::Word,
+                "rest" => EvaluatedType::Rest,
+                _ => unreachable!("base type"),
+            },
             K::TypeName => {
-                let name = contents
-                    .descendants_with_tokens()
-                    .filter_map(|e| e.into_token())
+                let name = tokens(&contents)
+                    .into_iter()
                     .find(|t| t.kind() == K::Ident)
                     .expect("named type has identifier");
                 let reference = self.spec.index.references[&name.text_range()];
@@ -239,32 +252,21 @@ impl<'s, 'i> Interpreter<'s, 'i> {
                 else {
                     unreachable!("valid type use resolves to a named type");
                 };
-                return self.types.get(&id).copied().ok_or_else(|| {
+                self.types.get(&id).cloned().ok_or_else(|| {
                     self.error(
                         ErrorCode::TypeUndefined,
                         format!("the type '{}' is not defined yet", name.text()),
                     )
-                    .into()
-                });
+                })?
             }
-            K::Range => return self.evaluate_range(&contents),
-            K::Alphabet => {
-                return Err(unsupported(
-                    node.text_range(),
-                    "alphabet reading types",
-                    "rust-004",
-                ));
-            }
+            K::Range => self.evaluate_range(&contents)?,
+            K::Alphabet => EvaluatedType::Alphabet(Self::alphabet_options(&contents)),
             _ => unreachable!("valid reading type"),
-        }
-        Ok(domain)
+        })
     }
     fn evaluate_range(&mut self, contents: &SyntaxNode) -> Result<EvaluatedType, Failure> {
-        let mut domain = EvaluatedType {
-            kind: ReadingKind::Range,
-            lower: None,
-            upper: None,
-        };
+        let mut lower = None;
+        let mut upper = None;
         let operator = tokens(contents)
             .into_iter()
             .find(|t| matches!(t.text(), ".." | "..<"))
@@ -278,15 +280,14 @@ impl<'s, 'i> Interpreter<'s, 'i> {
                 )
             })?;
             if bound.text_range().start() < operator.text_range().start() {
-                domain.lower = Some(integer);
+                lower = Some(integer);
             } else {
-                domain.upper = Some(integer);
+                upper = Some(integer);
             }
         }
         if operator.text() == "..<" {
-            domain.upper = Some(
-                domain
-                    .upper
+            upper = Some(
+                upper
                     .expect("exclusive upper bound exists")
                     .checked_sub(1)
                     .ok_or_else(|| {
@@ -297,32 +298,18 @@ impl<'s, 'i> Interpreter<'s, 'i> {
                     })?,
             );
         }
-        Ok(domain)
+        Ok(EvaluatedType::Range { lower, upper })
     }
-    fn read_scalar(&mut self, domain: EvaluatedType) -> Result<Value, Failure> {
-        let token = if domain.kind == ReadingKind::Rest {
-            self.input.read_rest()
-        } else {
-            self.input.next_token()
-        };
-        let Some(token) = token else {
-            return Err(self
-                .error(
-                    ErrorCode::ExpectedValue,
-                    "expected a value, found end of input",
-                )
-                .into());
-        };
-        // Declarations add zero even without an offset, clearing float negative zero (§6.7).
-        let value = match domain.kind {
-            ReadingKind::Int | ReadingKind::Range => {
+    fn convert_scalar(&self, domain: &EvaluatedType, token: &Token<'_>) -> Result<Value, Error> {
+        let value = match domain {
+            EvaluatedType::Int | EvaluatedType::Range { .. } => {
                 numeric::parse_integer(token.bytes).map(Value::int)
             }
-            ReadingKind::Float => numeric::parse_float(token.bytes).map(|v| Value::float(v + 0.0)),
-            ReadingKind::Num => numeric::parse_integer(token.bytes)
+            EvaluatedType::Float => numeric::parse_float(token.bytes).map(Value::float),
+            EvaluatedType::Num => numeric::parse_integer(token.bytes)
                 .map(Value::int)
-                .or_else(|| numeric::parse_float(token.bytes).map(|v| Value::float(v + 0.0))),
-            ReadingKind::Word | ReadingKind::Rest => {
+                .or_else(|| numeric::parse_float(token.bytes).map(Value::float)),
+            EvaluatedType::Word | EvaluatedType::Rest => {
                 let text = std::str::from_utf8(token.bytes).map_err(|e| {
                     self.error_at(
                         ErrorCode::Utf8,
@@ -332,31 +319,52 @@ impl<'s, 'i> Interpreter<'s, 'i> {
                 })?;
                 Some(Value::string(text.to_owned()))
             }
-            ReadingKind::Alphabet => unreachable!("alphabet execution deferred"),
-        }
-        .ok_or_else(|| self.expected_value(domain, &token))?;
-        if domain.kind == ReadingKind::Range {
+            EvaluatedType::Alphabet(_) => unreachable!("alphabet uses byte mapping"),
+        };
+        value.ok_or_else(|| self.expected_value(domain, token))
+    }
+    fn validate_range(
+        &self,
+        domain: &EvaluatedType,
+        value: &Value,
+        token: &Token<'_>,
+    ) -> Result<(), Error> {
+        if let EvaluatedType::Range { lower, upper } = domain {
             let integer = value
                 .root()
                 .as_int()
                 .expect("range conversion produced an int");
-            if domain.lower.is_some_and(|lo| integer < lo)
-                || domain.upper.is_some_and(|hi| integer > hi)
-            {
-                return Err(self.expected_value(domain, &token).into());
+            if lower.is_some_and(|lo| integer < lo) || upper.is_some_and(|hi| integer > hi) {
+                return Err(self.expected_value(domain, token));
             }
         }
+        Ok(())
+    }
+    fn read_scalar(&mut self, domain: &EvaluatedType) -> Result<Value, Failure> {
+        let token = if matches!(domain, EvaluatedType::Rest) {
+            self.input.read_rest()
+        } else {
+            self.input.next_token()
+        };
+        let token = token.ok_or_else(|| {
+            self.error(
+                ErrorCode::ExpectedValue,
+                "expected a value, found end of input",
+            )
+        })?;
+        let value = self.convert_scalar(domain, &token)?;
+        self.validate_range(domain, &value, &token)?;
         Ok(value)
     }
-    fn expected_value(&self, domain: EvaluatedType, token: &Token<'_>) -> Error {
-        let description = match domain.kind {
-            ReadingKind::Int => "int".into(),
-            ReadingKind::Float => "float".into(),
-            ReadingKind::Num => "a number".into(),
-            ReadingKind::Range => format!(
+    fn expected_value(&self, domain: &EvaluatedType, token: &Token<'_>) -> Error {
+        let description = match domain {
+            EvaluatedType::Int => "int".into(),
+            EvaluatedType::Float => "float".into(),
+            EvaluatedType::Num => "a number".into(),
+            EvaluatedType::Range { lower, upper } => format!(
                 "an int in {}..{}",
-                domain.lower.map_or(String::new(), |n| n.to_string()),
-                domain.upper.map_or(String::new(), |n| n.to_string())
+                lower.map_or(String::new(), |n| n.to_string()),
+                upper.map_or(String::new(), |n| n.to_string())
             ),
             _ => "a value".into(),
         };
@@ -372,10 +380,17 @@ impl<'s, 'i> Interpreter<'s, 'i> {
         error
     }
     pub fn lookup(&self, name: &str) -> Option<&Value> {
-        self.frames
+        self.bindings
             .iter()
             .rev()
-            .find_map(|frame| frame.lookup(name))
+            .find(|(bound, _)| bound == name)
+            .map(|(_, value)| value)
+            .or_else(|| {
+                self.frames
+                    .iter()
+                    .rev()
+                    .find_map(|frame| frame.lookup(name))
+            })
     }
     pub fn error(&self, code: ErrorCode, message: impl Into<String>) -> Error {
         self.error_at(code, message, self.input.position())
@@ -390,6 +405,9 @@ impl<'s, 'i> Interpreter<'s, 'i> {
                 .map(|(line, range)| (self.spec.parsed.origin(), line, range)),
             self.context.as_deref(),
         )
+    }
+    fn charge_idle(&mut self, _units: u128) -> Result<(), Error> {
+        Ok(())
     }
     pub fn charge_expression(&mut self, _units: u128) -> Result<(), Error> {
         Ok(())
@@ -436,6 +454,9 @@ fn is_expression(kind: K) -> bool {
 }
 pub(crate) fn truth(value: &Value) -> bool {
     let scalar = value.root();
+    if value.depth() > 0 {
+        return !scalar.children().expect("array").is_empty();
+    }
     match scalar.value_type() {
         "int" => scalar.as_int().expect("scalar int") != 0,
         "float" => scalar.as_float().expect("scalar float") != 0.0,

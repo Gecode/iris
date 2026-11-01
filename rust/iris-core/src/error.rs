@@ -20,6 +20,17 @@ pub enum ErrorCode {
     FunctionType,
     FunctionEmpty,
     TrailingInput,
+    Count,
+    SizeLimit,
+    Layout,
+    ListTerminator,
+    OffsetType,
+    Symbol,
+    ExpectedToken,
+    IndexScalar,
+    IndexType,
+    IndexRange,
+    ValueTypeMix,
 }
 impl ErrorCode {
     pub fn as_str(self) -> &'static str {
@@ -38,6 +49,17 @@ impl ErrorCode {
             Self::IntegerOverflow => "E-INTEGER-OVERFLOW",
             Self::FunctionType => "E-FUNCTION-TYPE",
             Self::FunctionEmpty => "E-FUNCTION-EMPTY",
+            Self::Count => "E-COUNT",
+            Self::SizeLimit => "E-SIZE-LIMIT",
+            Self::Layout => "E-LAYOUT",
+            Self::ListTerminator => "E-LIST-TERMINATOR",
+            Self::OffsetType => "E-OFFSET-TYPE",
+            Self::Symbol => "E-SYMBOL",
+            Self::ExpectedToken => "E-EXPECTED-TOKEN",
+            Self::IndexScalar => "E-INDEX-SCALAR",
+            Self::IndexType => "E-INDEX-TYPE",
+            Self::IndexRange => "E-INDEX-RANGE",
+            Self::ValueTypeMix => "E-VALUE-TYPE-MIX",
             Self::TrailingInput => "E-TRAILING-INPUT",
         }
     }
