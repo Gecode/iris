@@ -1,0 +1,1 @@
+let n=2 repeat n {index 1 x:int let n=1} y:int

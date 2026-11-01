@@ -1,0 +1,1 @@
+repeat 2 as jobs {each job repeat 2 as steps {each step x:int}} check size(job.steps)==2 && all(s in job.steps:s.x>0) let v=jobs[1].steps[0].x let total=sum(j in jobs:sum(j.x))

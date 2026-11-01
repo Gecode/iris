@@ -53,10 +53,26 @@ pub struct CaseMetadata {
 #[serde(deny_unknown_fields)]
 pub struct KnownFailureMetadata {
     pub driver: String,
-    pub outcome: OutcomeKind,
-    pub expected_file: PathBuf,
+    pub outcome: KnownFailureKind,
+    pub expected_file: Option<PathBuf>,
     pub reason: String,
     pub difference: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum KnownFailureKind {
+    Data,
+    Parse,
+    Dzn,
+    Error,
+    Unrepresentable,
+}
+
+#[derive(Debug)]
+pub enum KnownFailureOutcome {
+    Alternate(Outcome),
+    Unrepresentable,
 }
 
 #[derive(Debug)]
@@ -75,7 +91,7 @@ pub struct Case {
 #[derive(Debug)]
 pub struct KnownFailure {
     pub driver: String,
-    pub expected: Outcome,
+    pub expected: KnownFailureOutcome,
     pub reason: String,
     pub difference: Option<String>,
 }
@@ -96,10 +112,7 @@ impl Case {
 fn load_case(path: &Path, version: &str) -> Result<Case, String> {
     let metadata = load_metadata(path)?;
     let output = output_format(metadata.operation, metadata.output)?;
-    let spec = path.join("spec.iris");
-    if !spec.is_file() {
-        return Err("spec.iris must be a file or file symlink".into());
-    }
+    let spec = spec_path(path)?;
     let input = input_path(path, metadata.operation)?;
     let params = load_params(path, metadata.operation)?;
     let success = success_kind(metadata.operation, output);
@@ -117,6 +130,27 @@ fn load_case(path: &Path, version: &str) -> Result<Case, String> {
         expected,
         known_failures,
     })
+}
+
+fn spec_path(path: &Path) -> Result<PathBuf, String> {
+    let specs: Vec<PathBuf> = ["spec.iris", "spec.bin"]
+        .into_iter()
+        .map(|name| path.join(name))
+        .filter(|file| fs::symlink_metadata(file).is_ok())
+        .collect();
+    if specs.len() != 1 {
+        return Err("exactly one spec.iris or spec.bin is required".into());
+    }
+    let spec = &specs[0];
+    if !spec.is_file() {
+        return Err("spec must be a file or file symlink".into());
+    }
+    if spec.ends_with("spec.iris") {
+        let bytes = fs::read(spec).map_err(|error| error.to_string())?;
+        std::str::from_utf8(&bytes)
+            .map_err(|error| format!("spec.iris must be valid UTF-8 (use spec.bin): {error}"))?;
+    }
+    Ok(specs.into_iter().next().expect("one spec was validated"))
 }
 
 fn load_metadata(path: &Path) -> Result<CaseMetadata, String> {
@@ -260,25 +294,7 @@ fn load_known_failures(
         {
             return Err("difference must be nonempty when supplied".into());
         }
-        if annotation.expected_file.as_os_str().is_empty()
-            || annotation
-                .expected_file
-                .components()
-                .any(|part| !matches!(part, Component::Normal(_) | Component::CurDir))
-        {
-            return Err("known_failure expected_file must be case-relative without ..".into());
-        }
-        if annotation.outcome != OutcomeKind::Error && annotation.outcome != success {
-            return Err("known_failure outcome incompatible with operation/output".into());
-        }
-        let expected = load_expectation(
-            &path.join(annotation.expected_file),
-            annotation.outcome,
-            version,
-        )?;
-        if &expected == primary {
-            return Err("known_failure alternate must differ from primary outcome".into());
-        }
+        let expected = load_known_outcome(path, &annotation, primary, success, version)?;
         known.push(KnownFailure {
             driver: annotation.driver,
             expected,
@@ -287,6 +303,56 @@ fn load_known_failures(
         });
     }
     Ok(known)
+}
+
+fn load_known_outcome(
+    path: &Path,
+    annotation: &KnownFailureMetadata,
+    primary: &Outcome,
+    success: OutcomeKind,
+    version: &str,
+) -> Result<KnownFailureOutcome, String> {
+    let kind = match annotation.outcome {
+        KnownFailureKind::Unrepresentable => {
+            if !annotation.driver.starts_with("gecode-") {
+                return Err("unrepresentable requires a gecode- driver".into());
+            }
+            if annotation.difference.as_deref()
+                != Some("spec/0.1/appendix-c-differences.md#c1-unicode-strings")
+            {
+                return Err(
+                    "unrepresentable requires the C.1 Unicode strings difference link".into(),
+                );
+            }
+            if annotation.expected_file.is_some() {
+                return Err("unrepresentable must not supply expected_file".into());
+            }
+            return Ok(KnownFailureOutcome::Unrepresentable);
+        }
+        KnownFailureKind::Data => OutcomeKind::Data,
+        KnownFailureKind::Parse => OutcomeKind::Parse,
+        KnownFailureKind::Dzn => OutcomeKind::Dzn,
+        KnownFailureKind::Error => OutcomeKind::Error,
+    };
+    let file = annotation
+        .expected_file
+        .as_ref()
+        .ok_or("known_failure alternate requires expected_file")?;
+    if file.as_os_str().is_empty()
+        || file
+            .components()
+            .any(|part| !matches!(part, Component::Normal(_) | Component::CurDir))
+    {
+        return Err("known_failure expected_file must be case-relative without ..".into());
+    }
+    if kind != OutcomeKind::Error && kind != success {
+        return Err("known_failure outcome incompatible with operation/output".into());
+    }
+    let expected = load_expectation(&path.join(file), kind, version)?;
+    if &expected == primary {
+        return Err("known_failure alternate must differ from primary outcome".into());
+    }
+    Ok(KnownFailureOutcome::Alternate(expected))
 }
 
 fn is_difference_link(link: &str) -> bool {
@@ -332,7 +398,7 @@ pub fn discover(roots: &[PathBuf], filter: Option<&str>) -> Result<Vec<PathBuf>,
 }
 
 fn discover_directory(path: &Path, cases: &mut BTreeSet<PathBuf>) -> Result<(), String> {
-    if ["spec.iris", "case.toml"]
+    if ["spec.iris", "spec.bin", "case.toml"]
         .iter()
         .any(|name| fs::symlink_metadata(path.join(name)).is_ok())
     {

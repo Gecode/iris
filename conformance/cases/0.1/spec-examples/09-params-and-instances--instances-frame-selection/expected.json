@@ -1,0 +1,6 @@
+{"iris": "0.1", "entries": [
+  {"name": "shared", "type": "int", "depth": 0, "value": 2},
+  {"name": "name", "type": "string", "depth": 0, "value": "b"},
+  {"name": "n", "type": "int", "depth": 0, "value": 2},
+  {"name": "before", "type": "int", "depth": 0, "value": 9}
+]}

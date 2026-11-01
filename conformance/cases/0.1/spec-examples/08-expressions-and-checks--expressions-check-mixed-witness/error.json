@@ -1,0 +1,1 @@
+{"code": "E-CHECK-FAILED", "message": "check failed for element 2 of 'lim' in record 2 of 'x': below", "input_location": {"origin": "input.bin", "line": 1, "column": 7}, "spec_location": {"origin": "spec.iris", "line": 1, "column": null}, "context": null, "record_path": [1, 1]}

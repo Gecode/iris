@@ -1,0 +1,16 @@
+{
+  "code": "E-COUNT",
+  "message": "repeat count is too large (2147483648)",
+  "input_location": {
+    "origin": "input.bin",
+    "line": 1,
+    "column": 1
+  },
+  "spec_location": {
+    "origin": "spec.iris",
+    "line": 1,
+    "column": null
+  },
+  "context": null,
+  "record_path": null
+}

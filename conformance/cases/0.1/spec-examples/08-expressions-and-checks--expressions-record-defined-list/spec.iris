@@ -1,0 +1,1 @@
+repeat 0 as rows {x:int} check defined(rows) && size(rows)==0

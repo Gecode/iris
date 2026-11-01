@@ -1,0 +1,4 @@
+instances {
+ n:int check n>0 "first"
+ name:word check 0 "second"
+}

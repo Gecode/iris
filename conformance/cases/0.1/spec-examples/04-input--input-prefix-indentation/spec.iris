@@ -1,0 +1,1 @@
+comment "#" repeat until eof { x: word }

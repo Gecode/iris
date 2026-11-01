@@ -1,0 +1,1 @@
+{"code": "E-SPEC-PATTERN", "message": "capture name 'bad name' in pattern \"{x:@}{bad name}\" is not a name", "input_location": null, "spec_location": {"origin": "spec.iris", "line": 1, "column": null}, "context": null, "record_path": null}

@@ -1,0 +1,1 @@
+repeat 2 {k:int if k {let x=1} else {let x=2}} check x>0

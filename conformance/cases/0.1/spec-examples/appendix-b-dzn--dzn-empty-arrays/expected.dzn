@@ -1,0 +1,11 @@
+i = [];
+f = [];
+s = [];
+outer = array2d(1..0, 1..0, []);
+inner = array2d(1..2, 1..0, []);
+three = array3d(1..2, 1..0, 1..0, []);
+four = array4d(1..1, 1..2, 1..0, 1..0, []);
+five = array5d(1..0, 1..0, 1..0, 1..0, 1..0, []);
+six = array6d(1..1, 1..0, 1..0, 1..0, 1..0, 1..0, []);
+% seven: array[int] of tuple(array[int] of tuple(array[int] of tuple(array[int] of tuple(array[int] of tuple(array[int] of tuple(array[int] of int))))))
+seven = [];

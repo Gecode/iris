@@ -1,0 +1,8 @@
+{
+  "code": "E-SPEC-NAME-CONFLICT",
+  "message": "'t' names a type, so it cannot also name a value",
+  "input_location": null,
+  "spec_location": {"origin": "spec.iris", "line": 1, "column": null},
+  "context": null,
+  "record_path": null
+}

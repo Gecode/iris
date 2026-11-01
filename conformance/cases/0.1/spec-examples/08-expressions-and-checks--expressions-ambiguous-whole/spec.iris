@@ -1,0 +1,1 @@
+let x=1 repeat 1 {x:int} check size(x)==1 && defined(x) && all(t in x:t>0)

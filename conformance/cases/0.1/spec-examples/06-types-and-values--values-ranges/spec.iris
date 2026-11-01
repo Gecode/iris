@@ -1,0 +1,1 @@
+n:int a[n]:0..<n b:..0 c:-2..-1 d:1..2 offset -1 list e:1..2 until -1 offset 10

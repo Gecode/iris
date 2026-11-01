@@ -1,0 +1,1 @@
+let x=1 if 0 {let x=9} else if 1 {let y="yes"} else {let y="no"} let x=2

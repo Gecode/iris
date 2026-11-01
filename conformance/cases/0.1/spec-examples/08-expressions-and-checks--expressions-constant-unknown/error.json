@@ -1,0 +1,1 @@
+{"code": "E-SPEC-CONSTANT", "message": "unknown Gecode constant 'gecode.no' (known: gecode.int_max, gecode.int_min)", "input_location": null, "spec_location": {"origin": "spec.iris", "line": 1, "column": null}, "context": null, "record_path": null}

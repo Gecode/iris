@@ -1,0 +1,1 @@
+check x>0 repeat 0 {x:int}

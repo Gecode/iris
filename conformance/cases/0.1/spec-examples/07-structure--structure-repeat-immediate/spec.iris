@@ -1,0 +1,1 @@
+repeat until "END" store ending {x:int}

@@ -1,0 +1,1 @@
+a[0]:int f[0]:float s[0]:word let v=sum(a,f,s) let w=distinct(a,f,s) let n=size(a) let k=count(a)

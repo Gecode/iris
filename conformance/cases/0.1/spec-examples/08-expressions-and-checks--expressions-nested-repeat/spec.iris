@@ -1,0 +1,1 @@
+repeat 2 {k:int repeat 2 {x:int}} check x<k "limit"

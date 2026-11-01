@@ -1,0 +1,1 @@
+sections {"N {n:int}" "DATA" {a[n]:int}}

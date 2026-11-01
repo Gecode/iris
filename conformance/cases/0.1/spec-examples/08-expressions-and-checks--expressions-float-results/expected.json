@@ -1,0 +1,5 @@
+{"iris": "0.1", "entries": [
+  {"name": "precise", "type": "float", "depth": 0, "value": -1.2345678901234567},
+  {"name": "negative_zero", "type": "float", "depth": 0, "value": -0.0},
+  {"name": "positive_zero", "type": "float", "depth": 0, "value": 0}
+]}

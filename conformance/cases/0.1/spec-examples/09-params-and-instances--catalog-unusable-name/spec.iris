@@ -1,0 +1,2 @@
+let name="outer"
+instances {k:int if k==1 {let name=1.0} else if k==2 {name[0]:word} else if k==3 {let name=""}}

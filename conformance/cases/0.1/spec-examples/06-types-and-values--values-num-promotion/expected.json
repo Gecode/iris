@@ -1,0 +1,5 @@
+{"iris": "0.1", "entries": [
+  {"name": "a", "type": "float", "depth": 2, "value": [[1, 2.5], [3, 4]]},
+  {"name": "b", "type": "float", "depth": 1, "value": [9007199254740992, 1]},
+  {"name": "c", "type": "float", "depth": 0, "value": 9223372036854776000}
+]}

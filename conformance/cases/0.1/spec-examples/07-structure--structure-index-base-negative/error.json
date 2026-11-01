@@ -1,0 +1,16 @@
+{
+  "code": "E-COUNT",
+  "message": "index base is negative (-1)",
+  "input_location": {
+    "origin": "input.bin",
+    "line": 1,
+    "column": 1
+  },
+  "spec_location": {
+    "origin": "spec.iris",
+    "line": 1,
+    "column": null
+  },
+  "context": "repeat [1 of 1]",
+  "record_path": null
+}

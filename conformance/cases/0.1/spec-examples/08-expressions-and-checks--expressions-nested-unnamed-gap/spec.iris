@@ -1,0 +1,1 @@
+repeat 1 as jobs {repeat 1 {repeat 1 as steps {x:int}}} let v=jobs[0].steps[0].x

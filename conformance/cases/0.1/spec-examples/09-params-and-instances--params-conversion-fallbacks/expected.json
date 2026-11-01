@@ -1,0 +1,7 @@
+{"iris": "0.1", "entries": [
+  {"name": "overflow", "type": "string", "depth": 0, "value": "1e309"},
+  {"name": "underflow", "type": "string", "depth": 0, "value": "5e-324"},
+  {"name": "hex", "type": "string", "depth": 0, "value": "0x10"},
+  {"name": "leading", "type": "string", "depth": 0, "value": " 7"},
+  {"name": "trailing", "type": "string", "depth": 0, "value": "7 "}
+]}

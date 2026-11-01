@@ -1,0 +1,1 @@
+repeat 2 as jobs {repeat 2 as steps {x:int}} check all(s in jobs[1].steps:s.x>0)

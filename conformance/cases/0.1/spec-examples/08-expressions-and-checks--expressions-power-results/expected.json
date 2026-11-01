@@ -1,0 +1,9 @@
+{"iris": "0.1", "entries": [
+  {"name": "zero", "type": "int", "depth": 0, "value": 1},
+  {"name": "minimum", "type": "int", "depth": 0, "value": -9223372036854775808},
+  {"name": "identity", "type": "int", "depth": 0, "value": -9223372036854775808},
+  {"name": "minimum_zero", "type": "int", "depth": 0, "value": 1},
+  {"name": "one", "type": "int", "depth": 0, "value": 1},
+  {"name": "minus_one", "type": "int", "depth": 0, "value": -1},
+  {"name": "zero_large", "type": "int", "depth": 0, "value": 0}
+]}

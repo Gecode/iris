@@ -1,13 +1,14 @@
 use std::fmt::Write;
 
 use crate::canonical::{Data, Outcome, ValueToken};
-use crate::case::KnownFailure;
+use crate::case::{KnownFailure, KnownFailureOutcome};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum CaseStatus {
     Pass,
     Fail,
     KnownFailure,
+    Unrepresentable,
     UnexpectedPass,
 }
 
@@ -34,13 +35,14 @@ impl RunReport {
 
     pub fn render(&self) -> String {
         let mut text = String::new();
-        let mut counts = [0; 4];
+        let mut counts = [0; 5];
         for case in &self.cases {
             let (label, index) = match case.status {
                 CaseStatus::Pass => ("PASS", 0),
                 CaseStatus::KnownFailure => ("XFAIL", 1),
                 CaseStatus::Fail => ("FAIL", 2),
                 CaseStatus::UnexpectedPass => ("XPASS", 3),
+                CaseStatus::Unrepresentable => ("UNREPRESENTABLE", 4),
             };
             counts[index] += 1;
             writeln!(text, "{label} {}", case.path).expect("writing to String cannot fail");
@@ -50,12 +52,13 @@ impl RunReport {
         }
         writeln!(
             text,
-            "Summary: total={} pass={} xfail={} fail={} xpass={}",
+            "Summary: total={} pass={} xfail={} fail={} xpass={} unrepresentable={}",
             self.cases.len(),
             counts[0],
             counts[1],
             counts[2],
-            counts[3]
+            counts[3],
+            counts[4]
         )
         .expect("writing to String cannot fail");
         text
@@ -80,23 +83,31 @@ pub(crate) fn classify(
         };
     }
     if let Some(known) = known
-        && &known.expected == actual
+        && let KnownFailureOutcome::Alternate(alternate) = &known.expected
+        && alternate == actual
     {
-        let mut explanation = format!("{}: {}", known.driver, known.reason);
-        if let Some(link) = &known.difference {
-            explanation.push_str(&format!(" ({link})"));
-        }
-        return (CaseStatus::KnownFailure, vec![explanation]);
+        return (CaseStatus::KnownFailure, vec![known_failure_details(known)]);
     }
     let mut details = differences(expected, actual);
     if let Some(known) = known {
+        let mismatch = match &known.expected {
+            KnownFailureOutcome::Alternate(alternate) => differences(alternate, actual).join("; "),
+            KnownFailureOutcome::Unrepresentable => "actual outcome is representable".into(),
+        };
         details.push(format!(
             "alternate for {} did not match: {}",
-            known.driver,
-            differences(&known.expected, actual).join("; ")
+            known.driver, mismatch
         ));
     }
     (CaseStatus::Fail, details)
+}
+
+pub(crate) fn known_failure_details(known: &KnownFailure) -> String {
+    let mut explanation = format!("{}: {}", known.driver, known.reason);
+    if let Some(link) = &known.difference {
+        explanation.push_str(&format!(" ({link})"));
+    }
+    explanation
 }
 
 pub fn differences(expected: &Outcome, actual: &Outcome) -> Vec<String> {

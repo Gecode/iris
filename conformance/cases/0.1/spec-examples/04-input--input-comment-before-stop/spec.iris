@@ -1,0 +1,1 @@
+comment "END" stop "END" repeat until eof { x: word }

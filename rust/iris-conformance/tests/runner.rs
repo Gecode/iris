@@ -364,16 +364,51 @@ fn case_loading_defaults_and_all_operation_outputs() {
 
 #[test]
 fn driver_receives_spec_and_input_bytes_unchanged() {
-    // Negative cases such as invalid UTF-8 must reach the driver as written.
+    // Source stays UTF-8; arbitrary input bytes still reach the driver unchanged.
     let dir = fixture_copy("passing/read");
-    fs::write(dir.path().join("spec.iris"), b"x: int\0\xff\r\n").unwrap();
+    fs::write(dir.path().join("spec.iris"), b"x: int\0\r\n").unwrap();
     fs::write(dir.path().join("input.bin"), b"\0\xff\r\n").unwrap();
     change_control(dir.path(), |control| {
-        control["spec_hex"] = json!("783a20696e7400ff0d0a");
+        control["spec_hex"] = json!("783a20696e74000d0a");
         control["input_hex"] = json!("00ff0d0a");
     });
     let report = run(&options(dir.path().into())).unwrap();
     assert_eq!(report.exit_code(), 0, "{}", report.render());
+}
+
+#[test]
+fn binary_specs_are_discovered_and_passed_unchanged() {
+    let dir = fixture_copy("passing/read");
+    fs::remove_file(dir.path().join("spec.iris")).unwrap();
+    fs::write(dir.path().join("spec.bin"), b"x: int\0\xff\r\n").unwrap();
+    change_control(dir.path(), |control| {
+        control["spec_hex"] = json!("783a20696e7400ff0d0a");
+    });
+    assert_eq!(discover(&[dir.path().into()], None).unwrap().len(), 1);
+    assert_eq!(
+        Case::load(dir.path(), "0.1").unwrap().spec,
+        dir.path().canonicalize().unwrap().join("spec.bin")
+    );
+    let report = run(&options(dir.path().into())).unwrap();
+    assert_eq!(report.exit_code(), 0, "{}", report.render());
+}
+
+#[test]
+fn specs_reject_ambiguous_files_and_invalid_utf8_text() {
+    let dir = fixture_copy("passing/read");
+    fs::write(dir.path().join("spec.bin"), b"\xff").unwrap();
+    assert!(
+        Case::load(dir.path(), "0.1")
+            .unwrap_err()
+            .contains("exactly one spec.iris or spec.bin")
+    );
+    fs::remove_file(dir.path().join("spec.bin")).unwrap();
+    fs::write(dir.path().join("spec.iris"), b"# \xff").unwrap();
+    assert!(
+        Case::load(dir.path(), "0.1")
+            .unwrap_err()
+            .contains("spec.iris must be valid UTF-8")
+    );
 }
 
 #[test]
@@ -544,7 +579,7 @@ fn canned_driver_observes_all_commands_original_bytes_and_parameters() {
     assert!(
         report
             .render()
-            .ends_with("Summary: total=6 pass=6 xfail=0 fail=0 xpass=0\n")
+            .ends_with("Summary: total=6 pass=6 xfail=0 fail=0 xpass=0 unrepresentable=0\n")
     );
 }
 
@@ -566,7 +601,7 @@ fn known_failures_apply_only_to_selected_driver_and_complete_outcome() {
     assert!(
         report
             .render()
-            .contains("Summary: total=2 pass=0 xfail=2 fail=0 xpass=0")
+            .contains("Summary: total=2 pass=0 xfail=2 fail=0 xpass=0 unrepresentable=0")
     );
     opts.roots = vec![fixtures("failing")];
     let report = run(&opts).unwrap();
@@ -593,6 +628,123 @@ fn known_failures_apply_only_to_selected_driver_and_complete_outcome() {
             .contains("alternate for canned did not match")
     );
     assert!(report.render().contains("record_path"));
+}
+
+const UNREPRESENTABLE_ANNOTATION: &str = "\
+[[known_failure]]
+driver = 'gecode-test'
+outcome = 'unrepresentable'
+reason = 'The reference returns a non-UTF-8 string.'
+difference = 'spec/0.1/appendix-c-differences.md#c1-unicode-strings'
+";
+
+fn unrepresentable_case() -> TempDir {
+    let dir = fixture_copy("passing/read");
+    fs::write(dir.path().join("case.toml"), UNREPRESENTABLE_ANNOTATION).unwrap();
+    fs::write(dir.path().join("actual.bin"), b"").unwrap();
+    change_control(dir.path(), |control| {
+        control["output_file"] = json!("actual.bin");
+        control["exit"] = json!(3);
+        control["stderr"] =
+            json!("iris-gecode-driver: cannot serialize non-UTF-8 reference string\n");
+    });
+    dir
+}
+
+#[test]
+fn unrepresentable_requires_gecode_c1_and_no_alternate_file() {
+    for annotation in [
+        UNREPRESENTABLE_ANNOTATION.replace("gecode-test", "other"),
+        UNREPRESENTABLE_ANNOTATION.replace("c1-unicode-strings", "c2-reader-spec-source"),
+        UNREPRESENTABLE_ANNOTATION.replace("c1-unicode-strings", "c1-other"),
+        UNREPRESENTABLE_ANNOTATION.replace("spec/0.1/appendix-c-differences.md#", "other.md#"),
+        UNREPRESENTABLE_ANNOTATION.replace(
+            "difference = 'spec/0.1/appendix-c-differences.md#c1-unicode-strings'\n",
+            "",
+        ),
+        format!("{UNREPRESENTABLE_ANNOTATION}expected_file = 'expected.json'\n"),
+    ] {
+        let dir = unrepresentable_case();
+        fs::write(dir.path().join("case.toml"), &annotation).unwrap();
+        assert!(
+            Case::load(dir.path(), "0.1").is_err(),
+            "accepted {annotation}"
+        );
+    }
+}
+
+#[test]
+fn unrepresentable_is_reported_separately_and_only_for_the_selected_driver() {
+    let dir = unrepresentable_case();
+    let mut opts = options(dir.path().into());
+    assert_eq!(run(&opts).unwrap().cases[0].status, CaseStatus::Fail);
+    opts.driver_id = Some("gecode-test".into());
+    let report = run(&opts).unwrap();
+    assert_eq!(report.exit_code(), 0);
+    assert_eq!(report.cases[0].status, CaseStatus::Unrepresentable);
+    assert!(report.render().starts_with("UNREPRESENTABLE "));
+    assert!(report.render().contains("c1-unicode-strings"));
+    assert!(
+        report
+            .render()
+            .ends_with("Summary: total=1 pass=0 xfail=0 fail=0 xpass=0 unrepresentable=1\n")
+    );
+}
+
+#[test]
+fn unrepresentable_cannot_mask_other_driver_failures_or_outcomes() {
+    let diagnostic = "iris-gecode-driver: cannot serialize non-UTF-8 reference string\n";
+    let mut unmapped = error();
+    unmapped["code"] = json!("E-UNMAPPED");
+    for (exit, stdout, stderr) in [
+        (3, "", "different host failure\n"),
+        (3, "", "cannot serialize non-UTF-8 reference string\n"),
+        (3, "", diagnostic.trim_end()),
+        (3, "", &format!("{diagnostic}extra diagnostic\n")),
+        (3, "partial output", diagnostic),
+        (2, "", diagnostic),
+        (7, "", diagnostic),
+        (0, "not json", diagnostic),
+        (0, "{\"iris\":\"0.1\",\"entries\":[]}", diagnostic),
+        (1, &unmapped.to_string(), diagnostic),
+    ] {
+        let dir = unrepresentable_case();
+        fs::write(dir.path().join("actual.bin"), stdout).unwrap();
+        change_control(dir.path(), |control| {
+            control["exit"] = json!(exit);
+            control["stderr"] = json!(stderr);
+        });
+        let mut opts = options(dir.path().into());
+        opts.driver_id = Some("gecode-test".into());
+        let report = run(&opts).unwrap();
+        assert_eq!(
+            report.cases[0].status,
+            CaseStatus::Fail,
+            "{}",
+            report.render()
+        );
+        assert_eq!(report.exit_code(), 1);
+    }
+}
+
+#[test]
+fn unrepresentable_primary_match_is_a_stale_annotation() {
+    let dir = unrepresentable_case();
+    change_control(dir.path(), |control| {
+        control["output_file"] = json!("expected.json");
+        control["exit"] = json!(0);
+        control["stderr"] = json!("");
+    });
+    let mut opts = options(dir.path().into());
+    opts.driver_id = Some("gecode-test".into());
+    let report = run(&opts).unwrap();
+    assert_eq!(report.cases[0].status, CaseStatus::UnexpectedPass);
+    assert_eq!(report.exit_code(), 1);
+    assert!(
+        report
+            .render()
+            .contains("primary matched; stale known failure")
+    );
 }
 
 #[test]
@@ -737,13 +889,17 @@ fn cli_exit_codes_summary_and_configuration_diagnostics() {
         (
             "passing",
             0,
-            "Summary: total=6 pass=6 xfail=0 fail=0 xpass=0",
+            "Summary: total=6 pass=6 xfail=0 fail=0 xpass=0 unrepresentable=0",
         ),
-        ("known", 0, "Summary: total=2 pass=0 xfail=2 fail=0 xpass=0"),
+        (
+            "known",
+            0,
+            "Summary: total=2 pass=0 xfail=2 fail=0 xpass=0 unrepresentable=0",
+        ),
         (
             "failing",
             1,
-            "Summary: total=5 pass=0 xfail=0 fail=4 xpass=1",
+            "Summary: total=5 pass=0 xfail=0 fail=4 xpass=1 unrepresentable=0",
         ),
     ] {
         let output = Command::new(binary)

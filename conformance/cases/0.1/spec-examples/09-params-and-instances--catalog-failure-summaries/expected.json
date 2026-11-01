@@ -1,0 +1,5 @@
+{"iris": "0.1", "entries": [
+  {"name": "instances", "type": "int", "depth": 0, "value": 5},
+  {"name": "name", "type": "string", "depth": 1, "value": ["a", "c", "d", "e", "f"]},
+  {"name": "failed", "type": "string", "depth": 1, "value": ["positive", "a second line matching \"NAME {name}\"", "no line matching \"X {x:int}\"", "check on line 8 of the spec", ""]}
+]}

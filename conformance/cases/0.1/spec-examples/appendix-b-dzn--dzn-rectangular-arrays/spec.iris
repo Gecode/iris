@@ -1,0 +1,3 @@
+words[2]:word matrix[2][2]:float
+three[2][1][2]:int four[1][1][1][2]:int
+five[1][1][1][1][2]:int six[1][1][1][1][1][2]:int

@@ -1,0 +1,2 @@
+a[rows]:0..(2).bad
+repeat 0 as rows {}

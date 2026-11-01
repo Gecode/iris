@@ -1,0 +1,1 @@
+{"code": "E-INSTANCE-SELECTION", "message": "the file has 2 instances; select one with the parameter instance (a number from 1, or a name)", "input_location": {"origin": "input.bin", "line": 2, "column": 1}, "spec_location": {"origin": "spec.iris", "line": 2, "column": null}, "context": null, "record_path": null}

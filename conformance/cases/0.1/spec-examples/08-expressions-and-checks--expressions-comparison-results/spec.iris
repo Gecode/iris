@@ -1,0 +1,4 @@
+let exact=9007199254740993==9007199254740992
+let rounded=9007199254740993==9007199254740992.0
+let same="a"=="a" let mixed_equal="1"==1 let mixed_unequal="1"!=1
+let unicode="é"=="é"

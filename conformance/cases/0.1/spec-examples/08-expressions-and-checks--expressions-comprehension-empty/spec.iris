@@ -1,0 +1,1 @@
+a[0]:float let yes=all(x in a:missing) let no=any(x in a:missing) let s=sum(x in a:missing) let c=count(x in a:missing)

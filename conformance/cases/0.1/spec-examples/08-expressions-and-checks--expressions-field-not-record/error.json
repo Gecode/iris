@@ -1,0 +1,1 @@
+{"code": "E-SPEC-FIELD", "message": "only records have fields such as '.y'; to name each record of a repeat, write 'repeat n as nodes { each node ... }' and use 'node.y' or 'nodes[0].y'", "input_location": null, "spec_location": {"origin": "spec.iris", "line": 1, "column": null}, "context": null, "record_path": null}

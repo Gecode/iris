@@ -1,0 +1,1 @@
+repeat until "END" store _ {} repeat 1 {repeat until "STOP" store _ {}} check _=="END"

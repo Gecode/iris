@@ -1,0 +1,1 @@
+type w=word type v=w type c=alphabet "ab" blank "." a:v g[1][2]:c

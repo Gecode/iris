@@ -1,0 +1,1 @@
+repeat 2 as rows {each row a[3]:int} check size(row.a)==3

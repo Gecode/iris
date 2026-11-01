@@ -1,0 +1,1 @@
+instances {k:int if k {name:int} else {name:word}}

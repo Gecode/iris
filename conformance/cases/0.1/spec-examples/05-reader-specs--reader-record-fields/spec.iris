@@ -1,0 +1,1 @@
+repeat 1 as xs {each x a:int} check x.a==xs[0].a let first=xs[0].a

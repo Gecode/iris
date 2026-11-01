@@ -1,0 +1,3 @@
+repeat 2 {list var:int until 0 list real:float until 0 list text:word until "END"}
+repeat 2 {k:int repeat k {list nested:int until 0}}
+deep[1][1][1][1][1][1][1]:int

@@ -1,0 +1,1 @@
+{"code": "E-INTEGER-TYPE", "message": "'sum' needs integers", "input_location": {"origin": "input.bin", "line": 1, "column": 2}, "spec_location": {"origin": "spec.iris", "line": 1, "column": null}, "context": null, "record_path": null}

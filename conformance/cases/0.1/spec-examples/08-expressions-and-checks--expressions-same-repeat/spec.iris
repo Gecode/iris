@@ -1,0 +1,1 @@
+repeat 2 {lo:int hi:int} check lo<=hi "window"

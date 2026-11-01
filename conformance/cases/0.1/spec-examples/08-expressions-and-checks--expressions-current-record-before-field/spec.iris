@@ -1,0 +1,1 @@
+let outside=9 repeat 1 {each row let v=row.a a:int}

@@ -1,0 +1,8 @@
+{"iris": "0.1", "entries": [
+  {"name": "exact", "type": "int", "depth": 0, "value": 0},
+  {"name": "rounded", "type": "int", "depth": 0, "value": 1},
+  {"name": "same", "type": "int", "depth": 0, "value": 1},
+  {"name": "mixed_equal", "type": "int", "depth": 0, "value": 0},
+  {"name": "mixed_unequal", "type": "int", "depth": 0, "value": 1},
+  {"name": "unicode", "type": "int", "depth": 0, "value": 0}
+]}

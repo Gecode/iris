@@ -1,0 +1,8 @@
+{
+  "code": "E-EXPECTED-VALUE",
+  "message": "expected int, found 'oops'",
+  "input_location": {"origin": "input.bin", "line": 2, "column": 3},
+  "spec_location": {"origin": "spec.iris", "line": 2, "column": null},
+  "context": "repeat [2 of 2] > a",
+  "record_path": null
+}

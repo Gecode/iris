@@ -1,0 +1,1 @@
+repeat 2 {x:int} let total=sum(x) let first=x[0] if count(x)==2 {let yes=1}

@@ -1,0 +1,4 @@
+integral: float
+precise: float
+thousand: float
+x[3]: num

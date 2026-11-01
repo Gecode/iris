@@ -1,0 +1,1 @@
+a[2][2]:int let lo=min(a,0) let hi=max(a,7) let total=sum(a,5) let yes=distinct(a) let no=distinct(a,2) let n=size(a) let c=count(a)

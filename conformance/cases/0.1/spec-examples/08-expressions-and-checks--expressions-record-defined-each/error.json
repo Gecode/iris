@@ -1,0 +1,1 @@
+{"code": "E-SPEC-RECORD-VALUE", "message": "a record of 'row' is not a value; use one of its fields, as in 'row.x'", "input_location": null, "spec_location": {"origin": "spec.iris", "line": 1, "column": null}, "context": null, "record_path": null}

@@ -1,0 +1,1 @@
+sections until "END" "STOP" store ending skip other {"A {a:int}" "B {b:int}" optional "DONE" optional last} tail:int

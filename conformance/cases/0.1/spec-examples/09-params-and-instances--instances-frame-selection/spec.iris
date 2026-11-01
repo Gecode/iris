@@ -1,0 +1,2 @@
+let shared=9 let name="outer"
+instances {n:int let before=shared let shared=n name:word}

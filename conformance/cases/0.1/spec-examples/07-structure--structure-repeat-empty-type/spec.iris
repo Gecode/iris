@@ -1,0 +1,1 @@
+repeat 2 {k:int if k {a[0]:word} else {a[1]:int}}

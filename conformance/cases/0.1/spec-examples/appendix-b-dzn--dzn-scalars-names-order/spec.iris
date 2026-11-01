@@ -1,0 +1,4 @@
+format ignored
+let z=1 let a="text" let z=9
+lo:int hi:int var:int _name:int Var:int annotation_2:int
+repeat until "END" store _ {}

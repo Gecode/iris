@@ -1,0 +1,5 @@
+{"iris": "0.1", "entries": [
+  {"name": "before", "type": "int", "depth": 0, "value": 0},
+  {"name": "x", "type": "int", "depth": 1, "value": []},
+  {"name": "after", "type": "int", "depth": 0, "value": 1}
+]}

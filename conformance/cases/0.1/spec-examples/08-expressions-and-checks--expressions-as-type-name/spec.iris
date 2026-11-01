@@ -1,0 +1,1 @@
+type rows=int repeat 0 as rows {x:rows} let n=size(rows)

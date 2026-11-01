@@ -1,0 +1,1 @@
+a[2]:int check all(x in a:x>2)||all(y in a:y>1) "big"

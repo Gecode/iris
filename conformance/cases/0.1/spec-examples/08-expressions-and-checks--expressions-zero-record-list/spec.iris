@@ -1,0 +1,1 @@
+repeat 0 as rows {x:int} let n=count(rows) let v=sum(r in rows:r.x)

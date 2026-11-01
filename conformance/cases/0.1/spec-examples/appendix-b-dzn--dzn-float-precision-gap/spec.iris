@@ -1,0 +1,5 @@
+let below=99999999999999584.0
+let edge=99999999999999600.0
+let negative=-99999999999999984.0
+let above=1e17
+values[2]:float

@@ -1,0 +1,4 @@
+a[2]:int f[0]:float s[0]:word
+param keep=a param changed=a
+param keep_float=f param changed_float=f
+param keep_string=s param changed_string=s

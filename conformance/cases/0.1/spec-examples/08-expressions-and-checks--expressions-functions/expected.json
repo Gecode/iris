@@ -1,0 +1,10 @@
+{"iris": "0.1", "entries": [
+  {"name": "a", "type": "int", "depth": 2, "value": [[1, 2], [3, 4]]},
+  {"name": "lo", "type": "int", "depth": 0, "value": 0},
+  {"name": "hi", "type": "int", "depth": 0, "value": 7},
+  {"name": "total", "type": "int", "depth": 0, "value": 15},
+  {"name": "yes", "type": "int", "depth": 0, "value": 1},
+  {"name": "no", "type": "int", "depth": 0, "value": 0},
+  {"name": "n", "type": "int", "depth": 0, "value": 2},
+  {"name": "c", "type": "int", "depth": 0, "value": 2}
+]}

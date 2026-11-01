@@ -1,0 +1,1 @@
+n:int type frozen=0..n type alias=frozen let n=3 a:alias b:0..n

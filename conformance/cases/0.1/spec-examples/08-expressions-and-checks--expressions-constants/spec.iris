@@ -1,0 +1,1 @@
+let hi=gecode.int_max let lo=gecode.int_min

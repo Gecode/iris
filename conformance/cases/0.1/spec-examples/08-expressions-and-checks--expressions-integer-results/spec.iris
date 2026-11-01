@@ -1,0 +1,3 @@
+let add=7+3 let subtract=7-3 let product=-7*3
+let quotient=-7/3 let negative_divisor=7/-3 let both_divisors=-7/-3
+let remainder=-7%3 let negative_modulus=7%-3 let both_negative=-7%-3

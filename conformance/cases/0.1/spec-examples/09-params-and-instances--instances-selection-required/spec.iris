@@ -1,0 +1,2 @@
+param instance=2
+instances {n:int}

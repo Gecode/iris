@@ -1,0 +1,1 @@
+repeat 1 as rows {each row x:int} check all(t in row:1)

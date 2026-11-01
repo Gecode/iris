@@ -1,0 +1,1 @@
+let check=7 a:0.. b:..3 c[1][1]:0.. layout "FULL_MATRIX" offset -1 list d:0.. until 0 e:0..(check) f:0.. check f>0

@@ -1,0 +1,1 @@
+type t=int a[1]:int let v=all(t in a:t>0)

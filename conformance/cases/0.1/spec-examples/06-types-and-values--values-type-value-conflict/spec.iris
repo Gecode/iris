@@ -1,0 +1,1 @@
+if 0 {type t=int} t:int

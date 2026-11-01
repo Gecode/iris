@@ -1,0 +1,8 @@
+{
+  "code": "E-SYMBOL",
+  "message": "expected a symbol for row 2, column 2, found end of input",
+  "input_location": {"origin": "input.bin", "line": 2, "column": 2},
+  "spec_location": {"origin": "spec.iris", "line": 1, "column": null},
+  "context": "g",
+  "record_path": null
+}

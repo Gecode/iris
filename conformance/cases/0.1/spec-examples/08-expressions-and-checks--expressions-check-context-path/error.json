@@ -1,0 +1,1 @@
+{"code": "E-CHECK-FAILED", "message": "check failed for record 2 of 'inner': positive", "input_location": {"origin": "input.bin", "line": 1, "column": 7}, "spec_location": {"origin": "spec.iris", "line": 1, "column": null}, "context": "repeat [2 of 2]", "record_path": [1]}

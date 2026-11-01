@@ -1,0 +1,1 @@
+sections {"A {x:int} BAD" optional "A {y:int}"}

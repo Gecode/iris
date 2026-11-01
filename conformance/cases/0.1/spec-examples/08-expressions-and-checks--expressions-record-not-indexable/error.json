@@ -1,0 +1,1 @@
+{"code": "E-SPEC-RECORD-VALUE", "message": "a record of 'rows' cannot be indexed; use one of its fields, as in 'rows[0].x'", "input_location": null, "spec_location": {"origin": "spec.iris", "line": 1, "column": null}, "context": null, "record_path": null}

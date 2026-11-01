@@ -1,0 +1,11 @@
+{"iris": "0.1", "entries": [
+  {"name": "i", "type": "int", "depth": 0, "value": 7},
+  {"name": "f", "type": "float", "depth": 0, "value": 1.5},
+  {"name": "text", "type": "string", "depth": 0, "value": "alpha"},
+  {"name": "empty", "type": "string", "depth": 0, "value": ""},
+  {"name": "large", "type": "float", "depth": 0, "value": 9223372036854776000},
+  {"name": "integer", "type": "int", "depth": 0, "value": -7},
+  {"name": "real", "type": "float", "depth": 0, "value": 2},
+  {"name": "string", "type": "string", "depth": 0, "value": " a,b=2; "},
+  {"name": "zero", "type": "float", "depth": 0, "value": -0.0}
+]}

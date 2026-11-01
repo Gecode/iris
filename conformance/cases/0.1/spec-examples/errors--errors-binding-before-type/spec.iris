@@ -1,0 +1,5 @@
+type t=int
+t:int
+a[0]:int
+let z=sum(x in a:x)
+x:int

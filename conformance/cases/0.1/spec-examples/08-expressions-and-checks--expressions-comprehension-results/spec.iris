@@ -1,0 +1,1 @@
+a[2][2]:int let s=sum(r in a:sum(r)) let c=count(r in a:r) let yes=all(r in a:any(x in r:x)) let no=any(r in a:0) let out=defined(r)

@@ -1,0 +1,3 @@
+param a=2 param b=a+1 param a=b+1
+if 0 {param unused}
+repeat 2 {v:int param row=v+1}

@@ -1,0 +1,4 @@
+{"iris": "0.1", "entries": [
+  {"name": "x", "type": "float", "depth": 1, "value": [2, 3]},
+  {"name": "y", "type": "string", "depth": 0, "value": "hi"}
+]}

@@ -1,0 +1,1 @@
+sections {"A {x:int}" "A {y:int}" optional}

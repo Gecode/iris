@@ -1,0 +1,3 @@
+repeat 1023 as xs {}
+repeat 1024 as ys {}
+check all(x in xs: all(y in ys: 1))

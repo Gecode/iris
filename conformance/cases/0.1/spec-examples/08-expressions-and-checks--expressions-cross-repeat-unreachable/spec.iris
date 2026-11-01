@@ -1,0 +1,1 @@
+repeat 0 {x:int} repeat 0 {y:int} check 1||x==y

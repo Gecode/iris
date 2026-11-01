@@ -1,0 +1,1 @@
+{"code": "E-TRAILING-INPUT", "message": "unexpected input after the end of the spec: 'junk'", "input_location": {"origin": "input.bin", "line": 2, "column": 2}, "spec_location": null, "context": null, "record_path": null}

@@ -1,0 +1,5 @@
+instances {
+  n:int repeat n {x:int}
+  check x>0 "positive"
+  name:word
+}

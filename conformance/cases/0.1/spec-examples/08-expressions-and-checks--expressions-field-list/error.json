@@ -1,0 +1,1 @@
+{"code": "E-SPEC-FIELD", "message": "'rows' is a list of records, so '.x' needs one of them: use 'rows[i].x', or name each record with 'each' in the repeat and use its field", "input_location": null, "spec_location": {"origin": "spec.iris", "line": 1, "column": null}, "context": null, "record_path": null}

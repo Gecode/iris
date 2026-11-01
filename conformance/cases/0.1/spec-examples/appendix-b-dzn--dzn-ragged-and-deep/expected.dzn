@@ -1,0 +1,11 @@
+% var: array[int] of tuple(array[int] of int)
+'var' = [([1],), ([2, 3],)];
+% real: array[int] of tuple(array[int] of float)
+real = [([1.5],), ([2.5, 3.5],)];
+% text: array[int] of tuple(array[int] of string)
+text = [(["a"],), (["b", "c"],)];
+k = [1, 2];
+% nested: array[int] of tuple(array[int] of tuple(array[int] of int))
+nested = [([([7],)],), ([([8, 9],), ([],)],)];
+% deep: array[int] of tuple(array[int] of tuple(array[int] of tuple(array[int] of tuple(array[int] of tuple(array[int] of tuple(array[int] of int))))))
+deep = [([([([([([([5],)],)],)],)],)],)];

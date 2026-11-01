@@ -11,7 +11,8 @@ for the case format and driver protocol. The standalone runner is available in
 
 ```text
 conformance/cases/0.1/<area>/<case>/
-  spec.iris                 required, arbitrary source bytes
+  spec.iris                 required, valid UTF-8 source, OR
+  spec.bin                  same role; arbitrary bytes, never both
   input.txt                 required for read/catalog/dzn, OR
   input.bin                 same role; arbitrary bytes, never both
   params.json               optional string-to-string JSON object
@@ -24,10 +25,12 @@ conformance/cases/0.1/<area>/<case>/
 
 Exactly one primary expectation file exists. An empty input file and a missing input
 file are different. Preserve every source/input/dzn byte, including NUL, CR LF, invalid
-UTF-8, and the final newline. The runner does not parse Iris source or validate input
-UTF-8; the driver must see negative cases unchanged. `spec.iris` may be a regular file
-or a file symlink, allowing the later formats task to reuse its format reader spec. Do
-not follow directory symlinks during discovery.
+UTF-8, and the final newline. A case has exactly one of `spec.iris` and `spec.bin`.
+The runner rejects invalid UTF-8 in `spec.iris`; use `spec.bin` for those negative
+cases. It passes the selected spec path unchanged to the driver, which must not depend
+on its extension. The runner does not parse Iris source or validate input UTF-8.
+Either spec file may be a regular file or a file symlink, allowing formats to reuse
+their reader spec. Do not follow directory symlinks during discovery.
 
 `case.toml` omission means a read case with no descriptive metadata. Parse and catalog
 cases must state their operation. A parse case may contain one input file, but the
@@ -35,8 +38,8 @@ runner must not pass or read that input for the parse request. Its params must b
 or `{}`. Read, catalog, and dzn require exactly one input file even when the contents
 are empty.
 
-Recursively discover directories containing `spec.iris` or `case.toml`, and also accept
-a case directory itself as a root. Once a case directory is found, validate it and do
+Recursively discover directories containing `spec.iris`, `spec.bin`, or `case.toml`,
+and also accept a case directory itself as a root. Once a case directory is found, validate it and do
 not descend into its support files. A metadata-only directory with no spec is an invalid
 case. Deduplicate overlapping roots by canonical case-directory path, sort paths for
 deterministic execution, and reject nonexistent roots or zero selected cases. Do not
@@ -61,7 +64,7 @@ The complete key table and loader validation define the metadata contract.
 | `section` | optional nonempty string | Repository-relative Specification link including an anchor when available. |
 | `source` | optional nonempty string | E.g. `gecode:test/instance.cpp:Read::Scalars`, or `spec:spec/0.1/03-data-model.md#data-definition-order`. |
 | `tags` | array of strings; default `[]` | Descriptive only; no skipping or status effects. |
-| `known_failure` | array of tables; default `[]` | At most one entry per driver ID; precise alternate outcome, below. |
+| `known_failure` | array of tables; default `[]` | At most one entry per driver ID; precise alternate outcome or narrow serialization exception, below. |
 
 Read/catalog JSON success uses `expected.json` with the existing canonical data
 document. Parse JSON success uses the protocol document below in `expected.json`. dzn
@@ -110,7 +113,8 @@ DRIVER catalog SPEC INPUT     [--params JSON] [--version V] [--format json|dzn]
 DRIVER dzn SPEC INPUT         [--params JSON] [--version V]
 ```
 
-`SPEC` and `INPUT` are file paths. `JSON` is inline JSON text, not a pathname.
+`SPEC` and `INPUT` are file paths, with no required extension. `JSON` is inline JSON
+text, not a pathname.
 `--version` defaults to `0.1`; the runner always supplies its selected version
 explicitly. The first runner supports only `0.1`, rejecting other selections clearly.
 Options may follow the positional arguments as shown. Unknown/repeated options, missing
@@ -128,11 +132,11 @@ continues to mean read-then-render. No fifth command is needed.
 | `0` | Exactly one operation-success JSON document, or the complete dzn byte sequence | Successful parse/read/catalog/dzn. JSON may have trailing JSON whitespace, with no other text. Empty dzn is valid. |
 | `1` | Exactly one canonical error document | A language error, including a parse error during any operation. |
 | `2` | Empty; diagnostic on stderr | Driver misuse. Never a language outcome or known failure. |
-| `3` | Empty; diagnostic on stderr | Host/adapter failure, including inability to serialize non-Unicode reference data. Never a language outcome or known failure. |
+| `3` | Empty; diagnostic on stderr | Host/adapter failure, including inability to serialize non-Unicode reference data. Never a language outcome; only the exact `unrepresentable` exception below may be exempted. |
 
 Other exit statuses, signal termination, timeout, stdout/stderr read failure, and
 violations of these output rules are hard driver failures. stderr is diagnostic only and
-is included in failure reports; its wording is not compared. On errors there must be no
+is included in failure reports; its wording is compared only for the exact `unrepresentable` exception below. On errors there must be no
 partial successful output. `E-UNMAPPED` is always a hard adapter failure even if
 returned with exit 1 and structurally valid JSON. It must never occur in a primary or
 alternate expectation.
@@ -205,10 +209,10 @@ Each entry has these keys, with no others:
 | Key | Meaning |
 |---|---|
 | `driver` | Nonempty stable driver ID; unique in this case. |
-| `outcome` | `"data"`, `"parse"`, `"dzn"`, or `"error"`; determines the alternate result kind and its required status 0 or 1. |
-| `expected_file` | Case-relative path to the complete alternate result, conventionally under `known/<driver-id>/`; no absolute path or `..`. |
+| `outcome` | `"data"`, `"parse"`, `"dzn"`, or `"error"` determines the alternate result kind and its required status 0 or 1. `"unrepresentable"` selects the exact Gecode serialization exception below. |
+| `expected_file` | Case-relative path to the complete alternate result, conventionally under `known/<driver-id>/`; no absolute path or `..`. Required for alternate outcomes; forbidden for `"unrepresentable"`. |
 | `reason` | Nonempty explanation of the exact observed discrepancy. |
-| `difference` | Required when `driver` starts with `gecode-`: `spec/0.1/appendix-c-differences.md#c<N>-...` with a decimal subsection number and nonempty slug. Optional for other drivers. |
+| `difference` | Required when `driver` starts with `gecode-`: `spec/0.1/appendix-c-differences.md#c<N>-...` with a decimal subsection number and nonempty slug. Optional for other drivers. `"unrepresentable"` requires a `gecode-` driver and the exact C.1 link `spec/0.1/appendix-c-differences.md#c1-unicode-strings`. |
 
 Example contract, not a real case to add in this task:
 
@@ -227,59 +231,117 @@ same rules as an ordinary outcome of its kind. Its success kind must be compatib
 the requested operation/output; error is permitted for every operation. It must differ
 from the primary comparison outcome; reject a no-op exemption.
 
+The `unrepresentable` exception has no alternate file. It matches only exit 3,
+empty stdout, and stderr equal byte for byte to this complete line, including its final LF:
+
+```text
+iris-gecode-driver: cannot serialize non-UTF-8 reference string
+```
+
+For example:
+
+```toml
+[[known_failure]]
+driver = "gecode-6.5.0-5e7bbd5c26b0"
+outcome = "unrepresentable"
+reason = "Gecode reads a non-UTF-8 word after byte-wise token splitting; the adapter cannot serialize it."
+difference = "spec/0.1/appendix-c-differences.md#c1-unicode-strings"
+```
+
+This annotation records the C.1 raw-byte string difference at the adapter's
+serialization boundary. It does not accept any language outcome or other host failure.
+
 Classification order:
 
-1. Driver/protocol failure, malformed/noncanonical JSON, a crash, timeout, host/adapter
-   error, or E-UNMAPPED: FAIL immediately, regardless of annotations. dzn remains an
-   opaque byte result: the runner does not add a MiniZinc parser that would preempt a
-   documented printer discrepancy such as C.4.
-2. Actual outcome matches the primary: PASS if no matching annotation, otherwise XPASS.
-3. Actual outcome differs from the primary and matches the selected complete alternate:
-   XFAIL.
-4. Anything else: FAIL, showing the primary diff and, if applicable, why the alternate
+1. A selected `unrepresentable` annotation with exactly the exit status, stdout,
+   and stderr above: UNREPRESENTABLE, reported separately from XFAIL.
+2. Any other driver/protocol failure, malformed/noncanonical JSON, crash, timeout,
+   host/adapter error, or E-UNMAPPED: FAIL immediately, regardless of annotations.
+   dzn remains an opaque byte result: the runner does not add a MiniZinc parser that
+   would preempt a documented printer discrepancy such as C.4.
+3. Actual outcome matches the primary: PASS if no matching annotation, otherwise XPASS,
+   including for an `unrepresentable` annotation.
+4. Actual outcome differs from the primary and matches the selected complete alternate:
+   XFAIL. An `unrepresentable` annotation cannot match a representable alternate.
+5. Anything else: FAIL, showing the primary diff and, if applicable, why the alternate
    did not match.
 
 A known error-code difference cannot mask another line/column/path difference. A known
 data difference cannot mask another value/entry/shape difference. Error wording remains
 ignored by the normative projection, not by an exemption. Report XPASS separately and
-make it nonzero so stale annotations must be removed. XFAIL alone does not make the run
-fail.
+make it nonzero so stale annotations must be removed. XFAIL and UNREPRESENTABLE do not
+make the run fail.
 
 An annotation does not create a language difference. The loader checks the shape of
 Gecode difference links; authors must check that the linked accepted difference actually
 permits the alternate outcome. New disagreements with pinned Gecode need an accepted
-appendix C entry before exemption; stop and report absent authority. In particular
-appendix C does not permit accepting malformed JSON, an adapter's non-Unicode
-serialization failure, or undefined crash behavior. Extracted UTF-8 examples that the
-adapter cannot serialize remain hard failures against Gecode. Appendix C.3 specifies no
-deterministic result for reference undefined arithmetic, so it is not a wildcard
-exemption either.
+appendix C entry before exemption; stop and report absent authority. The only adapter
+serialization exemption is the exact C.1 `unrepresentable`
+exception above. Malformed JSON, every other host failure, and undefined crash behavior
+remain hard failures. Appendix C.3 specifies no deterministic result for reference
+undefined arithmetic, so it is not a wildcard exemption either.
 
-## Specification examples and later extraction
+## Specification examples and extraction
 
-Gecode test porting follows [PORTING.md](PORTING.md). conformance-008 separately
-implements the deterministic `extract-examples` subcommand, commits generated cases,
-deletes stale generated cases on regeneration, and checks them with `--check`. It is
-not part of the runner yet.
+Gecode test porting follows [PORTING.md](PORTING.md). Extract the Specification's
+executable examples from the repository root with:
 
-The shared transport is deliberately direct: example `spec` becomes spec.iris; input
-becomes input.bin (always safe for binary transport); params becomes params.json
-preserving values and source member order; expected data becomes expected.json; expected
-dzn becomes expected.dzn; expected error becomes error.json. Decode
+```sh
+(cd rust && cargo run --locked -p iris-conformance -- extract-examples \
+  ../spec/0.1 ../conformance/cases/0.1/spec-examples)
+```
+
+Add `--check` to compare the complete generated tree without writing. It exits nonzero
+for missing, changed, or stale files and stale directories. Run it after changing an
+example or the extractor:
+
+```sh
+(cd rust && cargo run --locked -p iris-conformance -- extract-examples \
+  ../spec/0.1 ../conformance/cases/0.1/spec-examples --check)
+```
+
+The extractor fully owns `cases/0.1/spec-examples/`: regeneration replaces its contents,
+including deleting stale cases and support files. Keep generated cases in Git; edit
+examples or extractor-owned annotations rather than generated files. The command needs
+a Rust build, so `scripts/check-repo.sh` does not invoke it. CI wiring belongs to the
+conformance CI task.
+
+Chapters are read in filename order. Each case is named `<chapter-stem>--<example-id>`,
+for example `02-notation--notation-no-final-newline`. Notation §2.3 requires explicit,
+globally unique IDs; missing or duplicate IDs are errors. Reordering examples does not
+rename cases. Metadata records the chapter and ID and sets operation explicitly. A
+catalog expected-dzn block additionally sets `output = "dzn"`.
+
+The shared transport is direct: example `spec` becomes `spec.iris` when its decoded
+bytes are valid UTF-8, otherwise `spec.bin`. Hex that decodes to valid UTF-8 still uses
+`spec.iris`. Input becomes `input.bin`; params becomes `params.json`, preserving values
+and source member order; expected data and expected parse become `expected.json`;
+expected dzn becomes `expected.dzn`; expected error becomes `error.json`. Decode
 literal/hex/no-final-newline exactly by notation §2.4, without dedenting, trimming,
-adding LF, or interpreting source backslashes. Use the explicit globally unique example
-ID as the directory name under `spec-examples/`, record its source chapter/ID in
-case.toml, and set operation explicitly. A catalog expected-dzn block additionally sets
-`output = "dzn"`.
+adding LF, or interpreting source backslashes. Expected JSON uses the same canonical
+validation as the runner. Malformed examples fail before the destination is changed.
 
 Notation [§2.3](../spec/0.1/02-notation.md#23-example-headers-and-parts) admits
-`--- expected parse` as a JSON part only for successful parse. It contains the protocol
-object above and maps to expected.json. Empty data cannot stand in for parse success.
+`--- expected parse` only for successful parse. It contains the protocol object above.
+Empty data cannot stand in for parse success.
 
-The extractor must not guess known failures or take alternate results from its driver.
-Existing documented differences require deliberate, reviewable annotations tied to
-appendix C, with deterministic ownership handled in conformance-008. Invalid/malformed
-examples must be reported, never silently repaired.
+The extractor's `known_failure` function in
+[examples.rs](../rust/iris-conformance/src/examples.rs) owns six deliberate annotations
+and the five complete alternate expectations for `gecode-6.5.0-5e7bbd5c26b0`:
+
+- `input-invalid-utf8-split`: the exact `unrepresentable` exception above, under
+  [C.1](../spec/0.1/appendix-c-differences.md#c1-unicode-strings).
+- `input-invalid-utf8-comment` and `input-invalid-utf8-tail`: Gecode reads `x = 7`,
+  under [C.1](../spec/0.1/appendix-c-differences.md#c1-unicode-strings).
+- `reader-invalid-utf8-string` and `reader-invalid-utf8-comment`: Gecode parses
+  successfully, under [C.2](../spec/0.1/appendix-c-differences.md#c2-reader-spec-source).
+- `dzn-float-precision-gap`: Gecode omits three float leaves, under
+  [C.4](../spec/0.1/appendix-c-differences.md#c4-dzn-floats-just-below-1e17).
+
+These are fixed annotations reviewed against appendix C. The extractor never invokes
+a driver or infers exemptions from its output. `input-invalid-utf8-split` reports
+UNREPRESENTABLE only when its annotation
+matches the exact serialization failure; every other failure remains FAIL.
 
 ## Running cases
 
@@ -306,18 +368,18 @@ does not manage arbitrary process trees.
 
 Cases are all loaded before any driver runs. Configuration errors stop the run;
 executed failures do not prevent later valid cases from running. Each case prints
-`PASS`, `XFAIL`, `FAIL` or `XPASS` and its path. Failures include field or byte
-differences and bounded diagnostic/output excerpts. The final line is exactly:
+`PASS`, `XFAIL`, `UNREPRESENTABLE`, `FAIL` or `XPASS` and its path. Failures include
+field or byte differences and bounded diagnostic/output excerpts. The final line is exactly:
 
 ```text
-Summary: total=N pass=P xfail=K fail=F xpass=U
+Summary: total=N pass=P xfail=K fail=F xpass=U unrepresentable=R
 ```
 
 Counts partition total. Runner exits: **0** when fail and xpass are both zero;
 **1** when either is nonzero; **2** for CLI, configuration, loading or zero-selection
 errors. Help and version exit 0. A driver exit 2 is a case failure, hence runner
-exit 1. XFAIL lines include the driver ID, reason and any difference link. XPASS
-identifies a stale annotation and requires its removal.
+exit 1. XFAIL and UNREPRESENTABLE lines include the driver ID, reason and any difference
+link. XPASS identifies a stale annotation and requires its removal.
 
 See [Rust build instructions](../rust/README.md) for the canned driver demonstration.
 Build the adapter and run the real suite from the repository root:
@@ -335,4 +397,6 @@ current directory. For a direct invocation, use
 the reference's UTF-8 behavior rather than implementing the Iris-only validation
 differences in appendix C.1–C.2.
 Non-Unicode reference string results fail at the serialization boundary with
-exit 3 and empty stdout, for both JSON and dzn; they are not language errors.
+exit 3 and empty stdout, for both JSON and dzn; they are not language errors. Only a
+selected `unrepresentable` annotation with the exact C.1 link and exact diagnostic line
+above exempts that serialization failure. Other exit 3 results remain hard failures.

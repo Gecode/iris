@@ -1,0 +1,1 @@
+repeat 2 as rows {each row x:int let y=row.x+1} check row.x<row.y let first=rows[0].x let total=sum(r in rows:r.y) let n=count(rows)

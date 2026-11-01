@@ -1,0 +1,1 @@
+{"code": "E-SPEC-UTF8", "message": "reader spec is not valid UTF-8", "input_location": null, "spec_location": {"origin": "spec.iris", "line": 1, "column": 8}, "context": null, "record_path": null}

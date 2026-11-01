@@ -1,0 +1,16 @@
+{
+  "code": "E-REPEAT-MISSING",
+  "message": "'x' is defined in no repetition",
+  "input_location": {
+    "origin": "input.bin",
+    "line": 1,
+    "column": 4
+  },
+  "spec_location": {
+    "origin": "spec.iris",
+    "line": 1,
+    "column": null
+  },
+  "context": null,
+  "record_path": null
+}

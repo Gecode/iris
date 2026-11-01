@@ -1,0 +1,11 @@
+{"iris": "0.1", "entries": [
+  {"name": "add", "type": "int", "depth": 0, "value": 10},
+  {"name": "subtract", "type": "int", "depth": 0, "value": 4},
+  {"name": "product", "type": "int", "depth": 0, "value": -21},
+  {"name": "quotient", "type": "int", "depth": 0, "value": -2},
+  {"name": "negative_divisor", "type": "int", "depth": 0, "value": -2},
+  {"name": "both_divisors", "type": "int", "depth": 0, "value": 2},
+  {"name": "remainder", "type": "int", "depth": 0, "value": -1},
+  {"name": "negative_modulus", "type": "int", "depth": 0, "value": 1},
+  {"name": "both_negative", "type": "int", "depth": 0, "value": -1}
+]}

@@ -2,13 +2,14 @@
 pub mod canonical;
 pub mod case;
 pub mod driver;
+pub mod examples;
 pub mod report;
 
 use std::path::PathBuf;
 use std::time::Duration;
 
 use canonical::{Outcome, OutcomeKind};
-use case::Case;
+use case::{Case, KnownFailureOutcome};
 use driver::{DriverCommand, DriverOutput};
 pub use report::{CaseResult, CaseStatus, RunReport};
 
@@ -54,8 +55,20 @@ fn run_case(command: &DriverCommand, case: &Case, options: &RunOptions) -> CaseR
         .as_ref()
         .and_then(|id| case.known_failures.iter().find(|known| &known.driver == id));
     let result = command.invoke(case, &options.version, options.timeout);
-    let (status, details) = match result {
-        Ok(output) => match decode_output(case, &output, &options.version) {
+    let (status, details) = match (result, known) {
+        (Ok(output), Some(known))
+            if matches!(known.expected, KnownFailureOutcome::Unrepresentable)
+                && output.status.code() == Some(3)
+                && output.stdout.is_empty()
+                && output.stderr
+                    == b"iris-gecode-driver: cannot serialize non-UTF-8 reference string\n" =>
+        {
+            (
+                CaseStatus::Unrepresentable,
+                vec![report::known_failure_details(known)],
+            )
+        }
+        (Ok(output), _) => match decode_output(case, &output, &options.version) {
             Ok(actual) => {
                 let (status, mut details) = report::classify(&case.expected, known, &actual);
                 if matches!(status, CaseStatus::Fail | CaseStatus::UnexpectedPass)
@@ -76,7 +89,7 @@ fn run_case(command: &DriverCommand, case: &Case, options: &RunOptions) -> CaseR
                 )],
             ),
         },
-        Err(error) => (
+        (Err(error), _) => (
             CaseStatus::Fail,
             vec![format!(
                 "{}: {}; stdout: {}; stderr: {}",

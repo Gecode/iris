@@ -1,0 +1,2 @@
+param i param f param text param empty param large
+param integer=1 param real=1.0 param string="default" param zero=0.0

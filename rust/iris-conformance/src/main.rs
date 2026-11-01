@@ -17,6 +17,13 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Generate conformance cases from executable Specification examples.
+    ExtractExamples {
+        source: PathBuf,
+        destination: PathBuf,
+        #[arg(long)]
+        check: bool,
+    },
     Run {
         #[arg(long)]
         driver: String,
@@ -34,33 +41,47 @@ enum Commands {
 }
 
 fn main() -> ExitCode {
-    let Cli {
-        command:
-            Commands::Run {
+    match Cli::parse().command {
+        Commands::ExtractExamples {
+            source,
+            destination,
+            check,
+        } => match iris_conformance::examples::extract(&source, &destination, check) {
+            Ok(report) => {
+                println!("{report}");
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("error: {error}");
+                ExitCode::from(1)
+            }
+        },
+        Commands::Run {
+            driver,
+            driver_id,
+            filter,
+            version,
+            timeout,
+            cases_dir,
+        } => {
+            let options = RunOptions {
                 driver,
                 driver_id,
+                roots: cases_dir,
                 filter,
                 version,
                 timeout,
-                cases_dir,
-            },
-    } = Cli::parse();
-    let options = RunOptions {
-        driver,
-        driver_id,
-        roots: cases_dir,
-        filter,
-        version,
-        timeout,
-    };
-    match iris_conformance::run(&options) {
-        Ok(report) => {
-            print!("{}", report.render());
-            ExitCode::from(report.exit_code())
-        }
-        Err(error) => {
-            eprintln!("error: {error}");
-            ExitCode::from(2)
+            };
+            match iris_conformance::run(&options) {
+                Ok(report) => {
+                    print!("{}", report.render());
+                    ExitCode::from(report.exit_code())
+                }
+                Err(error) => {
+                    eprintln!("error: {error}");
+                    ExitCode::from(2)
+                }
+            }
         }
     }
 }

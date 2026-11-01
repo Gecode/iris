@@ -1,0 +1,1 @@
+{"code": "E-SPEC-FIELD", "message": "'x' is defined inside and outside the repeat of 'rows', so it cannot be a field of its records", "input_location": null, "spec_location": {"origin": "spec.iris", "line": 1, "column": null}, "context": null, "record_path": null}

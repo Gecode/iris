@@ -1,0 +1,11 @@
+{"iris": "0.1", "entries": [
+  {"name": "a", "type": "int", "depth": 1, "value": [1, 2]},
+  {"name": "f", "type": "float", "depth": 1, "value": []},
+  {"name": "s", "type": "string", "depth": 1, "value": []},
+  {"name": "keep", "type": "int", "depth": 1, "value": [1, 2]},
+  {"name": "changed", "type": "int", "depth": 0, "value": 7},
+  {"name": "keep_float", "type": "float", "depth": 1, "value": []},
+  {"name": "changed_float", "type": "float", "depth": 0, "value": 8},
+  {"name": "keep_string", "type": "string", "depth": 1, "value": []},
+  {"name": "changed_string", "type": "string", "depth": 0, "value": "9"}
+]}

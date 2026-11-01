@@ -1,0 +1,1 @@
+{"code": "E-INSTANCE-NOT-FOUND", "message": "there is no instance '3' (the file has 1 instance)", "input_location": {"origin": "input.bin", "line": 2, "column": 1}, "spec_location": {"origin": "spec.iris", "line": 1, "column": null}, "context": null, "record_path": null}

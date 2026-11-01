@@ -1,0 +1,1 @@
+repeat 0 {x:int a[2]:float list b:word until eol let c="s"}

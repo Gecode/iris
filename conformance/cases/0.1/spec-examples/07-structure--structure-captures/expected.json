@@ -1,0 +1,5 @@
+{"iris": "0.1", "entries": [
+  {"name": "x", "type": "int", "depth": 0, "value": 7},
+  {"name": "w", "type": "string", "depth": 0, "value": "hi"},
+  {"name": "r", "type": "string", "depth": 0, "value": "tail words"}
+]}

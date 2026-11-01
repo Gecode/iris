@@ -1,0 +1,6 @@
+{"iris": "0.1", "entries": [
+  {"name": "integral", "type": "float", "depth": 0, "value": 3},
+  {"name": "precise", "type": "float", "depth": 0, "value": 1.2345678901234567},
+  {"name": "thousand", "type": "float", "depth": 0, "value": 1e3},
+  {"name": "x", "type": "float", "depth": 1, "value": [1, 2.5, 3]}
+]}

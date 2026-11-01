@@ -1,0 +1,1 @@
+{"code": "E-UTF8", "message": "string value is not valid UTF-8", "input_location": {"origin": "input.bin", "line": 1, "column": 1}, "spec_location": {"origin": "spec.iris", "line": 1, "column": null}, "context": "a", "record_path": null}

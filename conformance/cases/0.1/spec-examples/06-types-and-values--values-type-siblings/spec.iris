@@ -1,0 +1,1 @@
+if 1 {type t=int a:t} if 1 {type t=word b:t}

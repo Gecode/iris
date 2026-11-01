@@ -1,0 +1,4 @@
+{"iris": "0.1", "entries": [
+  {"name": "a", "type": "string", "depth": 1, "value": ["x"]},
+  {"name": "b", "type": "string", "depth": 1, "value": ["END"]}
+]}

@@ -1,0 +1,8 @@
+{
+  "code": "E-LIST-TERMINATOR",
+  "message": "a list of words needs a string or integer terminator",
+  "input_location": {"origin": "input.bin", "line": 1, "column": 1},
+  "spec_location": {"origin": "spec.iris", "line": 1, "column": null},
+  "context": "a",
+  "record_path": null
+}
