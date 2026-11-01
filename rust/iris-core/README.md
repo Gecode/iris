@@ -92,14 +92,23 @@ Instance record bindings are restored after skipped passes, with occurrence
 identities separating cached marker summaries. Execution retains record metadata
 in flat vectors, with work proportional to executed reads and statements.
 
-Later tasks add budget enforcement (009) and dzn output (010). Expression and
-idle-work hooks are fallible and impose no limit; they mark the work events
-defined by Specification §10.
+Each read or catalog operation enforces the two work budgets in
+[Specification §10](../../spec/0.1/10-work-budgets.md): 2^20 idle units and
+2^20 + 16*N expression units, where N counts all original input bytes.
+Counters span the prefix and every traversed instance, including deferred
+rejections; each separate operation starts fresh. Equality succeeds, and an
+excess charge immediately reports `E-BUDGET` at the current cursor with the
+active statement and execution context. Budget failures are hard errors.
+The reader owns both remaining allowances; evaluators charge the shared
+expression allowance while borrowing values. Each charge uses checked `u128`
+subtraction, with constant accounting work and no allocation or rescan.
+Later work adds dzn output (010).
 
 From `rust/`:
 
 ```sh
 cargo test --locked -p iris-core
+cargo test --locked -p iris-core budget -- --nocapture
 cargo test --locked -p iris-cli --test read_conformance -- --nocapture
 ```
 
@@ -111,9 +120,13 @@ line/sections probes at seed 73006 and 512 checks probes at seed 73007
 and 512 params/instances/catalog probes at seed 73008
 (2,432 total), with the pinned Gecode adapter; see the [CLI README](../iris-cli/README.md#conformance-driver).
 
-The progress gate selects 814 cases (155 parse, 638 read, 21 catalog), leaving
-118 for rust-009/010. Core tests cover the new charge events without enforcing
-budgets. `checks_scale_linearly` counts actual dispatches, metadata advances,
+The progress gate selects 911 cases (155 parse, 730 read, 26 catalog), leaving
+21 for rust-010. Budget tests cover exact limits, atomic charges, arithmetic
+overflow, fresh operations, and hard errors after deferred rejections.
+`budgets_scale_linearly` bounds work for 4× problem sizes by 6× work, and
+`budget_exhaustion_stops_work_promptly` checks that enormous repeats stop at
+the same charge and work count as minimally excessive ones.
+`checks_scale_linearly` counts actual dispatches, metadata advances,
 lookups, copies, leaves, and witness links. The ignored release measurement
 `check_doubling_measurements` prints read/collection and evaluator timings
 separately across record count, row width, depth, expression size, and check

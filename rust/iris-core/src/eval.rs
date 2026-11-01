@@ -207,17 +207,17 @@ impl<'a, 's, 'i> Evaluator<'a, 's, 'i> {
             charges: vec![],
         }
     }
-    pub(crate) fn charge(&mut self, _units: u128) -> Result<(), Failure> {
+    pub(crate) fn charge(&mut self, units: u128) -> Result<(), Failure> {
         #[cfg(test)]
         if self.reader.capture_charges {
             self.charges.push(crate::reader::Charge {
                 expression: true,
-                units: _units,
+                units,
                 statement_line: self.reader.statement.map(|s| s.0),
                 context: self.reader.execution_context(),
             });
         }
-        Ok(())
+        self.reader.charge_expression(units).map_err(Into::into)
     }
     pub(crate) fn leaf_span(&mut self, view: &View<'_>) -> std::ops::Range<usize> {
         self.boundary(view, view.row)..self.boundary(view, view.row + 1)

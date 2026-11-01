@@ -142,14 +142,21 @@ single-byte message can be invalid Unicode and cannot always be reproduced
 byte for byte in canonical JSON. Codes and locations follow the Specification.
 
 The `read_conformance` progress test discovers both case roots, validates the
-exact pending list and its rust-009/rust-010 owners, and excludes those
+exact pending list and its rust-010 owner, and excludes those
 paths before driver invocation. Newly discovered cases run automatically.
-The selection is 814 cases (155 parse, 638 read, 21 catalog), with 118 pending;
+The selection is 911 cases (155 parse, 730 read, 26 catalog), with 21 pending;
 counts follow inventory changes. No known-failure driver ID is used.
 
 ```sh
 cargo test --locked -p iris-cli --test read_conformance -- --nocapture
 ```
+
+Read and catalog enforce [Specification §10's work budgets](../../spec/0.1/10-work-budgets.md):
+2^20 idle units and 2^20 + 16*N expression units for the entire original input's
+byte length N. Both allowances span all traversed instances and deferred
+rejections. Equality is accepted; an excess charge immediately returns
+`E-BUDGET`, including in skipped instances and catalog. Parse performs no
+budgeted execution.
 
 The ignored differential test runs 256 bounded scalar probes with fixed seed
 73003, 384 array/read probes with seed 73004, 384 repeat probes with seed

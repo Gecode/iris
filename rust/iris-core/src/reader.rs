@@ -8,6 +8,8 @@ use iris_sema::{DefinitionId, DefinitionKind, ReferenceId, RepeatId, Resolution,
 use iris_syntax::{DecodedString, SyntaxKind as K, SyntaxNode, SyntaxToken, TextRange};
 use std::collections::{HashMap, HashSet};
 
+const BASE_BUDGET: u128 = 1 << 20;
+
 #[derive(Debug)]
 pub(crate) struct ModelIndex {
     pub params: HashSet<String>,
@@ -137,6 +139,8 @@ impl ModelIndex {
         }
     }
 }
+#[cfg(test)]
+mod budget_tests;
 pub(crate) mod checks;
 mod instances;
 mod params;
@@ -206,6 +210,9 @@ pub(crate) struct Interpreter<'s, 'i> {
     instance: Option<instances::Instance>,
     catalog: Option<instances::Catalog>,
     selected: bool,
+    idle_remaining: u128,
+    // Evaluators borrow the reader's values while charging this operation.
+    expression_remaining: std::cell::Cell<u128>,
     #[cfg(test)]
     pub(crate) charges: Vec<Charge>,
     #[cfg(test)]
@@ -215,6 +222,8 @@ pub(crate) struct Interpreter<'s, 'i> {
 }
 impl<'s, 'i> Interpreter<'s, 'i> {
     pub fn new(spec: &'s Spec, input: Input<'i>) -> Self {
+        // usize input lengths fit in u64 on supported Rust targets.
+        let expression_limit = BASE_BUDGET + 16 * input.bytes.len() as u128;
         Self {
             spec,
             input,
@@ -236,6 +245,8 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             instance: None,
             catalog: None,
             selected: false,
+            idle_remaining: BASE_BUDGET,
+            expression_remaining: std::cell::Cell::new(expression_limit),
             source_lines: std::iter::once(0)
                 .chain(
                     spec.source
@@ -614,9 +625,31 @@ impl<'s, 'i> Interpreter<'s, 'i> {
         contexts.extend(self.context.iter().cloned());
         (!contexts.is_empty()).then(|| contexts.join(" > "))
     }
-    fn charge_idle(&mut self, _units: u128) -> Result<(), Error> {
+    fn charge_idle(&mut self, units: u128) -> Result<(), Error> {
+        self.work(WorkKind::Probe, 1);
         #[cfg(test)]
-        self.observe_charge(false, _units);
+        self.observe_charge(false, units);
+        self.idle_remaining = self.idle_remaining.checked_sub(units).ok_or_else(|| {
+            self.error(
+                ErrorCode::Budget,
+                "too many repetitions or empty rows without reading input",
+            )
+        })?;
+        Ok(())
+    }
+    pub(crate) fn charge_expression(&self, units: u128) -> Result<(), Error> {
+        self.work(WorkKind::Probe, 1);
+        let remaining = self
+            .expression_remaining
+            .get()
+            .checked_sub(units)
+            .ok_or_else(|| {
+                self.error(
+                    ErrorCode::Budget,
+                    "the expressions do too much work for the size of the input",
+                )
+            })?;
+        self.expression_remaining.set(remaining);
         Ok(())
     }
     #[cfg(test)]
