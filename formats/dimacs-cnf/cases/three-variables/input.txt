@@ -1,0 +1,5 @@
+c Hand-made three-variable formula
+p cnf 3 3
+1 -2 0
+2 3 -1 0
+-3 0

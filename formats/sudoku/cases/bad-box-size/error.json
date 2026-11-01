@@ -1,0 +1,1 @@
+{"code":"E-CHECK-FAILED","message":"check failed: boxes must tile the grid","input_location":{"origin":"formats/sudoku/cases/bad-box-size/input.txt","line":5,"column":5},"spec_location":{"origin":"formats/sudoku/cases/bad-box-size/spec.iris","line":7,"column":null},"context":"instance [1]","record_path":[]}

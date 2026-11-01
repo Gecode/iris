@@ -1,0 +1,3 @@
+title = "Explicit distances require an edge weight section"
+source = "gecode:examples/tsp.cpp:instance_spec"
+tags = ["formats", "tsplib"]

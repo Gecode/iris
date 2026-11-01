@@ -1,0 +1,1 @@
+{"iris":"0.1","entries":[{"name":"n","type":"int","depth":0,"value":3},{"name":"dist","type":"int","depth":2,"value":[[0,2,4],[3,0,2],[4,3,0]]},{"name":"ready","type":"int","depth":1,"value":[0,2,5]},{"name":"due","type":"int","depth":1,"value":[20,8,12]}]}

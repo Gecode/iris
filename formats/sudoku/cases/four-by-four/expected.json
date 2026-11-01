@@ -1,0 +1,1 @@
+{"iris":"0.1","entries":[{"name":"n","type":"int","depth":0,"value":4},{"name":"box_width","type":"int","depth":0,"value":2},{"name":"box_height","type":"int","depth":0,"value":2},{"name":"cells","type":"int","depth":2,"value":[[1,0,0,4],[0,4,1,0],[0,1,4,0],[4,0,0,1]]}]}

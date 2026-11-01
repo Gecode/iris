@@ -1,0 +1,3 @@
+title = "Five-by-five X with comma-separated clues"
+source = "gecode:examples/nonogram.cpp:instance_spec"
+tags = ["formats", "nonogram"]

@@ -1,0 +1,3 @@
+title = "Depot and two customers with valid time windows"
+source = "gecode:examples/tsptw.cpp:instance_spec"
+tags = ["formats", "tsptw"]

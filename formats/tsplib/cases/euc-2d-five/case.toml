@@ -1,0 +1,3 @@
+title = "Five cities given by two-dimensional coordinates"
+source = "gecode:examples/tsp.cpp:instance_spec"
+tags = ["formats", "tsplib"]

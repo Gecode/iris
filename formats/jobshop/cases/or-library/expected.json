@@ -1,0 +1,1 @@
+{"iris":"0.1","entries":[{"name":"name","type":"string","depth":0,"value":"handmade-or"},{"name":"n_jobs","type":"int","depth":0,"value":3},{"name":"n_machines","type":"int","depth":0,"value":3},{"name":"machine","type":"int","depth":2,"value":[[0,1,2],[1,2,0],[2,0,1]]},{"name":"duration","type":"int","depth":2,"value":[[2,3,1],[1,4,2],[3,1,2]]}]}

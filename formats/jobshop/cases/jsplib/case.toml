@@ -1,0 +1,3 @@
+title = "Three-job instance with JSPLIB comments"
+source = "gecode:examples/job-shop.cpp:instance_spec"
+tags = ["formats", "jobshop"]

@@ -78,3 +78,4 @@ the component.
 | `editors/` | To be added by the editors area. |
 | `site/` | To be added by the site area. |
 | `conformance/` | Runner tests: `cd rust && cargo test --workspace --locked`. From the root: `adapter=$(conformance/adapters/gecode/build.sh)`; `ctest --test-dir "$(dirname "$adapter")" --output-on-failure`; `(cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$adapter\"" --driver-id gecode-6.5.0-5e7bbd5c26b0 ../conformance/cases/0.1/smoke)` (see [conformance/README.md](conformance/README.md)). |
+| `formats/` | From the root, after building the adapter as for `conformance/`: `(cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$adapter\"" --driver-id gecode-6.5.0-5e7bbd5c26b0 ../formats)` (see [formats/README.md](formats/README.md)). |

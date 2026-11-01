@@ -1,0 +1,1 @@
+{"code":"E-CHECK-FAILED","message":"check failed: no EDGE_WEIGHT_SECTION","input_location":{"origin":"formats/tsplib/cases/missing-weights/input.txt","line":5,"column":4},"spec_location":{"origin":"formats/tsplib/cases/missing-weights/spec.iris","line":26,"column":null},"context":null,"record_path":[]}

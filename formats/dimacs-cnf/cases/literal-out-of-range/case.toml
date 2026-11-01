@@ -1,0 +1,3 @@
+title = "Literal exceeds the declared variable count"
+source = "gecode:examples/sat.cpp:instance_spec"
+tags = ["formats", "dimacs-cnf"]

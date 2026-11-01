@@ -1,0 +1,3 @@
+title = "Box dimensions do not tile the grid"
+source = "gecode:examples/sudoku-instances.hh:instance_spec"
+tags = ["formats", "sudoku"]

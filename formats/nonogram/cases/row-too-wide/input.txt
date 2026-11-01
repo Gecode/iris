@@ -1,0 +1,15 @@
+title "Hand-made invalid clue"
+width 5
+height 5
+rows
+6
+1,1
+1
+1,1
+1,1
+columns
+1,1
+1,1
+1
+1,1
+1,1

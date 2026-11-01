@@ -1,0 +1,3 @@
+title = "Four-by-four grid with two-by-two boxes"
+source = "gecode:examples/sudoku-instances.hh:instance_spec"
+tags = ["formats", "sudoku"]

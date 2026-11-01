@@ -1,0 +1,23 @@
+format jobshop
+
+comment "#" "+++"
+instances {
+  sections skip other {
+    "instance {name:word}" optional
+    "{n_jobs:1..} {n_machines:1..}" last {
+      check n_jobs <= (gecode.int_max - 2) / 2 / n_machines "there are too many jobs and machines"
+
+      repeat n_jobs as jobs {
+        each job
+        repeat n_machines as steps {
+          each step
+          machine: 0..<n_machines
+          duration: 0..
+        }
+      }
+    }
+  }
+
+  check distinct(job.machine) "a job uses a machine twice; each job must use every machine once"
+  check sum(j in jobs: sum(j.duration)) <= gecode.int_max "the total duration is too large"
+}

@@ -1,0 +1,1 @@
+{"code":"E-CHECK-FAILED","message":"check failed for record 2 of 'nodes': the time window of a node is invalid","input_location":{"origin":"formats/tsptw/cases/reversed-window/input.txt","line":6,"column":1},"spec_location":{"origin":"formats/tsptw/cases/reversed-window/spec.iris","line":14,"column":null},"context":null,"record_path":[1]}

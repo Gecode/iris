@@ -1,0 +1,1 @@
+{"code":"E-EXPECTED-VALUE","message":"expected an int in -3..3, found '4'","input_location":{"origin":"formats/dimacs-cnf/cases/literal-out-of-range/input.txt","line":2,"column":3},"spec_location":{"origin":"formats/dimacs-cnf/cases/literal-out-of-range/spec.iris","line":7,"column":null},"context":"repeat [1 of 1] > clause","record_path":null}

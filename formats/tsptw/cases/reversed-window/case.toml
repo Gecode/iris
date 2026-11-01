@@ -1,0 +1,3 @@
+title = "A customer closes before it opens"
+source = "gecode:examples/tsptw.cpp:instance_spec"
+tags = ["formats", "tsptw"]

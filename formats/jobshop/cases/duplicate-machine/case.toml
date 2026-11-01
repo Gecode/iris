@@ -1,0 +1,3 @@
+title = "A job uses machine zero twice"
+source = "gecode:examples/job-shop.cpp:instance_spec"
+tags = ["formats", "jobshop"]

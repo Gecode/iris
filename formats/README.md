@@ -1,8 +1,64 @@
-# formats
+# Format library
 
-This directory will hold the format library: reader specs for standard
-benchmark formats, one directory per format with `<format>.iris`, a
-`README.md`, sample files, and their expected data. It starts with the six
-example specs from Gecode (added with the conformance suite in milestone M2)
-and grows toward the formats listed in `PLAN.md` §8.9. Formats that Iris 0.1
-cannot express, or expresses awkwardly, are input to the Iris 1.0 design.
+Ready-made Iris 0.1 reader specs for six benchmark formats from Gecode's
+examples. This is the format library in [PLAN.md §8.9](../PLAN.md#89-format-library-formats),
+part of milestone M2; its layout follows [§5](../PLAN.md#5-repository-layout).
+
+| Format | Samples |
+|---|---|
+| [DIMACS CNF](dimacs-cnf/) | Three variables; an out-of-range literal. |
+| [TSPLIB](tsplib/) | Five-city EXPLICIT and EUC_2D files; missing weights. |
+| [TSPTW](tsptw/) | Three nodes; a reversed time window. |
+| [Job shop](jobshop/) | Three jobs and machines in OR-Library and JSPLIB layouts; a repeated machine. |
+| [Sudoku](sudoku/) | A 4×4 grid with 2×2 boxes; incompatible box dimensions. |
+| [Nonogram](nonogram/) | A 5×5 X; a clue wider than the board. |
+
+Each `<format>/<format>.iris` is the verbatim value of `instance_spec` in
+the corresponding Gecode example at commit
+`5e7bbd5c26b0702c6fd652356b2289da0710ac3c`. All six are C++ raw string
+literals: their contents, including the final LF, need no escape decoding.
+Extraction was checked against bytes emitted by compiling the original
+literal. The [Gecode notices](GECODE-LICENSE.md) accompany these specs.
+
+## Samples and cases
+
+Samples live directly in `cases/<name>/input.txt`, alongside their
+`expected.json` or `error.json` and optional `params.json`. There is no
+second sample or expectation directory. Each case follows the
+[conformance contract](../conformance/README.md#case-files-and-discovery).
+Its `spec.iris` is a relative file symlink to `../../<format>.iris`.
+This keeps a single reader spec per format, so case copies cannot drift.
+The runner supports file symlinks and discovers these cases from `formats/`.
+
+All samples were written by hand for this repository and are freely
+redistributable under its [MIT license](../LICENSE). No benchmark instances
+were copied. Each format README cites its format documentation and describes
+the subset read by the pinned spec.
+
+Expected results come from running the pinned `gecode-instance` tool on
+every sample. Successful dzn output was compared byte for byte with the
+adapter's dzn output before capturing canonical JSON through the adapter.
+Invalid samples' reference diagnostics were checked against the adapter's
+canonical errors, including locations and record paths. These cases need
+no known-failure annotations.
+
+## Run the cases
+
+From the repository root:
+
+```sh
+eval "$(scripts/gecode-reference.sh --print-env)"
+adapter=$(conformance/adapters/gecode/build.sh)
+(cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$adapter\"" \
+  --driver-id gecode-6.5.0-5e7bbd5c26b0 ../formats)
+```
+
+For a direct read with the reference tool:
+
+```sh
+"$GECODE_REFERENCE_INSTANCE_TOOL" -spec formats/tsplib/tsplib.iris -dzn \
+  formats/tsplib/cases/euc-2d-five/input.txt
+```
+
+Changes to the copied specs belong in a later language version. Format
+limitations and awkward constructions feed into [Iris 1.0 ideas](../docs/1.0-ideas.md).

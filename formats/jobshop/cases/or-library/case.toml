@@ -1,0 +1,3 @@
+title = "Named three-job instance with OR-Library wrappers"
+source = "gecode:examples/job-shop.cpp:instance_spec"
+tags = ["formats", "jobshop"]

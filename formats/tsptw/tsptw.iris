@@ -1,0 +1,15 @@
+format tsptw
+
+comment "#"
+n: 2..1000
+dist[n][n]: 0..gecode.int_max / 2 / n
+
+type time = 0..gecode.int_max / 2
+repeat n as nodes {
+  each node
+  ready: time
+  due: time
+}
+
+check node.ready <= node.due "the time window of a node is invalid"
+check nodes[0].ready == 0 "the depot (node 0) must open at time 0"

@@ -1,0 +1,1 @@
+{"code":"E-CHECK-FAILED","message":"check failed for record 1 of 'row': the clues of a row do not fit into the width of the board","input_location":{"origin":"formats/nonogram/cases/row-too-wide/input.txt","line":5,"column":1},"spec_location":{"origin":"formats/nonogram/cases/row-too-wide/spec.iris","line":15,"column":null},"context":null,"record_path":[0]}

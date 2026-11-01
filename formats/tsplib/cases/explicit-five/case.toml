@@ -1,0 +1,3 @@
+title = "Five cities with an explicit full distance matrix"
+source = "gecode:examples/tsp.cpp:instance_spec"
+tags = ["formats", "tsplib"]

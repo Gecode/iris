@@ -1,0 +1,5 @@
+NAME : handmade-missing-weights
+TYPE : TSP
+DIMENSION : 5
+EDGE_WEIGHT_TYPE : EXPLICIT
+EOF

@@ -1,0 +1,13 @@
+NAME : handmade-explicit-five
+TYPE : TSP
+COMMENT : Hand-made symmetric distances
+DIMENSION : 5
+EDGE_WEIGHT_TYPE : EXPLICIT
+EDGE_WEIGHT_FORMAT : FULL_MATRIX
+EDGE_WEIGHT_SECTION
+0 2 4 6 3
+2 0 5 4 7
+4 5 0 3 6
+6 4 3 0 2
+3 7 6 2 0
+EOF
