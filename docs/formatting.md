@@ -58,8 +58,9 @@ one starting with `# iris:`, follows the same rule.
 
 Keep blank lines between the same surrounding tokens, including within a
 statement. Collapse each run to one blank line. Remove leading and trailing
-blank lines, and do not insert blank lines between groups of statements or
-arms (R3). A comment-only file follows the same rules as any nonempty file.
+blank lines of the file, and blank lines directly after `{` or directly
+before `}`, so a body holding only blank lines becomes `{}`. Do not insert
+blank lines between groups of statements or arms (R3). A comment-only file follows the same rules as any nonempty file.
 
 Before:
 
@@ -608,13 +609,14 @@ comment
   "ANOTHER_COMMENT_PREFIX"
   "THIRD_COMMENT_PREFIX"
 repeat
-  until
-    "END_OF_RECORDS"
-    "END_OF_FILE"
+  until "END_OF_RECORDS" "END_OF_FILE"
   store ending {
   value: int
 }
 ```
+
+Once `store ending` moves to its own line, the `until` group fits, so its
+strings stay on one line.
 
 ### Calls and comprehensions at width 40
 
@@ -810,7 +812,7 @@ supplies no preference, rather than evidence of agreement.
 |---|---|---|---|
 | R1: source whitespace and file ending | Spaces, LF outside protected text, trim trailing whitespace, one final LF for nonempty files; empty files stay empty. | Preserve original whitespace bytes and file endings. | All six Gecode specs end in LF; the Specification has 191 with and 162 without. A predictable file ending is useful, but the latter intentionally test optional LF. Preserve literal bytes inside strings and comments. |
 | R2: comment spacing and attachment | One space before trailing `#`; preserve its token attachment and line, and indent standalone comments at their position. Never reflow comment text. | Retain original spacing before `#`, or move long trailing comments above statements. | Gecode has two padded comments (20 and three spaces); the Specification has one with one space. One space follows the settled no-alignment rule. There are zero standalone or between-arm comments to settle their indentation. |
-| R3: blank-line edges | Keep interior single blank lines, including inside constructs, trim blank lines at file edges, and insert none. | Preserve edge blank lines or insert blank lines between statement groups. | Gecode has 13 single blank-line runs and no longer runs; the Specification has none. Keeping grouping changes the common style least. Edge trimming has no positive example in this sample. |
+| R3: blank-line edges | Keep interior single blank lines, including inside constructs, trim blank lines at file edges and directly inside braces, and insert none. | Preserve edge blank lines or insert blank lines between statement groups. | Gecode has 13 single blank-line runs and no longer runs; the Specification has none. Keeping grouping changes the common style least. Edge trimming has no positive example in this sample. |
 | R4: operators | One space around assignment and every binary operator, including `^`; no space after unary `-` or `!`. | Compact operators, or special compact spacing for multiplication and powers. | Gecode has 3 spaced assignments and 44 spaced non-minus binary operators, with one wrapped operator; the Specification has 219 compact assignments and 137 compact non-minus binary operators. All 17 unary `!` occurrences are attached. Prefer the application specs' readable expressions over compressed syntax examples. Gecode has no power operator. |
 | R5: expression and dimension punctuation | Tight brackets, dots, parentheses, and call openers; one space after commas. Keep a separating space on both sides of a field dot when gluing would change tokens. | Space inside delimiters, compact commas, or break postfix chains freely. | Gecode has 7 tight bracket openers, 5 tight field dots, and 20 tight calls, with no competing style. The Specification has 228, 25, and 102 respectively. Its 51 commas are compact; comma spacing is a deliberate readability departure. The token-boundary exception is required for meaning, with zero surveyed examples. |
 | R6: colons | No space before `:`, one after, for declarations and comprehensions. | Compact colons or spaces on both sides. | Gecode uses this for all 18 source colons; the Specification has 100 spaced-after and 359 compact. Keeping Gecode's style changes common reader specs least. Capture colons remain inside unchanged strings. |
