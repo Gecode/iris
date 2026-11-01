@@ -1,16 +1,17 @@
 # rust
 
-The Cargo workspace contains `iris-syntax`, the shared lossless parser for
-Iris 0.1 (milestone M3), and the standalone `iris-conformance` library and binary
-(milestone M2). The runner uses the
-[conformance protocol](../conformance/README.md) and has no dependency on the
-implementation crates. [iris-syntax](iris-syntax/README.md) owns source validation,
-lexing, syntax trees, and error recovery; name resolution and type checking
-belong to `iris-sema`.
+The Cargo workspace contains the standalone `iris-conformance` runner
+(milestone M2), and three implementation crates for Iris 0.1 (milestone M3):
+[iris-syntax](iris-syntax/README.md) owns source validation, the lossless parser,
+and formatting; [iris-sema](iris-sema/README.md) owns parse-time validity,
+resolution, and conservative value facts; [iris-cli](iris-cli/README.md) provides
+`iris check SPEC` and the `iris-driver parse` conformance command. The runner
+uses the [conformance protocol](../conformance/README.md) and has no dependency
+on implementation crates.
 
-The reference implementation will add `iris-sema`, `iris-core`,
-`iris-cli`, `iris-lsp`, `iris-wasm` and, if built, `iris-lint`, published under
-`gecode-iris`. [PLAN.md §4.2](../PLAN.md#42-the-rust-reference-implementation-is-layered)
+Later work adds `iris-core`, `iris-lsp`, `iris-wasm` and, if built, `iris-lint`,
+published under `gecode-iris`.
+[PLAN.md §4.2](../PLAN.md#42-the-rust-reference-implementation-is-layered)
 describes the layers; §8.1, §8.7, §8.12 and §8.13 describe the crates. Milestones
 M3, M4b, M4e and M6b cover the core/CLI, language server, formatter and linter.
 
@@ -35,6 +36,17 @@ The parser tests also cover the six pinned Gecode reader specs, embedded pattern
 nodes, malformed-input recovery, and all published nesting boundaries. See the
 [crate README](iris-syntax/README.md) for its syntax/semantic boundary and fixture
 regeneration.
+
+Check a reader spec and run every parse-only conformance case:
+
+```sh
+cargo run --locked -p iris-cli -- check path/to/spec.iris
+cargo test --locked -p iris-cli --test parse_conformance -- --nocapture
+```
+
+The integration test loads the whole version tree and selects cases by their
+operation. Read, catalog, and dzn await `iris-core`; the driver reports them as
+unsupported misuse (exit 2) if invoked directly.
 
 Run cases with an implementation's executable or wrapper command:
 

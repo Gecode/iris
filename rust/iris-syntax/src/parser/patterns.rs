@@ -1,4 +1,4 @@
-use super::{C, K, PResult, Parser, Stream};
+use super::{C, Check, K, PResult, Parser, Stream};
 use crate::lexer::{decode_string, is_name, lex};
 use std::ops::Range;
 
@@ -22,7 +22,7 @@ enum PatternItemKind {
 impl Parser<'_> {
     pub(super) fn pattern(&mut self) -> PResult {
         if self.kind() != Some(K::String) {
-            return self.fail(C::Syntax, "expected a pattern string");
+            return self.fail(C::Syntax, "expected a line pattern (a string)");
         }
         self.trivia();
         let token = self.token().expect("pattern string").clone();
@@ -132,6 +132,12 @@ impl Parser<'_> {
             diagnostic.range = crate::diagnostic::text_range(offsets[start], offsets[end]);
             diagnostic.location.line += line - 1;
             diagnostic.phase = crate::DiagnosticPhase::Parsing;
+            self.checks.push(crate::ParseCheck {
+                kind: Check::Diagnostic(self.diagnostics.len()),
+                target: diagnostic.range.start(),
+                range: diagnostic.range,
+                location: diagnostic.location.clone(),
+            });
             self.diagnostics.push(diagnostic);
         }
         let mut stream = Stream::new(text.into(), lexed.tokens);
@@ -147,11 +153,16 @@ impl Parser<'_> {
             );
             Err(())
         } else {
+            let target = self.raw_position();
             self.read_type().and_then(|_| {
                 if self.eof() {
+                    self.checkpoint(Check::CaptureForm, target);
                     Ok(())
                 } else {
-                    self.fail(C::Pattern, "unexpected token in capture type")
+                    self.fail(
+                        C::Pattern,
+                        format!("unexpected {} in the capture type '{text}'", self.found()),
+                    )
                 }
             })
         };
@@ -168,7 +179,7 @@ impl Parser<'_> {
     }
 }
 
-fn scan_pattern(text: &str) -> Result<Vec<PatternItem>, &'static str> {
+fn scan_pattern(text: &str) -> Result<Vec<PatternItem>, String> {
     let mut items = Vec::new();
     let mut offset = 0;
     while offset < text.len() {
@@ -178,7 +189,7 @@ fn scan_pattern(text: &str) -> Result<Vec<PatternItem>, &'static str> {
                 .bytes()
                 .all(|byte| matches!(byte, b' ' | b'\t'))
             {
-                return Err("'...' must end the pattern");
+                return Err(format!("'...' must end the pattern \"{text}\""));
             }
             offset = text.len();
             PatternItemKind::Ellipsis
@@ -192,11 +203,11 @@ fn scan_pattern(text: &str) -> Result<Vec<PatternItem>, &'static str> {
             let end = offset
                 + text[offset..]
                     .find('}')
-                    .ok_or("unterminated capture in pattern")?;
+                    .ok_or_else(|| format!("unterminated capture in pattern \"{text}\""))?;
             let inside = &text[offset + 1..end];
             let kind = if let Some(name) = inside.strip_prefix('$') {
                 if !is_name(name) {
-                    return Err("missing or bad reference name in pattern");
+                    return Err(format!("missing or bad name in pattern \"{text}\""));
                 }
                 PatternItemKind::CurrentValue {
                     name: offset + 2..end,
@@ -205,7 +216,10 @@ fn scan_pattern(text: &str) -> Result<Vec<PatternItem>, &'static str> {
                 let name_end = inside.find(':').map_or(end, |colon| offset + 1 + colon);
                 let name = offset + 1..name_end;
                 if !name.is_empty() && !is_name(&text[name.clone()]) {
-                    return Err("capture name in pattern is not a name");
+                    return Err(format!(
+                        "capture name '{}' in pattern \"{text}\" is not a name",
+                        &text[name.clone()]
+                    ));
                 }
                 let capture_type = (name_end < end).then_some(name_end + 1..end);
                 PatternItemKind::Capture { name, capture_type }

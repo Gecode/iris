@@ -1,5 +1,5 @@
 [workspace]
-members = ["iris-conformance", "iris-syntax"]
+members = ["iris-conformance", "iris-syntax", "iris-sema", "iris-cli"]
 resolver = "3"
 
 [workspace.package]

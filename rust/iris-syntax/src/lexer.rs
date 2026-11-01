@@ -33,6 +33,7 @@ pub(crate) fn lex(source: &str, origin: Arc<str>) -> Lexed {
     while offset < bytes.len() {
         let start = offset;
         let mut error = None;
+        let mut string_error = None;
         let kind = match bytes[offset] {
             b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c => {
                 offset += 1;
@@ -49,11 +50,12 @@ pub(crate) fn lex(source: &str, origin: Arc<str>) -> Lexed {
                 K::Comment
             }
             b'"' => {
-                let (end, valid) = scan_string(source, offset);
+                let (end, failure) = scan_string(source, offset);
                 offset = end;
-                if valid {
+                if failure.is_none() {
                     K::String
                 } else {
+                    string_error = failure;
                     error = Some(DiagnosticCode::String);
                     K::Invalid
                 }
@@ -110,9 +112,9 @@ pub(crate) fn lex(source: &str, origin: Arc<str>) -> Lexed {
             diagnostics.push(Diagnostic {
                 code,
                 message: match code {
-                    DiagnosticCode::String => "invalid or unterminated reader-spec string".into(),
+                    DiagnosticCode::String => string_error.expect("failed string scan"),
                     DiagnosticCode::Number => format!("bad number {}", &source[start..offset]),
-                    _ => format!("unexpected character {:?}", &source[start..offset]),
+                    _ => format!("unexpected character '{}'", &source[start..offset]),
                 },
                 range: text_range(start, offset),
                 location: SourceLocation {
@@ -152,29 +154,47 @@ pub(crate) fn is_name(text: &str) -> bool {
         && text.bytes().all(is_name_character)
 }
 
-fn scan_string(source: &str, start: usize) -> (usize, bool) {
+fn scan_string(source: &str, start: usize) -> (usize, Option<String>) {
     let bytes = source.as_bytes();
     let mut offset = start + 1;
-    let mut valid = true;
+    let mut failure = None;
     while offset < bytes.len() {
         match bytes[offset] {
-            b'"' => return (offset + 1, valid),
-            b'\n' => return (offset, false),
+            b'"' => return (offset + 1, failure),
+            b'\n' => {
+                return (
+                    offset,
+                    Some(failure.unwrap_or_else(|| "unterminated string".into())),
+                );
+            }
             b'\\' => {
                 offset += 1;
                 match bytes.get(offset) {
-                    None | Some(b'\n') => return (offset, false),
+                    None | Some(b'\n') => {
+                        return (
+                            offset,
+                            Some(failure.unwrap_or_else(|| "unterminated string".into())),
+                        );
+                    }
                     Some(b'n' | b't' | b'\\' | b'"') => offset += 1,
                     Some(_) => {
-                        valid = false;
-                        offset += source[offset..].chars().next().expect("not EOF").len_utf8();
+                        let ch = source[offset..].chars().next().expect("not EOF");
+                        failure.get_or_insert_with(|| {
+                            format!(
+                                "unknown escape '\\{ch}' in string (use \\n, \\t, \\\\, or \\\")"
+                            )
+                        });
+                        offset += ch.len_utf8();
                     }
                 }
             }
             _ => offset += source[offset..].chars().next().expect("not EOF").len_utf8(),
         }
     }
-    (offset, false)
+    (
+        offset,
+        Some(failure.unwrap_or_else(|| "unterminated string".into())),
+    )
 }
 
 fn scan_number(bytes: &[u8], start: usize) -> usize {

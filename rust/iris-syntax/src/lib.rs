@@ -1,6 +1,7 @@
 //! Lossless syntax analysis and whitespace-only formatting for Iris 0.1.
 //!
 //! Syntax acceptance does not include name resolution or type checking.
+mod checks;
 mod diagnostic;
 mod format;
 mod lexer;
@@ -9,6 +10,7 @@ mod syntax;
 
 use std::{fmt, sync::Arc};
 
+pub use checks::{ParseCheck, ParseCheckKind};
 pub use diagnostic::{Diagnostic, DiagnosticCode, DiagnosticPhase, SourceLocation};
 pub use format::{FormatEdit, FormatError, FormatOptions, RangeFormat, format, format_range};
 pub use rowan::{TextRange, TextSize};
@@ -23,6 +25,7 @@ pub enum LanguageVersion {
 pub struct Parse {
     green: rowan::GreenNode,
     diagnostics: Vec<Diagnostic>,
+    checks: Vec<ParseCheck>,
     version: LanguageVersion,
     origin: Arc<str>,
 }
@@ -33,6 +36,9 @@ impl Parse {
     }
     pub fn diagnostics(&self) -> &[Diagnostic] {
         &self.diagnostics
+    }
+    pub fn checks(&self) -> &[ParseCheck] {
+        &self.checks
     }
     pub fn version(&self) -> LanguageVersion {
         self.version
@@ -95,10 +101,11 @@ pub fn parse(source: &[u8], origin: &str, version: LanguageVersion) -> Result<Pa
         })
     })?;
     let lexed = lexer::lex(source, origin.clone());
-    let (green, diagnostics) = parser::parse(source, origin.clone(), lexed);
+    let (green, diagnostics, checks) = parser::parse(source, origin.clone(), lexed);
     Ok(Parse {
         green,
         diagnostics,
+        checks,
         version,
         origin,
     })
@@ -122,6 +129,23 @@ mod tests {
                 super::check_source_len(len),
                 Err(super::ParseError::SourceTooLarge { len })
             );
+        }
+    }
+}
+
+/// A valid source string decoded once, with raw byte boundaries for tooling.
+#[derive(Debug, Clone)]
+pub struct DecodedString {
+    pub text: String,
+    pub raw_boundaries: Vec<usize>,
+}
+impl DecodedString {
+    /// `text` must be a complete, lexically valid quoted Iris string token.
+    pub fn new(text: &str) -> Self {
+        let (text, raw_boundaries) = lexer::decode_string(text);
+        Self {
+            text,
+            raw_boundaries,
         }
     }
 }

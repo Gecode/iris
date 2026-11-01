@@ -1,11 +1,15 @@
-use super::{C, K, PResult, Parser, expressions::ExpressionForm};
+use super::{C, Check, K, PResult, Parser, expressions::ExpressionForm};
 
 impl Parser<'_> {
     pub(super) fn read_type(&mut self) -> PResult {
         self.trivia();
+        let target = self.raw_position();
         self.start(K::Type);
         let result = self.type_contents();
         self.finish();
+        if result.is_ok() {
+            self.checkpoint(Check::TypeUse, target);
+        }
         result
     }
     fn type_contents(&mut self) -> PResult {
@@ -39,7 +43,10 @@ impl Parser<'_> {
                 self.finish();
                 return Ok(());
             }
-            return self.fail(C::Syntax, "expected a range operator");
+            return self.fail(
+                C::Syntax,
+                "expected '..' or '..<' after the lower bound of a range",
+            );
         }
         self.builder.start_node_at(checkpoint, K::Range.into());
         let exclusive = self.at("..<");
@@ -47,7 +54,14 @@ impl Parser<'_> {
         let result = if self.upper_bound_ahead() {
             self.expression().map(|_| ())
         } else if exclusive || lower.is_none() {
-            self.fail(C::Syntax, "range needs an upper bound")
+            self.fail(
+                C::Syntax,
+                if exclusive {
+                    "'..<' needs an upper bound"
+                } else {
+                    "a range needs a lower or an upper bound"
+                },
+            )
         } else {
             Ok(())
         };
@@ -94,19 +108,24 @@ impl Parser<'_> {
         self.start(K::Alphabet);
         self.bump();
         let result = (|| {
-            self.require_kind(K::String)?;
+            self.string("an alphabet")?;
             while ["blank", "strip", "base"]
                 .iter()
                 .any(|word| self.option(word))
             {
                 self.start(K::AlphabetOption);
                 let base = self.at("base");
+                let description = if self.at("blank") {
+                    "blank symbols"
+                } else {
+                    "symbols to strip"
+                };
                 self.bump();
                 let result = if base {
                     self.eat("-");
                     self.require_kind(K::Integer)
                 } else {
-                    self.require_kind(K::String)
+                    self.string(description)
                 };
                 self.finish();
                 result?;

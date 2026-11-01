@@ -3,7 +3,8 @@ mod patterns;
 mod types;
 
 use crate::{
-    Diagnostic, DiagnosticCode as C, DiagnosticPhase, SourceLocation, SyntaxKind as K,
+    Diagnostic, DiagnosticCode as C, DiagnosticPhase, ParseCheck, ParseCheckKind as Check,
+    SourceLocation, SyntaxKind as K, TextSize,
     diagnostic::text_range,
     lexer::{Lexed, Token},
 };
@@ -53,19 +54,25 @@ struct Parser<'a> {
     stream: Stream,
     builder: GreenNodeBuilder<'static>,
     diagnostics: Vec<Diagnostic>,
+    checks: Vec<ParseCheck>,
     block_depth: usize,
     expression_depth: usize,
     type_names: Vec<String>,
     instances_seen: bool,
 }
 
-pub(crate) fn parse(source: &str, origin: Arc<str>, lexed: Lexed) -> (GreenNode, Vec<Diagnostic>) {
+pub(crate) fn parse(
+    source: &str,
+    origin: Arc<str>,
+    lexed: Lexed,
+) -> (GreenNode, Vec<Diagnostic>, Vec<ParseCheck>) {
     let mut parser = Parser {
         source,
         origin,
         stream: Stream::new(source.into(), lexed.tokens),
         builder: GreenNodeBuilder::new(),
         diagnostics: lexed.diagnostics,
+        checks: Vec::new(),
         block_depth: 0,
         expression_depth: 0,
         type_names: Vec::new(),
@@ -77,10 +84,36 @@ pub(crate) fn parse(source: &str, origin: Arc<str>, lexed: Lexed) -> (GreenNode,
     }
     parser.trivia();
     parser.finish();
-    (parser.builder.finish(), parser.diagnostics)
+    (parser.builder.finish(), parser.diagnostics, parser.checks)
 }
 
 impl Parser<'_> {
+    fn raw_position(&self) -> TextSize {
+        TextSize::new(
+            self.stream.raw_offset(
+                self.token()
+                    .map_or(self.stream.text.len(), |t| t.range.start),
+            ) as u32,
+        )
+    }
+    fn checkpoint(&mut self, kind: Check, target: TextSize) {
+        let range = self
+            .token()
+            .map_or(self.stream.text.len()..self.stream.text.len(), |t| {
+                t.range.clone()
+            });
+        let range = self.stream.raw_range(range);
+        self.checks.push(ParseCheck {
+            kind,
+            target,
+            range: text_range(range.start, range.end),
+            location: SourceLocation {
+                origin: self.origin.clone(),
+                line: self.line(),
+                column: None,
+            },
+        });
+    }
     fn start(&mut self, kind: K) {
         self.builder.start_node(kind.into());
     }
@@ -156,7 +189,18 @@ impl Parser<'_> {
             self.bump();
             Ok(())
         } else {
-            self.fail(C::Syntax, format!("expected {kind:?}"))
+            self.fail(
+                C::Syntax,
+                format!(
+                    "expected {}",
+                    match kind {
+                        K::Ident => "a field name",
+                        K::Integer => "an integer",
+                        K::String => "a string",
+                        _ => unreachable!("required token class"),
+                    }
+                ),
+            )
         }
     }
     fn diagnostic(&mut self, code: C, message: impl Into<String>) {
@@ -177,6 +221,10 @@ impl Parser<'_> {
         );
     }
     fn report(&mut self, code: C, message: String, range: Range<usize>, line: usize) {
+        self.checkpoint(
+            Check::Diagnostic(self.diagnostics.len()),
+            TextSize::new(range.start as u32),
+        );
         self.diagnostics.push(Diagnostic {
             code,
             message,
@@ -191,17 +239,41 @@ impl Parser<'_> {
         self.start(K::Error);
         self.finish();
     }
+    fn found(&self) -> String {
+        match self.kind() {
+            None => "end of spec".into(),
+            Some(K::String) => format!("\"{}\"", crate::lexer::decode_string(self.text()).0),
+            _ => format!("'{}'", self.text()),
+        }
+    }
     fn fail<T>(&mut self, code: C, message: impl Into<String>) -> PResult<T> {
+        let message = message.into();
+        let message = if message.starts_with("expected ") {
+            format!("{message}, found {}", self.found())
+        } else {
+            message
+        };
         self.diagnostic(code, message);
         Err(())
     }
     fn name(&mut self, allow_discard: bool) -> PResult<String> {
+        self.described_name(allow_discard, "a name")
+    }
+    fn described_name(&mut self, allow_discard: bool, description: &str) -> PResult<String> {
         if self.kind() != Some(K::Ident) {
-            return self.fail(C::Syntax, "expected a name");
+            return self.fail(C::Syntax, format!("expected {description}"));
         }
         let name = self.text().to_owned();
         self.bump();
-        if name.starts_with("gecode.") || (!allow_discard && name == "_") {
+        if name.starts_with("gecode.") {
+            return self.fail(
+                C::Name,
+                format!(
+                    "'{name}' cannot be defined: names starting with 'gecode.' are Gecode constants"
+                ),
+            );
+        }
+        if !allow_discard && name == "_" {
             return self.fail(C::Name, format!("'{name}' cannot be defined here"));
         }
         Ok(name)
@@ -280,7 +352,7 @@ impl Parser<'_> {
         let result = if top && self.instances_seen && kind != K::Format {
             self.fail(
                 C::Placement,
-                "'instances' must be the last executable statement",
+                "'instances' must be the last statement of the spec",
             )
         } else {
             self.statement_contents(kind, top, first_in_repeat)
@@ -295,32 +367,53 @@ impl Parser<'_> {
             return self.declaration();
         }
         if kind == K::Error {
-            return self.fail(C::Syntax, "unknown statement");
+            return if self.kind() == Some(K::Ident) {
+                self.fail(C::Syntax, format!("unknown statement '{}'", self.text()))
+            } else {
+                self.fail(C::Syntax, "expected a statement")
+            };
         }
         if kind == K::Format {
             return self.format();
         }
         if kind == K::Setting && !top {
-            return self.fail(C::Placement, "settings must be at the top level");
+            return self.fail(
+                C::Placement,
+                format!(
+                    "the setting '{}' must be at the top level of the spec",
+                    self.text()
+                ),
+            );
         }
         if kind == K::Instances && !top {
-            return self.fail(C::Placement, "'instances' must be at the top level");
+            self.bump();
+            return self.fail(
+                C::Placement,
+                "'instances' must be at the top level of the spec",
+            );
         }
         if kind == K::Each && !first_in_repeat {
-            return self.fail(C::Placement, "'each' must be first in a repeat body");
+            self.bump();
+            return self.fail(
+                C::Placement,
+                "'each' must be the first statement of a repeat, and comes at most once",
+            );
         }
         let keyword = self.text().to_owned();
         self.bump();
         match kind {
             K::Setting => match keyword.as_str() {
-                "comment" | "stop" => self.strings(),
+                "comment" | "stop" => self.strings("a line prefix"),
                 "ignore" => self.require("trailing"),
-                _ => self.require_kind(K::String),
+                "tokens" => self.string("single-character tokens"),
+                _ => self.string("separator characters"),
             },
-            K::Expect => self.strings(),
-            K::Each => self.name(true).map(|_| ()),
+            K::Expect => self.strings("a literal token"),
+            K::Each => self
+                .described_name(true, "a name for each record")
+                .map(|_| ()),
             K::Param => {
-                self.name(false)?;
+                self.described_name(false, "a parameter name")?;
                 if self.eat("=") {
                     self.expression()?;
                 }
@@ -339,16 +432,21 @@ impl Parser<'_> {
                 Ok(())
             }
             K::TypeDefinition => {
-                let name = self.name(false)?;
+                let target = self.raw_position();
+                let name = self.described_name(false, "a type name")?;
+                self.checkpoint(Check::TypeDefinitionName, target);
                 self.require("=")?;
                 self.read_type()?;
+                self.checkpoint(Check::TypeDefinitionComplete, target);
                 self.type_names.push(name);
                 Ok(())
             }
             K::List => {
                 self.name(true)?;
                 self.require(":")?;
+                let target = self.raw_position();
                 self.read_type()?;
+                self.checkpoint(Check::ReadForm, target);
                 self.require("until")?;
                 if !self.eat("eol") {
                     self.expression()?;
@@ -374,7 +472,7 @@ impl Parser<'_> {
                     self.expression()?;
                 }
                 if self.eat("as") {
-                    self.name(true)?;
+                    self.described_name(true, "a name for the records")?;
                 }
                 self.block(true)
             }
@@ -397,22 +495,41 @@ impl Parser<'_> {
             result?;
         }
         self.require(":")?;
+        let target = self.raw_position();
         self.read_type()?;
+        self.checkpoint(Check::ReadForm, target);
         self.expression_option("layout", K::Layout)?;
         self.expression_option("offset", K::Offset)
     }
     fn expression_option(&mut self, keyword: &str, kind: K) -> PResult {
         if self.option(keyword) {
+            let target = self.raw_position();
             self.start(kind);
             self.bump();
+            self.checkpoint(
+                if kind == K::Layout {
+                    Check::Layout
+                } else {
+                    Check::Offset
+                },
+                target,
+            );
             let result = self.expression();
             self.finish();
             result?;
         }
         Ok(())
     }
-    fn strings(&mut self) -> PResult {
-        self.require_kind(K::String)?;
+    fn string(&mut self, description: &str) -> PResult {
+        if self.kind() == Some(K::String) {
+            self.bump();
+            Ok(())
+        } else {
+            self.fail(C::Syntax, format!("expected {description} (a string)"))
+        }
+    }
+    fn strings(&mut self, description: &str) -> PResult {
+        self.string(description)?;
         while self.kind() == Some(K::String) {
             self.bump();
         }
@@ -421,7 +538,7 @@ impl Parser<'_> {
     fn terminators(&mut self) -> PResult {
         self.start(K::Terminators);
         let result = (|| {
-            self.strings()?;
+            self.strings("a terminating token")?;
             if self.eat("store") {
                 self.name(true)?;
             }
@@ -473,7 +590,11 @@ impl Parser<'_> {
                 self.statement(false, first);
                 first = false;
             }
-            let result = self.require("}");
+            let result = if self.eof() {
+                self.fail(C::Syntax, "missing '}'")
+            } else {
+                self.require("}")
+            };
             self.type_names.truncate(scope);
             self.block_depth -= 1;
             result
@@ -529,7 +650,11 @@ impl Parser<'_> {
             }
             self.finish();
         }
-        self.require("}")
+        if self.eof() {
+            self.fail(C::Syntax, "missing '}'")
+        } else {
+            self.require("}")
+        }
     }
     fn statement_ahead(&self) -> bool {
         self.declaration_ahead()

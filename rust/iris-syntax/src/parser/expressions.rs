@@ -1,4 +1,4 @@
-use super::{C, K, PResult, Parser};
+use super::{C, Check, K, PResult, Parser};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum ExpressionForm {
@@ -150,7 +150,9 @@ impl Parser<'_> {
             } else {
                 self.diagnostic_at(
                     C::Constant,
-                    format!("unknown Gecode constant '{name}'"),
+                    format!(
+                        "unknown Gecode constant '{name}' (known: gecode.int_max, gecode.int_min)"
+                    ),
                     &token,
                 );
                 Err(())
@@ -179,20 +181,29 @@ impl Parser<'_> {
             .into(),
         );
         let result = if comprehension {
-            self.comprehension()
+            self.comprehension(crate::TextSize::new(
+                self.stream.raw_offset(token.range.start) as u32,
+            ))
         } else {
             self.arguments(&name, &token)
         };
         self.finish();
         result.map(|_| ExpressionForm::Other)
     }
-    fn comprehension(&mut self) -> PResult {
-        self.name(false)?;
+    fn comprehension(&mut self, target: crate::TextSize) -> PResult {
+        let binding = self.raw_position();
+        let name = self.name(true)?;
+        if name == "_" {
+            return self.fail(C::Name, "'_' cannot be bound");
+        }
+        self.checkpoint(Check::BindingName, binding);
         self.require("in")?;
         self.expression()?;
         self.require(":")?;
         self.expression()?;
-        self.require(")")
+        self.require(")")?;
+        self.checkpoint(Check::ComprehensionComplete, target);
+        Ok(())
     }
     fn arguments(&mut self, name: &str, callee: &crate::lexer::Token) -> PResult {
         let mut arguments = 0;
@@ -221,7 +232,13 @@ impl Parser<'_> {
         } else {
             self.diagnostic_at(
                 C::Function,
-                format!("unknown function or wrong arguments for '{name}'"),
+                match name {
+                    "all" | "any" => format!("'{name}' needs the form {name}(x in a: e)"),
+                    "defined" | "count" | "size" | "min" | "max" | "sum" | "distinct" => {
+                        format!("wrong arguments for function '{name}'")
+                    }
+                    _ => format!("unknown function '{name}'"),
+                },
                 callee,
             );
             Err(())

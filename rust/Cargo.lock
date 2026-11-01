@@ -178,6 +178,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "iris-cli"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "iris-conformance",
+ "iris-sema",
+ "iris-syntax",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "iris-conformance"
 version = "0.1.0"
 dependencies = [
@@ -188,6 +201,13 @@ dependencies = [
  "shell-words",
  "tempfile",
  "toml",
+]
+
+[[package]]
+name = "iris-sema"
+version = "0.1.0"
+dependencies = [
+ "iris-syntax",
 ]
 
 [[package]]
