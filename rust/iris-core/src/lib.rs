@@ -41,7 +41,7 @@ impl Spec {
         if let Some(error) = analysis.first_error() {
             return Err(Error::from_spec(error).into());
         }
-        let index = reader::ModelIndex::new(&analysis.model);
+        let index = reader::ModelIndex::new(&analysis.model, parsed.syntax());
         Ok(Self {
             parsed,
             analysis,

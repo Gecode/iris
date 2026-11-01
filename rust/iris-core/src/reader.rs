@@ -13,10 +13,54 @@ pub(crate) struct ModelIndex {
     definitions: HashMap<TextRange, DefinitionId>,
     pub references: HashMap<TextRange, ReferenceId>,
     repeats: HashMap<TextRange, RepeatId>,
+    patterns: HashMap<TextRange, pattern::Pattern>,
+    pub pattern_literals: HashMap<TextRange, String>,
+    sections: HashMap<TextRange, sections::Sections>,
 }
 impl ModelIndex {
-    pub fn new(model: &SemanticModel) -> Self {
+    pub fn new(model: &SemanticModel, root: SyntaxNode) -> Self {
+        let named: HashMap<_, _> = model
+            .named_types()
+            .iter()
+            .map(|t| (t.definition, t.kind))
+            .collect();
+        let kinds = model
+            .references()
+            .iter()
+            .filter_map(|r| match r.resolution {
+                Resolution::NamedType(id) => Some((r.name_range, named[&id])),
+                _ => None,
+            })
+            .collect();
+        let sections = root
+            .descendants()
+            .filter(|n| n.kind() == K::Sections)
+            .map(|n| (n.text_range(), sections::Sections::new(n)))
+            .collect();
+        let patterns = root
+            .descendants()
+            .filter(|n| n.kind() == K::Pattern)
+            .map(|n| (n.text_range(), pattern::Pattern::new(&n, &kinds)))
+            .collect();
+        let pattern_literals = root
+            .descendants()
+            .filter(|n| n.kind() == K::Pattern)
+            .flat_map(|n| {
+                n.descendants()
+                    .filter(|n| n.kind() == K::Literal)
+                    .collect::<Vec<_>>()
+            })
+            .flat_map(|n| tokens(&n))
+            .filter(|t| t.kind() == K::String)
+            .map(|t| {
+                let inner = DecodedString::new(&format!("\"{}\"", t.text())).text;
+                (t.text_range(), DecodedString::new(&inner).text)
+            })
+            .collect();
         Self {
+            patterns,
+            sections,
+            pattern_literals,
             repeats: model
                 .repeats()
                 .iter()
@@ -39,15 +83,25 @@ impl ModelIndex {
         }
     }
 }
+mod pattern;
 mod reads;
 mod repeat;
+mod sections;
 use repeat::{RecordLists, RepeatState};
+use sections::SectionsState;
 
 enum Work {
     Statement(SyntaxNode),
     Sequence(Option<SyntaxNode>),
     RepeatNext,
     AfterBody,
+    SectionsNext,
+    AfterSectionBody,
+}
+
+enum ExecutionContext {
+    Repeat(usize),
+    Section(TextRange),
 }
 
 #[derive(Clone)]
@@ -89,7 +143,11 @@ pub(crate) struct Interpreter<'s, 'i> {
     context: Option<String>,
     repeats: Vec<RepeatState>,
     records: RecordLists,
+    sections: Vec<SectionsState>,
+    contexts: Vec<ExecutionContext>,
     source_lines: Vec<usize>,
+    #[cfg(test)]
+    charges: Vec<Charge>,
 }
 impl<'s, 'i> Interpreter<'s, 'i> {
     pub fn new(spec: &'s Spec, input: Input<'i>) -> Self {
@@ -103,6 +161,10 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             context: None,
             repeats: vec![],
             records: RecordLists::default(),
+            sections: vec![],
+            contexts: vec![],
+            #[cfg(test)]
+            charges: vec![],
             source_lines: std::iter::once(0)
                 .chain(
                     spec.source
@@ -158,6 +220,8 @@ impl<'s, 'i> Interpreter<'s, 'i> {
                     self.collect_iteration()?;
                     work.push(Work::RepeatNext);
                 }
+                Work::SectionsNext => self.next_section(&mut work)?,
+                Work::AfterSectionBody => self.after_section_body(&mut work)?,
                 Work::Statement(node) => {
                     // A block is not a statement of its own: diagnostics keep
                     // the enclosing statement until a child statement runs.
@@ -176,6 +240,10 @@ impl<'s, 'i> Interpreter<'s, 'i> {
                             {
                                 work.push(Work::Statement(body));
                             }
+                        }
+                        K::Sections => {
+                            self.begin_sections(&node);
+                            work.push(Work::SectionsNext);
                         }
                         K::Repeat => {
                             self.begin_repeat(&node)?;
@@ -225,11 +293,9 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             K::List => self.execute_list(node),
             K::Each => Ok(()),
             K::Index => self.execute_index(node),
-            K::Line | K::Find | K::Skip | K::Expect | K::Sections => Err(unsupported(
-                node.text_range(),
-                "line and section execution",
-                "rust-006",
-            )),
+            K::Line | K::Find => self.execute_pattern(node),
+            K::Skip => self.execute_skip(node),
+            K::Expect => self.execute_expect(node),
             K::Check => Err(unsupported(
                 node.text_range(),
                 "check execution",
@@ -373,7 +439,11 @@ impl<'s, 'i> Interpreter<'s, 'i> {
                     self.error_at(
                         ErrorCode::Utf8,
                         "string value is not valid UTF-8",
-                        self.input.position_at(token.start.offset + e.valid_up_to()),
+                        Position {
+                            offset: token.start.offset + e.valid_up_to(),
+                            column: token.start.column + e.valid_up_to(),
+                            ..token.start
+                        },
                     )
                 })?;
                 Some(Value::string(text.to_owned()))
@@ -455,13 +525,7 @@ impl<'s, 'i> Interpreter<'s, 'i> {
         self.error_at(code, message, self.input.position())
     }
     fn error_at(&self, code: ErrorCode, message: impl Into<String>, position: Position) -> Error {
-        let mut contexts: Vec<_> = self
-            .repeats
-            .iter()
-            .filter_map(RepeatState::context)
-            .collect();
-        contexts.extend(self.context.iter().cloned());
-        let context = (!contexts.is_empty()).then(|| contexts.join(" > "));
+        let context = self.execution_context();
         Error::input(
             code,
             message,
@@ -472,11 +536,39 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             context.as_deref(),
         )
     }
+    fn execution_context(&self) -> Option<String> {
+        let mut contexts: Vec<_> = self
+            .contexts
+            .iter()
+            .filter_map(|context| match context {
+                ExecutionContext::Repeat(index) => self.repeats[*index].context(),
+                ExecutionContext::Section(range) => Some(format!(
+                    "section \"{}\"",
+                    self.spec.index.patterns[range].source
+                )),
+            })
+            .collect();
+        contexts.extend(self.context.iter().cloned());
+        (!contexts.is_empty()).then(|| contexts.join(" > "))
+    }
     fn charge_idle(&mut self, _units: u128) -> Result<(), Error> {
+        #[cfg(test)]
+        self.observe_charge(false, _units);
         Ok(())
     }
     pub fn charge_expression(&mut self, _units: u128) -> Result<(), Error> {
+        #[cfg(test)]
+        self.observe_charge(true, _units);
         Ok(())
+    }
+    #[cfg(test)]
+    fn observe_charge(&mut self, expression: bool, units: u128) {
+        self.charges.push(Charge {
+            expression,
+            units,
+            statement_line: self.statement.map(|s| s.0),
+            context: self.execution_context(),
+        });
     }
 }
 pub(crate) fn unsupported(range: TextRange, feature: &'static str, task: &'static str) -> Failure {
@@ -528,4 +620,13 @@ pub(crate) fn truth(value: &Value) -> bool {
         "float" => scalar.as_float().expect("scalar float") != 0.0,
         _ => !scalar.as_str().expect("scalar string").is_empty(),
     }
+}
+
+#[cfg(test)]
+#[derive(Debug, PartialEq, Eq)]
+struct Charge {
+    expression: bool,
+    units: u128,
+    statement_line: Option<usize>,
+    context: Option<String>,
 }

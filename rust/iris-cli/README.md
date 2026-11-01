@@ -129,9 +129,9 @@ single-byte message can be invalid Unicode and cannot always be reproduced
 byte for byte in canonical JSON. Codes and locations follow the Specification.
 
 The `read_conformance` progress test discovers both case roots, validates the
-exact pending list and its rust-006 through rust-010 owners, and excludes those
+exact pending list and its rust-007 through rust-010 owners, and excludes those
 paths before driver invocation. Newly discovered cases run automatically.
-The selection is 532 cases (155 parse, 377 read), with 400 pending;
+The selection is 606 cases (155 parse, 451 read), with 326 pending;
 counts follow inventory changes. No known-failure driver ID is used.
 
 ```sh
@@ -139,15 +139,22 @@ cargo test --locked -p iris-cli --test read_conformance -- --nocapture
 ```
 
 The ignored differential test runs 256 bounded scalar probes with fixed seed
-73003, 384 array/read probes with seed 73004, and 384 repeat probes with seed
-73005, decoding both drivers through the independent canonical validator. Scalar probes cover input spellings,
+73003, 384 array/read probes with seed 73004, 384 repeat probes with seed
+73005, and 384 line/sections probes with seed 73006. Both drivers are decoded
+through the independent canonical validator. Scalar probes cover input spellings,
 arithmetic boundaries, frozen types, settings, control flow, functions,
 comparisons, and error order. Array/read probes cover ranks 1–4, zeros,
 subtree copies, offsets and promotion, all nine layouts, byte alphabets,
 sentinel/eol lists, aggregates, indexing, and comprehensions. Per-family counts
 are printed. Repeat probes cover count admission and fresh frames, termination
 and scanning, stores and aliases, ragged lists, missing rows and type/depth
-consistency, nested columns, index statements, and progress diagnostics. Every
+consistency, nested columns, index statements, and progress diagnostics.
+Line/sections probes cover capture boundaries and references, selected
+commitment and ranges, line search, skips and token expectations, arm order,
+termination and stores, and nested execution. CLI diagnostics also check capture
+spans, repeated-arm precedence, missing-arm locations and interleaved section
+and repeat contexts. Both CLI entry points exercise sections at the parser's
+nesting boundary and serialize deeply dimensional arrays in arm bodies. Every
 generated reader spec is validated before either driver runs. The test preserves
 a temporary reproducer and prints commands on the first mismatch. Build the pinned adapter from the repository root, then
 run from `rust/`:

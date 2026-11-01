@@ -170,6 +170,8 @@ impl Interpreter<'_, '_> {
         self.records.lists[repeat.occurrence].starts.push(start);
         repeat.before = Some(self.input.position().offset);
         self.frames.push(Frame::default());
+        self.contexts
+            .push(ExecutionContext::Repeat(self.repeats.len() - 1));
         Ok(true)
     }
     pub(super) fn collect_iteration(&mut self) -> Result<(), Failure> {
@@ -195,6 +197,7 @@ impl Interpreter<'_, '_> {
                 .map_err(|code| self.column_error(code, name, false))?;
         }
         self.frames.pop();
+        self.contexts.pop();
         let repeat = self.repeats.last_mut().expect("active repeat");
         repeat.columns = columns;
         repeat.row += 1;
@@ -227,7 +230,11 @@ impl Interpreter<'_, '_> {
         };
         self.error(code, format!("'{name}' {detail}"))
     }
-    fn admit_count(&mut self, node: &SyntaxNode, description: &str) -> Result<usize, Failure> {
+    pub(super) fn admit_count(
+        &mut self,
+        node: &SyntaxNode,
+        description: &str,
+    ) -> Result<usize, Failure> {
         let value = self.eval(node)?;
         let integer = value.root().as_int().map_err(|_| {
             self.error(

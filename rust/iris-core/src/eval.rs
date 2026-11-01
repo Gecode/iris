@@ -20,7 +20,14 @@ impl Interpreter<'_, '_> {
                         numeric::parse_float(token.text().as_bytes())
                             .expect("validated float literal"),
                     ),
-                    K::String => Value::string(DecodedString::new(token.text()).text),
+                    K::String => Value::string(
+                        self.spec
+                            .index
+                            .pattern_literals
+                            .get(&token.text_range())
+                            .cloned()
+                            .unwrap_or_else(|| DecodedString::new(token.text()).text),
+                    ),
                     _ => unreachable!("literal kind"),
                 })
             }

@@ -185,11 +185,12 @@ fn read_json_and_instance_caret() {
         assert_eq!(output.status.code(), Some(2));
         assert!(output.stdout.is_empty());
     }
-    for (source, bytes, code, column, spec_line, context, span_end) in [
+    for (source, bytes, code, input_line, column, spec_line, context, span_end) in [
         (
             "b:int\na[2]:int offset\n1",
             "7 9223372036854775807 0",
             "E-INTEGER-OVERFLOW",
+            1,
             24usize,
             2,
             Some("a"),
@@ -199,6 +200,7 @@ fn read_json_and_instance_caret() {
             "b:int\nlist a:int until eol offset\n1.0",
             "7 1 2  \n3",
             "E-OFFSET-TYPE",
+            1,
             8usize,
             2,
             Some("a"),
@@ -208,6 +210,7 @@ fn read_json_and_instance_caret() {
             "repeat 2 {\nk:int\nif k {a:int}\n}",
             "1 7 0",
             "E-REPEAT-MISSING",
+            1,
             6,
             3,
             Some("repeat [2 of 2]"),
@@ -217,6 +220,7 @@ fn read_json_and_instance_caret() {
             "repeat 1 {\nk:int\nif k {a:int}\n}",
             "0",
             "E-REPEAT-MISSING",
+            1,
             2,
             1,
             None,
@@ -226,10 +230,51 @@ fn read_json_and_instance_caret() {
             "repeat 1 {\nrepeat 2 {\nindex 1\n}\n}",
             "1 3",
             "E-INDEX-MISMATCH",
+            1,
             3,
             3,
             Some("repeat [1 of 1] > repeat [2 of 2]"),
             3,
+        ),
+        (
+            "line \"A {x:0..1}\"",
+            "A 123\n",
+            "E-EXPECTED-VALUE",
+            1,
+            3,
+            1,
+            None,
+            5,
+        ),
+        (
+            "sections {\n\"A {x:0..1}\" optional {expect \"OK\"}\n}",
+            "A 1\nOK\nA 9",
+            "E-SECTIONS-REPEATED",
+            3,
+            1,
+            1,
+            None,
+            7,
+        ),
+        (
+            "sections {\n\"NEED\"\n\"END\" last {\nx:int\n}\n}",
+            "END\n7\n",
+            "E-LINE-MATCH",
+            1,
+            1,
+            4,
+            None,
+            0,
+        ),
+        (
+            "sections {\n\"A\" last {\nrepeat 1 {\nsections {\"B\" last {\nx:int\n}}}}}",
+            "A\nB\nbad",
+            "E-EXPECTED-VALUE",
+            3,
+            1,
+            5,
+            Some("section \"A\" > repeat [1 of 1] > section \"B\" > x"),
+            7,
         ),
     ] {
         std::fs::write(&path, source).unwrap();
@@ -250,13 +295,29 @@ fn read_json_and_instance_caret() {
             source[..start].bytes().filter(|&b| b == b'\n').count() + 1,
             spec_line
         );
-        assert_eq!(error.input_span().unwrap().bytes, column - 1..span_end);
+        let line_start = bytes
+            .split_inclusive('\n')
+            .take(input_line - 1)
+            .map(str::len)
+            .sum::<usize>();
+        assert_eq!(
+            error.input_span().unwrap().bytes,
+            line_start + column - 1..span_end
+        );
+        let output = driver(&["read", &path, input]);
+        assert_eq!(output.status.code(), Some(1));
+        let diagnostic: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(diagnostic["code"], code);
+        assert_eq!(diagnostic["input_location"]["line"], input_line);
+        assert_eq!(diagnostic["input_location"]["column"], column);
+        assert_eq!(diagnostic["spec_location"]["line"], spec_line);
+        assert_eq!(diagnostic["context"], serde_json::json!(context));
         let output = check(&["read", &path, input, "--json"]);
         assert_eq!(output.status.code(), Some(1));
         assert!(output.stdout.is_empty());
         let rendered = String::from_utf8(output.stderr).unwrap();
         assert!(
-            rendered.starts_with(&format!("{input}:1:{column}:")),
+            rendered.starts_with(&format!("{input}:{input_line}:{column}:")),
             "{rendered}"
         );
         assert!(
@@ -284,6 +345,11 @@ fn deeply_dimensional_arrays_serialize() {
     const DEPTH: usize = 16384;
     for (source, depth, value) in [
         (format!("a{}:int", "[1]".repeat(DEPTH)), DEPTH, "7"),
+        (
+            format!("sections {{\"A\" last {{a{}:int}}}}", "[1]".repeat(DEPTH)),
+            DEPTH,
+            "A\n7",
+        ),
         (
             format!("repeat 1 {{a{}:int}}", "[1]".repeat(DEPTH)),
             DEPTH + 1,
@@ -365,6 +431,18 @@ fn empty_branches_keep_the_enclosing_statement_line() {
             "E-REPEAT-MISSING",
             3,
         ),
+        (
+            "sections {\n\"NEED\"\n\"END\" last {\n}\n}",
+            "END\n",
+            "E-LINE-MATCH",
+            1,
+        ),
+        (
+            "sections {\n\"NEED\"\n\"END\" last {\nif 0 {} else {}\n}\n}",
+            "END\n",
+            "E-LINE-MATCH",
+            4,
+        ),
     ] {
         let (dir, path) = fixture(spec.as_bytes());
         let input_path = dir.path().join("input.bin");
@@ -381,11 +459,31 @@ fn empty_branches_keep_the_enclosing_statement_line() {
 fn deeply_nested_repeats_respect_parser_admission() {
     // Execute at the existing 256-block limit, then reject thousands of
     // levels through the parser's established operational limit.
-    for levels in [256, 4096] {
-        let source = format!("{}x:int{}", "repeat 1 {".repeat(levels), "}".repeat(levels));
+    for (route, levels) in [0, 1, 2]
+        .into_iter()
+        .flat_map(|route| [256, 4096].map(|levels| (route, levels)))
+    {
+        let mut source = String::new();
+        let mut bytes = String::new();
+        let mut suffix = String::new();
+        let mut depth = 0;
+        for level in 0..levels {
+            if route == 0 || (route == 2 && level % 3 == 0) {
+                source.push_str("repeat 1 {");
+                suffix.push('}');
+                depth += 1;
+            } else {
+                source.push_str("sections {\"A\" last {");
+                suffix.push_str("}}");
+                bytes.push_str("A\n");
+            }
+        }
+        source.push_str("x:int");
+        source.extend(suffix.chars().rev());
+        bytes.push('7');
         let (dir, path) = fixture(source.as_bytes());
         let input = dir.path().join("input.bin");
-        std::fs::write(&input, "7").unwrap();
+        std::fs::write(&input, bytes).unwrap();
         let input = input.to_str().unwrap();
         for output in [
             check(&["read", &path, input, "--json"]),
@@ -394,9 +492,9 @@ fn deeply_nested_repeats_respect_parser_admission() {
             if levels == 256 {
                 assert_eq!(output.status.code(), Some(0), "{output:?}");
                 let expected = format!(
-                    "{{\"iris\":\"0.1\",\"entries\":[{{\"name\":\"x\",\"type\":\"int\",\"depth\":{levels},\"value\":{}7{}}}]}}\n",
-                    "[".repeat(levels),
-                    "]".repeat(levels)
+                    "{{\"iris\":\"0.1\",\"entries\":[{{\"name\":\"x\",\"type\":\"int\",\"depth\":{depth},\"value\":{}7{}}}]}}\n",
+                    "[".repeat(depth),
+                    "]".repeat(depth)
                 );
                 assert_eq!(String::from_utf8(output.stdout).unwrap(), expected);
             } else {

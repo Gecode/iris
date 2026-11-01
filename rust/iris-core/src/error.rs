@@ -37,11 +37,23 @@ pub enum ErrorCode {
     RepeatDepth,
     IndexContext,
     IndexMismatch,
+    LineMatch,
+    FindMatch,
+    SkipEof,
+    PatternReference,
+    SectionsRepeated,
+    SectionsUnexpected,
 }
 impl ErrorCode {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Spec(code) => code.as_str(),
+            Self::LineMatch => "E-LINE-MATCH",
+            Self::FindMatch => "E-FIND-MATCH",
+            Self::SkipEof => "E-SKIP-EOF",
+            Self::PatternReference => "E-PATTERN-REFERENCE",
+            Self::SectionsRepeated => "E-SECTIONS-REPEATED",
+            Self::SectionsUnexpected => "E-SECTIONS-UNEXPECTED",
             Self::ParamUnknown => "E-PARAM-UNKNOWN",
             Self::Utf8 => "E-UTF8",
             Self::ExpectedValue => "E-EXPECTED-VALUE",

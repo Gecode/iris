@@ -58,6 +58,20 @@ struct Cursor {
     line_start: usize,
     line_blank: bool,
 }
+pub(crate) struct Line<'a> {
+    pub bytes: &'a [u8],
+    pub start: Position,
+    pub physical_end: usize,
+}
+impl Line<'_> {
+    pub fn position(&self, relative: usize) -> Position {
+        Position {
+            offset: self.start.offset + relative,
+            column: self.start.column + relative,
+            ..self.start
+        }
+    }
+}
 pub(crate) struct Token<'a> {
     pub bytes: &'a [u8],
     pub start: Position,
@@ -204,38 +218,51 @@ impl<'a> Input<'a> {
         self.next_data = next_data;
         token
     }
-    pub fn read_rest(&mut self) -> Option<Token<'a>> {
+    pub fn remaining_line(&mut self) -> Option<Line<'a>> {
         self.skip_to_data();
         if self.cursor.offset == self.bytes.len() {
             return None;
         }
         let start = self.position();
-        let end = self.bytes[self.cursor.offset..]
+        let physical_end = self.bytes[start.offset..]
             .iter()
             .position(|&b| b == b'\n')
-            .map_or(self.bytes.len(), |n| self.cursor.offset + n);
-        let mut trimmed = end;
-        while trimmed > self.cursor.offset && is_line_blank(self.bytes[trimmed - 1]) {
+            .map_or(self.bytes.len(), |n| start.offset + n);
+        let mut trimmed = physical_end;
+        while trimmed > start.offset && is_line_blank(self.bytes[trimmed - 1]) {
             trimmed -= 1;
         }
-        self.advance_to(end);
-        // The token holds no LF, so its end lies on its start's line.
-        let end = Position {
-            offset: trimmed,
-            column: start.column + (trimmed - start.offset),
-            ..start
-        };
-        Some(Token {
+        Some(Line {
             bytes: &self.bytes[start.offset..trimmed],
             start,
-            end,
+            physical_end,
+        })
+    }
+    pub fn consume_line(&mut self, line: &Line<'_>) {
+        self.advance_to(line.physical_end);
+    }
+    pub fn skip_line(&mut self) -> bool {
+        if let Some(line) = self.remaining_line() {
+            self.consume_line(&line);
+            true
+        } else {
+            false
+        }
+    }
+    pub fn read_rest(&mut self) -> Option<Token<'a>> {
+        let line = self.remaining_line()?;
+        self.consume_line(&line);
+        Some(Token {
+            bytes: line.bytes,
+            start: line.start,
+            end: line.position(line.bytes.len()),
         })
     }
 }
-fn is_line_blank(byte: u8) -> bool {
+pub(super) fn is_line_blank(byte: u8) -> bool {
     matches!(byte, b' ' | b'\t' | b'\r')
 }
-fn is_word_byte(byte: u8) -> bool {
+pub(super) fn is_word_byte(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || byte == b'_'
 }
 fn prefix_matches(tail: &[u8], prefix: &[u8]) -> bool {

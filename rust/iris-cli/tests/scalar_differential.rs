@@ -40,6 +40,7 @@ fn scalar_differential() {
         ("Scalar", SEED, probes()),
         ("Array", ARRAY_SEED, array_probes()),
         ("Repeat", REPEAT_SEED, repeat_probes()),
+        ("Sections", 73006, section_probes()),
     ];
     for (name, seed, probes) in &groups {
         let mut families = std::collections::BTreeMap::new();
@@ -906,5 +907,313 @@ fn repeat_probes() -> Vec<Probe> {
         REPEAT_COUNT,
         "curated probes must never be truncated"
     );
+    probes
+}
+
+fn section_probes() -> Vec<Probe> {
+    let mut state = 73006u64;
+    let mut next = |bound: usize| {
+        state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+        ((state >> 32) as usize) % bound
+    };
+    let mut probes = vec![];
+    for (family, count) in [
+        ("capture boundaries and blanks", 64),
+        ("current-value references", 48),
+        ("selected commitment and ranges", 64),
+        ("line and find", 48),
+        ("skip and expect", 48),
+        ("sections", 80),
+        ("nested execution", 32),
+    ] {
+        for sample in 0..count {
+            let n = next(8) + 1;
+            let word = ["hi", "é", "a_b", "word"][next(4)];
+            let lf = if next(2) == 0 { "\n" } else { "" };
+            let (spec, input) = match family {
+                "capture boundaries and blanks" => match sample % 16 {
+                    0 => ("line \"A : {n:int}\"".into(), format!("A:{n}{lf}")),
+                    1 => ("line \"a b {w}\"".into(), format!("ab {word}{lf}")),
+                    2 => ("line \"a b {w}\"".into(), format!("a\t\rb {word}{lf}")),
+                    3 => ("line \"{w}aba\"".into(), format!("{word}ababax{lf}")),
+                    4 => ("line \"{w:rest}!\"".into(), format!("{word}!{lf}")),
+                    5 => ("line \"{n:int}2\"".into(), format!("{n}2{lf}")),
+                    6 => ("line \"{n:float}e2\"".into(), format!("{n}e2{lf}")),
+                    7 => (
+                        "line \"{n:num}\"".into(),
+                        ["9223372036854775808", "1e309", "1e-9999", "-0.0"][next(4)].into(),
+                    ),
+                    8 => (
+                        "line \"{a:float},{b:num}!\"".into(),
+                        format!("-0.0,{n}.5!{lf}"),
+                    ),
+                    9 => ("line \"{w}!\"".into(), format!("{word}\u{b}\u{c}!{lf}")),
+                    10 => ("line \"a b\"".into(), format!("a\u{b}b{lf}")),
+                    11 => ("line \"a b\"".into(), format!("a\u{c}b{lf}")),
+                    12 => ("line \"{w}!\"".into(), format!("{word}\0b!{lf}")),
+                    13 => ("line \"{a:int},{b:int}\"".into(), format!("+{n},-{n}{lf}")),
+                    14 => ("line \"{w:rest}\"".into(), format!("{word} tail \t\r{lf}")),
+                    _ => ("line \"{n:float}\"".into(), format!("{n}e+-2{lf}")),
+                },
+                "current-value references" => match sample % 12 {
+                    0 => (
+                        format!("let x={n} line \"{{x:int}} {{$x}}\""),
+                        format!("{} {n}{lf}", n + 1),
+                    ),
+                    1 => (
+                        format!("let x=\"{word}\" line \"{{$x}}:{{n:int}}\""),
+                        format!("{word}:{n}{lf}"),
+                    ),
+                    2 => ("let x=\"\" line \"{$x}...\"".into(), word.into()),
+                    3 => ("let x=1.5 line \"{$x}\"".into(), format!("{n}{lf}")),
+                    4 => ("x[1]:int line \"{$x}\"".into(), format!("{n} {n}{lf}")),
+                    5 => ("line \"A {$missing}\"".into(), format!("B {n}{lf}")),
+                    6 => (
+                        "find \"A {$missing}\"".into(),
+                        format!("B {n}\nA {word}{lf}"),
+                    ),
+                    7 => (format!("let x={n} line \"{{$x}}!\""), format!("0{n}!{lf}")),
+                    8 => (format!("let x=-{n} line \"{{$x}}!\""), format!("-{n}!{lf}")),
+                    9 => (
+                        format!("let x=\"{word}\" line \"X {{$x}}\""),
+                        format!("X{word}{lf}"),
+                    ),
+                    10 => (
+                        format!("let x={n} sections {{\"B\" last \"A {{$missing}}\" optional}}"),
+                        "B".into(),
+                    ),
+                    _ => (
+                        format!("let x={n} line \"{{x:int}}!{{$x}}\""),
+                        format!("{}!{n}{lf}", n + 1),
+                    ),
+                },
+                "selected commitment and ranges" => match sample % 16 {
+                    0 => ("line \"{x:0..n} {n:int}\"".into(), format!("{n} {n}{lf}")),
+                    1 => (
+                        "line \"{x:0..x} {x:int}\"".into(),
+                        format!("{} {n}{lf}", n + 1),
+                    ),
+                    2 => ("line \"{_:0..1}\"".into(), format!("{n}{lf}")),
+                    3 => ("line \"{:0..1}\"".into(), format!("{n}{lf}")),
+                    4 => (
+                        "find \"A {x:1/0..} Z\"".into(),
+                        format!("A {n} NO\nA {n} Z{lf}"),
+                    ),
+                    5 => (
+                        "sections {\"A {x:0..1}\" optional \"A {y:int}\"}".into(),
+                        format!("A {n}{lf}"),
+                    ),
+                    6 => (
+                        format!("let n={n} type t=0..n type alias=t let n=0 line \"{{x:alias}}\""),
+                        format!("{n}{lf}"),
+                    ),
+                    7 => ("line \"{x:0..\\\"hi\\\"}\"".into(), format!("{n}{lf}")),
+                    8 => (
+                        "line \"{x:0..(\\\"hi\\\"==\\\"hi\\\")}\"".into(),
+                        "1".into(),
+                    ),
+                    9 => (
+                        "a[2]:int find \"A {x:0..sum(a)} Z\"".into(),
+                        format!("{n} {n}\nA 99 NO\nA {n} Z{lf}"),
+                    ),
+                    10 => ("line \"{x:0..missing} Z\"".into(), format!("{n} NO{lf}")),
+                    11 => ("line \"{x:0..missing} Z\"".into(), format!("{n} Z{lf}")),
+                    12 => (
+                        "line \"{x:0..<(-9223372036854775807-1)}\"".into(),
+                        format!("{n}{lf}"),
+                    ),
+                    13 => ("line \"{x:0..y} {y:0..x}\"".into(), format!("{n} {n}{lf}")),
+                    14 => (
+                        "line \"{x:0..x} {x:int}\"".into(),
+                        format!("{n} {}{lf}", n + 1),
+                    ),
+                    _ => (
+                        "sections {\"{x:1/0..}!\" optional \"...\" last}".into(),
+                        format!("{n}?{lf}"),
+                    ),
+                },
+                "line and find" => match sample % 12 {
+                    0 => (
+                        "n:int line \"X {x:int}\"".into(),
+                        format!("{n} X {}{lf}", n + 1),
+                    ),
+                    1 => (
+                        "comment \"#\" find \"X {x:int}\"".into(),
+                        format!("# ignored\n\n{}X\nX {n}{lf}", word.repeat(n)),
+                    ),
+                    2 => (
+                        "find \"X {x:int}\"".into(),
+                        format!("{}X\nX {n}{lf}", "noise\n".repeat(n)),
+                    ),
+                    3 => (
+                        "tokens \":\" n:word line \":{x:int}\"".into(),
+                        format!("{word}:{n}{lf}"),
+                    ),
+                    4 => (
+                        "separators \",\" line \"{x:int},{w}\"".into(),
+                        format!(",,{n},{word}{lf}"),
+                    ),
+                    5 => ("stop \"STOP\" find \"A\"".into(), "no\nSTOP\nA".into()),
+                    6 => ("find \"A\"".into(), "no\n".repeat(n)),
+                    7 => ("line \"A\"".into(), " \n\t".into()),
+                    8 => ("find \"{w}aba\"".into(), format!("{word}ababax\nyaba{lf}")),
+                    9 => (
+                        "find \"A {x:0..1}\"".into(),
+                        format!("B\nA {}\nA 1{lf}", n + 1),
+                    ),
+                    10 => (
+                        "n:word find \"X {$missing}\"".into(),
+                        format!("{word} noise\nX {n}{lf}"),
+                    ),
+                    _ => (
+                        "comment \"#\" n:word line \"# tail\"".into(),
+                        format!("{word} # tail{lf}"),
+                    ),
+                },
+                "skip and expect" => match sample % 12 {
+                    0 => (
+                        "n:int skip line x:int".into(),
+                        format!("{n} tail\n{}", n + 1),
+                    ),
+                    1 => (
+                        format!("comment \"#\" skip {n} lines x:int"),
+                        format!("{}{}", "# skip\n\nnoise\n".repeat(n), n + 1),
+                    ),
+                    2 => ("skip 0 lines n:int".into(), format!("{n}{lf}")),
+                    3 => ("skip -1 lines".into(), word.into()),
+                    4 => ("skip 1.0 lines".into(), word.into()),
+                    5 => ("skip 2147483648 lines".into(), word.into()),
+                    6 => (format!("skip {n} lines"), "\n".repeat(n)),
+                    7 => (
+                        "tokens \":\" expect \"A\" \":\" \"B\" n:int".into(),
+                        format!("A:B {n}{lf}"),
+                    ),
+                    8 => ("separators \",\" expect \"A\" \"B\"".into(), "A,B".into()),
+                    9 => (
+                        format!("expect \"{word}\" \"END\""),
+                        format!("{word} ENDx{lf}"),
+                    ),
+                    10 => ("expect \"A\" \"B\"".into(), "A \n".into()),
+                    _ => ("skip 1/0 lines".into(), word.into()),
+                },
+                "sections" => match sample % 20 {
+                    0 => (
+                        "sections {\"A {x:int}\" \"A {y:int}\" optional}".into(),
+                        format!("A {n}{lf}"),
+                    ),
+                    1 => (
+                        "sections {\"A {x:0..1}\" optional}".into(),
+                        format!("A 1\nA {}{lf}", n + 1),
+                    ),
+                    2 => (
+                        "sections {\"A {$missing}\" optional \"A {y:int}\"}".into(),
+                        format!("A {n}{lf}"),
+                    ),
+                    3 => (
+                        "sections until \"END\" store _ {\"END\" optional} x:int".into(),
+                        format!("END {n}{lf}"),
+                    ),
+                    4 => (
+                        "sections until \"X\" store old until \"Y\" store final {\"A\" optional}"
+                            .into(),
+                        ["X", "Y"][next(2)].into(),
+                    ),
+                    5 => (
+                        "sections until \"END\" store ending {\"A\" optional}".into(),
+                        "".into(),
+                    ),
+                    6 => (
+                        "sections skip other {\"A {x:int}\" last}".into(),
+                        format!("{}A {n}{lf}", "noise\n".repeat(n)),
+                    ),
+                    7 => (
+                        "sections {\"NEED\" \"END\" last {x:int}}".into(),
+                        format!("END\n{n}{lf}"),
+                    ),
+                    8 => (
+                        "sections {\"NEED\" \"END\" last {if 0 {} else {}}}".into(),
+                        "END".into(),
+                    ),
+                    9 => ("sections until \"END\" {\"B\" \"A\"}".into(), "END".into()),
+                    10 => ("sections {\"A\" optional \"B\"}".into(), "A\nA".into()),
+                    11 => (
+                        "sections {\"A {x:int}\" {y:int} \"B\" last}".into(),
+                        format!("A {n}\n{}\nB{lf}", n + 1),
+                    ),
+                    12 => (
+                        "sections {\"A {x:int} Z\" optional \"A {y:int} NO\" last}".into(),
+                        format!("A {n} NO{lf}"),
+                    ),
+                    13 => (
+                        "sections until \"END\" {\"A\" optional}".into(),
+                        "ENDx".into(),
+                    ),
+                    14 => (
+                        "sections {\"A\" \"B\" \"C\" \"D\" \"E\" \"F\" \"G\"}".into(),
+                        word.into(),
+                    ),
+                    15 => (
+                        "sections {\"A {x:int}\" \"B {y:int}\" last} let x=y".into(),
+                        format!("A {n}\nB {}{lf}", n + 1),
+                    ),
+                    16 => ("sections until \"END\" {\"A\"}".into(), "A\nEND".into()),
+                    17 => (
+                        "sections {\"A\" last {expect \"OK\"} \"NEED\"}".into(),
+                        "A\nBAD".into(),
+                    ),
+                    18 => (
+                        "sections skip other until \"END\" skip other {\"A\" optional}".into(),
+                        format!("{}END{lf}", "noise\n".repeat(n)),
+                    ),
+                    _ => ("sections {\"A\" optional}".into(), "A".into()),
+                },
+                _ => match sample % 8 {
+                    0 => (
+                        "repeat 2 {sections {\"A {x:int}\" last {y:word}}}".into(),
+                        format!("A {n}\n{word}\nA {}\n{word}{lf}", n + 1),
+                    ),
+                    1 => (
+                        "sections {\"A\" last {repeat 1 {sections {\"B\" last {x:int}}}}}".into(),
+                        "A\nB\nbad".into(),
+                    ),
+                    2 => (
+                        "repeat 2 {sections {\"A\" optional {x:int} \"B\" last}}".into(),
+                        format!("A\n{n}\nB\nB{lf}"),
+                    ),
+                    3 => (
+                        "repeat 1 {sections until \"END\" store ending {\"A\" last}}".into(),
+                        "A".into(),
+                    ),
+                    4 => (
+                        "repeat 2 {sections {\"A\" optional {a[0]:int} \"B\" last}}".into(),
+                        "B\nB".into(),
+                    ),
+                    5 => (
+                        "repeat until eof {sections {\"A\" optional}}".into(),
+                        "".into(),
+                    ),
+                    6 => (
+                        "repeat 1 {sections {\"A\" last {repeat until eof {if 0 {} else {}}}}}"
+                            .into(),
+                        "A\nx".into(),
+                    ),
+                    _ => (
+                        format!(
+                            "{}x:int{}",
+                            "sections {\"A\" last {repeat 1 {".repeat(2),
+                            "}}}".repeat(2)
+                        ),
+                        format!("A\nA\n{n}{lf}"),
+                    ),
+                },
+            };
+            assert!(spec.len() <= 32768 && input.len() <= 32768);
+            probes.push(Probe {
+                family,
+                ..Probe::new(spec, input)
+            });
+        }
+    }
+    assert_eq!(probes.len(), 384, "curated probes must never be truncated");
     probes
 }
