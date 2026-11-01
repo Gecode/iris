@@ -59,7 +59,7 @@ site can supply its final routes later.
 
 Analysis runs on the server thread using complete reparses; the document cache
 retains each tree and semantic model together and invalidates both on accepted
-changes. Completion, formatting, semantic tokens, and live sample reading
+changes. Completion, formatting, and live sample reading
 belong to later LSP tasks.
 
 ## Navigation and rename
@@ -91,6 +91,42 @@ unresolved names; prepare-rename returns null there, and rename refuses them.
 All edits concern the selected open document; the server does not search files
 on disk or modify the buffer itself.
 
+## Outline, folding, and semantic tokens
+
+Document symbols outline repeats, sections, arms, and instances. Labels use
+their source headers; ranges include their bodies. Clients offering
+`hierarchicalDocumentSymbolSupport` receive nested symbols; other clients
+receive a flat list of locations. Arms are `Key` symbols for clients that
+list `Key` in `symbolKind.valueSet`, and `String` symbols otherwise.
+
+Folding ranges cover brace blocks, sections, and consecutive comment lines.
+Blank lines separate comment runs. With `lineFoldingOnly`, block folds leave
+the closing brace visible; otherwise ranges include character positions.
+
+Full semantic tokens use this ordered legend (indices start at zero):
+
+```text
+variable, parameter, type, function, keyword, string, number, comment,
+operator, property
+```
+
+The modifier legend is `declaration`, `readonly`, `defaultLibrary`, with bits
+1, 2, and 4 respectively. Captures are variable declarations; current-value
+references inside line patterns are variables. Named types and parameters
+retain their semantic roles, and contextual keywords used as names receive
+name tokens. Built-in types and functions carry `defaultLibrary`; host
+constants also carry `readonly`. No custom token types are needed.
+
+All three features use the latest open buffer and negotiated encoding.
+Semantic tokens use relative deltas in source order, split at physical line
+endings even when the client supports multiline tokens. Escapes keep their
+raw source spans. Token range and delta requests are not advertised.
+
+Bulk positions are indexed once per request. CST walks inspect each node or
+leaf a constant number of times, and semantic names use a range index rather
+than repeated model searches. Each request's feature work takes linear time
+and memory in the document and model size, in addition to cached analysis.
+
 ## Validation
 
 From `rust/`:
@@ -104,6 +140,7 @@ The in-process client in `tests/support/mod.rs` uses the production server
 entry point. Tests cover synchronization, diagnostic links and ranges,
 Unicode encodings, atomic edits, document isolation, debounce decisions,
 lifecycle errors, navigation, ambiguous definitions, transitive rename groups,
-capture names and bounds, rename refusals, and representative repository reader
+capture names and bounds, rename refusals, nested outlines, block and comment
+folding, semantic token roles and deltas, and representative repository reader
 specs. The CLI test starts the real binary and checks framing, diagnostics,
 and orderly exit.

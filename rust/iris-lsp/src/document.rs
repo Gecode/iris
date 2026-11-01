@@ -1,5 +1,5 @@
 use iris_sema::Analysis;
-use iris_syntax::{LanguageVersion, Parse, ParseError};
+use iris_syntax::{LanguageVersion, Parse, ParseError, SyntaxNode, TextRange, TextSize};
 use lsp_types::{Position, PositionEncodingKind, Range, TextDocumentContentChangeEvent};
 use std::time::{Duration, Instant};
 
@@ -37,7 +37,7 @@ pub(crate) struct Document {
 
 struct AnalysisSnapshot {
     // Keep the lossless tree with its semantic model for later LSP features.
-    _parsed: Parse,
+    parsed: Parse,
     analysis: Analysis,
 }
 
@@ -86,10 +86,7 @@ impl Document {
         if self.snapshot.is_none() {
             let parsed = iris_syntax::parse(self.source.as_bytes(), origin, LanguageVersion::V0_1)?;
             let analysis = iris_sema::analyze(&parsed);
-            self.snapshot = Some(AnalysisSnapshot {
-                _parsed: parsed,
-                analysis,
-            });
+            self.snapshot = Some(AnalysisSnapshot { parsed, analysis });
         }
         Ok(&self
             .snapshot
@@ -100,6 +97,44 @@ impl Document {
 
     pub(crate) fn cached_analysis(&self) -> Option<&Analysis> {
         self.snapshot.as_ref().map(|snapshot| &snapshot.analysis)
+    }
+
+    pub(crate) fn cached_syntax(&self) -> Option<SyntaxNode> {
+        self.snapshot
+            .as_ref()
+            .map(|snapshot| snapshot.parsed.syntax())
+    }
+}
+
+/// Request-local positions for bulk range conversion. Indexing byte boundaries
+/// avoids rescanning a long line for every symbol, fold, or semantic token.
+pub(crate) struct Positions(Vec<Position>);
+
+impl Positions {
+    pub(crate) fn new(source: &str, lines: &LineIndex, encoding: PositionEncoding) -> Self {
+        let mut positions = vec![Position::default(); source.len() + 1];
+        for (number, line) in lines.lines.iter().enumerate() {
+            let mut position = Position::new(number as u32, 0);
+            for (offset, scalar) in source[line.start..line.end].char_indices() {
+                let start = line.start + offset;
+                positions[start..start + scalar.len_utf8()].fill(position);
+                position.character += encoding.character_len(scalar) as u32;
+            }
+            let next = lines
+                .lines
+                .get(number + 1)
+                .map_or(source.len() + 1, |l| l.start);
+            positions[line.end..next].fill(position);
+        }
+        Self(positions)
+    }
+
+    pub(crate) fn at(&self, offset: TextSize) -> Position {
+        self.0[usize::from(offset)]
+    }
+
+    pub(crate) fn range(&self, range: TextRange) -> Range {
+        Range::new(self.at(range.start()), self.at(range.end()))
     }
 }
 
@@ -221,6 +256,11 @@ mod tests {
                 (PositionEncoding::Utf16, utf16),
                 (PositionEncoding::Utf8, utf8),
             ] {
+                let positions = Positions::new(source, &lines, encoding);
+                assert_eq!(
+                    positions.at(TextSize::new(offset as u32)),
+                    Position::new(line, character)
+                );
                 assert_eq!(
                     lines.position(source, offset, encoding),
                     Ok(Position::new(line, character))

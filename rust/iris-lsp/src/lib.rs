@@ -2,7 +2,9 @@
 mod diagnostic;
 mod document;
 mod navigation;
+mod semantic_tokens;
 mod server;
+mod structure;
 
 use lsp_server::Connection;
 

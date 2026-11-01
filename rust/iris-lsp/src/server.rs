@@ -1,15 +1,17 @@
 use crate::{
     Result, diagnostic,
     document::{Document, PositionEncoding},
-    navigation,
+    navigation, semantic_tokens, structure,
 };
 use crossbeam_channel::RecvTimeoutError;
 use iris_syntax::ParseError;
 use lsp_server::{Connection, ErrorCode, Message, Notification, Request, Response};
 use lsp_types::{
-    InitializeParams, InitializeResult, OneOf, PositionEncodingKind, PublishDiagnosticsParams,
-    RenameOptions, ServerCapabilities, ServerInfo, TextDocumentSyncCapability,
-    TextDocumentSyncKind, TextDocumentSyncOptions, Uri, WorkDoneProgressOptions,
+    FoldingRangeProviderCapability, InitializeParams, InitializeResult, OneOf,
+    PositionEncodingKind, PublishDiagnosticsParams, RenameOptions, SemanticTokensFullOptions,
+    SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo,
+    SymbolKind, TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions, Uri,
+    WorkDoneProgressOptions,
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, PublishDiagnostics,
     },
@@ -17,17 +19,18 @@ use lsp_types::{
 use std::{collections::HashMap, time::Instant};
 
 pub(crate) fn run(connection: Connection) -> Result<()> {
-    let encoding = initialize(&connection)?;
+    let (encoding, structure_options) = initialize(&connection)?;
     Server {
         connection,
         encoding,
+        structure_options,
         documents: HashMap::new(),
         shutdown_requested: false,
     }
     .run()
 }
 
-fn initialize(connection: &Connection) -> Result<PositionEncoding> {
+fn initialize(connection: &Connection) -> Result<(PositionEncoding, structure::Options)> {
     let (id, params) = connection.initialize_start()?;
     let params: InitializeParams = match serde_json::from_value(params) {
         Ok(params) => params,
@@ -41,18 +44,44 @@ fn initialize(connection: &Connection) -> Result<PositionEncoding> {
     let supports_utf8 = params
         .capabilities
         .general
-        .and_then(|general| general.position_encodings)
+        .as_ref()
+        .and_then(|general| general.position_encodings.as_ref())
         .is_some_and(|encodings| encodings.contains(&PositionEncodingKind::UTF8));
     let encoding = if supports_utf8 {
         PositionEncoding::Utf8
     } else {
         PositionEncoding::Utf16
     };
+    let text_document = params.capabilities.text_document.as_ref();
+    let structure_options = structure::Options {
+        hierarchical_symbols: text_document
+            .and_then(|c| c.document_symbol.as_ref())
+            .and_then(|c| c.hierarchical_document_symbol_support)
+            .unwrap_or(false),
+        line_folding_only: text_document
+            .and_then(|c| c.folding_range.as_ref())
+            .and_then(|c| c.line_folding_only)
+            .unwrap_or(false),
+        key_symbols: text_document
+            .and_then(|c| c.document_symbol.as_ref())
+            .and_then(|c| c.symbol_kind.as_ref())
+            .and_then(|c| c.value_set.as_ref())
+            .is_some_and(|kinds| kinds.contains(&SymbolKind::KEY)),
+    };
     let result = InitializeResult {
         capabilities: ServerCapabilities {
             position_encoding: Some(encoding.protocol_kind()),
             definition_provider: Some(OneOf::Left(true)),
             references_provider: Some(OneOf::Left(true)),
+            document_symbol_provider: Some(OneOf::Left(true)),
+            folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
+            semantic_tokens_provider: Some(
+                SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions {
+                    legend: semantic_tokens::legend(),
+                    full: Some(SemanticTokensFullOptions::Bool(true)),
+                    ..SemanticTokensOptions::default()
+                }),
+            ),
             rename_provider: Some(OneOf::Right(RenameOptions {
                 prepare_provider: Some(true),
                 work_done_progress_options: WorkDoneProgressOptions::default(),
@@ -72,12 +101,13 @@ fn initialize(connection: &Connection) -> Result<PositionEncoding> {
         }),
     };
     connection.initialize_finish(id, serde_json::to_value(result)?)?;
-    Ok(encoding)
+    Ok((encoding, structure_options))
 }
 
 struct Server {
     connection: Connection,
     encoding: PositionEncoding,
+    structure_options: structure::Options,
     documents: HashMap<Uri, Document>,
     shutdown_requested: bool,
 }
@@ -152,6 +182,18 @@ impl Server {
                 | "textDocument/rename"
         ) {
             navigation::handle_request(request, &mut self.documents, self.encoding)
+        } else if matches!(
+            request.method.as_str(),
+            "textDocument/documentSymbol"
+                | "textDocument/foldingRange"
+                | "textDocument/semanticTokens/full"
+        ) {
+            structure::handle_request(
+                request,
+                &mut self.documents,
+                self.encoding,
+                &self.structure_options,
+            )
         } else {
             Response::new_err(
                 request.id,
