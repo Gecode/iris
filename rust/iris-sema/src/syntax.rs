@@ -1,6 +1,7 @@
 //! CST indexing shared by the checker, resolver, and fact inference.
 use crate::model::*;
-use iris_syntax::{SyntaxKind as K, SyntaxNode, SyntaxToken};
+use iris_syntax::{SyntaxKind as K, SyntaxNode, SyntaxToken, TextSize};
+use std::collections::HashMap;
 
 pub(crate) fn tokens(node: &SyntaxNode) -> Vec<SyntaxToken> {
     node.children_with_tokens()
@@ -49,17 +50,159 @@ pub(crate) fn definition_token(node: &SyntaxNode) -> Option<SyntaxToken> {
         _ => tokens.into_iter().filter(|t| t.kind() == K::Ident).nth(1),
     }
 }
-pub(crate) fn scope_of(model: &SemanticModel, node: &SyntaxNode) -> ScopeId {
-    node.ancestors()
-        .find_map(|a| model.scopes.iter().position(|s| s.node == a).map(ScopeId))
-        .unwrap_or(ScopeId(0))
+/// Immutable lookups for the definitions and scopes collected before checking.
+/// Keep these outside the public model; analysis never changes their identities.
+pub(crate) struct SyntaxIndex {
+    scopes: HashMap<SyntaxNode, ScopeId>,
+    definitions: HashMap<SyntaxNode, Vec<DefinitionId>>,
+    names: HashMap<TextSize, DefinitionId>,
+    repeats: HashMap<SyntaxNode, usize>,
+    ordinary_by_start: Vec<DefinitionId>,
+    ordinary: HashMap<String, Vec<DefinitionId>>,
+    structural: HashMap<String, (RepeatId, DefinitionId, bool)>,
+    checkpoints: HashMap<(K, TextSize), SyntaxNode>,
 }
-pub(crate) fn definition_for(model: &SemanticModel, node: &SyntaxNode) -> Option<DefinitionId> {
-    model
-        .definitions
-        .iter()
-        .position(|d| d.node == *node)
-        .map(DefinitionId)
+impl SyntaxIndex {
+    pub(crate) fn new(model: &SemanticModel) -> Self {
+        let mut index = Self {
+            scopes: HashMap::new(),
+            definitions: HashMap::new(),
+            names: HashMap::new(),
+            repeats: HashMap::new(),
+            ordinary_by_start: vec![],
+            ordinary: HashMap::new(),
+            structural: HashMap::new(),
+            checkpoints: HashMap::new(),
+        };
+        for (i, scope) in model.scopes.iter().enumerate() {
+            crate::work::record();
+            index.scopes.insert(scope.node.clone(), ScopeId(i));
+        }
+        for (i, definition) in model.definitions.iter().enumerate() {
+            crate::work::record();
+            let id = DefinitionId(i);
+            if definition.is_ordinary() {
+                index.ordinary_by_start.push(id);
+                index
+                    .ordinary
+                    .entry(definition.name.clone())
+                    .or_default()
+                    .push(id);
+            }
+            index
+                .definitions
+                .entry(definition.node.clone())
+                .or_default()
+                .push(id);
+            index
+                .names
+                .entry(definition.name_range.start())
+                .or_insert(id);
+        }
+        index
+            .ordinary_by_start
+            .sort_by_key(|id| model.definition(*id).node.text_range().start());
+        for (i, repeat) in model.repeats.iter().enumerate() {
+            crate::work::record();
+            index.repeats.insert(repeat.node.clone(), i);
+            for (id, list) in [
+                (repeat.list_definition, true),
+                (repeat.each_definition, false),
+            ] {
+                if let Some(id) = id {
+                    index
+                        .structural
+                        .entry(model.definition(id).name.clone())
+                        .or_insert((RepeatId(i), id, list));
+                }
+            }
+        }
+        for node in model.scopes[0].node.descendants() {
+            crate::work::record();
+            if !matches!(
+                node.kind(),
+                K::Type | K::Layout | K::Offset | K::Comprehension
+            ) {
+                continue;
+            }
+            index
+                .checkpoints
+                .entry((node.kind(), node.text_range().start()))
+                .or_insert_with(|| node.clone());
+            if let Some(token) = node
+                .descendants_with_tokens()
+                .filter_map(|e| e.into_token())
+                .find(|t| {
+                    crate::work::record();
+                    !matches!(t.kind(), K::Whitespace | K::Comment)
+                })
+            {
+                index
+                    .checkpoints
+                    .entry((node.kind(), token.text_range().start()))
+                    .or_insert(node);
+            }
+        }
+        index
+    }
+    pub(crate) fn ordinary_definitions(&self, name: &str) -> &[DefinitionId] {
+        crate::work::record();
+        self.ordinary.get(name).map_or(&[], Vec::as_slice)
+    }
+    pub(crate) fn structural(&self, name: &str) -> Option<(RepeatId, DefinitionId, bool)> {
+        crate::work::record();
+        self.structural.get(name).copied()
+    }
+    pub(crate) fn repeat_for(&self, node: &SyntaxNode) -> Option<usize> {
+        crate::work::record();
+        self.repeats.get(node).copied()
+    }
+    pub(crate) fn ordinary_definitions_in(
+        &self,
+        container: &SyntaxNode,
+        model: &SemanticModel,
+    ) -> Vec<DefinitionId> {
+        let range = container.text_range();
+        let start = self.ordinary_by_start.partition_point(|id| {
+            crate::work::record();
+            model.definition(*id).node.text_range().start() < range.start()
+        });
+        let mut ids: Vec<_> = self.ordinary_by_start[start..]
+            .iter()
+            .copied()
+            .take_while(|id| {
+                crate::work::record();
+                model.definition(*id).node.text_range().start() <= range.end()
+            })
+            .filter(|id| range.contains_range(model.definition(*id).node.text_range()))
+            .collect();
+        // Admission order is definition order, including overlapping owner nodes.
+        ids.sort_unstable();
+        ids
+    }
+    pub(crate) fn scope_of(&self, node: &SyntaxNode) -> ScopeId {
+        node.ancestors()
+            .find_map(|a| {
+                crate::work::record();
+                self.scopes.get(&a).copied()
+            })
+            .unwrap_or(ScopeId(0))
+    }
+    pub(crate) fn definitions_for(&self, node: &SyntaxNode) -> &[DefinitionId] {
+        crate::work::record();
+        self.definitions.get(node).map_or(&[], Vec::as_slice)
+    }
+    pub(crate) fn definition_for(&self, node: &SyntaxNode) -> Option<DefinitionId> {
+        self.definitions_for(node).first().copied()
+    }
+    pub(crate) fn definition_at(&self, start: TextSize) -> Option<DefinitionId> {
+        crate::work::record();
+        self.names.get(&start).copied()
+    }
+    pub(crate) fn at_start(&self, kind: K, start: TextSize) -> Option<SyntaxNode> {
+        crate::work::record();
+        self.checkpoints.get(&(kind, start)).cloned()
+    }
 }
 pub(crate) fn collect(root: &SyntaxNode) -> SemanticModel {
     let mut model = SemanticModel::default();
@@ -71,24 +214,28 @@ pub(crate) fn collect(root: &SyntaxNode) -> SemanticModel {
         repeats: vec![],
     });
     collect_children(root, ScopeId(0), &mut model);
-    for index in 0..model.repeats.len() {
-        let repeat = RepeatId(index);
-        let mut fields: Vec<FieldInfo> = vec![];
-        for (id, definition) in model.definitions.iter().enumerate() {
-            if !definition.is_ordinary() || !definition.repeats.contains(&repeat) {
-                continue;
-            }
-            if let Some(field) = fields.iter_mut().find(|f| f.name == definition.name) {
-                field.definitions.push(DefinitionId(id));
-            } else {
-                fields.push(FieldInfo {
-                    name: definition.name.clone(),
-                    definitions: vec![DefinitionId(id)],
-                    fallback: ValueFacts::unknown(),
-                });
-            }
+    let mut fields_by_name: Vec<HashMap<String, usize>> = vec![HashMap::new(); model.repeats.len()];
+    for (id, definition) in model.definitions.iter().enumerate() {
+        crate::work::record();
+        if !definition.is_ordinary() {
+            continue;
         }
-        model.repeats[index].fields = fields;
+        for repeat in &definition.repeats {
+            crate::work::record();
+            let fields = &mut model.repeats[repeat.0].fields;
+            let index = *fields_by_name[repeat.0]
+                .entry(definition.name.clone())
+                .or_insert_with(|| {
+                    let index = fields.len();
+                    fields.push(FieldInfo {
+                        name: definition.name.clone(),
+                        definitions: vec![],
+                        fallback: ValueFacts::unknown(),
+                    });
+                    index
+                });
+            fields[index].definitions.push(DefinitionId(id));
+        }
     }
     model
 }

@@ -4,23 +4,28 @@ use std::collections::HashMap;
 
 type Result<T = ()> = std::result::Result<T, Error>;
 
-pub(crate) fn check(parsed: &Parse, model: &mut SemanticModel) -> Result {
+pub(crate) fn check(parsed: &Parse, model: &mut SemanticModel, index: &SyntaxIndex) -> Result {
     StatementChecks {
         parsed,
-        root: parsed.syntax(),
+        index,
         model,
         reading_types: HashMap::new(),
         completed_types: vec![],
+        visible_types: HashMap::new(),
+        type_kinds: HashMap::new(),
         completed_bindings: vec![],
     }
     .run()
 }
 struct StatementChecks<'a> {
     parsed: &'a Parse,
-    root: SyntaxNode,
+    index: &'a SyntaxIndex,
     model: &'a mut SemanticModel,
     reading_types: HashMap<TextSize, ReadingKind>,
     completed_types: Vec<DefinitionId>,
+    /// The latest completed type for each scope and name.
+    visible_types: HashMap<ScopeId, HashMap<String, DefinitionId>>,
+    type_kinds: HashMap<DefinitionId, ReadingKind>,
     completed_bindings: Vec<DefinitionId>,
 }
 impl StatementChecks<'_> {
@@ -51,12 +56,11 @@ impl StatementChecks<'_> {
         }
     }
     fn check_type_name(&mut self, event: &ParseCheck) -> Result {
-        let definition = self
-            .model
-            .definitions
-            .iter()
-            .find(|d| d.name_range.start() == event.target && d.kind == DefinitionKind::NamedType)
+        let id = self
+            .index
+            .definition_at(event.target)
             .expect("type name checkpoint");
+        let definition = self.model.definition(id);
         if matches!(
             definition.name.as_str(),
             "int" | "float" | "num" | "word" | "rest" | "alphabet"
@@ -69,9 +73,9 @@ impl StatementChecks<'_> {
         }
         if visible_type(
             self.model,
+            &self.visible_types,
             &definition.name,
             definition.scope,
-            &self.completed_types,
         )
         .is_some()
         {
@@ -85,7 +89,10 @@ impl StatementChecks<'_> {
         Ok(())
     }
     fn check_type_use(&mut self, event: &ParseCheck) -> Result {
-        let node = at_start(&self.root, K::Type, event.target).expect("type checkpoint");
+        let node = self
+            .index
+            .at_start(K::Type, event.target)
+            .expect("type checkpoint");
         let child = node.children().next().expect("completed type");
         let kind = match child.kind() {
             K::BaseType => match child.text().to_string().as_str() {
@@ -112,9 +119,9 @@ impl StatementChecks<'_> {
                     .then(|| {
                         visible_type(
                             self.model,
+                            &self.visible_types,
                             token.text(),
-                            scope_of(self.model, &node),
-                            &self.completed_types,
+                            self.index.scope_of(&node),
                         )
                     })
                     .flatten();
@@ -125,13 +132,7 @@ impl StatementChecks<'_> {
                         format!("unknown type '{}'", token.text()),
                     ));
                 };
-                let kind = self
-                    .model
-                    .named_types
-                    .iter()
-                    .find(|t| t.definition == id)
-                    .expect("completed named type")
-                    .kind;
+                let kind = self.type_kinds[&id];
                 self.model.add_reference(Reference {
                     name: token.text().into(),
                     name_range: token.text_range(),
@@ -148,13 +149,8 @@ impl StatementChecks<'_> {
     }
     fn complete_type(&mut self, event: &ParseCheck) -> Result {
         let id = self
-            .model
-            .definitions
-            .iter()
-            .position(|d| {
-                d.name_range.start() == event.target && d.kind == DefinitionKind::NamedType
-            })
-            .map(DefinitionId)
+            .index
+            .definition_at(event.target)
             .expect("completed type definition");
         let node = self
             .model
@@ -170,11 +166,20 @@ impl StatementChecks<'_> {
             source: node,
         });
         self.completed_types.push(id);
+        let definition = self.model.definition(id);
+        self.visible_types
+            .entry(definition.scope)
+            .or_default()
+            .insert(definition.name.clone(), id);
+        self.type_kinds.insert(id, kind);
 
         Ok(())
     }
     fn check_read_form(&mut self, event: &ParseCheck) -> Result {
-        let node = at_start(&self.root, K::Type, event.target).expect("read form type");
+        let node = self
+            .index
+            .at_start(K::Type, event.target)
+            .expect("read form type");
         let owner = node.parent().expect("type owner");
         let kind = self.reading_types[&event.target];
         let dimensions = owner
@@ -207,7 +212,7 @@ impl StatementChecks<'_> {
             }
             return Err(diagnostic);
         }
-        if let Some(id) = definition_for(self.model, &owner) {
+        if let Some(id) = self.index.definition_for(&owner) {
             let depth = if owner.kind() == K::List {
                 1
             } else {
@@ -224,7 +229,10 @@ impl StatementChecks<'_> {
         } else {
             K::Offset
         };
-        let node = at_start(&self.root, option_kind, event.target).expect("option checkpoint");
+        let node = self
+            .index
+            .at_start(option_kind, event.target)
+            .expect("option checkpoint");
         let owner = node.parent().expect("option owner");
         let type_node = owner
             .children()
@@ -249,12 +257,11 @@ impl StatementChecks<'_> {
         Ok(())
     }
     fn check_binding_name(&mut self, event: &ParseCheck) -> Result {
-        let binding = self
-            .model
-            .definitions
-            .iter()
-            .find(|d| d.kind == DefinitionKind::Binding && d.name_range.start() == event.target)
+        let id = self
+            .index
+            .definition_at(event.target)
             .expect("binding checkpoint");
+        let binding = self.model.definition(id);
         for ancestor in binding
             .node
             .ancestors()
@@ -281,22 +288,22 @@ impl StatementChecks<'_> {
         Ok(())
     }
     fn complete_comprehension(&mut self, event: &ParseCheck) -> Result {
-        let node =
-            at_start(&self.root, K::Comprehension, event.target).expect("comprehension checkpoint");
-        self.completed_bindings
-            .push(definition_for(self.model, &node).expect("binding definition"));
+        let node = self
+            .index
+            .at_start(K::Comprehension, event.target)
+            .expect("comprehension checkpoint");
+        self.completed_bindings.push(
+            self.index
+                .definition_for(&node)
+                .expect("binding definition"),
+        );
 
         Ok(())
     }
     fn check_global_conflicts(&self) -> Result {
         for &id in &self.completed_bindings {
             let definition = self.model.definition(id);
-            if self
-                .model
-                .definitions
-                .iter()
-                .any(|d| d.is_ordinary() && d.name == definition.name)
-            {
+            if !self.index.ordinary_definitions(&definition.name).is_empty() {
                 let mut diagnostic = at_node(
                     self.parsed,
                     &definition.node,
@@ -313,12 +320,7 @@ impl StatementChecks<'_> {
         }
         for &id in &self.completed_types {
             let definition = self.model.definition(id);
-            if self
-                .model
-                .definitions
-                .iter()
-                .any(|d| d.is_ordinary() && d.name == definition.name)
-            {
+            if !self.index.ordinary_definitions(&definition.name).is_empty() {
                 return Err(at_node(
                     self.parsed,
                     &definition.node,
@@ -335,31 +337,20 @@ impl StatementChecks<'_> {
     }
 }
 
+/// Finds the innermost completed type named `name` visible from `scope`.
 fn visible_type(
     model: &SemanticModel,
+    visible: &HashMap<ScopeId, HashMap<String, DefinitionId>>,
     name: &str,
     mut scope: ScopeId,
-    completed: &[DefinitionId],
 ) -> Option<DefinitionId> {
     loop {
-        if let Some(id) = completed.iter().rev().find(|id| {
-            let d = model.definition(**id);
-            d.name == name && d.scope == scope
-        }) {
-            return Some(*id);
+        crate::work::record();
+        if let Some(&id) = visible.get(&scope).and_then(|types| types.get(name)) {
+            return Some(id);
         }
         scope = model.scopes[scope.0].parent?;
     }
-}
-fn at_start(root: &SyntaxNode, kind: K, start: TextSize) -> Option<SyntaxNode> {
-    root.descendants().find(|n| {
-        n.kind() == kind
-            && (n.text_range().start() == start
-                || n.descendants_with_tokens()
-                    .filter_map(|e| e.into_token())
-                    .find(|t| !matches!(t.kind(), K::Whitespace | K::Comment))
-                    .is_some_and(|t| t.text_range().start() == start))
-    })
 }
 fn error(event: &ParseCheck, code: E, message: String) -> Error {
     Error {

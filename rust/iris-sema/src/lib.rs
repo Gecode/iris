@@ -1,10 +1,13 @@
 //! Parse-time validity and conservative semantic facts for Iris reader specs.
 mod check;
 mod diagnostic;
+mod environment;
 mod infer;
 mod model;
 mod resolve;
 mod syntax;
+mod targets;
+mod work;
 
 pub use diagnostic::{Error, ErrorCode};
 use iris_syntax::{DiagnosticPhase, Parse};
@@ -28,15 +31,16 @@ impl Analysis {
 /// IDs and cloned CST handles belong to this analysis snapshot.
 pub fn analyze(parsed: &Parse) -> Analysis {
     let mut model = syntax::collect(&parsed.syntax());
+    let index = syntax::SyntaxIndex::new(&model);
     let error = parsed
         .diagnostics()
         .iter()
         .find(|d| d.phase == DiagnosticPhase::Lexing)
         .map(Error::from)
-        .or_else(|| check::check(parsed, &mut model).err())
-        .or_else(|| resolve::resolve(parsed, &mut model).err());
+        .or_else(|| check::check(parsed, &mut model, &index).err())
+        .or_else(|| resolve::resolve(parsed, &mut model, &index).err());
     if error.is_none() {
-        infer::infer(&mut model);
+        infer::infer(&mut model, &index);
     }
     Analysis {
         model,

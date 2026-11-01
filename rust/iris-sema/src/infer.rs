@@ -1,436 +1,459 @@
 //! Structured, conservative summaries. This module never reports validity errors.
+use crate::environment::{Binding, Changes, Environment};
+use crate::targets::{TargetSetId, TargetSets};
 use crate::{model::*, syntax::*};
 use iris_syntax::{SyntaxKind as K, SyntaxNode};
-use std::collections::BTreeMap;
+use std::collections::{BTreeSet, HashMap};
 
-#[derive(Clone)]
-struct Binding {
-    definitions: Vec<DefinitionId>,
-    facts: ValueFacts,
-    possibly_unavailable: bool,
-}
-type Environment = BTreeMap<String, Binding>;
-
-pub(crate) fn infer(model: &mut SemanticModel) {
-    let root = model.scopes[0].node.clone();
-    infer_block(&root, &mut Environment::new(), model);
-    // Fallback is the first syntactic definition, independent of executed facts.
-    for r in 0..model.repeats.len() {
-        for f in 0..model.repeats[r].fields.len() {
-            let id = model.repeats[r].fields[f].definitions[0];
-            let definition = model.definition(id);
-            let fallback = fallback_facts(definition);
-            let index = definition
-                .repeats
-                .iter()
-                .position(|id| id.0 == r)
-                .expect("repeat field");
-            model.repeats[r].fields[f].fallback =
-                fallback.shifted((definition.repeats.len() - index - 1) as isize);
-        }
+pub(crate) fn infer(model: &mut SemanticModel, index: &SyntaxIndex) {
+    let mut references = HashMap::new();
+    for (i, reference) in model.references.iter().enumerate() {
+        references.entry(reference.name_range).or_insert(i);
     }
-    // Reference targets can change during flow summaries; rebuild inverse links once.
-    for definition in &mut model.definitions {
-        definition.references.clear();
+    let mut expressions = HashMap::new();
+    for (i, expression) in model.expressions.iter().enumerate() {
+        expressions.entry(expression.node.clone()).or_insert(i);
     }
-    for (index, reference) in model.references.iter().enumerate() {
-        for id in reference.resolution.definitions() {
-            model.definitions[id.0].references.push(ReferenceId(index));
-        }
-    }
-}
-fn infer_block(container: &SyntaxNode, env: &mut Environment, model: &mut SemanticModel) {
-    for statement in container.children() {
-        infer_statement(&statement, env, model);
-    }
-}
-fn infer_statement(node: &SyntaxNode, env: &mut Environment, model: &mut SemanticModel) {
-    match node.kind() {
-        K::Repeat => return infer_repeat(node, env, model),
-        K::If => return infer_branches(node, env, model),
-        K::Instances => return infer_instances(node, env, model),
-        K::Sections => return infer_sections(node, env, model),
-        _ => {}
-    }
-    for pattern in node.children().filter(|n| n.kind() == K::Pattern) {
-        infer_pattern(&pattern, env, model);
-    }
-    for type_node in node.children().filter(|n| n.kind() == K::Type) {
-        infer_type_bounds(&type_node, env, model);
-    }
-    for child in node
-        .children()
-        .filter(|n| matches!(n.kind(), K::Dimension | K::Layout | K::Offset))
-    {
-        for expression in expressions(&child) {
-            infer_expression(&expression, env, model);
-        }
-    }
-    let result = expressions(node)
-        .into_iter()
-        .map(|e| infer_expression(&e, env, model))
-        .last();
-    if let Some(id) = model
-        .definitions
+    let type_kinds = model
+        .named_types
         .iter()
-        .position(|d| d.node == *node && d.is_ordinary())
-        .map(DefinitionId)
-    {
-        let facts = match model.definition(id).kind {
-            DefinitionKind::Let => result.unwrap_or_else(ValueFacts::unknown),
-            DefinitionKind::Param => match result {
-                Some(mut facts) => {
-                    facts.depths = facts.depths.join(&Possibilities::one(0));
-                    facts
-                }
-                None => ValueFacts {
-                    value_types: Possibilities::Known(vec![
-                        ValueType::Int,
-                        ValueType::Float,
-                        ValueType::String,
-                    ]),
-                    depths: Possibilities::one(0),
+        .map(|t| (t.definition, t.kind))
+        .collect();
+    let mut inference = Inference {
+        references,
+        expressions,
+        targets: TargetSets::new(model.definitions.len()),
+        type_kinds,
+        model,
+        index,
+    };
+    inference.run();
+}
+struct Inference<'a> {
+    model: &'a mut SemanticModel,
+    index: &'a SyntaxIndex,
+    references: HashMap<iris_syntax::TextRange, usize>,
+    expressions: HashMap<SyntaxNode, usize>,
+    targets: TargetSets,
+    type_kinds: HashMap<DefinitionId, ReadingKind>,
+}
+impl Inference<'_> {
+    fn run(&mut self) {
+        let root = self.model.scopes[0].node.clone();
+        self.infer_block(&root, &mut Environment::default());
+        // Fallback is the first syntactic definition, independent of executed facts.
+        for r in 0..self.model.repeats.len() {
+            for f in 0..self.model.repeats[r].fields.len() {
+                let id = self.model.repeats[r].fields[f].definitions[0];
+                let definition = self.model.definition(id);
+                let fallback = fallback_facts(definition);
+                let index = definition
+                    .repeats
+                    .iter()
+                    .position(|id| id.0 == r)
+                    .expect("repeat field");
+                self.model.repeats[r].fields[f].fallback =
+                    fallback.shifted((definition.repeats.len() - index - 1) as isize);
+            }
+        }
+        // Reference targets can change during flow summaries; rebuild inverse links once.
+        for definition in &mut self.model.definitions {
+            definition.references.clear();
+        }
+        for (index, reference) in self.model.references.iter().enumerate() {
+            for id in reference.resolution.definitions() {
+                self.model.definitions[id.0]
+                    .references
+                    .push(ReferenceId(index));
+            }
+        }
+    }
+    fn infer_block(&mut self, container: &SyntaxNode, env: &mut Environment) {
+        for statement in container.children() {
+            self.infer_statement(&statement, env);
+        }
+    }
+    fn infer_statement(&mut self, node: &SyntaxNode, env: &mut Environment) {
+        match node.kind() {
+            K::Repeat => return self.infer_repeat(node, env),
+            K::If => return self.infer_branches(node, env),
+            K::Instances => return self.infer_instances(node, env),
+            K::Sections => return self.infer_sections(node, env),
+            _ => {}
+        }
+        for pattern in node.children().filter(|n| n.kind() == K::Pattern) {
+            self.infer_pattern(&pattern, env);
+        }
+        for type_node in node.children().filter(|n| n.kind() == K::Type) {
+            self.infer_type_bounds(&type_node, env);
+        }
+        for child in node
+            .children()
+            .filter(|n| matches!(n.kind(), K::Dimension | K::Layout | K::Offset))
+        {
+            for expression in expressions(&child) {
+                self.infer_expression(&expression, env);
+            }
+        }
+        let result = expressions(node)
+            .into_iter()
+            .map(|e| self.infer_expression(&e, env))
+            .last();
+        if let Some(id) = self
+            .index
+            .definitions_for(node)
+            .iter()
+            .copied()
+            .find(|id| self.model.definition(*id).is_ordinary())
+        {
+            let facts = match self.model.definition(id).kind {
+                DefinitionKind::Let => result.unwrap_or_else(ValueFacts::unknown),
+                DefinitionKind::Param => match result {
+                    Some(mut facts) => {
+                        facts.depths = facts.depths.join(&Possibilities::one(0));
+                        facts
+                    }
+                    None => ValueFacts {
+                        value_types: Possibilities::Known(vec![
+                            ValueType::Int,
+                            ValueType::Float,
+                            ValueType::String,
+                        ]),
+                        depths: Possibilities::one(0),
+                    },
                 },
-            },
-            _ => model.definition(id).facts.clone(),
-        };
-        model.definitions[id.0].facts = facts.clone();
-        publish(id, facts, false, env, model);
-    }
-}
-fn infer_repeat(node: &SyntaxNode, env: &mut Environment, model: &mut SemanticModel) {
-    for expression in expressions(node) {
-        infer_expression(&expression, env, model);
-    }
-    let repeat = model
-        .repeats
-        .iter()
-        .position(|r| r.node == *node)
-        .expect("repeat");
-    let mut local = env.clone();
-    if let Some(body) = node.children().find(|n| n.kind() == K::Block) {
-        infer_block(&body, &mut local, model);
-    }
-    publish_store(node, env, model);
-    for field in model.repeats[repeat].fields.clone() {
-        let mut facts = None;
-        for id in &field.definitions {
-            let d = model.definition(*id);
-            let p = d
-                .repeats
-                .iter()
-                .position(|r| r.0 == repeat)
-                .expect("field chain");
-            let projected = collected_facts(d, d.repeats.len() - p);
-            facts = Some(facts.map_or(projected.clone(), |f: ValueFacts| f.join(&projected)));
+                _ => self.model.definition(id).facts.clone(),
+            };
+            self.model.definitions[id.0].facts = facts.clone();
+            self.publish(id, facts, false, env);
         }
-        env.insert(
-            field.name,
-            Binding {
-                definitions: field.definitions,
-                facts: facts.unwrap_or_else(ValueFacts::unknown),
+    }
+    fn infer_repeat(&mut self, node: &SyntaxNode, env: &mut Environment) {
+        for expression in expressions(node) {
+            self.infer_expression(&expression, env);
+        }
+        let repeat = self.index.repeat_for(node).expect("repeat");
+        let checkpoint = env.checkpoint();
+        if let Some(body) = node.children().find(|n| n.kind() == K::Block) {
+            self.infer_block(&body, env);
+        }
+        env.rollback(checkpoint);
+        self.publish_store(node, env);
+        for field in self.model.repeats[repeat].fields.clone() {
+            let mut facts = None;
+            for id in &field.definitions {
+                let d = self.model.definition(*id);
+                let p = d
+                    .repeats
+                    .iter()
+                    .position(|r| r.0 == repeat)
+                    .expect("field chain");
+                let projected = collected_facts(d, d.repeats.len() - p);
+                facts = Some(facts.map_or(projected.clone(), |f: ValueFacts| f.join(&projected)));
+            }
+            env.insert(
+                field.name,
+                Binding {
+                    definitions: self.targets.insert(&field.definitions),
+                    facts: facts.unwrap_or_else(ValueFacts::unknown),
+                    possibly_unavailable: false,
+                },
+            );
+        }
+    }
+    fn infer_branches(&mut self, node: &SyntaxNode, env: &mut Environment) {
+        for expression in expressions(node) {
+            self.infer_expression(&expression, env);
+        }
+        let mut branches = vec![];
+        for body in node
+            .children()
+            .filter(|n| matches!(n.kind(), K::Block | K::If | K::Declaration))
+        {
+            let checkpoint = env.checkpoint();
+            if body.kind() == K::Block {
+                self.infer_block(&body, env);
+            } else {
+                self.infer_statement(&body, env);
+            }
+            branches.push(env.rollback(checkpoint));
+        }
+        if branches.len() < 2 {
+            branches.push(Changes::new());
+        }
+        self.join_branches(env, &branches);
+    }
+    fn infer_instances(&mut self, node: &SyntaxNode, env: &mut Environment) {
+        let checkpoint = env.checkpoint();
+        if let Some(body) = node.children().find(|n| n.kind() == K::Block) {
+            // A retained earlier instance can publish into the enclosing frame
+            // before this pass starts (Specification §9.3).
+            self.admit_possible_definitions(&body, env);
+            self.infer_block(&body, env);
+        }
+        let changed = env.rollback(checkpoint);
+        self.join_branches(env, &[Changes::new(), changed]);
+        env.make_uncertain();
+    }
+    fn infer_sections(&mut self, node: &SyntaxNode, env: &mut Environment) {
+        // Input determines both arm order and occurrence. Admit all possible
+        // definitions while keeping their facts and availability uncertain.
+        for arm in node.children().filter(|n| n.kind() == K::Arm) {
+            self.admit_possible_definitions(&arm, env);
+        }
+        for arm in node.children().filter(|n| n.kind() == K::Arm) {
+            let checkpoint = env.checkpoint();
+            for pattern in arm.children().filter(|n| n.kind() == K::Pattern) {
+                self.infer_pattern(&pattern, env);
+            }
+            for body in arm.children().filter(|n| n.kind() == K::Block) {
+                self.infer_block(&body, env);
+            }
+            let changed = env.rollback(checkpoint);
+            self.join_branches(env, &[Changes::new(), changed]);
+        }
+        self.publish_store(node, env);
+    }
+    fn admit_possible_definitions(&mut self, container: &SyntaxNode, env: &mut Environment) {
+        for id in self.index.ordinary_definitions_in(container, self.model) {
+            crate::work::record();
+            let d = self.model.definition(id);
+            let definitions = env
+                .get(&d.name)
+                .map_or(TargetSetId::EMPTY, |b| b.definitions);
+            let definitions = self.targets.join(definitions, TargetSets::single(id));
+            env.insert(
+                d.name.clone(),
+                Binding {
+                    definitions,
+                    facts: ValueFacts::unknown(),
+                    possibly_unavailable: true,
+                },
+            );
+        }
+    }
+    fn publish_store(&mut self, node: &SyntaxNode, env: &mut Environment) {
+        if let Some(id) = self
+            .index
+            .definitions_for(node)
+            .iter()
+            .copied()
+            .find(|id| self.model.definition(*id).kind == DefinitionKind::Store)
+        {
+            let facts = ValueFacts::known(ValueType::String, 0);
+            self.model.definitions[id.0].facts = facts.clone();
+            let stored = Binding {
+                definitions: TargetSets::single(id),
+                facts,
                 possibly_unavailable: false,
+            };
+            let name = self.model.definition(id).name.clone();
+            // Sections can finish at EOF or a last arm without storing a token.
+            let binding = if node.kind() == K::Sections {
+                self.join_bindings(env.get(&name), Some(&stored))
+                    .expect("stored binding")
+            } else {
+                stored
+            };
+            env.insert(name, binding);
+        }
+    }
+    fn publish(
+        &mut self,
+        id: DefinitionId,
+        facts: ValueFacts,
+        possibly_unavailable: bool,
+        env: &mut Environment,
+    ) {
+        env.insert(
+            self.model.definition(id).name.clone(),
+            Binding {
+                definitions: TargetSets::single(id),
+                facts,
+                possibly_unavailable,
             },
         );
     }
-}
-fn infer_branches(node: &SyntaxNode, env: &mut Environment, model: &mut SemanticModel) {
-    for expression in expressions(node) {
-        infer_expression(&expression, env, model);
-    }
-    let mut branches = vec![];
-    for body in node
-        .children()
-        .filter(|n| matches!(n.kind(), K::Block | K::If | K::Declaration))
-    {
-        let mut branch = env.clone();
-        if body.kind() == K::Block {
-            infer_block(&body, &mut branch, model);
-        } else {
-            infer_statement(&body, &mut branch, model);
-        }
-        branches.push(branch);
-    }
-    if branches.len() < 2 {
-        branches.push(env.clone());
-    }
-    if let Some(first) = branches.first() {
-        *env = branches
-            .iter()
-            .skip(1)
-            .fold(first.clone(), |a, b| join(&a, b));
-    }
-}
-fn infer_instances(node: &SyntaxNode, env: &mut Environment, model: &mut SemanticModel) {
-    let mut local = env.clone();
-    if let Some(body) = node.children().find(|n| n.kind() == K::Block) {
-        // A retained earlier instance can publish into the enclosing frame
-        // before this pass starts (Specification §9.3).
-        admit_possible_definitions(&body, &mut local, model);
-        infer_block(&body, &mut local, model);
-    }
-    *env = join(env, &local);
-    for binding in env.values_mut() {
-        binding.facts = ValueFacts::unknown();
-        binding.possibly_unavailable = true;
-    }
-}
-fn infer_sections(node: &SyntaxNode, env: &mut Environment, model: &mut SemanticModel) {
-    // Input determines both arm order and occurrence. Admit all possible
-    // definitions while keeping their facts and availability uncertain.
-    let mut summary = env.clone();
-    for arm in node.children().filter(|n| n.kind() == K::Arm) {
-        admit_possible_definitions(&arm, &mut summary, model);
-    }
-    for arm in node.children().filter(|n| n.kind() == K::Arm) {
-        let mut branch = summary.clone();
-        for pattern in arm.children().filter(|n| n.kind() == K::Pattern) {
-            infer_pattern(&pattern, &mut branch, model);
-        }
-        for body in arm.children().filter(|n| n.kind() == K::Block) {
-            infer_block(&body, &mut branch, model);
-        }
-        summary = join(&summary, &branch);
-    }
-    *env = summary;
-    publish_store(node, env, model);
-}
-
-fn admit_possible_definitions(
-    container: &SyntaxNode,
-    env: &mut Environment,
-    model: &SemanticModel,
-) {
-    for (id, d) in model.definitions.iter().enumerate().filter(|(_, d)| {
-        d.is_ordinary() && container.text_range().contains_range(d.node.text_range())
-    }) {
-        let binding = env.entry(d.name.clone()).or_insert(Binding {
-            definitions: vec![],
-            facts: ValueFacts::unknown(),
-            possibly_unavailable: true,
-        });
-        if !binding.definitions.contains(&DefinitionId(id)) {
-            binding.definitions.push(DefinitionId(id));
-        }
-        binding.facts = ValueFacts::unknown();
-        binding.possibly_unavailable = true;
-    }
-}
-
-fn publish_store(node: &SyntaxNode, env: &mut Environment, model: &mut SemanticModel) {
-    if let Some(id) = model
-        .definitions
-        .iter()
-        .position(|d| d.node == *node && d.kind == DefinitionKind::Store)
-        .map(DefinitionId)
-    {
-        let facts = ValueFacts::known(ValueType::String, 0);
-        model.definitions[id.0].facts = facts.clone();
-        let mut stored = env.clone();
-        publish(id, facts, false, &mut stored, model);
-        // Sections can finish at EOF or a last arm without storing a token.
-        *env = if node.kind() == K::Sections {
-            join(env, &stored)
-        } else {
-            stored
-        };
-    }
-}
-fn publish(
-    id: DefinitionId,
-    facts: ValueFacts,
-    possibly_unavailable: bool,
-    env: &mut Environment,
-    model: &SemanticModel,
-) {
-    env.insert(
-        model.definition(id).name.clone(),
-        Binding {
-            definitions: vec![id],
-            facts,
-            possibly_unavailable,
-        },
-    );
-}
-fn join(a: &Environment, b: &Environment) -> Environment {
-    let mut result = a.clone();
-    for (name, binding) in &mut result {
-        if let Some(other) = b.get(name) {
-            for id in &other.definitions {
-                if !binding.definitions.contains(id) {
-                    binding.definitions.push(*id);
-                }
+    fn join_branches(&mut self, env: &mut Environment, branches: &[Changes]) {
+        let names: BTreeSet<_> = branches.iter().flat_map(|b| b.keys()).collect();
+        for name in names {
+            crate::work::record();
+            let base = env.get(name);
+            let mut binding = branches.first().and_then(|b| b.get(name).or(base)).cloned();
+            for branch in branches.iter().skip(1) {
+                binding = self.join_bindings(binding.as_ref(), branch.get(name).or(base));
             }
-            binding.facts = binding.facts.join(&other.facts);
-            binding.possibly_unavailable |= other.possibly_unavailable;
-        } else {
-            binding.possibly_unavailable = true;
+            if let Some(binding) = binding {
+                env.insert(name.clone(), binding);
+            }
         }
     }
-    for (name, binding) in b {
-        if !result.contains_key(name) {
-            let mut binding = binding.clone();
-            binding.possibly_unavailable = true;
-            result.insert(name.clone(), binding);
+    fn join_bindings(&mut self, a: Option<&Binding>, b: Option<&Binding>) -> Option<Binding> {
+        crate::work::record();
+        match (a, b) {
+            (Some(a), Some(b)) => Some(Binding {
+                definitions: self.targets.join(a.definitions, b.definitions),
+                facts: a.facts.join(&b.facts),
+                possibly_unavailable: a.possibly_unavailable || b.possibly_unavailable,
+            }),
+            (Some(binding), None) | (None, Some(binding)) => {
+                let mut binding = binding.clone();
+                binding.possibly_unavailable = true;
+                Some(binding)
+            }
+            (None, None) => None,
         }
     }
-    result
-}
-fn infer_pattern(pattern: &SyntaxNode, env: &mut Environment, model: &mut SemanticModel) {
-    for current in pattern.children().filter(|n| n.kind() == K::CurrentValue) {
-        if let Some(token) = first_ident(&current) {
-            infer_reference(token.text_range(), env, model);
+    fn infer_pattern(&mut self, pattern: &SyntaxNode, env: &mut Environment) {
+        for current in pattern.children().filter(|n| n.kind() == K::CurrentValue) {
+            if let Some(token) = first_ident(&current) {
+                self.infer_reference(token.text_range(), env);
+            }
+        }
+        let captures: Vec<_> = pattern
+            .children()
+            .filter(|n| n.kind() == K::Capture)
+            .collect();
+        for capture in &captures {
+            if let Some(id) = self.index.definition_for(capture) {
+                self.publish(id, self.model.definition(id).facts.clone(), false, env);
+            }
+        }
+        for capture in captures {
+            for node in capture.children().filter(|n| n.kind() == K::Type) {
+                self.infer_type_bounds(&node, env);
+            }
         }
     }
-    let captures: Vec<_> = pattern
-        .children()
-        .filter(|n| n.kind() == K::Capture)
-        .collect();
-    for capture in &captures {
-        if let Some(id) = definition_for(model, capture) {
-            publish(id, model.definition(id).facts.clone(), false, env, model);
+    fn infer_type_bounds(&mut self, node: &SyntaxNode, env: &mut Environment) {
+        for range in node.children().filter(|n| n.kind() == K::Range) {
+            for expression in expressions(&range) {
+                self.infer_expression(&expression, env);
+            }
         }
     }
-    for capture in captures {
-        for node in capture.children().filter(|n| n.kind() == K::Type) {
-            infer_type_bounds(&node, env, model);
-        }
-    }
-}
-fn infer_type_bounds(node: &SyntaxNode, env: &Environment, model: &mut SemanticModel) {
-    for range in node.children().filter(|n| n.kind() == K::Range) {
-        for expression in expressions(&range) {
-            infer_expression(&expression, env, model);
-        }
-    }
-}
-fn infer_expression(node: &SyntaxNode, env: &Environment, model: &mut SemanticModel) -> ValueFacts {
-    let args = expressions(node);
-    let facts = match node.kind() {
-        K::Literal => {
-            let token = tokens(node).into_iter().next().expect("literal");
-            ValueFacts::known(
-                match token.kind() {
-                    K::Float => ValueType::Float,
-                    K::String => ValueType::String,
-                    _ => ValueType::Int,
-                },
-                0,
-            )
-        }
-        K::HostConstant => ValueFacts::known(ValueType::Int, 0),
-        K::Name => {
-            let token = first_ident(node).expect("name");
-            infer_reference(token.text_range(), env, model)
-        }
-        K::Parenthesized => infer_expression(&args[0], env, model),
-        K::Comprehension => {
-            let domain = infer_expression(&args[0], env, model);
-            let id = definition_for(model, node).expect("binding");
-            let facts = domain.shifted(-1);
-            model.definitions[id.0].facts = facts.clone();
-            let mut local = env.clone();
-            publish(id, facts, false, &mut local, model);
-            infer_expression(&args[1], &local, model);
-            ValueFacts::known(ValueType::Int, 0)
-        }
-        K::IndexExpression => {
-            let base = infer_expression(&args[0], env, model);
-            infer_expression(&args[1], env, model);
-            base.shifted(-1)
-        }
-        K::Field => {
-            infer_expression(&args[0], env, model);
-            let token = first_ident(node).expect("field");
-            infer_reference(token.text_range(), env, model)
-        }
-        K::Unary => {
-            let facts = infer_expression(&args[0], env, model);
-            if tokens(node).first().is_some_and(|t| t.text() == "-") {
-                ValueFacts {
-                    value_types: facts.value_types,
-                    depths: Possibilities::one(0),
-                }
-            } else {
+    fn infer_expression(&mut self, node: &SyntaxNode, env: &mut Environment) -> ValueFacts {
+        let args = expressions(node);
+        let facts = match node.kind() {
+            K::Literal => {
+                let token = tokens(node).into_iter().next().expect("literal");
+                ValueFacts::known(
+                    match token.kind() {
+                        K::Float => ValueType::Float,
+                        K::String => ValueType::String,
+                        _ => ValueType::Int,
+                    },
+                    0,
+                )
+            }
+            K::HostConstant => ValueFacts::known(ValueType::Int, 0),
+            K::Name => {
+                let token = first_ident(node).expect("name");
+                self.infer_reference(token.text_range(), env)
+            }
+            K::Parenthesized => self.infer_expression(&args[0], env),
+            K::Comprehension => {
+                let domain = self.infer_expression(&args[0], env);
+                let id = self.index.definition_for(node).expect("binding");
+                let facts = domain.shifted(-1);
+                self.model.definitions[id.0].facts = facts.clone();
+                let checkpoint = env.checkpoint();
+                self.publish(id, facts, false, env);
+                self.infer_expression(&args[1], env);
+                env.rollback(checkpoint);
                 ValueFacts::known(ValueType::Int, 0)
             }
-        }
-        _ => {
-            for argument in args {
-                infer_expression(&argument, env, model);
+            K::IndexExpression => {
+                let base = self.infer_expression(&args[0], env);
+                self.infer_expression(&args[1], env);
+                base.shifted(-1)
             }
-            ValueFacts::known(ValueType::Int, 0)
-        }
-    };
-    if let Some(info) = model.expressions.iter_mut().find(|e| e.node == *node) {
-        info.facts = if info.denotation == Denotation::Value {
-            facts.clone()
-        } else {
-            ValueFacts::unknown()
-        };
-    }
-    facts
-}
-fn infer_reference(
-    range: iris_syntax::TextRange,
-    env: &Environment,
-    model: &mut SemanticModel,
-) -> ValueFacts {
-    let Some(index) = model.references.iter().position(|r| r.name_range == range) else {
-        return ValueFacts::unknown();
-    };
-    let reference = model.references[index].clone();
-    let mut resolution = reference.resolution.clone();
-    let facts = match &mut resolution {
-        Resolution::Value {
-            definitions,
-            possibly_unavailable,
-            projection,
-        } => {
-            if projection.is_empty() {
-                if let Some(binding) = env.get(&reference.name) {
-                    *definitions = binding.definitions.clone();
-                    *possibly_unavailable = binding.possibly_unavailable;
-                    binding.facts.clone()
+            K::Field => {
+                self.infer_expression(&args[0], env);
+                let token = first_ident(node).expect("field");
+                self.infer_reference(token.text_range(), env)
+            }
+            K::Unary => {
+                let facts = self.infer_expression(&args[0], env);
+                if tokens(node).first().is_some_and(|t| t.text() == "-") {
+                    ValueFacts {
+                        value_types: facts.value_types,
+                        depths: Possibilities::one(0),
+                    }
                 } else {
-                    ValueFacts::unknown()
+                    ValueFacts::known(ValueType::Int, 0)
                 }
-            } else {
-                *definitions = model
-                    .definitions
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, d)| d.is_ordinary() && d.name == reference.name)
-                    .map(|(i, _)| DefinitionId(i))
-                    .collect();
-                joined_definition_facts(definitions, model, |_| 0)
             }
+            _ => {
+                for argument in args {
+                    self.infer_expression(&argument, env);
+                }
+                ValueFacts::known(ValueType::Int, 0)
+            }
+        };
+        crate::work::record();
+        if let Some(&index) = self.expressions.get(node) {
+            let info = &mut self.model.expressions[index];
+            info.facts = if info.denotation == Denotation::Value {
+                facts.clone()
+            } else {
+                ValueFacts::unknown()
+            };
         }
-        Resolution::Bound(id) => env
-            .get(&reference.name)
-            .map_or_else(|| model.definition(*id).facts.clone(), |b| b.facts.clone()),
-        Resolution::Field {
-            definitions,
-            record,
-        } => joined_definition_facts(definitions, model, |d| {
-            d.repeats.len()
-                - d.repeats
-                    .iter()
-                    .position(|r| r == record)
-                    .expect("field record")
-                - 1
-        }),
-        Resolution::HostConstant(_) => ValueFacts::known(ValueType::Int, 0),
-        Resolution::NamedType(id) => model
-            .named_types
-            .iter()
-            .find(|t| t.definition == *id)
-            .map_or_else(ValueFacts::unknown, |t| t.kind.facts(0)),
-        Resolution::Structural { .. } => ValueFacts::unknown(),
-    };
-    model.references[index].resolution = resolution;
-    model.references[index].facts = facts.clone();
-    facts
+        facts
+    }
+    fn infer_reference(&mut self, range: iris_syntax::TextRange, env: &Environment) -> ValueFacts {
+        crate::work::record();
+        let Some(&index) = self.references.get(&range) else {
+            return ValueFacts::unknown();
+        };
+        let reference = self.model.references[index].clone();
+        let mut resolution = reference.resolution.clone();
+        let facts = match &mut resolution {
+            Resolution::Value {
+                definitions,
+                possibly_unavailable,
+                projection,
+            } => {
+                if projection.is_empty() {
+                    if let Some(binding) = env.get(&reference.name) {
+                        *definitions = self.targets.to_vec(binding.definitions);
+                        *possibly_unavailable = binding.possibly_unavailable;
+                        binding.facts.clone()
+                    } else {
+                        ValueFacts::unknown()
+                    }
+                } else {
+                    *definitions = self.index.ordinary_definitions(&reference.name).to_vec();
+                    joined_definition_facts(definitions, self.model, |_| 0)
+                }
+            }
+            Resolution::Bound(id) => env.get(&reference.name).map_or_else(
+                || self.model.definition(*id).facts.clone(),
+                |b| b.facts.clone(),
+            ),
+            Resolution::Field {
+                definitions,
+                record,
+            } => joined_definition_facts(definitions, self.model, |d| {
+                d.repeats.len()
+                    - d.repeats
+                        .iter()
+                        .position(|r| r == record)
+                        .expect("field record")
+                    - 1
+            }),
+            Resolution::HostConstant(_) => ValueFacts::known(ValueType::Int, 0),
+            Resolution::NamedType(id) => self
+                .type_kinds
+                .get(id)
+                .map_or_else(ValueFacts::unknown, |kind| kind.facts(0)),
+            Resolution::Structural { .. } => ValueFacts::unknown(),
+        };
+        self.model.references[index].resolution = resolution;
+        self.model.references[index].facts = facts.clone();
+        facts
+    }
 }
 fn joined_definition_facts(
     ids: &[DefinitionId],

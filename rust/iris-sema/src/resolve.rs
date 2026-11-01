@@ -3,11 +3,12 @@ use crate::{Error, ErrorCode as E, check::at_node, model::*, syntax::*};
 use iris_syntax::{Parse, SyntaxKind as K, SyntaxNode};
 type Result<T = ()> = std::result::Result<T, Error>;
 
-pub(crate) fn resolve(parsed: &Parse, model: &mut SemanticModel) -> Result {
-    precheck(parsed, model)?;
+pub(crate) fn resolve(parsed: &Parse, model: &mut SemanticModel, index: &SyntaxIndex) -> Result {
+    precheck(parsed, model, index)?;
     let mut resolver = Resolver {
         parsed,
         model,
+        index,
         statement: parsed.syntax(),
         repeats: vec![],
         bound: vec![],
@@ -15,8 +16,8 @@ pub(crate) fn resolve(parsed: &Parse, model: &mut SemanticModel) -> Result {
     };
     resolver.visit(&parsed.syntax())
 }
-fn precheck(parsed: &Parse, model: &SemanticModel) -> Result {
-    let mut preceding: Vec<String> = vec![];
+fn precheck(parsed: &Parse, model: &SemanticModel, index: &SyntaxIndex) -> Result {
+    let mut preceding = std::collections::HashSet::new();
     for repeat in &model.repeats {
         for (position, id) in [repeat.list_definition, repeat.each_definition]
             .into_iter()
@@ -46,11 +47,7 @@ fn precheck(parsed: &Parse, model: &SemanticModel) -> Result {
                     format!("'{name}' already names records"),
                 ));
             }
-            if model
-                .definitions
-                .iter()
-                .any(|d| d.is_ordinary() && d.name == *name)
-            {
+            if !index.ordinary_definitions(name).is_empty() {
                 return Err(at_node(
                     parsed,
                     &repeat.node,
@@ -63,13 +60,14 @@ fn precheck(parsed: &Parse, model: &SemanticModel) -> Result {
             .into_iter()
             .flatten()
         {
-            preceding.push(model.definition(id).name.clone());
+            preceding.insert(model.definition(id).name.clone());
         }
     }
     Ok(())
 }
 struct Resolver<'a> {
     parsed: &'a Parse,
+    index: &'a SyntaxIndex,
     model: &'a mut SemanticModel,
     statement: SyntaxNode,
     repeats: Vec<RepeatId>,
@@ -89,7 +87,7 @@ impl Resolver<'_> {
     fn visit_statement(&mut self, statement: &SyntaxNode) -> Result {
         self.statement = statement.clone();
         self.dependencies.clear();
-        self.repeats = self.model.scopes[scope_of(self.model, statement).0]
+        self.repeats = self.model.scopes[self.index.scope_of(statement).0]
             .repeats
             .clone();
         self.resolve_components(statement)?;
@@ -330,7 +328,7 @@ impl Resolver<'_> {
             .find(|(id, _)| self.model.definition(*id).name == name)
         {
             (denotation.clone(), Resolution::Bound(*id))
-        } else if let Some((r, id, list)) = self.structural(name) {
+        } else if let Some((r, id, list)) = self.index.structural(name) {
             let repeat = &self.model.repeats[r.0];
             let active = self.repeats.contains(&r);
             let denotation = if list {
@@ -374,11 +372,10 @@ impl Resolver<'_> {
         } else {
             if self.statement.kind() == K::Check && !whole {
                 let chains: Vec<_> = self
-                    .model
-                    .definitions
+                    .index
+                    .ordinary_definitions(name)
                     .iter()
-                    .filter(|d| d.is_ordinary() && d.name == name)
-                    .map(|d| self.beyond(&d.repeats))
+                    .map(|id| self.beyond(&self.model.definition(*id).repeats))
                     .collect();
                 if let Some(first) = chains.first() {
                     if chains.iter().any(|c| c != first) {
@@ -404,18 +401,6 @@ impl Resolver<'_> {
             facts: ValueFacts::unknown(),
         });
         Ok(denotation)
-    }
-    fn structural(&self, name: &str) -> Option<(RepeatId, DefinitionId, bool)> {
-        for (i, r) in self.model.repeats.iter().enumerate() {
-            for (id, list) in [(r.list_definition, true), (r.each_definition, false)] {
-                if let Some(id) = id
-                    && self.model.definition(id).name == name
-                {
-                    return Some((RepeatId(i), id, list));
-                }
-            }
-        }
-        None
     }
     fn list_name(&self, r: RepeatId) -> String {
         self.model.repeats[r.0]
@@ -480,7 +465,7 @@ impl Resolver<'_> {
             }
             Denotation::Record(r)=>r,
         };
-        if let Some((nested, id, true)) = self.structural(field) {
+        if let Some((nested, id, true)) = self.index.structural(field) {
             let info = &self.model.repeats[nested.0];
             if info.chain[..info.chain.len() - 1].contains(&r) {
                 if info.parent != Some(r) {
@@ -505,14 +490,7 @@ impl Resolver<'_> {
                 return Ok(denotation);
             }
         }
-        let definitions: Vec<_> = self
-            .model
-            .definitions
-            .iter()
-            .enumerate()
-            .filter(|(_, d)| d.is_ordinary() && d.name == field)
-            .map(|(i, _)| DefinitionId(i))
-            .collect();
+        let definitions = self.index.ordinary_definitions(field).to_vec();
         if !definitions
             .iter()
             .any(|id| self.model.definition(*id).repeats.contains(&r))
@@ -569,9 +547,9 @@ impl Resolver<'_> {
         Ok(Denotation::Value)
     }
     fn resolve_comprehension(&mut self, node: &SyntaxNode) -> Result<Denotation> {
-        let id = definition_for(self.model, node).expect("binding");
+        let id = self.index.definition_for(node).expect("binding");
         let name = self.model.definition(id).name.clone();
-        if self.structural(&name).is_some() {
+        if self.index.structural(&name).is_some() {
             return self.fail(
                 E::NameConflict,
                 format!("'{name}' is bound by a comprehension but names records"),
@@ -632,12 +610,8 @@ impl Resolver<'_> {
         };
         let mut candidate = None;
         let mut found = false;
-        for definition in self
-            .model
-            .definitions
-            .iter()
-            .filter(|d| d.is_ordinary() && d.name == name)
-        {
+        for id in self.index.ordinary_definitions(&name) {
+            let definition = self.model.definition(*id);
             let index = parent.map_or_else(
                 || definition.repeats.len() - self.beyond(&definition.repeats).len(),
                 |r| {
