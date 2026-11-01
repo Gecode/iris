@@ -8,8 +8,9 @@ resolution, and conservative value facts; [iris-core](iris-core/README.md) reads
 scalar and array input, executes repeats, index statements, line operations and
 sections, evaluates expressions, and owns column data and canonical JSON;
 [iris-cli](iris-cli/README.md) provides
-`iris check SPEC`, `iris read SPEC FILE --json`, `iris fmt PATH...`, and the
-`iris-driver parse|read` conformance commands. The runner
+`iris check SPEC`, `iris read SPEC FILE... --json [--param k=v]`,
+`iris list SPEC FILE...`, `iris fmt PATH...`, and the
+`iris-driver parse|read|catalog` conformance commands. The runner
 uses the [conformance protocol](../conformance/README.md) and has no dependency
 on implementation crates.
 
@@ -54,9 +55,9 @@ cargo test --locked -p iris-cli --test parse_conformance -- --nocapture
 The parse integration test loads the whole version tree and selects parse cases.
 The progress test discovers both the conformance tree and `formats`,
 then excludes the exact cases in `iris-cli/tests/pending-cases.txt` before
-invoking any driver. Every pending case names its later owner (rust-008 through
-rust-010); newly discovered cases run by default. Catalog and dzn remain
-unsupported (exit 2), as do reached execution features owned by later tasks.
+invoking any driver. Every pending case names its later owner (rust-009 or
+rust-010); newly discovered cases run by default. Budget enforcement remains a
+no-op, and dzn remains unsupported (exit 2).
 
 Read input and run the current progress selection:
 
@@ -65,10 +66,11 @@ cargo run --locked -p iris-cli -- read path/to/spec.iris path/to/input.txt --jso
 cargo test --locked -p iris-cli --test read_conformance -- --nocapture
 ```
 
-The interim user command requires exactly one input file and `--json`.
-Later tasks add summary/dzn output, repeated files, and caller parameters.
-The driver already transports ordered string parameters and rejects unknown
-names; parameter declaration execution remains deferred.
+The read command requires `--json` and accepts multiple input files and repeated
+`--param k=v` options. `iris list SPEC FILE...` lists counts, usable names, and
+first rejection summaries in Gecode's `-list` format. Parameters retain exact
+strings; defaults execute even when overridden. Later tasks add summary/dzn
+output and budget enforcement.
 
 Format reader specs in place, preview changes, or format standard input:
 
@@ -116,9 +118,9 @@ crate's tests directory. Another implementation needs only to supply the four
 protocol commands; it does not need to link this library.
 
 Checks and structural record expressions are implemented. The progress gate
-selects 717 cases (155 parse and 562 read), with 215 pending cases owned by
-rust-008/009/010. Expression and lifted traversal use iterative borrowed views;
+selects 814 cases (155 parse, 638 read, 21 catalog), with 118 pending cases owned
+by rust-009/010. Expression and lifted traversal use iterative borrowed views;
 false-check diagnostics retain witness paths and saved record positions.
-The differential test adds 512 Checks probes at seed 73007 to the existing
-1,408 probes. See the [core README](iris-core/README.md) for the complexity
-regressions and separate read/evaluator doubling measurements.
+The differential test retains the earlier 1,920 probes and adds 512
+params/instances/catalog probes at seed 73008. See the
+[core README](iris-core/README.md) for the complexity regressions and separate read/evaluator doubling measurements.

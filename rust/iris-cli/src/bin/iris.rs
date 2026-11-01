@@ -3,6 +3,8 @@ use iris_cli::{CheckFailure, check_spec, format_name, render_error};
 use std::{path::PathBuf, process::ExitCode};
 #[path = "iris/fmt.rs"]
 mod fmt;
+#[path = "iris/list.rs"]
+mod list;
 #[path = "iris/read.rs"]
 mod read;
 #[derive(Parser)]
@@ -17,8 +19,10 @@ struct Arguments {
 }
 #[derive(Subcommand)]
 enum Command {
-    /// Read scalar input and print canonical JSON.
+    /// Read input and print canonical JSON.
     Read(read::Arguments),
+    /// List instances, names, and rejection summaries.
+    List(list::Arguments),
     Check {
         spec: PathBuf,
     },
@@ -30,6 +34,7 @@ enum Command {
 fn main() -> ExitCode {
     match Arguments::parse().command {
         Command::Read(arguments) => read::run(arguments),
+        Command::List(arguments) => list::run(arguments),
         Command::Check { spec } => check(spec),
         Command::Fmt(arguments) => fmt::run(arguments),
         Command::Lsp => match iris_lsp::run_stdio() {

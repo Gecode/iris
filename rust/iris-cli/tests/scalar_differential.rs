@@ -15,6 +15,8 @@ struct Probe {
     family: &'static str,
     spec: String,
     input: Vec<u8>,
+    params: String,
+    operation: Operation,
 }
 impl Probe {
     fn new(spec: impl Into<String>, input: impl AsRef<[u8]>) -> Self {
@@ -22,6 +24,8 @@ impl Probe {
             family: "scalar",
             spec: spec.into(),
             input: input.as_ref().to_vec(),
+            params: "{}".into(),
+            operation: Operation::Read,
         }
     }
 }
@@ -42,6 +46,7 @@ fn scalar_differential() {
         ("Repeat", REPEAT_SEED, repeat_probes()),
         ("Sections", 73006, section_probes()),
         ("Checks", 73007, check_probes()),
+        ("Params/instances/catalog", 73008, instance_probes()),
     ];
     for (name, seed, probes) in &groups {
         let mut families = std::collections::BTreeMap::new();
@@ -77,14 +82,16 @@ fn scalar_differential() {
             if !matches!(&outcomes,[Ok(a),Ok(b)] if a==b) {
                 let repro = directory.keep();
                 panic!(
-                    "differential mismatch: seed={seed} index={index} family={}\nRust: {rust} read {}/spec.iris {}/input.bin --params '{{}}' --version 0.1\nGecode: {adapter} read {}/spec.iris {}/input.bin --params '{{}}' --version 0.1\nspec: {}\ninput bytes: {:?}\noutcomes: {outcomes:#?}",
+                    "differential mismatch: seed={seed} index={index} family={}\nRust: {rust} read {}/spec.iris {}/input.bin --params '{{}}' --version 0.1\nGecode: {adapter} read {}/spec.iris {}/input.bin --params '{{}}' --version 0.1\nspec: {}\ninput bytes: {:?}\nparams: {} operation: {:?}\noutcomes: {outcomes:#?}",
                     probe.family,
                     repro.display(),
                     repro.display(),
                     repro.display(),
                     repro.display(),
                     probe.spec,
-                    probe.input
+                    probe.input,
+                    probe.params,
+                    probe.operation
                 );
             }
         }
@@ -110,11 +117,11 @@ fn write_probe(directory: &Path, probe: &Probe) -> Case {
     Case {
         path: directory.into(),
         display_path: "generated differential probe".into(),
-        operation: Operation::Read,
+        operation: probe.operation,
         output: OutputFormat::Json,
         spec,
         input: Some(input),
-        params: Some("{}".into()),
+        params: Some(probe.params.clone()),
         expected: Outcome::Parse,
         known_failures: vec![],
     }
@@ -1391,9 +1398,161 @@ fn check_probes() -> Vec<Probe> {
             assert!(spec.len() <= 32768 && input.len() <= 32768);
             probes.push(Probe {
                 family,
-                spec,
-                input: input.into_bytes(),
+                ..Probe::new(spec, input)
             });
+        }
+    }
+    assert_eq!(probes.len(), 512);
+    probes
+}
+
+fn instance_probes() -> Vec<Probe> {
+    // Eight families of 64, seed 73008. Bounds: 1..=8 instances,
+    // 1..=4 array leaves per instance, sampled payloads -3..=5, 1..=8 params.
+    let mut state = 73008u64;
+    let mut next = |bound| {
+        state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+        ((state >> 32) as usize) % bound
+    };
+    let mut probes = Vec::new();
+    for family in 0..8 {
+        for i in 0..64 {
+            let n = 1 + next(8);
+            let k = 1 + next(n);
+            let width = 1 + next(4);
+            let mut params = serde_json::Map::new();
+            let (label, source, input, operation) = match family {
+                0 => {
+                    let strings = [
+                        "+007",
+                        "-0.0",
+                        "1.5",
+                        "1e309",
+                        "5e-324",
+                        "",
+                        " a,b=2 ",
+                        "9223372036854775808",
+                    ];
+                    let value = strings[next(strings.len())];
+                    params.insert("p".into(), value.into());
+                    let default = ["", "=1", "=1.0", "=\"default\"", "=a"][i % 5];
+                    (
+                        "param-conversions",
+                        format!("a[0]:float param p{default}"),
+                        String::new(),
+                        Operation::Read,
+                    )
+                }
+                1 => {
+                    for j in 0..n {
+                        params.insert(format!("p{j}"), format!("{}", next(9) as i64 - 3).into());
+                    }
+                    let source = (0..n).map(|j| format!("param p{j}=1 ")).collect::<String>()
+                        + "param p0=p0+1";
+                    ("param-reexecution", source, String::new(), Operation::Read)
+                }
+                2 => {
+                    params.insert(
+                        "instance".into(),
+                        if i % 2 == 0 {
+                            format!("+00{k}")
+                        } else {
+                            format!("n{k}")
+                        }
+                        .into(),
+                    );
+                    let input = (1..=n).map(|j| format!("{j} n{j}\n")).collect();
+                    (
+                        "instance-selection",
+                        "instances {x:int name:word}".into(),
+                        input,
+                        Operation::Read,
+                    )
+                }
+                3 => {
+                    params.insert(
+                        "instance".into(),
+                        if i % 2 == 0 {
+                            format!("n{k}")
+                        } else {
+                            k.to_string()
+                        }
+                        .into(),
+                    );
+                    let input = (1..=n)
+                        .map(|j| format!("{} n{j}\n", next(9) as i64 - 3))
+                        .collect();
+                    (
+                        "deferred-checks",
+                        "instances {x:int check x>0 \"first\" name:word check x!=0 \"second\"}"
+                            .into(),
+                        input,
+                        Operation::Read,
+                    )
+                }
+                4 => {
+                    let input = (1..=n)
+                        .map(|j| format!("{} n{j}\n", next(9) as i64 - 3))
+                        .collect();
+                    params.insert("instance".into(), "unmatched".into());
+                    (
+                        "catalog-checks",
+                        "instances {x:int check x>0 name:word}".into(),
+                        input,
+                        Operation::Catalog,
+                    )
+                }
+                5 => {
+                    let input = (1..=n)
+                        .map(|j| match next(3) {
+                            0 => format!("A {j}\nEND\nn{j}\n"),
+                            1 => format!("A {j}\nA {}\nEND\nn{j}\n", j + 1),
+                            _ => format!("END\nn{j}\n"),
+                        })
+                        .collect();
+                    (
+                        "catalog-sections",
+                        "instances {sections until \"END\" {\"A {x:int}\" {}} name:word}".into(),
+                        input,
+                        Operation::Catalog,
+                    )
+                }
+                6 => {
+                    params.insert("instance".into(), k.to_string().into());
+                    let input = (1..=n)
+                        .map(|j| format!("{j} {} n{j}\n", vec![j.to_string(); width].join(" ")))
+                        .collect();
+                    (
+                        "instance-frames-records",
+                        format!(
+                            "let shared=9 instances {{x:int let before=shared let shared=x repeat {width} as rows {{each row y:int}} check all(r in rows:r.y==x) name:word}}"
+                        ),
+                        input,
+                        Operation::Read,
+                    )
+                }
+                _ => {
+                    let name = [
+                        "let name=x",
+                        "let name=1.0",
+                        "let name=a",
+                        "let name=\"same\"",
+                        "",
+                    ][i % 5];
+                    let input = (1..=n).map(|j| format!("{j} ")).collect();
+                    (
+                        "catalog-names",
+                        format!("instances {{x:int a[0]:int {name}}}"),
+                        input,
+                        Operation::Catalog,
+                    )
+                }
+            };
+            let mut probe = Probe::new(source, input);
+            probe.family = label;
+            probe.operation = operation;
+            probe.params = serde_json::to_string(&params).unwrap();
+            probes.push(probe);
         }
     }
     assert_eq!(probes.len(), 512);

@@ -7,6 +7,12 @@ use std::{fmt, ops::Range};
 pub enum ErrorCode {
     Spec(iris_sema::ErrorCode),
     ParamUnknown,
+    ParamMissing,
+    ParamType,
+    InstanceEmpty,
+    InstanceNotFound,
+    InstanceNumber,
+    InstanceSelection,
     Utf8,
     ExpectedValue,
     RangeBounds,
@@ -60,6 +66,12 @@ impl ErrorCode {
             Self::PatternReference => "E-PATTERN-REFERENCE",
             Self::SectionsRepeated => "E-SECTIONS-REPEATED",
             Self::SectionsUnexpected => "E-SECTIONS-UNEXPECTED",
+            Self::ParamMissing => "E-PARAM-MISSING",
+            Self::ParamType => "E-PARAM-TYPE",
+            Self::InstanceEmpty => "E-INSTANCE-EMPTY",
+            Self::InstanceNotFound => "E-INSTANCE-NOT-FOUND",
+            Self::InstanceNumber => "E-INSTANCE-NUMBER",
+            Self::InstanceSelection => "E-INSTANCE-SELECTION",
             Self::ParamUnknown => "E-PARAM-UNKNOWN",
             Self::Utf8 => "E-UTF8",
             Self::ExpectedValue => "E-EXPECTED-VALUE",
@@ -112,6 +124,7 @@ pub struct Error {
 #[derive(Debug, Clone)]
 pub(crate) struct Details {
     pub message: String,
+    pub earlier_rejection: Option<String>,
     pub input_location: Option<Location>,
     pub spec_location: Option<Location>,
     pub context: Option<String>,
@@ -126,6 +139,7 @@ impl Error {
             code,
             details: Box::new(Details {
                 message: message.into(),
+                earlier_rejection: None,
                 input_location: None,
                 spec_location: None,
                 context: None,
@@ -175,7 +189,7 @@ impl Error {
         result.details.input_span = Some(InputSpan {
             bytes: position.offset..position.offset,
         });
-        result.details.excerpt = Some(excerpt(input.bytes, position.offset));
+        result.details.excerpt = Some(excerpt(input.bytes, position));
         if let Some((origin, line, range)) = statement {
             result.details.spec_location = Some(Location {
                 origin: Some(origin.into()),
@@ -259,23 +273,26 @@ impl fmt::Display for Error {
                 write!(f, ":{line}")?;
             }
         }
+        if let Some(summary) = &self.details.earlier_rejection {
+            write!(
+                f,
+                "\n  after an earlier error in the instance: {}",
+                safe_text(summary)
+            )?;
+        }
         Ok(())
     }
 }
 impl std::error::Error for Error {}
-fn excerpt(bytes: &[u8], offset: usize) -> String {
-    let start = bytes[..offset]
-        .iter()
-        .rposition(|&b| b == b'\n')
-        .map_or(0, |n| n + 1);
-    let end = bytes[start..]
+fn excerpt(bytes: &[u8], position: Position) -> String {
+    let start = position.offset - (position.column - 1);
+    let remaining = &bytes[start..bytes.len().min(start + 101)];
+    let length = remaining
         .iter()
         .position(|&b| b == b'\n')
-        .map_or(bytes.len(), |n| start + n);
-    let mut text = safe_text(&String::from_utf8_lossy(
-        &bytes[start..end.min(start + 100)],
-    ));
-    if end > start + 100 {
+        .unwrap_or(remaining.len());
+    let mut text = safe_text(&String::from_utf8_lossy(&remaining[..length.min(100)]));
+    if length > 100 {
         text.push_str("...");
     }
     text

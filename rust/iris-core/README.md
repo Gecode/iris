@@ -19,7 +19,9 @@ let json = data.to_json()?;
 `Spec::parse` selects language 0.1; `parse_version` takes an explicit
 `LanguageVersion`. A valid `Spec` can read several inputs independently.
 `read` borrows bytes only for the duration of execution; `read_path` acquires
-a file and calls it. Returned data and errors own their retained content.
+a file and calls it. `catalog` and `catalog_path` execute every instance and
+return the count, usable names, and first rejection summaries as ordinary data.
+Returned data and errors own their retained content.
 The byte-slice interface also permits a future caller to use a memory map.
 
 Execution supports int, float, num, word, rest, and integer ranges;
@@ -79,10 +81,20 @@ execution indices and explicit record indices are omitted. False checks
 without an indexed witness have `[]`; hard evaluation failures have a null
 path. Successful checks add no data entries.
 
-Later tasks add parameter execution and instances/catalog (008), budget enforcement (009), and dzn output (010). Supplied parameter
-strings are transported and unknown names rejected; declarations/defaults do
-not execute yet. Expression and idle-work hooks are fallible and impose no
-limit. They mark the work events defined by Specification §10.
+Parameters retain caller order and exact strings. Defaults execute even when
+overridden; conversion uses the default's leaf type. Declared names and supplied
+keys are indexed, so admission and repeated assignments avoid linear searches.
+Each instance runs in a local frame; ordinal and exact-name selection return
+when matched. Catalog traverses all instances. Only false checks and missing or
+repeated sections arms can be deferred; the first diagnostic and summary survive
+until completion. Missing arms at EOF and hard errors remain immediate.
+Instance record bindings are restored after skipped passes, with occurrence
+identities separating cached marker summaries. Execution retains record metadata
+in flat vectors, with work proportional to executed reads and statements.
+
+Later tasks add budget enforcement (009) and dzn output (010). Expression and
+idle-work hooks are fallible and impose no limit; they mark the work events
+defined by Specification §10.
 
 From `rust/`:
 
@@ -96,12 +108,19 @@ borrowed ragged rows, selected-subtree copying, and empty depth/type
 preservation. The CLI's ignored `scalar_differential` test compares 256 scalar
 and 384 array/read probes, plus 384 repeat probes at seed 73005 and 384
 line/sections probes at seed 73006 and 512 checks probes at seed 73007
-(1,920 total), with the pinned Gecode adapter; see the [CLI README](../iris-cli/README.md#conformance-driver).
+and 512 params/instances/catalog probes at seed 73008
+(2,432 total), with the pinned Gecode adapter; see the [CLI README](../iris-cli/README.md#conformance-driver).
 
-The progress gate selects 717 cases (155 parse, 562 read), leaving 215 for
-rust-008/009/010. Core tests cover the new charge events without enforcing
+The progress gate selects 814 cases (155 parse, 638 read, 21 catalog), leaving
+118 for rust-009/010. Core tests cover the new charge events without enforcing
 budgets. `checks_scale_linearly` counts actual dispatches, metadata advances,
 lookups, copies, leaves, and witness links. The ignored release measurement
 `check_doubling_measurements` prints read/collection and evaluator timings
 separately across record count, row width, depth, expression size, and check
 count. It parses each program before measurement.
+
+`instances_scale_linearly` compares 4× inputs against a 6× work bound for
+ordinal/name selection, catalog, deferred rejections, instance size, and parameter
+count. `instance_doubling_measurements` prints release timings for instance count,
+instance size, and parameter count. Separate-execution tests reuse a `Spec` after
+a failed read and after catalog.

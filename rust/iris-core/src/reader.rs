@@ -1,15 +1,16 @@
 use crate::{
-    Error, ErrorCode, Failure, Spec, UnsupportedFeature, Value,
+    Error, ErrorCode, Failure, Spec, Value,
     input::{Input, Position, Token},
     numeric,
     value::{Frame, LeafStorage},
 };
 use iris_sema::{DefinitionId, DefinitionKind, ReferenceId, RepeatId, Resolution, SemanticModel};
 use iris_syntax::{DecodedString, SyntaxKind as K, SyntaxNode, SyntaxToken, TextRange};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug)]
 pub(crate) struct ModelIndex {
+    pub params: HashSet<String>,
     definitions: HashMap<TextRange, DefinitionId>,
     pub references: HashMap<TextRange, ReferenceId>,
     pub repeats: HashMap<TextRange, RepeatId>,
@@ -61,7 +62,17 @@ impl ModelIndex {
                 (t.text_range(), DecodedString::new(&inner).text)
             })
             .collect();
+        let mut params: HashSet<_> = model
+            .definitions()
+            .iter()
+            .filter(|d| d.kind == DefinitionKind::Param)
+            .map(|d| d.name.clone())
+            .collect();
+        if root.children().any(|n| n.kind() == K::Instances) {
+            params.insert("instance".into());
+        }
         Self {
+            params,
             checks: model
                 .checks()
                 .iter()
@@ -127,6 +138,8 @@ impl ModelIndex {
     }
 }
 pub(crate) mod checks;
+mod instances;
+mod params;
 mod pattern;
 mod reads;
 pub(crate) mod repeat;
@@ -189,6 +202,10 @@ pub(crate) struct Interpreter<'s, 'i> {
     sections: Vec<SectionsState>,
     contexts: Vec<ExecutionContext>,
     source_lines: Vec<usize>,
+    params: crate::Params,
+    instance: Option<instances::Instance>,
+    catalog: Option<instances::Catalog>,
+    selected: bool,
     #[cfg(test)]
     pub(crate) charges: Vec<Charge>,
     #[cfg(test)]
@@ -215,6 +232,10 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             capture_charges: true,
             #[cfg(test)]
             work: std::cell::Cell::new([0; 6]),
+            params: crate::Params::new(),
+            instance: None,
+            catalog: None,
+            selected: false,
             source_lines: std::iter::once(0)
                 .chain(
                     spec.source
@@ -226,21 +247,13 @@ impl<'s, 'i> Interpreter<'s, 'i> {
                 .collect(),
         }
     }
+    pub fn with_params(mut self, params: &crate::Params) -> Self {
+        self.params = params.clone();
+        self
+    }
     pub fn read(mut self) -> Result<crate::Data, Failure> {
         self.execute(self.spec.parsed.syntax())?;
-        self.statement = None;
-        self.context = None;
-        if !self.input.settings.ignore_trailing {
-            self.input.skip_to_data();
-            if self.input.position().offset < self.input.bytes.len() {
-                return Err(self
-                    .error(
-                        ErrorCode::TrailingInput,
-                        "unexpected input after the end of the spec",
-                    )
-                    .into());
-            }
-        }
+        self.finish_input()?;
         Ok(self
             .frames
             .pop()
@@ -250,6 +263,7 @@ impl<'s, 'i> Interpreter<'s, 'i> {
     pub(crate) fn execute(&mut self, root: SyntaxNode) -> Result<(), Failure> {
         let mut work = vec![Work::Sequence(root.first_child())];
         while let Some(next) = work.pop() {
+            self.work(WorkKind::Dispatch, 1);
             match next {
                 Work::Sequence(Some(node)) => {
                     work.push(Work::Sequence(node.next_sibling()));
@@ -322,7 +336,10 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             K::TypeDefinition => {
                 let descriptor = self.evaluate_domain(&child(node, K::Type))?;
                 let id = self.spec.index.definitions[&node.text_range()];
-                self.types.insert(id, descriptor);
+                let previous = self.types.insert(id, descriptor);
+                if let Some(instance) = &mut self.instance {
+                    instance.types.push((id, previous));
+                }
                 Ok(())
             }
             K::Let => {
@@ -347,11 +364,8 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             K::Skip => self.execute_skip(node),
             K::Expect => self.execute_expect(node),
             K::Check => self.execute_check(node),
-            K::Param | K::Instances => Err(unsupported(
-                node.text_range(),
-                "parameters and instances",
-                "rust-008",
-            )),
+            K::Param => self.execute_param(node),
+            K::Instances => self.execute_instances(node),
             _ => unreachable!("valid root/block contains statements"),
         }
     }
@@ -527,6 +541,7 @@ impl<'s, 'i> Interpreter<'s, 'i> {
                 "expected a value, found end of input",
             )
         })?;
+        self.work(WorkKind::Leaf, token.bytes.len());
         let value = self.convert_scalar(domain, &token)?;
         self.validate_range(domain, &value, &token)?;
         Ok(value)
@@ -593,6 +608,9 @@ impl<'s, 'i> Interpreter<'s, 'i> {
                 )),
             })
             .collect();
+        if let Some(instance) = &self.instance {
+            contexts.insert(0, format!("instance [{}]", instance.ordinal));
+        }
         contexts.extend(self.context.iter().cloned());
         (!contexts.is_empty()).then(|| contexts.join(" > "))
     }
@@ -613,13 +631,6 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             context: self.execution_context(),
         });
     }
-}
-pub(crate) fn unsupported(range: TextRange, feature: &'static str, task: &'static str) -> Failure {
-    Failure::Unsupported(UnsupportedFeature {
-        feature,
-        task,
-        range,
-    })
 }
 pub(crate) fn tokens(node: &SyntaxNode) -> Vec<SyntaxToken> {
     node.children_with_tokens()

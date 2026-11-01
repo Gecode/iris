@@ -94,11 +94,9 @@ fn driver_misuse_and_host_failures() {
         assert!(output.stdout.is_empty());
         assert!(!output.stderr.is_empty());
     }
-    for operation in ["catalog", "dzn"] {
-        let output = driver(&[operation, &path, &path]);
-        assert_eq!(output.status.code(), Some(2));
-        assert!(output.stdout.is_empty());
-    }
+    let output = driver(&["dzn", &path, &path]);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
     let output = driver(&["parse", &format!("{path}.missing")]);
     assert_eq!(output.status.code(), Some(3));
     assert!(output.stdout.is_empty());
@@ -162,7 +160,6 @@ fn read_json_and_instance_caret() {
         vec!["read", &path],
         vec!["read", &path, input],
         vec!["read", &path, input, "--dzn"],
-        vec!["read", &path, input, input, "--json"],
     ] {
         assert_eq!(check(&args).status.code(), Some(2));
     }
@@ -1100,5 +1097,537 @@ fn deeply_nested_checks_respect_parser_admission() {
         let output = check(&["read", &path, input, "--json"]);
         assert_eq!(output.status.code(), Some(1));
         assert!(output.stdout.is_empty());
+    }
+}
+
+#[test]
+fn instance_and_param_locations_contexts_and_paths() {
+    let probes = [
+        (
+            r####"empty-instance-block"####,
+            r####"read"####,
+            r####"
+instances {}"####,
+            r####"1"####,
+            r####"{}"####,
+            r####"{"code": "E-NO-PROGRESS", "message": "an instance must read some input", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 1, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 2, "column": null}, "context": null, "record_path": null}"####,
+        ),
+        (
+            r####"bare-instance-block"####,
+            r####"read"####,
+            r####"instances {
+ {}
+}"####,
+            r####"
+1"####,
+            r####"{}"####,
+            r####"{"code": "E-SPEC-SYNTAX", "message": "expected a statement, found '{'", "input_location": null, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 2, "column": null}, "context": null, "record_path": null}"####,
+        ),
+        (
+            r####"invalid-number"####,
+            r####"read"####,
+            r####"
+instances {n:int}"####,
+            r####""####,
+            r####"{"instance": "0"}"####,
+            r####"{"code": "E-INSTANCE-NUMBER", "message": "instance numbers start at 1", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 1, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 2, "column": null}, "context": null, "record_path": null}"####,
+        ),
+        (
+            r####"not-found"####,
+            r####"read"####,
+            r####"
+instances {n:int}"####,
+            r####"1
+"####,
+            r####"{"instance": "2"}"####,
+            r####"{"code": "E-INSTANCE-NOT-FOUND", "message": "there is no instance '2' (the file has 1 instance)", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 2, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 2, "column": null}, "context": null, "record_path": null}"####,
+        ),
+        (
+            r####"empty"####,
+            r####"read"####,
+            r####"
+instances {n:int}"####,
+            r####""####,
+            r####"{}"####,
+            r####"{"code": "E-INSTANCE-EMPTY", "message": "the file contains no instance", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 1, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 2, "column": null}, "context": null, "record_path": null}"####,
+        ),
+        (
+            r####"selection-required"####,
+            r####"read"####,
+            r####"
+instances {n:int}"####,
+            r####"1
+2
+"####,
+            r####"{}"####,
+            r####"{"code": "E-INSTANCE-SELECTION", "message": "the file has 2 instances; select one with the parameter instance (a number from 1, or a name)", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 3, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 2, "column": null}, "context": null, "record_path": null}"####,
+        ),
+        (
+            r####"selected-read"####,
+            r####"read"####,
+            r####"instances {
+n:int
+}"####,
+            r####"1
+bad"####,
+            r####"{"instance": "2"}"####,
+            r####"{"code": "E-EXPECTED-VALUE", "message": "expected int, found 'bad'", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 2, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 2, "column": null}, "context": "instance [2] > n", "record_path": null}"####,
+        ),
+        (
+            r####"skipped-read"####,
+            r####"read"####,
+            r####"instances {
+n:int name:word
+}"####,
+            r####"bad a 2 b"####,
+            r####"{"instance": "2"}"####,
+            r####"{"code": "E-EXPECTED-VALUE", "message": "expected int, found 'bad'", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 1, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 2, "column": null}, "context": "instance [1] > n", "record_path": null}"####,
+        ),
+        (
+            r####"deferred-record"####,
+            r####"read"####,
+            r####"instances {
+n:int repeat n {x:int}
+check x>0 "positive"
+name:word
+}"####,
+            r####"2 1 0 a
+1 5 b"####,
+            r####"{"instance": "a"}"####,
+            r####"{"code": "E-CHECK-FAILED", "message": "check failed for record 2 of 'x': positive", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 1, "column": 5}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 3, "column": null}, "context": "instance [1]", "record_path": [1]}"####,
+        ),
+        (
+            r####"deferred-then-hard"####,
+            r####"read"####,
+            r####"instances {
+n:int check n>0 "first"
+x:int name:word}"####,
+            r####"0 bad a"####,
+            r####"{"instance": "a"}"####,
+            r####"{"code": "E-EXPECTED-VALUE", "message": "expected int, found 'bad'", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 1, "column": 3}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 3, "column": null}, "context": "instance [1] > x", "record_path": null}"####,
+        ),
+        (
+            r####"deferred-then-immediate"####,
+            r####"read"####,
+            r####"instances {
+n:int check n>0 "first"
+name:word check 0 "second"}"####,
+            r####"0 a"####,
+            r####"{"instance": "a"}"####,
+            r####"{"code": "E-CHECK-FAILED", "message": "check failed: second", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 1, "column": 4}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 3, "column": null}, "context": "instance [1]", "record_path": []}"####,
+        ),
+        (
+            r####"empty-name-immediate"####,
+            r####"read"####,
+            r####"instances {
+n:int check 0
+name:word}"####,
+            r####"1 a"####,
+            r####"{"instance": ""}"####,
+            r####"{"code": "E-CHECK-FAILED", "message": "check failed", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 1, "column": 2}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 2, "column": null}, "context": "instance [1]", "record_path": []}"####,
+        ),
+        (
+            r####"line-is-hard"####,
+            r####"read"####,
+            r####"instances {
+line "A"
+}"####,
+            r####"B
+A"####,
+            r####"{"instance": "2"}"####,
+            r####"{"code": "E-LINE-MATCH", "message": "expected a line matching \"A\"", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 1, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 2, "column": null}, "context": "instance [1]", "record_path": null}"####,
+        ),
+        (
+            r####"check-expression-is-hard"####,
+            r####"read"####,
+            r####"instances {
+n:int check n/0
+name:word}"####,
+            r####"1 a"####,
+            r####"{"instance": "a"}"####,
+            r####"{"code": "E-DIVISION-ZERO", "message": "division by zero", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 1, "column": 2}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 2, "column": null}, "context": "instance [1]", "record_path": null}"####,
+        ),
+        (
+            r####"read-repeated-hard"####,
+            r####"read"####,
+            r####"instances {
+sections until "END" {
+"A {n:int}" {check n>0}
+}
+name:word
+}"####,
+            r####"A 1
+A bad
+END
+a
+"####,
+            r####"{"instance": "b"}"####,
+            r####"{"code": "E-SECTIONS-UNEXPECTED", "message": "unexpected line; expected one of \"A {n:int}\"", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 2, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 2, "column": null}, "context": "instance [1]", "record_path": null}"####,
+        ),
+        (
+            r####"read-repeated-rethrow"####,
+            r####"read"####,
+            r####"instances {
+sections until "END" {
+"A {n:int}" {}
+}
+name:word
+}"####,
+            r####"A 1
+A 2
+END
+a
+"####,
+            r####"{"instance": "a"}"####,
+            r####"{"code": "E-SECTIONS-REPEATED", "message": "a second line matching \"A {n:int}\" (the first is on line 1)", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 2, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 2, "column": null}, "context": "instance [1]", "record_path": null}"####,
+        ),
+        (
+            r####"read-missing-eof"####,
+            r####"read"####,
+            r####"instances {
+sections until "END" {
+"A" {}
+}
+}"####,
+            r####"END
+"####,
+            r####"{"instance": "b"}"####,
+            r####"{"code": "E-LINE-MATCH", "message": "expected a line matching \"A\" before 'END'", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 1, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 2, "column": null}, "context": "instance [1]", "record_path": null}"####,
+        ),
+        (
+            r####"read-missing-comment-eof"####,
+            r####"read"####,
+            r####"comment "#"
+instances {
+sections until "END" {"A"}
+}"####,
+            r####"END
+# tail
+"####,
+            r####"{"instance": "b"}"####,
+            r####"{"code": "E-LINE-MATCH", "message": "expected a line matching \"A\" before 'END'", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 1, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 3, "column": null}, "context": "instance [1]", "record_path": null}"####,
+        ),
+        (
+            r####"read-missing-last-body"####,
+            r####"read"####,
+            r####"instances {
+sections {
+"A"
+"B" last {
+let x=1
+}
+}
+name:word
+}"####,
+            r####"B
+a"####,
+            r####"{"instance": "a"}"####,
+            r####"{"code": "E-LINE-MATCH", "message": "expected a line matching \"A\" before the line matching \"B\"", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 1, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 5, "column": null}, "context": "instance [1]", "record_path": null}"####,
+        ),
+        (
+            r####"read-param-nested"####,
+            r####"read"####,
+            r####"instances {
+n:int repeat n {
+param p
+}
+}"####,
+            r####"1"####,
+            r####"{"instance": "b"}"####,
+            r####"{"code": "E-PARAM-MISSING", "message": "parameter 'p' must be given", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 1, "column": 2}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 3, "column": null}, "context": "instance [1] > repeat [1 of 1]", "record_path": null}"####,
+        ),
+        (
+            r####"catalog-repeated-hard"####,
+            r####"catalog"####,
+            r####"instances {
+sections until "END" {
+"A {n:int}" {check n>0}
+}
+name:word
+}"####,
+            r####"A 1
+A bad
+END
+a
+"####,
+            r####"{}"####,
+            r####"{"code": "E-SECTIONS-UNEXPECTED", "message": "unexpected line; expected one of \"A {n:int}\"", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 2, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 2, "column": null}, "context": "instance [1]", "record_path": null}"####,
+        ),
+        (
+            r####"catalog-repeated-rethrow"####,
+            r####"catalog"####,
+            r####"instances {
+sections until "END" {
+"A {n:int}" {}
+}
+name:word
+}"####,
+            r####"A 1
+A 2
+END
+a
+"####,
+            r####"{}"####,
+            r####"{"iris": "0.1", "entries": [{"name": "instances", "type": "int", "depth": 0, "value": 1}, {"name": "name", "type": "string", "depth": 1, "value": ["a"]}, {"name": "failed", "type": "string", "depth": 1, "value": ["a second line matching \"A {n:int}\""]}]}"####,
+        ),
+        (
+            r####"catalog-missing-eof"####,
+            r####"catalog"####,
+            r####"instances {
+sections until "END" {
+"A" {}
+}
+}"####,
+            r####"END
+"####,
+            r####"{}"####,
+            r####"{"code": "E-LINE-MATCH", "message": "expected a line matching \"A\" before 'END'", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 1, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 2, "column": null}, "context": "instance [1]", "record_path": null}"####,
+        ),
+        (
+            r####"catalog-missing-comment-eof"####,
+            r####"catalog"####,
+            r####"comment "#"
+instances {
+sections until "END" {"A"}
+}"####,
+            r####"END
+# tail
+"####,
+            r####"{}"####,
+            r####"{"code": "E-LINE-MATCH", "message": "expected a line matching \"A\" before 'END'", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 1, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 3, "column": null}, "context": "instance [1]", "record_path": null}"####,
+        ),
+        (
+            r####"catalog-missing-last-body"####,
+            r####"catalog"####,
+            r####"instances {
+sections {
+"A"
+"B" last {
+let x=1
+}
+}
+name:word
+}"####,
+            r####"B
+a"####,
+            r####"{}"####,
+            r####"{"iris": "0.1", "entries": [{"name": "instances", "type": "int", "depth": 0, "value": 1}, {"name": "name", "type": "string", "depth": 1, "value": ["a"]}, {"name": "failed", "type": "string", "depth": 1, "value": ["no line matching \"A\""]}]}"####,
+        ),
+        (
+            r####"catalog-param-nested"####,
+            r####"catalog"####,
+            r####"instances {
+n:int repeat n {
+param p
+}
+}"####,
+            r####"1"####,
+            r####"{}"####,
+            r####"{"code": "E-PARAM-MISSING", "message": "parameter 'p' must be given", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 1, "column": 2}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 3, "column": null}, "context": "instance [1] > repeat [1 of 1]", "record_path": null}"####,
+        ),
+        (
+            r####"param-missing"####,
+            r####"read"####,
+            r####"
+param p"####,
+            r####""####,
+            r####"{}"####,
+            r####"{"code": "E-PARAM-MISSING", "message": "parameter 'p' must be given", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 1, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 2, "column": null}, "context": null, "record_path": null}"####,
+        ),
+        (
+            r####"param-type"####,
+            r####"read"####,
+            r####"n:int
+param p=1"####,
+            r####"5"####,
+            r####"{"p": "1.5"}"####,
+            r####"{"code": "E-PARAM-TYPE", "message": "parameter 'p' must be an integer, not '1.5'", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 1, "column": 2}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 2, "column": null}, "context": null, "record_path": null}"####,
+        ),
+        (
+            r####"param-default-error"####,
+            r####"read"####,
+            r####"
+param p=1/0"####,
+            r####""####,
+            r####"{"p": "1"}"####,
+            r####"{"code": "E-DIVISION-ZERO", "message": "division by zero", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 1, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 2, "column": null}, "context": null, "record_path": null}"####,
+        ),
+        (
+            r####"param-unknown-order"####,
+            r####"read"####,
+            r####"param a"####,
+            r####""####,
+            r####"{"z": "x", "b": "2"}"####,
+            r####"{"code": "E-PARAM-UNKNOWN", "message": "the spec has no parameter 'z'", "input_location": null, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": null, "column": null}, "context": null, "record_path": null}"####,
+        ),
+        (
+            r####"param-nested-block"####,
+            r####"read"####,
+            r####"if 1 {
+{}
+param p
+}"####,
+            r####""####,
+            r####"{}"####,
+            r####"{"code": "E-SPEC-SYNTAX", "message": "expected a statement, found '{'", "input_location": null, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 2, "column": null}, "context": null, "record_path": null}"####,
+        ),
+        (
+            r####"catalog-no-block"####,
+            r####"catalog"####,
+            r####"
+check 0"####,
+            r####""####,
+            r####"{}"####,
+            r####"{"code": "E-CHECK-FAILED", "message": "check failed", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 1, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 2, "column": null}, "context": null, "record_path": []}"####,
+        ),
+        (
+            r####"catalog-prefix-check"####,
+            r####"catalog"####,
+            r####"check 0
+instances {n:int}"####,
+            r####"1"####,
+            r####"{}"####,
+            r####"{"code": "E-CHECK-FAILED", "message": "check failed", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 1, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 1, "column": null}, "context": null, "record_path": []}"####,
+        ),
+        (
+            r####"catalog-hard-after-deferred"####,
+            r####"catalog"####,
+            r####"instances {
+n:int check n>0
+x:int
+}"####,
+            r####"0 bad"####,
+            r####"{}"####,
+            r####"{"code": "E-EXPECTED-VALUE", "message": "expected int, found 'bad'", "input_location": {"origin": "/tmp/iris-zdev/rust-008-probe-input.txt", "line": 1, "column": 3}, "spec_location": {"origin": "/tmp/iris-zdev/rust-008-probe.iris", "line": 3, "column": null}, "context": "instance [1] > x", "record_path": null}"####,
+        ),
+    ];
+    for (name, operation, source, bytes, params, expected) in probes {
+        let (dir, path) = fixture(source.as_bytes());
+        let input = dir.path().join("input.bin");
+        std::fs::write(&input, bytes).unwrap();
+        let output = driver(&[
+            operation,
+            &path,
+            input.to_str().unwrap(),
+            "--params",
+            params,
+        ]);
+        assert!(output.stderr.is_empty(), "{name}: {output:?}");
+        let actual: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        let expected: serde_json::Value = serde_json::from_str(expected).unwrap();
+        assert_eq!(
+            output.status.code(),
+            Some(if expected.get("code").is_some() { 1 } else { 0 }),
+            "{name}"
+        );
+        if expected.get("code").is_none() {
+            assert_eq!(actual, expected, "{name}");
+            continue;
+        }
+        for field in ["code", "message", "context", "record_path"] {
+            assert_eq!(actual[field], expected[field], "{name}: {field}");
+        }
+        for location in ["spec_location", "input_location"] {
+            if expected[location].is_null() {
+                assert!(actual[location].is_null(), "{name}: {location}");
+            } else {
+                for field in ["line", "column"] {
+                    assert_eq!(
+                        actual[location][field], expected[location][field],
+                        "{name}: {location}.{field}"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn list_and_read_params() {
+    let (dir, path) = fixture(b"param p=1 instances {x:int check x>0 \"positive\" name:word}");
+    let input = dir.path().join("input.bin");
+    let input = input.to_str().unwrap();
+    std::fs::write(input, "0 a\n2 b\n").unwrap();
+    let output = check(&["list", &path, input, input, "--param", "instance=unmatched"]);
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        format!("{input}: 2 instances\n  1 a (failed: positive)\n  2 b\n").repeat(2)
+    );
+    let output = check(&[
+        "read",
+        &path,
+        input,
+        "--json",
+        "--param",
+        "instance=2",
+        "--param",
+        "p=3",
+        "--param",
+        "p=7",
+    ]);
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(document["entries"][0]["value"], 7);
+    assert_eq!(document["entries"][1]["value"], 2);
+    for args in [
+        vec!["list", &path],
+        vec!["read", &path, input, "--json", "--param", "bad"],
+        vec!["list", &path, input, "--param", "=value"],
+    ] {
+        assert_eq!(check(&args).status.code(), Some(2));
+    }
+    for args in [
+        vec!["catalog", &path],
+        vec!["catalog", &path, input, "--format", "bad"],
+        vec![
+            "catalog", &path, input, "--format", "json", "--format", "json",
+        ],
+        vec!["read", &path, input, "--format", "json"],
+    ] {
+        let output = driver(&args);
+        assert_eq!(output.status.code(), Some(2), "{output:?}");
+        assert!(output.stdout.is_empty());
+    }
+    std::fs::write(&path, "instances {x:int check x>0}").unwrap();
+    std::fs::write(input, "1 0 1").unwrap();
+    let output = check(&["list", &path, input]);
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        format!("{input}: 3 instances\n  2 (failed: check on line 1 of the spec)\n")
+    );
+    std::fs::write(input, "").unwrap();
+    assert_eq!(
+        String::from_utf8(check(&["list", &path, input]).stdout).unwrap(),
+        format!("{input}: 0 instances\n")
+    );
+    std::fs::write(&path, "param p=\"\"").unwrap();
+    let output = check(&["read", &path, input, "--json", "--param", "p= a,b=c "]);
+    assert_eq!(output.status.code(), Some(0));
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(document["entries"][0]["value"], " a,b=c ");
+    assert_eq!(
+        String::from_utf8(check(&["list", &path, input]).stdout).unwrap(),
+        format!("{input}: 1 instance\n")
+    );
+}
+
+#[test]
+fn deeply_nested_instance_bodies_use_the_work_stack() {
+    let source = format!(
+        "instances {{{}x:int{} name:word}}",
+        "repeat 1 {".repeat(255),
+        "}".repeat(255)
+    );
+    let (dir, path) = fixture(source.as_bytes());
+    let input = dir.path().join("input.bin");
+    let input = input.to_str().unwrap();
+    std::fs::write(input, "7 a 8 b").unwrap();
+    for args in [
+        vec!["read", &path, input, "--params", "{\"instance\":\"b\"}"],
+        vec!["catalog", &path, input],
+    ] {
+        let output = driver(&args);
+        assert_eq!(output.status.code(), Some(0), "{output:?}");
     }
 }

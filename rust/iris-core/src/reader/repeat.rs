@@ -42,6 +42,7 @@ pub(crate) struct RecordList {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct MarkerSubtree {
     pub target: RepeatId,
+    pub occurrence: Option<usize>,
     pub next: RepeatId,
     pub parent: Option<RecordId>,
 }
@@ -75,7 +76,16 @@ impl Interpreter<'_, '_> {
             occurrence: repeat.occurrence,
             row: repeat.row,
         });
+        let key = (id, parent);
+        let previous = self.records.occurrences.get(&key).copied();
         let occurrence = self.records.begin(id, parent);
+        if let Some(instance) = &mut self.instance {
+            instance.records.push(instances::RecordBinding {
+                repeat: id,
+                parent,
+                previous,
+            });
+        }
         self.repeats.push(RepeatState {
             node: node.clone(),
             body: child(node, K::Block),

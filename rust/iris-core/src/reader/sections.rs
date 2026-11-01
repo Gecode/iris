@@ -90,19 +90,23 @@ impl Interpreter<'_, '_> {
             let pattern = &self.spec.index.patterns[&arm.pattern];
             if let Some(captures) = self.match_pattern(pattern, &line)? {
                 if let Some(first) = self.sections.last().expect("active sections").seen[index] {
-                    return Err(self
-                        .error_at(
-                            ErrorCode::SectionsRepeated,
-                            format!(
-                                "a second line matching \"{}\" (the first is on line {})",
-                                pattern.source, first.line
-                            ),
-                            line.start,
-                        )
-                        .into());
+                    let error = self.error_at(
+                        ErrorCode::SectionsRepeated,
+                        format!(
+                            "a second line matching \"{}\" (the first is on line {})",
+                            pattern.source, first.line
+                        ),
+                        line.start,
+                    );
+                    self.reject(
+                        error,
+                        format!("a second line matching \"{}\"", pattern.source),
+                    )?;
                 }
                 let state = self.sections.last_mut().expect("active sections");
-                state.seen[index] = Some(line.start);
+                if state.seen[index].is_none() {
+                    state.seen[index] = Some(line.start);
+                }
                 state.selected = Some(index);
                 self.take_pattern(pattern, &line, captures)?;
                 self.contexts.push(ExecutionContext::Section(arm.pattern));
@@ -183,16 +187,25 @@ impl Interpreter<'_, '_> {
         let sections = &self.spec.index.sections[&state.descriptor];
         for (arm, seen) in sections.arms.iter().zip(&state.seen) {
             if !arm.optional && seen.is_none() {
-                return Err(self
-                    .error_at(
-                        ErrorCode::LineMatch,
-                        format!(
-                            "expected a line matching \"{}\" before {end}",
-                            self.spec.index.patterns[&arm.pattern].source
-                        ),
-                        position,
-                    )
-                    .into());
+                let error = self.error_at(
+                    ErrorCode::LineMatch,
+                    format!(
+                        "expected a line matching \"{}\" before {end}",
+                        self.spec.index.patterns[&arm.pattern].source
+                    ),
+                    position,
+                );
+                let summary = format!(
+                    "no line matching \"{}\"",
+                    self.spec.index.patterns[&arm.pattern].source
+                );
+                self.input.skip_to_data();
+                if self.input.peek_byte().is_none() {
+                    return Err(error.into());
+                }
+                self.reject(error, summary)?;
+                self.sections.pop();
+                return Ok(());
             }
         }
         self.sections.pop();

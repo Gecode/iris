@@ -5,7 +5,7 @@ The `iris` command and Rust conformance driver, part of milestone M3 in
 [§4.2 layers](../../PLAN.md#42-the-rust-reference-implementation-is-layered).
 The user command checks and formats reader specs, reads inputs through
 [iris-core](../iris-core/README.md), and starts the language server. The driver
-implements parse-and-resolve and reading. Parse-only requests never
+implements parse-and-resolve, reading, and catalog. Parse-only requests never
 execute expressions or parameter defaults.
 
 From `rust/`:
@@ -13,7 +13,8 @@ From `rust/`:
 ```sh
 cargo run --locked -p iris-cli -- lsp
 cargo run --locked -p iris-cli -- check path/to/spec.iris
-cargo run --locked -p iris-cli -- read path/to/spec.iris path/to/input.txt --json
+cargo run --locked -p iris-cli -- read path/to/spec.iris path/to/input.txt --json --param instance=2
+cargo run --locked -p iris-cli -- list path/to/spec.iris path/to/input.txt
 cargo run --locked -p iris-cli -- fmt path/to/spec.iris
 cargo run --locked -p iris-cli -- fmt --check --diff path/to/directory
 cargo run --locked -p iris-cli --bin iris-driver -- parse path/to/spec.iris --version 0.1
@@ -32,12 +33,20 @@ Usage errors exit 2; file acquisition and resource failures exit 1.
 
 ## Reading input
 
-`iris read SPEC FILE --json` prints the canonical data document. It currently
-requires one input file and `--json`. Runtime language errors exit 1 with an
-input location, bounded excerpt, byte-position caret, and active reader-spec
-line. No partial data is printed. File/serialization failures exit 1; usage
-errors exit 2. Summary output, multiple files, dzn, and repeated `--param`
-options belong to later tasks.
+`iris read SPEC FILE... --json [--param NAME=VALUE]` prints one canonical data
+document per input file. It requires `--json`. Split assignments at the first
+`=`; the remainder is the exact string value. Repeated keys replace their earlier
+values without moving their supplied positions. Parameters apply to every file.
+Runtime language errors exit 1 with an input location, bounded excerpt,
+byte-position caret, and active reader-spec line. No partial read data is printed.
+File/serialization failures exit 1; usage errors exit 2. Summary and dzn output
+belong to later tasks.
+
+`iris list SPEC FILE... [--param NAME=VALUE]` matches Gecode's `-list`: print each
+file's instance count, then numbered names when all are usable, with first
+rejection summaries in `(failed: MESSAGE)`. Without usable names, only failed
+instances get individual lines. Catalog traverses every instance even when the
+caller supplies a selector.
 
 ## Language server
 
@@ -114,8 +123,12 @@ data (exit 0) or a canonical language error (exit 1). It buffers output before
 writing stdout. Host failures exit 3; unsupported reached features and misuse
 exit 2, both with empty stdout. Parameters are decoded as ordered string pairs,
 with exact values and duplicate rejection. Unknown names fail before input
-UTF-8 validation. Parameter statements/defaults await rust-008.
-Catalog and dzn operations remain unsupported (exit 2).
+UTF-8 validation. Parameter defaults execute even when overridden.
+
+`iris-driver catalog SPEC INPUT [--params JSON] [--version 0.1] [--format json]`
+returns canonical catalog data. Both operations defer eligible instance
+rejections while keeping hard errors immediate. `dzn` and catalog's dzn format
+remain unsupported (exit 2).
 
 The integration test discovers and loads the entire `conformance/cases/0.1`
 tree through the runner library, selects exactly `Operation::Parse`, and gives
@@ -129,9 +142,9 @@ single-byte message can be invalid Unicode and cannot always be reproduced
 byte for byte in canonical JSON. Codes and locations follow the Specification.
 
 The `read_conformance` progress test discovers both case roots, validates the
-exact pending list and its rust-008 through rust-010 owners, and excludes those
+exact pending list and its rust-009/rust-010 owners, and excludes those
 paths before driver invocation. Newly discovered cases run automatically.
-The selection is 717 cases (155 parse, 562 read), with 215 pending;
+The selection is 814 cases (155 parse, 638 read, 21 catalog), with 118 pending;
 counts follow inventory changes. No known-failure driver ID is used.
 
 ```sh
@@ -141,8 +154,8 @@ cargo test --locked -p iris-cli --test read_conformance -- --nocapture
 The ignored differential test runs 256 bounded scalar probes with fixed seed
 73003, 384 array/read probes with seed 73004, 384 repeat probes with seed
 73005, 384 line/sections probes with seed 73006, and 512 checks probes with seed
-73007 (1,920 total). Both drivers are decoded
-through the independent canonical validator. Scalar probes cover input spellings,
+73007, plus 512 params/instances/catalog probes with seed 73008 (2,432 total).
+Both drivers are decoded through the independent canonical validator. Scalar probes cover input spellings,
 arithmetic boundaries, frozen types, settings, control flow, functions,
 comparisons, and error order. Array/read probes cover ranks 1–4, zeros,
 subtree copies, offsets and promotion, all nine layouts, byte alphabets,
@@ -173,3 +186,10 @@ probes beyond conformance's primary comparison, including source lines, raw
 spans, contexts, empty bodies, Unicode byte positions, and explicit selections.
 Deep checks exercise both user and driver routes at parser admission limits
 and on 16,384-dimensional values without recursive JSON decoding.
+
+The seed-73008 group has eight families of 64 probes: parameter conversions and
+reexecution, ordinal/name selection, deferred checks, catalog checks, catalog
+sections, local frames and records, and usable names. Bounds are 1–8 instances,
+1–4 array leaves, sampled payloads -3–5, and 1–8 parameters. Another 34 pinned
+location probes assert code, input coordinates, reader-spec line, context, and
+record path for parameters, selection, skipped bodies, and deferred rejections.

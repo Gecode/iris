@@ -33,7 +33,23 @@ impl Interpreter<'_, '_> {
             drop(evaluator);
             self.charges.extend(charges);
         }
-        result
+        match result {
+            Err(Failure::Language(error)) if error.code == ErrorCode::CheckFailed => {
+                let summary = tokens(node)
+                    .iter()
+                    .find(|t| t.kind() == K::String)
+                    .map(|t| DecodedString::new(t.text()).text)
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or_else(|| {
+                        format!(
+                            "check on line {} of the spec",
+                            self.statement.expect("check statement").0
+                        )
+                    });
+                self.reject(error, summary)
+            }
+            result => result,
+        }
     }
 }
 fn run_check(evaluator: &mut Evaluator<'_, '_, '_>, info: &CheckInfo) -> Result<(), Failure> {

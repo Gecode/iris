@@ -10,6 +10,7 @@ use std::{
 enum Operation {
     Parse,
     Read { input: PathBuf },
+    Catalog { input: PathBuf },
 }
 struct Request {
     operation: Operation,
@@ -18,13 +19,17 @@ struct Request {
 }
 fn parse_request() -> Result<Request, String> {
     let mut args = std::env::args_os().skip(1);
-    let operation = args.next().ok_or("expected parse or read")?;
-    if operation != "parse" && operation != "read" {
-        return Err("only parse and read operations are supported".into());
+    let operation = args.next().ok_or("expected parse, read, or catalog")?;
+    if operation != "parse" && operation != "read" && operation != "catalog" {
+        return Err("only parse, read, and catalog operations are supported".into());
     }
     let spec = required_path(&mut args, "a reader-spec path")?;
     let operation = if operation == "read" {
         Operation::Read {
+            input: required_path(&mut args, "an input path")?,
+        }
+    } else if operation == "catalog" {
+        Operation::Catalog {
             input: required_path(&mut args, "an input path")?,
         }
     } else {
@@ -32,12 +37,14 @@ fn parse_request() -> Result<Request, String> {
     };
     let mut version_seen = false;
     let mut params_seen = false;
+    let mut format_seen = false;
     let mut params = Params::new();
     while let Some(option) = args.next() {
         let option = option.to_str().ok_or("options must be Unicode")?;
         let seen = match option {
             "--version" => &mut version_seen,
             "--params" => &mut params_seen,
+            "--format" if matches!(operation, Operation::Catalog { .. }) => &mut format_seen,
             _ => return Err(format!("unexpected argument {option}")),
         };
         if *seen {
@@ -49,6 +56,9 @@ fn parse_request() -> Result<Request, String> {
             .ok_or_else(|| format!("missing value for {option}"))?;
         let value = value.to_str().ok_or("option values must be Unicode")?;
         match option {
+            "--format" if value != "json" => {
+                return Err("only catalog format json is supported".into());
+            }
             "--version" if value != "0.1" => {
                 return Err(format!(
                     "unsupported language version {value}; supported: 0.1"
@@ -82,12 +92,16 @@ fn required_path(
         .ok_or_else(|| format!("operation requires {description}"))
 }
 fn read_document(request: &Request, bytes: &[u8]) -> Result<(u8, Vec<u8>), (u8, String)> {
-    let Operation::Read { input } = &request.operation else {
-        unreachable!("read dispatch");
+    let input = match &request.operation {
+        Operation::Read { input } | Operation::Catalog { input } => input,
+        Operation::Parse => unreachable!("read dispatch"),
     };
-    match Spec::parse(bytes, &request.spec.to_string_lossy())
-        .and_then(|spec| spec.read_path(input, &request.params))
-    {
+    match Spec::parse(bytes, &request.spec.to_string_lossy()).and_then(|spec| {
+        match request.operation {
+            Operation::Catalog { .. } => spec.catalog_path(input, &request.params),
+            _ => spec.read_path(input, &request.params),
+        }
+    }) {
         Ok(data) => Ok((0, data.to_json().map_err(|e| (3, e.to_string()))?)),
         Err(Failure::Language(error)) => Ok((1, error.to_json().map_err(|e| (3, e.to_string()))?)),
         Err(Failure::Host(error)) => Err((3, error.to_string())),
@@ -107,7 +121,7 @@ fn run() -> Result<u8, (u8, String)> {
             ),
             Err(error) => return Err((3, error.to_string())),
         },
-        Operation::Read { .. } => read_document(&request, &bytes)?,
+        Operation::Read { .. } | Operation::Catalog { .. } => read_document(&request, &bytes)?,
     };
     io::stdout()
         .lock()

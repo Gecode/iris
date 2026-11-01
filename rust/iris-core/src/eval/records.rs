@@ -189,6 +189,12 @@ impl<'a> Evaluator<'a, '_, '_> {
         let key = MarkerSubtree {
             target,
             next: chain[level],
+            occurrence: self
+                .reader
+                .records
+                .occurrences
+                .get(&(chain[level], parent))
+                .copied(),
             parent,
         };
         let mut counts = self.reader.records.marker_counts.borrow_mut();
@@ -200,6 +206,12 @@ impl<'a> Evaluator<'a, '_, '_> {
             let key = MarkerSubtree {
                 target,
                 next: chain[level],
+                occurrence: self
+                    .reader
+                    .records
+                    .occurrences
+                    .get(&(chain[level], parent))
+                    .copied(),
                 parent,
             };
             if counts.contains_key(&key) {
@@ -221,6 +233,12 @@ impl<'a> Evaluator<'a, '_, '_> {
                     count += counts[&MarkerSubtree {
                         target,
                         next: chain[level + 1],
+                        occurrence: self
+                            .reader
+                            .records
+                            .occurrences
+                            .get(&(chain[level + 1], Some(record)))
+                            .copied(),
                         parent: Some(record),
                     }];
                 }

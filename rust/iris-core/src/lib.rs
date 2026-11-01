@@ -8,10 +8,10 @@ mod reader;
 mod value;
 
 pub use error::{Error, ErrorCode, InputSpan, Location};
-use iris_sema::{Analysis, DefinitionKind};
+use iris_sema::Analysis;
 pub use iris_syntax::LanguageVersion;
 use iris_syntax::{Parse, ParseError};
-use std::{fmt, path::Path};
+use std::{collections::HashMap, fmt, path::Path};
 pub use value::{AccessError, Data, Entry, Value, ValueRef};
 
 #[derive(Debug)]
@@ -51,9 +51,33 @@ impl Spec {
     }
 
     pub fn read(&self, input: &[u8], origin: &str, params: &Params) -> Result<Data, Failure> {
+        reader::Interpreter::new(self, self.input(input, origin, params)?)
+            .with_params(params)
+            .read()
+    }
+
+    /// Execute every instance and return its count, usable names, and rejections.
+    pub fn catalog(&self, input: &[u8], origin: &str, params: &Params) -> Result<Data, Failure> {
+        reader::Interpreter::new(self, self.input(input, origin, params)?)
+            .with_params(params)
+            .catalog()
+    }
+
+    pub fn catalog_path(&self, path: impl AsRef<Path>, params: &Params) -> Result<Data, Failure> {
+        let path = path.as_ref();
+        let bytes = std::fs::read(path).map_err(HostError::Io)?;
+        self.catalog(&bytes, &path.to_string_lossy(), params)
+    }
+
+    fn input<'a>(
+        &self,
+        bytes: &'a [u8],
+        origin: &'a str,
+        params: &Params,
+    ) -> Result<input::Input<'a>, Failure> {
         self.admit_params(params)?;
-        let input = input::Input::new(input, origin);
-        if let Err(error) = std::str::from_utf8(input.bytes) {
+        let input = input::Input::new(bytes, origin);
+        if let Err(error) = std::str::from_utf8(bytes) {
             return Err(Error::input(
                 ErrorCode::Utf8,
                 "input is not valid UTF-8",
@@ -64,7 +88,7 @@ impl Spec {
             )
             .into());
         }
-        reader::Interpreter::new(self, input).read()
+        Ok(input)
     }
 
     pub fn read_path(&self, path: impl AsRef<Path>, params: &Params) -> Result<Data, Failure> {
@@ -74,19 +98,8 @@ impl Spec {
     }
 
     fn admit_params(&self, params: &Params) -> Result<(), Error> {
-        let model = &self.analysis.model;
-        let has_instances = self
-            .parsed
-            .syntax()
-            .children()
-            .any(|n| n.kind() == iris_syntax::SyntaxKind::Instances);
         for (name, _) in &params.pairs {
-            if !model
-                .definitions()
-                .iter()
-                .any(|d| d.kind == DefinitionKind::Param && d.name == *name)
-                && !(has_instances && name == "instance")
-            {
+            if !self.index.params.contains(name) {
                 return Err(Error::unknown_param(name, self.parsed.origin()));
             }
         }
@@ -98,6 +111,7 @@ impl Spec {
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Params {
     pairs: Vec<(String, String)>,
+    positions: HashMap<String, usize>,
 }
 impl Params {
     pub fn new() -> Self {
@@ -106,11 +120,17 @@ impl Params {
     pub fn set(&mut self, name: impl Into<String>, value: impl Into<String>) {
         let name = name.into();
         let value = value.into();
-        if let Some(pair) = self.pairs.iter_mut().find(|(key, _)| *key == name) {
-            pair.1 = value;
+        if let Some(&index) = self.positions.get(&name) {
+            self.pairs[index].1 = value;
         } else {
+            self.positions.insert(name.clone(), self.pairs.len());
             self.pairs.push((name, value));
         }
+    }
+    pub fn get(&self, name: &str) -> Option<&str> {
+        self.positions
+            .get(name)
+            .map(|&index| self.pairs[index].1.as_str())
     }
     pub fn pairs(&self) -> &[(String, String)] {
         &self.pairs
