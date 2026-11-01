@@ -2,6 +2,6 @@
   "operation": "read",
   "output_file": "actual.bin",
   "exit": 1,
-  "spec_hex": "63616e6e6564206669787475726500ff0d0a",
-  "input_hex": "00ff0d0a"
+  "spec_hex": "783a20696e740a",
+  "input_hex": "370a"
 }

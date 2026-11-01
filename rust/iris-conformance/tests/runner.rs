@@ -363,6 +363,20 @@ fn case_loading_defaults_and_all_operation_outputs() {
 }
 
 #[test]
+fn driver_receives_spec_and_input_bytes_unchanged() {
+    // Negative cases such as invalid UTF-8 must reach the driver as written.
+    let dir = fixture_copy("passing/read");
+    fs::write(dir.path().join("spec.iris"), b"x: int\0\xff\r\n").unwrap();
+    fs::write(dir.path().join("input.bin"), b"\0\xff\r\n").unwrap();
+    change_control(dir.path(), |control| {
+        control["spec_hex"] = json!("783a20696e7400ff0d0a");
+        control["input_hex"] = json!("00ff0d0a");
+    });
+    let report = run(&options(dir.path().into())).unwrap();
+    assert_eq!(report.exit_code(), 0, "{}", report.render());
+}
+
+#[test]
 fn case_loading_rejects_missing_ambiguous_and_unknown_configuration() {
     let changes = [
         ("spec.iris", None),
