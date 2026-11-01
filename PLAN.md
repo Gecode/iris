@@ -19,7 +19,7 @@ deliverable, the order of work, and the decisions made and still open.
 
 | Language version | What it is | Used by |
 |---|---|---|
-| **Iris 0.1** | Exactly the language of Gecode 6.5.0, written down precisely. No new features. | Gecode 6.5.0 (its own implementation) |
+| **Iris 0.1** | The language of Gecode 6.5.0, written down precisely. No new features; the only deliberate differences are listed in the Specification's appendix C. | Gecode 6.5.0 (its own implementation) |
 | **Iris 1.0** | The language developed further, based on what 0.1 shows us. | Gecode 7 |
 
 The first releases of every package are **0.1.0** and implement Iris 0.1.
@@ -42,8 +42,10 @@ Gecode 7.
      plus a small Kotlin extensions module.
    - C++ library with no Gecode dependency, designed so that Gecode 7 can
      adopt it.
-4. **Tooling:** the `iris` CLI, a tree-sitter grammar, a TextMate grammar,
-   a language server, and editor packages (VS Code, Zed, Neovim, Helix).
+4. **Tooling:** the `iris` CLI, a formatter, a linter if it has useful
+   lints (§8.13), a tree-sitter
+   grammar, a TextMate grammar, a language server, and editor packages (VS
+   Code, JetBrains IDEs, Zed, Neovim, Helix).
 5. **An agent skill** that teaches coding agents to write and debug reader
    specs with the CLI.
 6. **A documentation site** with a tutorial, the language reference, a
@@ -102,6 +104,8 @@ iris-syntax   lexer, lossless CST (rowan), error-tolerant parser, formatter
      │
 iris-sema     name resolution, scopes, record names, types and shapes,
      │        diagnostics with codes
+     ├── iris-lint   lints and their fixes, if built (§8.13)
+     │
 iris-core     reader, expression evaluator, data model, work budgets,
      │        JSON and dzn output
      ├── iris-cli    `iris` binary
@@ -109,6 +113,9 @@ iris-core     reader, expression evaluator, data model, work budgets,
      ├── iris-wasm   wasm-bindgen API for the playground
      └── (python/)   PyO3 binding
 ```
+
+`iris-lint` depends on `iris-sema` only, so the reader and the Python
+binding do not carry it. The CLI, the LSP, and the WASM crate use it.
 
 The parser must be **lossless and error-tolerant** from the start. The LSP
 and formatter need a syntax tree for broken input, and the reader needs
@@ -181,11 +188,11 @@ iris/
 │   ├── cases/<version>/<area>/<case>/
 │   │                        spec.iris, input.txt, params.json,
 │   │                        expected.json or error.json
-│   ├── runner/              runs the cases against any driver (§7.2)
 │   └── adapters/gecode/     driver that links Gecode's libgecodeinstance
 ├── formats/                 library of reader specs for standard formats
 │   └── <format>/            <format>.iris, README.md, samples/, expected/
-├── rust/                    Cargo workspace (crates from §4.2)
+├── rust/                    Cargo workspace (crates from §4.2, and the
+│                            conformance runner iris-conformance, §7.2)
 ├── python/                  PyO3/maturin package
 ├── cpp/                     C++ library (CMake)
 ├── java/                    Gradle build: iris (Java), iris-kotlin
@@ -193,6 +200,7 @@ iris/
 ├── editors/
 │   ├── textmate/            iris.tmLanguage.json (VS Code, Shiki, GitHub)
 │   ├── vscode/              extension: grammar plus LSP client
+│   ├── jetbrains/           plugin: TextMate grammar plus LSP client
 │   ├── zed/                 extension: tree-sitter plus LSP
 │   └── nvim/, helix/        configuration snippets and docs
 ├── skill/iris/              the agent skill (SKILL.md and references)
@@ -312,10 +320,11 @@ a documented breaking change says (§10.2).
 ### 7.2 Runner and driver protocol
 
 Each implementation provides a small **conformance driver**: a command that
-takes `read|catalog|parse SPEC [INPUT] [--params JSON] [--version V]` and
-prints canonical JSON for the data or the error. One runner (in Rust, part
-of the `iris` CLI as `iris conformance`) runs every case against any driver
-and prints a report. The same runner works for Rust, C++, Java, Python, and
+takes `parse|read|catalog|dzn SPEC [INPUT] [--params JSON] [--version V]`
+and prints canonical JSON for the data or the error, or the dzn text for
+`dzn`. One runner, the Rust crate `rust/iris-conformance` (also offered by
+the `iris` CLI as `iris conformance`), runs every case against any driver
+and prints a report. `conformance/README.md` is the authoritative protocol. The same runner works for Rust, C++, Java, Python, and
 Gecode.
 
 ### 7.3 Gecode as an implementation
@@ -341,8 +350,9 @@ reported upstream. Gecode itself needs no changes.
 
 ### 8.1 Rust (`rust/`)
 
-- Crates: `iris-syntax`, `iris-sema`, `iris-core`, `iris-cli`, `iris-lsp`,
-  `iris-wasm`, published under the umbrella crate `gecode-iris`.
+- Crates: `iris-syntax`, `iris-sema`, `iris-core`, `iris-cli`,
+  `iris-lsp`, `iris-wasm`, and `iris-lint` if built (§8.13), published
+  under the umbrella crate `gecode-iris`.
 - API sketch:
   ```rust
   let spec = Spec::parse(text, "dimacs-cnf.iris")?;
@@ -362,7 +372,8 @@ reported upstream. Gecode itself needs no changes.
   `criterion` benchmark suite tracks the format library inputs.
 - CLI `iris`:
   `iris read SPEC FILE... [--summary|--json|--dzn] [--param k=v]`,
-  `iris list`, `iris check SPEC`, `iris fmt`, `iris lsp`,
+  `iris list`, `iris check SPEC`, `iris fmt` (§8.12), `iris lint`
+  (§8.13, if built), `iris lsp`,
   `iris conformance DRIVER`, and from 1.0 `iris migrate` (§10.2). The exit
   codes match `gecode-instance` (2 for usage errors, 1 for spec or
   instance errors). Release binaries are built with `cargo-dist`, with a
@@ -372,7 +383,8 @@ reported upstream. Gecode itself needs no changes.
 
 - Distribution name `gecode-iris`, import name `gecode_iris`. The name
   `iris` is taken on PyPI, and SciTools Iris imports as `iris`.
-- PyO3 with the `abi3` stable ABI (Python 3.10+), built by maturin. Wheels
+- PyO3 with the `abi3` stable ABI (Python 3.10+, provisional until §12
+  open question 2 is decided), built by maturin. Wheels
   for manylinux and musllinux (x86_64 and aarch64), macOS (arm64 and
   x86_64), and Windows, built with `maturin-action`.
 - API:
@@ -468,8 +480,10 @@ to this library, so the library must fit Gecode's needs:
   and, later, reader specs embedded in C++ raw strings, Rust, Python,
   Java, and Kotlin, recognized by a marker comment or by text that starts
   with `format `.
-- Tests: the tree-sitter corpus, plus CI that parses every conformance
-  spec and every format library spec with no `ERROR` nodes.
+- Tests: the tree-sitter corpus, plus CI that parses every syntactically
+  valid conformance spec and every format library spec with no `ERROR`
+  nodes. The conformance suite marks which specs are syntactically valid;
+  for the others, the test checks that the parser reports an error.
 - Published to npm (`tree-sitter-iris`) and crates.io, and offered to
   nvim-treesitter and Helix.
 
@@ -489,16 +503,22 @@ hand-written and kept small, and it is tested against the same corpus with
 - Go to definition, find references, and rename for names, types, and
   record names.
 - Completion for keywords, names in scope, types, layouts, and functions.
+- Lints (§8.13), if built, as warnings, with their fixes as quick fixes.
 - Semantic tokens, document symbols (an outline of repeats, sections, and
-  instances), folding, and formatting through `iris fmt`.
+  instances), folding, and whole-document and range formatting with the
+  formatter (§8.12).
 - Inlay hints with the inferred shapes of declarations.
 - **Live reading:** a directive comment such as `# iris: sample
   samples/ft06.txt` lets the server read a sample file on every change and
   report instance errors at the right place in the spec, together with a
   summary of the data. This is the feature that makes writing specs fast.
 - Editor packages: a VS Code extension (TextMate grammar plus the LSP
-  client, published to the Marketplace and Open VSX), a Zed extension, and
-  documented Neovim and Helix configurations.
+  client, published to the Marketplace and Open VSX), a JetBrains plugin
+  (§8.14), a Zed extension, and documented Neovim and Helix configurations.
+- Directive comments (`# iris: ...`) are a tooling convention, not
+  language syntax. Implementations ignore them like any comment, so a spec
+  that uses them still reads in Gecode 6.5.0. The live-reading directive
+  and lint suppressions (§8.13), if built, share the one syntax.
 
 ### 8.8 Agent skill (`skill/iris/`)
 
@@ -508,14 +528,16 @@ hand-written and kept small, and it is tested against the same corpus with
   - The workflow: inspect the sample, look in the format library for a
     close match, draft the spec, run `iris check`, run
     `iris read --summary`, fix the errors, add `check` statements for the
-    invariants the model relies on, and test with an invalid file.
+    invariants the model relies on, test with an invalid file, and finish
+    with `iris fmt` (and `iris lint`, if built).
   - A language cheat sheet and common patterns (header counts,
     `KEY : VALUE` sections, matrices with layouts, lists with sentinels,
     several instances per file, character grids).
   - How to read Iris errors, and how to embed specs in Gecode
     (`InstanceOptions`), Python, Java, and C++.
-  - Which language version to write for: 0.1 for Gecode 6.5, 1.0 for
-    Gecode 7 and the standalone libraries.
+  - Iris 0.1 only, since that is what every implementation supports at
+    0.1.0. Guidance on choosing between 0.1 and 1.0 (0.1 for Gecode 6.5,
+    1.0 for Gecode 7 and the standalone libraries) is added at M9.
 - `references/` holds the language reference and the format library index,
   loaded on demand.
 - Evaluated with skill-creator style evals: a set of real benchmark files
@@ -557,11 +579,12 @@ cannot express, or expresses awkwardly, is input to the 1.0 design.
      links to its generated API docs (docs.rs, a Python API reference built
      with mkdocstrings or pdoc and hosted on the site, Javadoc and Dokka,
      and Doxygen for C++).
-  7. **Tools:** CLI, LSP, editors, and the agent skill.
+  7. **Tools:** CLI, formatter, linter if built (one page per lint), LSP,
+     editors, and the agent skill.
   8. **Playground:** the Rust implementation compiled to WASM. Edit a spec
      and an input side by side, and see the data (as a table, JSON, or
-     dzn) or the error with its caret, updated as you type. Links can be
-     shared through state in the URL.
+     dzn) or the error with its caret, updated as you type, with a Format
+     button and any lints. Links can be shared through state in the URL.
 - Syntax highlighting through the TextMate grammar in Expressive Code.
 - CI builds the site on every pull request, checks links, and tests the
   site's examples like those of the Specification.
@@ -575,45 +598,168 @@ cannot express, or expresses awkwardly, is input to the 1.0 design.
 | Red card | `#DA251D` |
 | Orange card | `#EB891B` |
 | Blue card (and the gecode.dev link color) | `#005CA1` |
-| Green card (gecode.dev brand color) | `#0B7646` |
+| Green stem (gecode.dev brand color) | `#0B7646` |
 | Ink | `#27393E` (the gecode.dev border color) |
 
-**Concept:** the Gecode logo is a fan of four rounded diamond cards in red,
-orange, blue, and green. For Iris, the same cards are arranged radially
-around a center, as the petals of an iris. That reads both as the iris of
-an eye (*reading*) and as the flower, and it is plainly related to Gecode.
+**The mark** (chosen, in `brand/`): an iris drawn with the cards of the
+Gecode logo. The orange card is the standard, the red and blue cards are
+the falls, and the green stem carries the flower. The icons use a tuned
+version with wider gaps, so the parts stay apart at 16 and 32 px.
+`brand/concepts/` keeps the concepts that led to it.
 
-Directions to sketch:
+**Deliverables**, all generated by `brand/build.py` (see `brand/README.md`
+for the file list and the rules for use):
+- the mark in color and in one color for light and dark backgrounds;
+  stacked and horizontal lockups with the lowercase wordmark "iris" in
+  Raleway, as on gecode.dev, each in four versions;
+- `favicon.svg`, `favicon.ico` (16, 32, 48), `apple-touch-icon.png` (180),
+  `icon-192.png`, `icon-512.png`, and a web manifest.
 
-1. **Eye iris:** eight card-shaped petals (each color twice, in Gecode
-   order) around a round pupil in ink or white. Use this for the main
-   mark.
-2. **Flower iris:** three upright petals and three falling petals, using
-   the card shape. More botanical, but four colors do not divide evenly
-   into three.
-3. **Aperture:** four overlapping cards rotated around a square opening,
-   like a camera shutter. Simplest, and best at 16 px.
-
-My recommendation is direction 1 for the logo and direction 3 (or a
-four-petal version of 1) for the favicon, since eight petals blur at
-16×16.
-
-**Deliverables:**
-- `iris-mark.svg` (the symbol), `iris-logo.svg` (the symbol plus the
-  lowercase wordmark "iris" set in Raleway, as on gecode.dev), and
-  horizontal and stacked lockups, each in color, one-color, and reversed
-  versions.
-- `favicon.svg` with a `prefers-color-scheme` variant, `favicon.ico`
-  (16, 32, 48), `apple-touch-icon.png` (180), `icon-192.png`,
-  `icon-512.png`, and a web manifest.
-- A social card (`og-image.png`, 1200×630).
-- `brand/README.md` with the palette, clear space, minimum sizes, and
-  rules for use, including how to write the name.
-- Icons for the VS Code extension, the PyPI and crates.io READMEs, and the
-  GitHub repository avatar.
+Still to make, by the components that need them: a social card
+(`og-image.png`, 1200×630) for the site, and icons for the VS Code
+extension, the JetBrains plugin, the PyPI and crates.io READMEs, and the
+GitHub repository avatar, all from the existing mark.
 
 Check every version against WCAG contrast for any text, at 16 px, and in
 dark mode.
+
+### 8.12 Formatter (`iris fmt`, in `iris-syntax`)
+
+- **One style.** Specs are short, often embedded in programs, and shared
+  through the format library, so a single style is worth more than
+  configurability. The only setting is the line width, read from
+  `max_line_length` in `.editorconfig` for the spec's path, and 100 when
+  the property is unset or `off`. The formatter reads no other
+  `.editorconfig` property and has no configuration file of its own.
+- **The style** is decided by formatting Gecode's six example specs and
+  the first formats of the library, then writing the result down as a
+  style guide on the site. The guide can come before the tool, so the
+  format library is written in the final style from the start. Starting
+  points: one statement per line (statements have no separators), two
+  spaces of indentation inside `{ }`, no column alignment (it causes diff
+  noise), single blank lines kept and longer runs collapsed, and comments
+  kept where they are.
+- **It never changes meaning.** It changes only whitespace and line
+  breaks: it never rewrites strings, line patterns, numbers, or names, and
+  never reorders statements. Rewrites belong to lint fixes and
+  `iris migrate`. It knows both language versions.
+- **Broken input:** `iris fmt` refuses a spec with syntax errors and
+  leaves it unchanged. The LSP still formats a range that parses cleanly.
+- **CLI:** `iris fmt FILE...` rewrites in place, `--check` exits 1 when a
+  file is not formatted (for CI), `--diff` prints the change, and `-`
+  reads standard input, with `--stdin-filepath PATH` naming the path whose
+  `.editorconfig` applies. The LSP uses the document's path, and the
+  playground uses 100. Formatting reader specs embedded in host source
+  files, found as the tree-sitter injections find them (§8.5), comes after
+  0.1.
+- **Stability:** formatter output changes only in minor package releases,
+  and the changelog lists each style change, so that `--check` in users'
+  CI does not break on a patch release.
+- **Tests:**
+  - Idempotence: formatting a formatted spec changes nothing.
+  - Same tree: the formatted spec parses to the same syntax tree, ignoring
+    whitespace.
+  - Same data: every conformance case reads the same data or reports the
+    same error code after its spec is formatted (locations shift, so they
+    are not compared).
+  - Snapshot tests of the style at several line widths, and of
+    `.editorconfig` lookup (nested files, `root = true`, globs that match
+    `.iris`), plus formatting the random specs from the
+    differential fuzzer (§7.4) under the same three checks.
+- CI checks that the format library and the site's examples are
+  formatted. Specification examples and conformance specs are exempt: some
+  test unusual layout on purpose, and error results include positions in
+  the spec that formatting would move.
+- Available in Rust and in everything built on it: the CLI, the LSP, the
+  playground, and the `iris` command in the Python wheel. The C++ and
+  Java libraries do not format.
+
+### 8.13 Linter (`iris lint`, crate `iris-lint`), only if it earns its place
+
+**We build the linter only if there are useful lints.** A useful lint
+flags a mistake that was actually made in a real spec (the format library,
+Gecode's examples, the skill evals, or a user report); the Specification
+cannot make it an error; and it gives no false warnings on the format
+library. Candidates and the specs that show them are collected in
+`docs/lint-candidates.md` while the format library and the skill evals
+are written. When those are done we decide (§12, open question 5):
+
+- No useful lints: no linter. Drop `iris-lint`, `iris lint`, and lint
+  suppressions from this plan.
+- One or two: report them as warnings from `iris check` and the LSP, in
+  `iris-sema`, without a separate crate or command.
+- More: build the linter as described below.
+
+A candidate that points at confusing 0.1 behavior may belong in
+`docs/1.0-ideas.md` instead, so that 1.0 removes the trap.
+
+The rest of this section describes the linter if we build it.
+
+- **Errors and lints are different things.** An error (§4.4) makes a spec
+  invalid; it has a code, is normative, and is tested by the conformance
+  suite. A lint flags a valid spec that is probably wrong, fragile, or hard
+  to read. Lints are not part of the Specification or the conformance
+  suite, and only the Rust tooling has them.
+- **Every lint has** a stable kebab-case name (such as
+  `unreachable-arm`), a default level (`warn` or `allow`), and a page on
+  the site with an example and the fix. Names, not codes, because
+  suppressions are read by people.
+- **Ideas to test against real specs**, not a commitment:
+  - *Likely bugs:* a sections arm that never matches because an earlier
+    arm matches every line it would; a `check` whose condition is
+    constant, so it never fails or always fails; a range with constant
+    bounds that is empty; a named type or `each` name that is never used.
+  - *Versions (from 1.0):* a construct whose meaning changes in 1.0 or
+    that 1.0 deprecates, such as the `gecode.*` host constants (§6.3),
+    with the `iris migrate` rewrite as its fix (§10.2).
+  - Style is the formatter's job, not the linter's.
+- **Fixes:** a lint may offer a fix. `iris lint --fix` applies the fixes
+  that are safe to apply without review, and the LSP offers every fix as a
+  quick fix.
+- **Configuration:** only directive comments, such as
+  `# iris: allow unreachable-arm` before a statement or at the top of the
+  file. No configuration file in 0.1: specs are single files, often
+  embedded in a host program, and a lint setting should travel with the
+  spec.
+- **CLI:** `iris check` keeps reporting errors only. `iris lint SPEC...`
+  reports errors and lints, exits 1 on an error or a lint at level `deny`,
+  and turns warnings into failures with `--deny warnings`. `--json` prints
+  diagnostics for tools.
+- **Tests:** a directory of specs per lint with expected diagnostics and
+  expected fixed output; every fix that is not a version migration must
+  read the same data on the format library samples. CI keeps the format
+  library free of warnings.
+
+### 8.14 JetBrains plugin (`editors/jetbrains/`)
+
+For IntelliJ IDEA, CLion (where Gecode's C++ users are), PyCharm,
+RustRover, and the other JetBrains IDEs.
+
+- **A thin client, like the VS Code extension.** The plugin registers the
+  `.iris` file type and icon, highlights with the TextMate grammar
+  (§8.6), and gets everything else from `iris lsp`: diagnostics, lints and
+  their fixes, completion, hover, navigation, rename, formatting, semantic
+  tokens, inlay hints, and live reading.
+- **LSP client:** the IntelliJ Platform's own LSP API, which JetBrains
+  made available in all its IDEs, including the unified IntelliJ IDEA,
+  from 2025.3. LSP4IJ, the open-source client that also runs in Android
+  Studio, is the fallback if the platform API lacks a feature we need
+  (§12, open question 3).
+- **Not a native parser.** A Grammar-Kit parser and PSI would be a fourth
+  parser to keep in step with the Specification. The cost is that JetBrains
+  language injection, which needs PSI, cannot mark reader specs inside C++,
+  Kotlin, or Python strings. Revisit after 0.1 if users ask for it.
+- **The server binary:** the plugin uses `iris` from a configured path or
+  from `PATH`, and otherwise offers to download the release binary (§8.1)
+  that matches its version, with a checksum check (§12, open question 4).
+- Later: a run configuration that runs `iris read --summary` on a sample
+  file and shows the data.
+- Kotlin, built with the IntelliJ Platform Gradle Plugin 2.x, and
+  published to JetBrains Marketplace as "Iris". Supports the IDE releases
+  of the past year.
+- **Tests:** the IntelliJ Plugin Verifier on every supported IDE release,
+  and a headless test that opens a format library spec and expects
+  highlighting and no diagnostics.
 
 ---
 
@@ -688,22 +834,30 @@ Dependencies flow downward. Work in the same row can run in parallel.
 
 | # | Milestone | Contents | Done when |
 |---|---|---|---|
-| M0 | Foundations | Repository skeleton, `CONTEXT.md`, ADRs 1 to 11, license, CI scaffolding, brand concepts | The layout exists and builds empty, and a logo direction is chosen |
+| M0 | Foundations | Repository skeleton, `CONTEXT.md`, ADRs 1 to 11, license, CI scaffolding, brand | The layout exists and builds empty, and the logo and icons are in `brand/` |
 | M1 | 0.1 Specification | Chapters from §6, grammar, data model, JSON schemas, error code registry, answers to §6.2 | Every item in §6.2 is decided, with a case planned for each |
 | M2 | 0.1 conformance suite | Gecode tests ported, example formats, the runner, the Gecode adapter | The suite runs green against Gecode 6.5.0, apart from documented Gecode bugs |
 | M3 | Rust core and CLI | `iris-syntax`, `iris-sema`, `iris-core`, `iris-cli` | 100% conformance, performance target met, fuzzing in CI |
 | M4a | Python | Wheels, stubs, docs | 100% conformance, wheels on TestPyPI |
-| M4b | Tooling | Tree-sitter, TextMate, LSP, VS Code and Zed packages | Every conformance spec parses cleanly, and the LSP features in §8.7 work |
+| M4b | Tooling | Tree-sitter, TextMate, LSP, VS Code, JetBrains, and Zed packages | Every syntactically valid conformance spec parses cleanly, the LSP features in §8.7 work, and the JetBrains plugin passes the Plugin Verifier |
 | M4c | C++ | Port, CMake package | 100% conformance, sanitizer runs clean, differential fuzzing against Rust |
 | M4d | Java and Kotlin | Core library, Kotlin module | 100% conformance, JMH baseline recorded |
+| M4e | Formatter | `iris fmt`, `.editorconfig` line width, the style guide | The checks of §8.12 pass on every conformance case, and the format library is formatted |
 | M5 | Site and playground | Starlight site, the Specification rendered, guides, WASM playground, format pages | Deployed at `iris.gecode.dev` |
 | M6 | Skill | `skill/iris`, evals | The eval set passes, for example 8 of 10 formats read correctly on the first attempt |
-| M7 | 0.1.0 release | The 0.1 Specification frozen, every package published as 0.1.0, announcement | Every registry has 0.1.0, and the docs are live |
+| M6b | Lint decision | Review `docs/lint-candidates.md` (§8.13, §12 open question 5), then build what the decision calls for | The decision is recorded in §12; any lints that ship have tests, fixes where possible, and site pages. Not required for M7 |
+| M7 | 0.1.0 release | The 0.1 Specification frozen, every package published as 0.1.0, announcement | Every registry and marketplace (including JetBrains Marketplace) has 0.1.0, and the docs are live |
 
-M4a to M4d depend only on M2, plus M3 for Python and the LSP. They can run
-in parallel, which is where splitting the work between agents pays off.
+M4a to M4e can start once M2 is done, and run in parallel, which is where
+splitting the work between agents pays off. Some need parts of M3 to start
+or to finish: Python binds the Rust core; the LSP and the formatter start
+on the Rust parser and resolver and need the complete reader only for live
+reading and the same-result check; C++'s differential fuzzing needs the
+Rust driver. The LSP's formatting needs M4e. M6b needs the
+format library and the skill evals, since they supply the evidence.
 The site can start during M1, so the Specification is readable while it is
-written.
+written. The formatting style guide can start with the format library,
+before M4e.
 
 ### Iris 1.0 (the Gecode 7 language)
 
@@ -753,6 +907,10 @@ written.
 - **Float underflow:** a float token whose value is nonzero but rounds to
   a subnormal number or to zero is rejected, as the reference build does.
   This gives every implementation the same portable rule.
+- **Formatter settings:** the line width is the only setting, read from
+  `max_line_length` in `.editorconfig`, with 100 as the default (§8.12).
+- **Logo:** the flower mark in `brand/` (§8.11), drawn with the Gecode
+  cards; `brand/README.md` has the files and the rules for use.
 - **Work tracking:** zdev, with personal records (`.zdev/` is not
   committed).
 
@@ -762,5 +920,15 @@ written.
    compatible by default, with breaking changes listed and handled by
    `iris migrate`.
 2. **Python floor.** *Recommendation:* 3.10+ with `abi3`.
-3. **Logo direction.** Choose among the concepts in `brand/concepts/`
-   (§8.11).
+3. **JetBrains LSP client.** The IntelliJ Platform LSP API (no extra
+   plugin, maintained by JetBrains, but not in Android Studio) or LSP4IJ
+   (open source, runs in every IntelliJ-based IDE, but users install a
+   second plugin). *Recommendation:* the platform API; switch only if a
+   spike finds a missing feature we need.
+4. **How the JetBrains plugin gets `iris`.** Bundle a binary for each
+   platform (works offline, larger plugin) or download on first use.
+   *Recommendation:* use `PATH` or a configured path, else download the
+   matching release binary with a checksum check.
+5. **Whether to build a linter.** Decided at M6b from the evidence in
+   `docs/lint-candidates.md`, by the rule in §8.13. *Recommendation:* no
+   linter unless at least three candidates meet that rule.

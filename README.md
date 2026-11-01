@@ -10,7 +10,8 @@ The language comes from Gecode 6.5.0, which added it as `gecode/instance`
 ([Gecode/gecode#270](https://github.com/Gecode/gecode/pull/270)). This
 repository makes it a standalone project with its own versions:
 
-- **Iris 0.1** is exactly the Gecode 6.5.0 language, written down precisely.
+- **Iris 0.1** is the Gecode 6.5.0 language, written down precisely, with
+  the few deliberate differences listed in the Specification's appendix C.
 - **Iris 1.0** develops the language further and is the language of Gecode 7.
 
 ## Status

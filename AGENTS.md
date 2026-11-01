@@ -12,6 +12,9 @@ coding agent. `CLAUDE.md` imports it.
 - `docs/adr/` holds the architecture decision records.
 - `docs/1.0-ideas.md` collects candidate changes for Iris 1.0. Add an entry
   there when Iris 0.1 cannot express something, or expresses it awkwardly.
+- `docs/lint-candidates.md` collects evidence for lints. Add an entry there
+  when a valid reader spec contained a mistake that a tool could have
+  flagged.
 - Each component directory has a `README.md` naming its purpose, its
   `PLAN.md` section, and its milestone.
 
@@ -31,7 +34,8 @@ coding agent. `CLAUDE.md` imports it.
 - The **Iris Language Specification**, or *the Specification*, is the
   normative document for one language version in `spec/`. Always capitalize
   it, and never shorten it to "spec".
-- **Iris 0.1** is exactly the Gecode 6.5.0 language. **Iris 1.0** develops it
+- **Iris 0.1** is the Gecode 6.5.0 language; its only deliberate
+  differences are listed in the Specification's appendix C. **Iris 1.0** develops it
   further and is the language of Gecode 7. Language versions and package
   versions are separate.
 

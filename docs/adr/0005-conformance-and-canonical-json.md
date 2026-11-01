@@ -19,9 +19,12 @@ implementations. An implementation conforms to a language version when it
 passes that version's suite. Cases cover reading, parsing, and catalog
 results, with expected data or errors.
 
-Each implementation provides a conformance driver for `read`, `catalog`,
-and `parse`. One runner, `iris conformance`, runs cases against any driver,
-including the Gecode adapter. The CLI also emits canonical JSON.
+Each implementation provides a conformance driver for `parse`, `read`,
+`catalog`, and `dzn`. `dzn` prints the dzn text that the Specification's
+dzn appendix defines; the others print canonical JSON. One runner, the
+crate `rust/iris-conformance`, also offered as `iris conformance`, runs
+cases against any driver, including the Gecode adapter. The CLI also emits
+canonical JSON.
 
 ## Consequences
 

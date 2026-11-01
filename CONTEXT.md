@@ -15,7 +15,7 @@ the Specification.
 | data | The result of reading: named, typed scalars and possibly ragged arrays, exposed as entries in definition order. | Using data for the input text. |
 | implementation | A library that parses reader specs and reads inputs. Rust is the reference implementation, Python binds Rust, and C++ and Java are native implementations, with a Kotlin module for Java. | Treating the Python binding as an independent implementation. |
 | host | The program that embeds an implementation, such as Gecode or a Python script. | Using host for the reader spec. |
-| language version | A version of the language defined by the Specification: Iris 0.1 is exactly the Gecode 6.5.0 language, and Iris 1.0 develops it further for Gecode 7. | Treating a language version as a package release number. |
+| language version | A version of the language defined by the Specification: Iris 0.1 is the Gecode 6.5.0 language, apart from the deliberate differences in the Specification's appendix C, and Iris 1.0 develops it further for Gecode 7. | Treating a language version as a package release number. |
 | package version | The release version of a particular library or tool, separate from the language versions it supports. The first planned package releases are 0.1.0 and implement Iris 0.1. | Assuming language and package versions are interchangeable. |
 
 ## Language terms
@@ -61,6 +61,9 @@ The following terms describe the planned tooling and conformance contract in
 | error code | A stable identifier for a kind of error, separate from its message wording, with codes defined in the Specification. The conformance suite compares the code and location, including the record path for check failures. | Confusing it with a CLI exit code or claiming Gecode already reports these codes. |
 | canonical JSON | The common encoding of data and errors, defined in the Specification, that the CLI emits and the conformance suite compares. | Treating an implementation's arbitrary JSON output as canonical. |
 | conformance case | A language-neutral test for a particular language version, with a reader spec, any input and parameters, and expected data or an error. Cases can test parsing alone or catalog results as well as reading. | Using case for a sections arm. |
-| conformance driver | An implementation-specific command that accepts the suite's `read`, `catalog`, and `parse` requests and returns canonical JSON. | Confusing the driver with the runner. |
+| conformance driver | An implementation-specific command that accepts the suite's `parse`, `read`, `catalog`, and `dzn` requests and returns canonical JSON, or dzn text for `dzn`. | Confusing the driver with the runner. |
 | conformance runner | The shared tool that runs conformance cases against a driver and compares the results with their expectations. | Giving each implementation a different definition of conformance. |
 | conformance suite | The versioned collection of cases that forms the contract between implementations, including Gecode. | Treating the suite as the normative language document. |
+| formatter | The tool, `iris fmt`, that gives a reader spec its one formatted form for a line width by changing only whitespace and line breaks. The line width comes from `.editorconfig`. | Expecting it to rewrite constructs; that is a lint fix or `iris migrate`. |
+| lint | A named warning about a valid reader spec that is probably wrong, fragile, or hard to read, reported by the language server and by `iris lint` or `iris check`. The linter is built only if useful lints exist (PLAN.md §8.13). Lints are not normative and have names, not error codes. | Calling a lint an error, or giving it an error code. |
+| directive comment | A comment starting with `# iris:` that instructs tooling, such as naming a sample file for live reading or allowing a lint. Implementations ignore it like any comment. | Treating a directive as language syntax. |
