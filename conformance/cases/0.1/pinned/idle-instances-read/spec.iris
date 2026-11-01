@@ -1,0 +1,2 @@
+repeat 1048576 {}
+instances {_:int repeat 1 {}}

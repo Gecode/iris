@@ -227,6 +227,67 @@ void check_diagnostics() {
   require(trailing.code == "E-TRAILING-INPUT" && !trailing.spec_location,
           "trailing input envelope");
 }
+
+void check_nul_diagnostics() {
+  const auto decode = [](const std::string &message, const std::string &input,
+                         bool trailing = false) {
+    const auto text =
+        "input.bin:1:1: " + message + "\n     1 | " + input + "\n       | ^" +
+        (trailing ? "" : "\n  while reading: x\n  spec: spec.iris:2");
+    const Gecode::Instance::Error error(text);
+    require(std::string(error.what()) == text.substr(0, text.find('\0')),
+            "reference what() did not truncate at NUL");
+    return iris::decode_error(iris::Phase::read, error, "spec.iris",
+                              "input.bin", input);
+  };
+  const std::string token("1\0'\\2", 5);
+  for (const std::string type :
+       {"int", "float", "a number", "n (an int in ..3)"}) {
+    const auto message = "expected " + type + ", found '" + token + "'";
+    const auto d = decode(message, token);
+    require(
+        d.code == "E-EXPECTED-VALUE" && d.message == message &&
+            d.input_location->line == 1 && d.input_location->column == 1 &&
+            d.spec_location->line == 2 && d.context == "x" && !d.record_path &&
+            iris::encode_error(d).find("1\\u0000'\\\\2") != std::string::npos,
+        "NUL value diagnostic lost token, escaping, or envelope");
+  }
+  const auto literal = decode("expected 'end', found '" + token + "'", token);
+  require(literal.code == "E-EXPECTED-TOKEN", "NUL literal mismatch");
+  const std::string nul(1, '\0');
+  const auto symbol =
+      decode("unexpected symbol '" + nul + "', expected one of 'ab'", nul);
+  require(symbol.code == "E-SYMBOL" &&
+              symbol.message ==
+                  "unexpected symbol '" + nul + "', expected one of 'ab'",
+          "NUL symbol lost alphabet suffix");
+  const std::string rest("word\t\0tail", 10);
+  const auto trailing = decode(
+      "unexpected input after the end of the spec: 'word\\t" + nul + "tail'",
+      rest, true);
+  require(trailing.code == "E-TRAILING-INPUT" && !trailing.spec_location,
+          "NUL trailing input with escaped tab");
+  rejects([&] { decode("expected int, found '1" + nul + "2'", "1x2"); },
+          "truncation without an input NUL accepted");
+  rejects([&] { decode("expected int, found '1" + nul + "2'", "2" + nul); },
+          "truncation with a different input prefix accepted");
+  rejects([&] { decode("future message '" + token + "'", token); },
+          "NUL truncation without a known template accepted");
+  rejects([&] { decode("expected '" + token + "', found 'word'", token); },
+          "NUL in expected literal accepted as input truncation");
+  rejects([&] { decode("expected int, found 'bad'", token); },
+          "NUL in excerpt accepted as message truncation");
+  rejects(
+      [&] { decode("expected 'x', found 'y', found '" + token + "'", token); },
+      "ambiguous quoted slot accepted");
+  rejects(
+      [&] {
+        iris::decode_error(iris::Phase::read,
+                           "input.bin:1:1: expected int, found '1", "spec.iris",
+                           "input.bin", token);
+      },
+      "truncation without retained complete diagnostic accepted");
+}
 } // namespace
 
 int main(int argc, char **argv) {
@@ -236,6 +297,7 @@ int main(int argc, char **argv) {
     check_params();
     check_json();
     check_diagnostics();
+    check_nul_diagnostics();
     std::cout << "Adapter checks passed\n";
     return 0;
   } catch (const std::exception &error) {

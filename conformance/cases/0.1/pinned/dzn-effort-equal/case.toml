@@ -1,0 +1,5 @@
+operation = "dzn"
+title = "dzn effort equal"
+section = "spec/0.1/appendix-b-dzn.md#b1-rendering-data-and-operation-boundaries"
+source = "hand-written:conformance-009"
+tags = ["pinned"]

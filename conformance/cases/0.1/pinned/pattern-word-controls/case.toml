@@ -1,0 +1,5 @@
+operation = "read"
+title = "pattern word controls"
+section = "spec/0.1/07-structure.md#72-line-patterns-and-captures"
+source = "hand-written:conformance-009"
+tags = ["pinned"]

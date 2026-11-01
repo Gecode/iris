@@ -1,0 +1,5 @@
+operation = "read"
+title = "order range before dimension"
+section = "spec/0.1/errors.md#112-error-order"
+source = "hand-written:conformance-009"
+tags = ["pinned"]

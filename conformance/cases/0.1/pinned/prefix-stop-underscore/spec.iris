@@ -1,0 +1,1 @@
+stop "END_" repeat until eof {x:word}

@@ -1,0 +1,3 @@
+a:int
+tokens "," type bounded=..3
+x:bounded

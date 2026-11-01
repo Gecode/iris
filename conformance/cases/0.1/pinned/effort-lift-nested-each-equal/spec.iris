@@ -1,0 +1,6 @@
+repeat 1 {repeat 1 {each item a[0]:int}}
+repeat 1024 as xs {}
+repeat 1022 as ys {}
+check all(x in xs:all(y in ys:1))
+repeat 1020 {check sum(1)==1}
+check 1||item.a

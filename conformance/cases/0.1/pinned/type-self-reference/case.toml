@@ -1,0 +1,5 @@
+operation = "parse"
+title = "type self reference"
+section = "spec/0.1/06-types-and-values.md#65-named-types-and-visibility"
+source = "hand-written:conformance-009"
+tags = ["pinned"]

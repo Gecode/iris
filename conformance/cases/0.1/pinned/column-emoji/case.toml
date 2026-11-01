@@ -1,0 +1,5 @@
+operation = "read"
+title = "column emoji"
+section = "spec/0.1/04-input.md#46-input-positions"
+source = "hand-written:conformance-009"
+tags = ["pinned"]

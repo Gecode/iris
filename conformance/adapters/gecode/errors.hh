@@ -7,6 +7,10 @@
 #include <string_view>
 #include <vector>
 
+namespace Gecode::Instance {
+class Error;
+}
+
 namespace iris {
 enum class Phase { parse, read };
 struct Location {
@@ -26,11 +30,16 @@ struct Pattern {
   Phase phase;
   std::string code;
   std::string text;
+  std::string input_quote = "";
 };
 const std::vector<Pattern> &patterns();
 std::string expand_pattern(const Pattern &pattern);
 std::string map_message(Phase phase, const std::string &message);
 Diagnostic decode_error(Phase phase, const std::string &diagnostic,
+                        const std::string &spec_origin,
+                        const std::string &input_origin,
+                        const std::string &input);
+Diagnostic decode_error(Phase phase, const Gecode::Instance::Error &error,
                         const std::string &spec_origin,
                         const std::string &input_origin,
                         const std::string &input);

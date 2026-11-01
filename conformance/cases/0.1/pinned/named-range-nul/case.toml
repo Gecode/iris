@@ -1,0 +1,5 @@
+operation = "read"
+title = "named range nul"
+section = "spec/0.1/06-types-and-values.md#64-integer-ranges"
+source = "hand-written:conformance-009"
+tags = ["pinned"]

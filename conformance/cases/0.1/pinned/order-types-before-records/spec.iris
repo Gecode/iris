@@ -1,0 +1,4 @@
+type t=int
+t:int
+repeat 0 as rows {}
+rows:int

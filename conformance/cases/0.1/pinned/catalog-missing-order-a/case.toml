@@ -1,0 +1,5 @@
+operation = "catalog"
+title = "catalog missing order a"
+section = "spec/0.1/09-params-and-instances.md#96-catalog-results"
+source = "hand-written:conformance-009"
+tags = ["pinned"]

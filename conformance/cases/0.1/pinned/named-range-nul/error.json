@@ -1,0 +1,16 @@
+{
+  "code": "E-EXPECTED-VALUE",
+  "message": "expected bounded (an int in ..3), found '1\u0000'\\2'",
+  "input_location": {
+    "origin": "input.bin",
+    "line": 2,
+    "column": 3
+  },
+  "spec_location": {
+    "origin": "spec.iris",
+    "line": 3,
+    "column": null
+  },
+  "context": "x",
+  "record_path": null
+}

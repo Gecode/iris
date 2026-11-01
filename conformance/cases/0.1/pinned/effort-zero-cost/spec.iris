@@ -1,0 +1,12 @@
+let a=3
+a0[0]:float
+repeat 1 {each row let b=2 check row.b==2}
+repeat 1024 as xs {}
+repeat 1022 as ys {}
+check all(x in xs:all(y in ys:1))
+repeat 1024 {check sum(1)==1}
+let copy=a0
+check size(a0)==0 && count(a0)==0 && defined(a) && (a^2==9) && !a0
+check 1||missing
+check sum(a0)==0 && distinct(a0)
+check all(x in a0:missing)

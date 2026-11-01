@@ -1,0 +1,12 @@
+{
+  "code": "E-TRAILING-INPUT",
+  "message": "unexpected input after the end of the spec: 'extra\\t\u0000tail word'",
+  "input_location": {
+    "origin": "input.bin",
+    "line": 2,
+    "column": 3
+  },
+  "spec_location": null,
+  "context": null,
+  "record_path": null
+}

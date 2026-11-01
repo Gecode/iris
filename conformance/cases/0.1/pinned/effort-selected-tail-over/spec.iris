@@ -1,0 +1,5 @@
+repeat 1024 as xs {}
+repeat 1022 as ys {}
+check all(x in xs:all(y in ys:1))
+repeat 1024 {check sum(1)==1}
+instances {_:int repeat 97 {check sum(1)==1}}

@@ -1,6 +1,7 @@
 #include "errors.hh"
 #include <algorithm>
 #include <charconv>
+#include <gecode/instance.hh>
 #include <iomanip>
 #include <regex>
 #include <sstream>
@@ -141,9 +142,9 @@ const std::vector<Pattern> &patterns() {
       {Phase::read, "E-COUNT", R"pattern({A} is too large ({I}))pattern"},
       {Phase::read, "E-DIVISION-ZERO", R"pattern(division by zero)pattern"},
       {Phase::read, "E-EXPECTED-TOKEN",
-       R"pattern(expected {Q}, found {F})pattern"},
+       R"pattern(expected {Q}, found {F})pattern", "{F}"},
       {Phase::read, "E-EXPECTED-VALUE",
-       R"pattern(expected {D}, found {F})pattern"},
+       R"pattern(expected {D}, found {F})pattern", "{F}"},
       {Phase::read, "E-EXPECTED-VALUE",
        R"pattern(expected a line of values, found end of input)pattern"},
       {Phase::read, "E-EXPONENT", R"pattern(negative exponent in '^')pattern"},
@@ -238,9 +239,10 @@ const std::vector<Pattern> &patterns() {
       {Phase::read, "E-SYMBOL",
        R"pattern(expected a symbol for row {U}, column {U}, found end of input)pattern"},
       {Phase::read, "E-SYMBOL",
-       R"pattern(unexpected symbol {Q}, expected one of {Q})pattern"},
+       R"pattern(unexpected symbol {Q}, expected one of {Q})pattern", "{Q}"},
       {Phase::read, "E-TRAILING-INPUT",
-       R"pattern(unexpected input after the end of the spec: {Q})pattern"},
+       R"pattern(unexpected input after the end of the spec: {Q})pattern",
+       "{Q}"},
       {Phase::read, "E-TYPE-UNDEFINED",
        R"pattern(the type '{N}' is not defined yet)pattern"},
       {Phase::read, "E-VALUE-TYPE-MIX",
@@ -365,8 +367,8 @@ std::vector<std::size_t> check_path(const std::string &message) {
   return indices;
 }
 
-std::string excerpt(const std::string &input, std::size_t line,
-                    std::size_t column) {
+std::size_t input_offset(const std::string &input, std::size_t line,
+                         std::size_t column) {
   std::size_t start = 0;
   for (std::size_t n = 1; n < line; ++n) {
     const auto lf = input.find('\n', start);
@@ -379,6 +381,15 @@ std::string excerpt(const std::string &input, std::size_t line,
     end = input.size();
   if (column - 1 > end - start)
     throw std::runtime_error("diagnostic column outside input line");
+  return start + column - 1;
+}
+
+std::string excerpt(const std::string &input, std::size_t line,
+                    std::size_t column) {
+  const auto start = input_offset(input, line, column) - (column - 1);
+  auto end = input.find('\n', start);
+  if (end == std::string::npos)
+    end = input.size();
   while (end > start && (input[end - 1] == ' ' || input[end - 1] == '\t' ||
                          input[end - 1] == '\r'))
     --end;
@@ -390,6 +401,50 @@ std::string excerpt(const std::string &input, std::size_t line,
       << std::setw(6) << line << " | " << text << "\n       | "
       << std::string(column - 1, ' ') << '^';
   return out.str();
+}
+
+// Only an input-valued quoted slot can explain a C-string truncation. The
+// retained Error string supplies the complete token and envelope; no token
+// boundaries, settings, context, or missing template suffixes are guessed.
+void validate_nul_quote(Phase phase, const Diagnostic &diagnostic,
+                        const std::string &input) {
+  const auto nul = diagnostic.message.find('\0');
+  if (phase != Phase::read || !diagnostic.input_location ||
+      nul == std::string::npos)
+    throw std::runtime_error("unsupported NUL-truncated reference diagnostic");
+  const auto &location = *diagnostic.input_location;
+  const auto start = input_offset(input, *location.line, *location.column);
+  const auto input_nul = input.find('\0', start);
+  if (input_nul == std::string::npos)
+    throw std::runtime_error("reference truncation has no matching input NUL");
+  std::string partial;
+  for (auto i = start; i < input_nul; ++i) {
+    if (input[i] == '\n')
+      throw std::runtime_error("reference truncation crosses an input line");
+    partial += input[i] == '\t' ? "\\t" : std::string(1, input[i]);
+  }
+
+  const auto prefix = diagnostic.message.substr(0, nul);
+  std::size_t matches = 0;
+  bool matches_input = false;
+  for (const auto &pattern : patterns()) {
+    if (pattern.phase != phase || pattern.input_quote.empty())
+      continue;
+    const auto slot = pattern.text.find(pattern.input_quote);
+    const std::regex before_quote(
+        expand_pattern({phase, pattern.code, pattern.text.substr(0, slot)}));
+    for (auto at = prefix.find('\''); at != std::string::npos;
+         at = prefix.find('\'', at + 1)) {
+      if (!std::regex_match(prefix.substr(0, at), before_quote))
+        continue;
+      ++matches;
+      matches_input =
+          pattern.code == diagnostic.code && prefix.substr(at + 1) == partial;
+    }
+  }
+  if (matches != 1 || !matches_input)
+    throw std::runtime_error(
+        "ambiguous or unverified NUL-truncated diagnostic");
 }
 
 // A footer is accepted only as a complete suffix, with the supplied origin.
@@ -545,10 +600,27 @@ Diagnostic decode_error(Phase phase, const std::string &diagnostic,
     base = decode_runtime_error(diagnostic, spec_origin, input_origin, input);
   }
   base.code = map_message(phase, base.message);
+  if (diagnostic.find('\0') != std::string::npos)
+    validate_nul_quote(phase, base, input);
   if (base.code == "E-UNMAPPED")
     base.message = diagnostic;
   if (base.code == "E-CHECK-FAILED")
     base.record_path = check_path(base.message);
   return base;
+}
+
+Diagnostic decode_error(Phase phase, const Gecode::Instance::Error &error,
+                        const std::string &spec_origin,
+                        const std::string &input_origin,
+                        const std::string &input) {
+  // Copy the public exception into a derived object to read its protected
+  // std::string legally. what() alone loses everything from the first NUL.
+  struct StoredError : Gecode::Instance::Error {
+    explicit StoredError(const Gecode::Instance::Error &source)
+        : Gecode::Instance::Error(source) {}
+    const std::string &text() const { return msg; }
+  };
+  return decode_error(phase, StoredError(error).text(), spec_origin,
+                      input_origin, input);
 }
 } // namespace iris

@@ -1,0 +1,9 @@
+m0[1][1]:1..9 layout "FULL_MATRIX" offset 10
+m1[1][1]:1..9 layout "UPPER_ROW" offset 10
+m2[1][1]:1..9 layout "LOWER_ROW" offset 10
+m3[1][1]:1..9 layout "UPPER_DIAG_ROW" offset 10
+m4[1][1]:1..9 layout "LOWER_DIAG_ROW" offset 10
+m5[1][1]:1..9 layout "UPPER_COL" offset 10
+m6[1][1]:1..9 layout "LOWER_COL" offset 10
+m7[1][1]:1..9 layout "UPPER_DIAG_COL" offset 10
+m8[1][1]:1..9 layout "LOWER_DIAG_COL" offset 10

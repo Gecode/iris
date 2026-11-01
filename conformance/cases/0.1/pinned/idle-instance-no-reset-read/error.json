@@ -1,0 +1,16 @@
+{
+  "code": "E-BUDGET",
+  "message": "too many repetitions or empty rows without reading input",
+  "input_location": {
+    "origin": "input.bin",
+    "line": 1,
+    "column": 4
+  },
+  "spec_location": {
+    "origin": "spec.iris",
+    "line": 1,
+    "column": null
+  },
+  "context": "instance [2] > repeat [524288 of 524289]",
+  "record_path": null
+}

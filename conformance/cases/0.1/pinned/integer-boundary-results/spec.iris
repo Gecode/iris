@@ -1,0 +1,5 @@
+lo:int hi:int
+let add_hi=hi+0 let add_lo=lo+0
+let sub_hi=hi-0 let sub_lo=lo-0
+let mul_hi=hi*1 let mul_lo=lo*1 let zero=lo*0
+let negative=(-3)*(-7) let positive=3*7 let reversed=3*(-7)

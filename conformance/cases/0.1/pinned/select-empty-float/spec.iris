@@ -1,0 +1,1 @@
+let name="outer" instances {n:int let name=1.0}

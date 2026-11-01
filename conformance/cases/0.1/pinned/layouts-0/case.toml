@@ -1,0 +1,5 @@
+operation = "read"
+title = "layouts 0"
+section = "spec/0.1/06-types-and-values.md#68-matrix-layouts"
+source = "hand-written:conformance-009"
+tags = ["pinned"]

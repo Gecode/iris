@@ -1,0 +1,5 @@
+operation = "read"
+title = "effort array comprehension equal"
+section = "spec/0.1/10-work-budgets.md#103-expression-effort"
+source = "hand-written:conformance-009"
+tags = ["pinned"]

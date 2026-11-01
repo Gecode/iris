@@ -1,0 +1,5 @@
+operation = "dzn"
+title = "dzn read error"
+section = "spec/0.1/appendix-b-dzn.md#b8-separators-line-endings-and-errors"
+source = "hand-written:conformance-009"
+tags = ["pinned"]

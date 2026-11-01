@@ -1,0 +1,5 @@
+operation = "dzn"
+title = "dzn thin matrices"
+section = "spec/0.1/appendix-b-dzn.md#b5-rectangular-arrays-and-empty-dimensions"
+source = "hand-written:conformance-009"
+tags = ["pinned"]

@@ -1,0 +1,5 @@
+operation = "read"
+title = "select empty array"
+section = "spec/0.1/09-params-and-instances.md#94-instance-selection"
+source = "hand-written:conformance-009"
+tags = ["pinned"]

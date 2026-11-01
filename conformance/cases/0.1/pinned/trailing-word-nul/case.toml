@@ -1,0 +1,5 @@
+operation = "read"
+title = "trailing word nul"
+section = "spec/0.1/04-input.md#48-end-of-input-and-trailing-input"
+source = "hand-written:conformance-009"
+tags = ["pinned"]

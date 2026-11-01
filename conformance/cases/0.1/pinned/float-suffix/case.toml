@@ -1,0 +1,5 @@
+operation = "read"
+title = "float suffix"
+section = "spec/0.1/04-input.md#45-floating-point-tokens"
+source = "hand-written:conformance-009"
+tags = ["pinned"]

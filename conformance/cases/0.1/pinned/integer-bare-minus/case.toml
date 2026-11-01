@@ -1,0 +1,5 @@
+operation = "read"
+title = "integer bare minus"
+section = "spec/0.1/04-input.md#44-integer-tokens"
+source = "hand-written:conformance-009"
+tags = ["pinned"]

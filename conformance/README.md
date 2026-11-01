@@ -7,6 +7,9 @@ for the case format and driver protocol. The standalone runner is available in
 [rust/iris-conformance](../rust/iris-conformance/), with a
 [Gecode adapter](adapters/gecode/README.md) and 15 [smoke cases](cases/0.1/smoke/).
 
+[COVERAGE.md](COVERAGE.md) maps appendix D's individual decided rules to
+existing cases and hand-written supplements in `cases/0.1/pinned/`.
+
 ## Case files and discovery
 
 ```text

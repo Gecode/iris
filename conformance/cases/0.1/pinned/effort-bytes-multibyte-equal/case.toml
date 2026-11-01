@@ -1,0 +1,5 @@
+operation = "read"
+title = "effort bytes multibyte equal"
+section = "spec/0.1/10-work-budgets.md#101-counters-and-input-byte-length"
+source = "hand-written:conformance-009"
+tags = ["pinned"]

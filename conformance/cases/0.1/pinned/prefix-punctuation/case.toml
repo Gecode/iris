@@ -1,0 +1,5 @@
+operation = "read"
+title = "prefix punctuation"
+section = "spec/0.1/04-input.md#47-comment-and-stop-prefixes"
+source = "hand-written:conformance-009"
+tags = ["pinned"]

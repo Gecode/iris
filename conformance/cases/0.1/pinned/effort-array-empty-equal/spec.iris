@@ -1,0 +1,6 @@
+a[1][0]:int
+repeat 1024 as xs {}
+repeat 1022 as ys {}
+check all(x in xs:all(y in ys:1))
+repeat 1023 {check sum(1)==1}
+let v=a[0]

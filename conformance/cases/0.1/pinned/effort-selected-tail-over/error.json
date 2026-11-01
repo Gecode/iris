@@ -1,0 +1,16 @@
+{
+  "code": "E-BUDGET",
+  "message": "the expressions do too much work for the size of the input",
+  "input_location": {
+    "origin": "input.bin",
+    "line": 1,
+    "column": 2
+  },
+  "spec_location": {
+    "origin": "spec.iris",
+    "line": 5,
+    "column": null
+  },
+  "context": "instance [1] > repeat [97 of 97]",
+  "record_path": null
+}

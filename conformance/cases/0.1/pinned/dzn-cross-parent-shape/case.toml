@@ -1,0 +1,5 @@
+operation = "dzn"
+title = "dzn cross parent shape"
+section = "spec/0.1/appendix-b-dzn.md#b6-ragged-and-deeper-arrays"
+source = "hand-written:conformance-009"
+tags = ["pinned"]

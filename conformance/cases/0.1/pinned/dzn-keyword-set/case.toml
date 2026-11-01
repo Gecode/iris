@@ -1,0 +1,5 @@
+operation = "dzn"
+title = "dzn keyword set"
+section = "spec/0.1/appendix-b-dzn.md#b2-entry-names-and-integers"
+source = "hand-written:conformance-009"
+tags = ["pinned"]

@@ -31,8 +31,8 @@ Response language_error(iris::Phase phase, const instance::Error &error,
                         const Request &request, const std::string &input) {
   const std::string original = error.what();
   std::cerr << original << '\n';
-  return {iris::encode_error(iris::decode_error(
-              phase, original, request.spec_path, request.input_path, input)),
+  return {iris::encode_error(iris::decode_error(phase, error, request.spec_path,
+                                                request.input_path, input)),
           1};
 }
 

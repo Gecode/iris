@@ -1,0 +1,5 @@
+operation = "read"
+title = "number nul"
+section = "spec/0.1/06-types-and-values.md#62-scalar-reading-and-numeric-promotion"
+source = "hand-written:conformance-009"
+tags = ["pinned"]
