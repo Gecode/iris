@@ -1,14 +1,15 @@
 use crate::{
     Result, diagnostic,
     document::{Document, PositionEncoding},
+    navigation,
 };
 use crossbeam_channel::RecvTimeoutError;
 use iris_syntax::ParseError;
 use lsp_server::{Connection, ErrorCode, Message, Notification, Request, Response};
 use lsp_types::{
-    InitializeParams, InitializeResult, PositionEncodingKind, PublishDiagnosticsParams,
-    ServerCapabilities, ServerInfo, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, Uri,
+    InitializeParams, InitializeResult, OneOf, PositionEncodingKind, PublishDiagnosticsParams,
+    RenameOptions, ServerCapabilities, ServerInfo, TextDocumentSyncCapability,
+    TextDocumentSyncKind, TextDocumentSyncOptions, Uri, WorkDoneProgressOptions,
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, PublishDiagnostics,
     },
@@ -50,6 +51,12 @@ fn initialize(connection: &Connection) -> Result<PositionEncoding> {
     let result = InitializeResult {
         capabilities: ServerCapabilities {
             position_encoding: Some(encoding.protocol_kind()),
+            definition_provider: Some(OneOf::Left(true)),
+            references_provider: Some(OneOf::Left(true)),
+            rename_provider: Some(OneOf::Right(RenameOptions {
+                prepare_provider: Some(true),
+                work_done_progress_options: WorkDoneProgressOptions::default(),
+            })),
             text_document_sync: Some(TextDocumentSyncCapability::Options(
                 TextDocumentSyncOptions {
                     open_close: Some(true),
@@ -137,6 +144,14 @@ impl Server {
                     error.to_string(),
                 ),
             }
+        } else if matches!(
+            request.method.as_str(),
+            "textDocument/definition"
+                | "textDocument/references"
+                | "textDocument/prepareRename"
+                | "textDocument/rename"
+        ) {
+            navigation::handle_request(request, &mut self.documents, self.encoding)
         } else {
             Response::new_err(
                 request.id,

@@ -57,10 +57,39 @@ reachability and editor hyperlink rendering are not established by server
 tests. The documentation base is one constant in `src/diagnostic.rs` so the
 site can supply its final routes later.
 
-Navigation, completion, formatting, semantic tokens, and live sample reading
-belong to later LSP tasks and are not advertised here. Analysis runs on the
-server thread using complete reparses; the document cache retains each tree
-and semantic model together and invalidates both on accepted changes.
+Analysis runs on the server thread using complete reparses; the document cache
+retains each tree and semantic model together and invalidates both on accepted
+changes. Completion, formatting, semantic tokens, and live sample reading
+belong to later LSP tasks.
+
+## Navigation and rename
+
+The server advertises definition, references, and rename with prepare-rename.
+These requests use the latest open buffer immediately, including changes still
+waiting for diagnostic publication. Names, named types, record names, and names
+inside line patterns use the semantic model's raw source ranges and the
+negotiated position encoding.
+
+Definition returns every possible definition of the selected reference.
+References returns the uses of the selected definitions, deduplicated in source
+order, and honors `includeDeclaration`. Rename follows shared references
+transitively: every possible definition of every affected reference joins the
+rename group. Separate definitions with the same spelling remain separate when
+no reference connects them.
+
+Rename refuses collisions with values outside the group, including columns
+published by repeats. It reparses and analyzes the proposed text to enforce
+contextual keyword, type, record, and comprehension rules, and verifies that
+references retain their targets. Contextual keywords are accepted where the
+Specification permits them. Rename requires a reader spec without parse or
+resolution errors, because an invalid source can have a partial semantic model.
+Navigation can still use the available model for such a source.
+
+Requests for unknown or closed documents and invalid positions return parameter
+errors. Definition and references return empty arrays on non-name positions or
+unresolved names; prepare-rename returns null there, and rename refuses them.
+All edits concern the selected open document; the server does not search files
+on disk or modify the buffer itself.
 
 ## Validation
 
@@ -74,5 +103,7 @@ cargo test --locked -p iris-cli --test lsp_stdio
 The in-process client in `tests/support/mod.rs` uses the production server
 entry point. Tests cover synchronization, diagnostic links and ranges,
 Unicode encodings, atomic edits, document isolation, debounce decisions,
-lifecycle errors, and representative repository reader specs. The CLI test
-starts the real binary and checks framing, diagnostics, and orderly exit.
+lifecycle errors, navigation, ambiguous definitions, transitive rename groups,
+capture names and bounds, rename refusals, and representative repository reader
+specs. The CLI test starts the real binary and checks framing, diagnostics,
+and orderly exit.

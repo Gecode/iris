@@ -97,6 +97,10 @@ impl Document {
             .expect("analysis was just cached")
             .analysis)
     }
+
+    pub(crate) fn cached_analysis(&self) -> Option<&Analysis> {
+        self.snapshot.as_ref().map(|snapshot| &snapshot.analysis)
+    }
 }
 
 #[derive(Clone)]
@@ -155,7 +159,7 @@ impl LineIndex {
         ))
     }
 
-    fn byte_offset(
+    pub(crate) fn byte_offset(
         &self,
         source: &str,
         position: Position,

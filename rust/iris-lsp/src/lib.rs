@@ -1,6 +1,7 @@
 //! Language server for Iris reader specs, shared by stdio and in-process clients.
 mod diagnostic;
 mod document;
+mod navigation;
 mod server;
 
 use lsp_server::Connection;
