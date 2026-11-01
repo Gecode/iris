@@ -1,0 +1,69 @@
+name: JetBrains
+
+on:
+  push:
+    paths:
+      - 'editors/jetbrains/**'
+      - 'editors/textmate/**'
+      - 'rust/**'
+      - 'formats/**'
+      - 'brand/favicon/favicon.svg'
+      - '.github/workflows/jetbrains.yml'
+  pull_request:
+    paths:
+      - 'editors/jetbrains/**'
+      - 'editors/textmate/**'
+      - 'rust/**'
+      - 'formats/**'
+      - 'brand/favicon/favicon.svg'
+      - '.github/workflows/jetbrains.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jetbrains-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache Rust build
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: ${{ runner.os }}-${{ runner.arch }}-jetbrains-rust-${{ hashFiles('rust/Cargo.lock', 'rust/**/Cargo.toml') }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-jetbrains-rust-
+      - name: Build Iris language server
+        working-directory: rust
+        run: cargo build --locked -p iris-cli --bin iris
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+          cache-dependency-path: |
+            editors/jetbrains/*.gradle.kts
+            editors/jetbrains/gradle/wrapper/gradle-wrapper.properties
+      - name: Build, test and verify plugin
+        working-directory: editors/jetbrains
+        env:
+          IRIS_TEST_EXECUTABLE: ${{ github.workspace }}/rust/target/debug/iris
+        run: ./gradlew build verifyPlugin
+      - name: Upload failure reports
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: jetbrains-reports
+          path: |
+            editors/jetbrains/build/reports/tests/
+            editors/jetbrains/build/test-results/
+            editors/jetbrains/build/reports/pluginVerifier/
+            editors/jetbrains/build/sandbox/iris/*/log-test/

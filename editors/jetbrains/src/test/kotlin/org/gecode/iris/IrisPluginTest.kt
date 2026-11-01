@@ -1,14 +1,18 @@
 package org.gecode.iris
 
+import com.intellij.codeInsight.daemon.impl.HighlightInfo
 import com.intellij.notification.Notification
 import com.intellij.notification.Notifications
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
+import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.fileTypes.SyntaxHighlighterFactory
+import com.intellij.openapi.util.IconLoader
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.lsp.api.LspServer
 import com.intellij.platform.lsp.api.LspServerDescriptor
@@ -22,11 +26,14 @@ import com.intellij.testFramework.PsiTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.testFramework.fixtures.IdeaTestFixtureFactory
 import com.intellij.testFramework.fixtures.TempDirTestFixture
+import com.intellij.testFramework.fixtures.impl.CodeInsightTestFixtureImpl
 import com.intellij.util.ui.UIUtil
 import com.intellij.util.xmlb.XmlSerializer
 import org.jetbrains.plugins.textmate.TextMateService
 import org.jetbrains.plugins.textmate.language.syntax.highlighting.TextMateHighlighter
+import java.awt.GraphicsEnvironment
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import javax.swing.JTextField
 
@@ -42,10 +49,16 @@ class IrisPluginTest : BasePlatformTestCase() {
         val file = myFixture.tempDirFixture.createFile("example.iris")
         assertSame(IrisFileType, file.fileType)
         assertSame(IrisFileType, FileTypeManager.getInstance().getFileTypeByExtension("iris"))
-        val icon = requireNotNull(file.fileType.icon)
-        assertEquals(16, icon.iconWidth)
-        assertEquals(16, icon.iconHeight)
-        assertTrue(icon.toString().contains("icons/iris.svg"))
+        // Headless IDEs leave icon loading inactive by default.
+        IconLoader.activate()
+        try {
+            val icon = requireNotNull(file.fileType.icon)
+            assertEquals(16, icon.iconWidth)
+            assertEquals(16, icon.iconHeight)
+            assertTrue(icon.toString().contains("icons/iris.svg"))
+        } finally {
+            IconLoader.deactivate()
+        }
     }
 
     fun testExecutableLookupAndCommandLine() {
@@ -122,6 +135,8 @@ class IrisPluginTest : BasePlatformTestCase() {
     }
 
     fun testHighlightingDiagnosticAndRestartThroughPlatformClient() {
+        // LSP semantic tokens can arrive while doHighlighting dispatches events.
+        (myFixture as CodeInsightTestFixtureImpl).canChangeDocumentDuringHighlighting(true)
         val realExecutable = System.getProperty("iris.executable")
         val executable = realExecutable ?: stubExecutable()
         val diagnosticText = if (realExecutable == null) "Iris stub diagnostic" else "not_defined"
@@ -174,6 +189,74 @@ class IrisPluginTest : BasePlatformTestCase() {
             }, 10)
         }
     }
+
+    fun testDimacsFormatWithRealServer() {
+        val executable = requireNotNull(System.getProperty("iris.executable")) {
+            "IRIS_TEST_EXECUTABLE must point to a built iris binary"
+        }
+        assertTrue("The IDE test must run without a display", GraphicsEnvironment.isHeadless())
+        // LSP semantic tokens can arrive while doHighlighting dispatches events.
+        (myFixture as CodeInsightTestFixtureImpl).canChangeDocumentDuringHighlighting(true)
+        project.getService(IrisLspSettings::class.java).executablePath = executable
+        val spec = File(requireNotNull(System.getProperty("iris.repository")), "formats/dimacs-cnf/dimacs-cnf.iris")
+        val specFile = requireNotNull(LocalFileSystem.getInstance().refreshAndFindFileByIoFile(spec)) {
+            "DIMACS reader spec not found: $spec"
+        }
+        val serverManager = LspServerManager.getInstance(project)
+        val publications = AtomicInteger()
+        serverManager.addLspServerManagerListener(object : LspServerManagerListener {
+            override fun diagnosticsReceived(lspServer: LspServer, file: VirtualFile) {
+                if (lspServer.providerClass == IrisLspSupportProvider::class.java && file == specFile) {
+                    publications.incrementAndGet()
+                }
+            }
+        }, testRootDisposable)
+        PsiTestUtil.addContentRoot(module, specFile.parent)
+        TextMateService.getInstance().reloadEnabledBundles()
+        myFixture.configureFromExistingVirtualFile(specFile)
+        val document = myFixture.editor.document
+        val original = document.text
+        try {
+            PlatformTestUtil.waitWithEventsDispatching("Real iris lsp publishes initial DIMACS diagnostics", {
+                publications.get() > 0
+            }, 30)
+            assertEmpty("The DIMACS reader spec has no diagnostics", diagnosticsInEditor())
+            assertTrue("TextMate editor highlighter is applied to DIMACS",
+                (myFixture.editor as EditorEx).highlighter.javaClass.name.contains("TextMate"))
+            val highlighter = requireNotNull(SyntaxHighlighterFactory.getSyntaxHighlighter(IrisFileType, project, specFile))
+            assertTrue("DIMACS uses the TextMate grammar", highlighter is TextMateHighlighter)
+            val lexer = highlighter.highlightingLexer
+            lexer.start(document.charsSequence)
+            assertTrue("TextMate assigns attributes to format",
+                highlighter.getTokenHighlights(requireNotNull(lexer.tokenType)).isNotEmpty())
+
+            val beforeError = publications.get()
+            WriteCommandAction.runWriteCommandAction(project) {
+                document.insertString(document.textLength, "\ninvalid: not_defined\n")
+            }
+            PlatformTestUtil.waitWithEventsDispatching("Real iris lsp reports the introduced undefined type", {
+                publications.get() > beforeError &&
+                    diagnosticsInEditor().any { it.description?.contains("not_defined") == true }
+            }, 30)
+
+            val beforeFix = publications.get()
+            WriteCommandAction.runWriteCommandAction(project) { document.setText(original) }
+            PlatformTestUtil.waitWithEventsDispatching("Real iris lsp clears the diagnostic after the fix", {
+                publications.get() > beforeFix && diagnosticsInEditor().isEmpty()
+            }, 30)
+        } finally {
+            // The fixture opens the repository file itself; always restore its document.
+            WriteCommandAction.runWriteCommandAction(project) { document.setText(original) }
+            serverManager.stopServers(IrisLspSupportProvider::class.java)
+            PlatformTestUtil.waitWithEventsDispatching("Real iris lsp shuts down", {
+                serverManager.getServersForProvider(IrisLspSupportProvider::class.java)
+                    .none { it.state == LspServerState.Initializing || it.state == LspServerState.Running }
+            }, 10)
+        }
+    }
+
+    private fun diagnosticsInEditor(): List<HighlightInfo> =
+        myFixture.doHighlighting().filter { it.description != null }
 
     private fun stubExecutable(): String {
         // Give the executable-path setting a real executable, without changing the production command contract.

@@ -38,8 +38,9 @@ intellijPlatform {
     }
     pluginVerification {
         ides {
-            // Representative ends of the past-year window; override for other products.
+            // One release of each supported line; override for other products.
             create(IntelliJPlatformType.IntellijIdea, "2025.3.3")
+            create(IntelliJPlatformType.IntellijIdea, "2026.1.4")
             create(IntelliJPlatformType.IntellijIdea, "2026.2.4")
         }
     }
@@ -71,7 +72,18 @@ tasks.withType<PrepareSandboxTask>().configureEach {
 }
 
 tasks.test {
-    providers.environmentVariable("IRIS_TEST_EXECUTABLE").orNull?.let { systemProperty("iris.executable", it) }
+    val executable = providers.environmentVariable("IRIS_TEST_EXECUTABLE").orNull?.takeIf { it.isNotBlank() }
+    check(providers.environmentVariable("CI").orNull == null || executable != null) {
+        "CI requires IRIS_TEST_EXECUTABLE: the real-server format test must run"
+    }
+    if (executable == null) {
+        logger.lifecycle("SKIPPED testDimacsFormatWithRealServer: IRIS_TEST_EXECUTABLE is unset; build iris to run it")
+        filter { excludeTestsMatching("org.gecode.iris.IrisPluginTest.testDimacsFormatWithRealServer") }
+    } else {
+        systemProperty("iris.executable", executable)
+    }
+    systemProperty("iris.repository", layout.projectDirectory.dir("../..").asFile.absolutePath)
+    systemProperty("java.awt.headless", "true")
     systemProperty("iris.stub", layout.projectDirectory.file("src/test/resources/stub_server.py").asFile.absolutePath)
     systemProperty("idea.log.debug.categories", "#com.intellij.platform.lsp")
 }
