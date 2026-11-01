@@ -1,0 +1,1 @@
+{"iris":"0.1","entries":[{"name":"a","type":"int","depth":1,"value":[1,2,3]},{"name":"b","type":"int","depth":1,"value":[4,5]},{"name":"c","type":"int","depth":1,"value":[6,7]},{"name":"w","type":"string","depth":1,"value":["x","y"]}]}

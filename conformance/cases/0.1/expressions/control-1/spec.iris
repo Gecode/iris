@@ -1,0 +1,8 @@
+n: int
+if n > 1 { w: word } else { let w = "none" }
+let m = n * 3 + 1
+a[2]: int
+let s = sum(a)
+check max(a) - min(a) == 2 "spread"
+check count(a) == 2 && defined(m) && !defined(zz)
+check 7 / 2 == 3 && 7 % 2 == 1

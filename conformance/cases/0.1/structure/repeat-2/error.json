@@ -1,0 +1,1 @@
+{"code":"E-INDEX-MISMATCH","message":"expected index 2, found 3","input_location":{"origin":"input.txt","line":3,"column":1},"spec_location":{"origin":"spec.iris","line":1,"column":null},"context":"repeat [2 of 2]","record_path":null}

@@ -1,0 +1,3 @@
+operation = "parse"
+section = "spec/0.1/06-types-and-values.md#610-alphabets"
+source = "gecode:test/instance.cpp:Read::Alphabets"

@@ -1,0 +1,4 @@
+instance a
+1 2
+instance b
+3 4

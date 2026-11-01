@@ -1,0 +1,1 @@
+n: int  type small = 0..n  a: small

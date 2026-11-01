@@ -1,0 +1,6 @@
+n: int
+repeat n { index 1  k: int  s[k]: int offset -1 }
+repeat until "999" { a: int }
+repeat until ">=" "=" store op { c: int  v: word }
+rhs: int
+repeat until eof { w: word }

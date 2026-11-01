@@ -1,0 +1,1 @@
+{"code":"E-SECTIONS-REPEATED","message":"a second line matching \"NAME : {name:word}\" (the first is on line 1)","input_location":{"origin":"input.txt","line":5,"column":1},"spec_location":{"origin":"spec.iris","line":1,"column":null},"context":null,"record_path":null}

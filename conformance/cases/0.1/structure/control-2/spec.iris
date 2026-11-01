@@ -1,0 +1,1 @@
+n: int if n > 1 { w: word } else { let w = "none" }

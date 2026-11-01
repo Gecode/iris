@@ -1,0 +1,1 @@
+{"code":"E-CHECK-FAILED","message":"check failed: must be two","input_location":{"origin":"input.txt","line":1,"column":2},"spec_location":{"origin":"spec.iris","line":1,"column":null},"context":null,"record_path":[]}

@@ -1,0 +1,1 @@
+type w = word  type v = w  line "{x:v} {y:0..1}"

@@ -1,0 +1,5 @@
+type time = 0..gecode.int_max / 2
+n: 1..
+repeat n { ready: time  due: time }
+type cell = alphabet "ab" blank "."
+g[1][2]: cell

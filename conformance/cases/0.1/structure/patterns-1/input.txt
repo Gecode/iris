@@ -1,0 +1,4 @@
+# size=6 box=3x2
+noise
+NAME:  a b c 
+p cnf 10 2.5 trailing words

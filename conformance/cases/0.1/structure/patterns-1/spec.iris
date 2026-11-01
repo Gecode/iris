@@ -1,0 +1,3 @@
+line "# size={n:int} box={w:int}x{h:int}"
+find "NAME : {name:rest}"
+line "p {_} {v:int} {c:num} ..."

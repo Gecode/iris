@@ -1,0 +1,1 @@
+list a: int until 0  list b: int until eol  list c: int until eol  list w: word until "END"

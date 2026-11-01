@@ -1,0 +1,5 @@
+NAME : a
+N : 1
+DATA
+4
+NAME : b

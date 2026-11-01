@@ -1,0 +1,2 @@
+param which  param k = 2
+find "instance {$which}"  x[k]: int  ignore trailing

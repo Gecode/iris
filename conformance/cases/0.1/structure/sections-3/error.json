@@ -1,0 +1,1 @@
+{"code":"E-SECTIONS-UNEXPECTED","message":"unexpected line; expected one of \"N : {n:int}\", \"DATA\", \"NAME : {name:word}\"","input_location":{"origin":"input.txt","line":2,"column":1},"spec_location":{"origin":"spec.iris","line":1,"column":null},"context":null,"record_path":null}

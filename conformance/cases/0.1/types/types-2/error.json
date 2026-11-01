@@ -1,0 +1,1 @@
+{"code":"E-EXPECTED-VALUE","message":"expected small (an int in 0..3), found '4'","input_location":{"origin":"input.txt","line":1,"column":3},"spec_location":{"origin":"spec.iris","line":1,"column":null},"context":"a","record_path":null}

@@ -1,0 +1,5 @@
+sections until "EOF" {
+  "N : {n:int}"
+  "DATA" { x[n]: int }
+  "NAME : {name:word}" optional
+}
