@@ -368,7 +368,7 @@ reported upstream. Gecode itself needs no changes.
 - Optional `spec!` macro that checks an embedded spec at compile time
   (after 0.1).
 - Performance target: at least as fast as Gecode on the 100 MB DIMACS
-  benchmark from #270 (1.40 s), with memory-mapped input. A
+  benchmark from #270 (1.40 s), with ordinary buffered input (§12). A
   `criterion` benchmark suite tracks the format library inputs.
 - CLI `iris`:
   `iris read SPEC FILE... [--summary|--json|--dzn] [--param k=v]`,
@@ -948,6 +948,12 @@ before M4e.
   checksum check (§8.14), decided on 2026-11-01. Bundling was estimated at
   about 5 MiB of plugin download per platform, from a comparable Rust
   language server.
+- **No memory-mapped input:** iris-core reads input files into memory
+  with an ordinary buffered read, decided on 2026-11-01 from the rust-013
+  measurements. Reading a generated 100 MB DIMACS file took 15 ms of a
+  16 s run, so a map would gain almost nothing. Mapping the file itself
+  would need `unsafe` code, and a file changed during a read could crash
+  the process. Revisit if a profile shows acquisition mattering.
 
 ### Open
 
