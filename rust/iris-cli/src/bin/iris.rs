@@ -1,11 +1,13 @@
 use clap::{Parser, Subcommand};
 use iris_cli::{CheckFailure, check_spec, format_name, render_error};
 use std::{path::PathBuf, process::ExitCode};
+#[path = "iris/fmt.rs"]
+mod fmt;
 #[derive(Parser)]
 #[command(
     name = "iris",
     version = "0.1.0 (language 0.1)",
-    about = "Check an Iris reader spec"
+    about = "Check and format Iris reader specs"
 )]
 struct Arguments {
     #[command(subcommand)]
@@ -13,12 +15,20 @@ struct Arguments {
 }
 #[derive(Subcommand)]
 enum Command {
-    Check { spec: PathBuf },
+    Check {
+        spec: PathBuf,
+    },
+    /// Format reader specs in place, or preview changes.
+    Fmt(fmt::Arguments),
 }
 fn main() -> ExitCode {
-    let Arguments {
-        command: Command::Check { spec },
-    } = Arguments::parse();
+    match Arguments::parse().command {
+        Command::Check { spec } => check(spec),
+        Command::Fmt(arguments) => fmt::run(arguments),
+    }
+}
+
+fn check(spec: PathBuf) -> ExitCode {
     let origin = spec.to_string_lossy();
     let bytes = match std::fs::read(&spec) {
         Ok(bytes) => bytes,

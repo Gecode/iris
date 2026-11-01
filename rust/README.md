@@ -5,7 +5,7 @@ The Cargo workspace contains the standalone `iris-conformance` runner
 [iris-syntax](iris-syntax/README.md) owns source validation, the lossless parser,
 and formatting; [iris-sema](iris-sema/README.md) owns parse-time validity,
 resolution, and conservative value facts; [iris-cli](iris-cli/README.md) provides
-`iris check SPEC` and the `iris-driver parse` conformance command. The runner
+`iris check SPEC`, `iris fmt PATH...`, and the `iris-driver parse` conformance command. The runner
 uses the [conformance protocol](../conformance/README.md) and has no dependency
 on implementation crates.
 
@@ -47,6 +47,26 @@ cargo test --locked -p iris-cli --test parse_conformance -- --nocapture
 The integration test loads the whole version tree and selects cases by their
 operation. Read, catalog, and dzn await `iris-core`; the driver reports them as
 unsupported misuse (exit 2) if invoked directly.
+
+Format reader specs in place, preview changes, or format standard input:
+
+```sh
+cargo run --locked -p iris-cli -- fmt path/to/spec.iris path/to/directory
+cargo run --locked -p iris-cli -- fmt --check --diff path/to/directory
+cat path/to/spec.iris | cargo run --locked -p iris-cli -- fmt --stdin-filepath path/to/spec.iris -
+cargo test --locked -p iris-cli --test fmt
+```
+
+Directories recurse into `.iris` files, skipping symlinks and including
+`.gitignore` matches. `--check` leaves files unchanged and exits 1 when changes
+are needed; `--diff` previews unified diffs without writing files and combines
+with `--check`. Standard input normally produces formatted source on stdout.
+The line width comes from `.editorconfig`'s `max_line_length`, defaulting to 100
+when absent, `unset`, or `off`; all other properties are ignored. Source errors,
+including invalid UTF-8, leave the file unchanged and make the command exit 1;
+other files still run. See the [CLI README](iris-cli/README.md#formatting) for
+stdin options and exit statuses. Do not reformat Specification examples or
+conformance reader specs: some test layout or error positions deliberately.
 
 Run cases with an implementation's executable or wrapper command:
 
