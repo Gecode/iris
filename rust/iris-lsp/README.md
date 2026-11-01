@@ -59,7 +59,7 @@ site can supply its final routes later.
 
 Analysis runs on the server thread using complete reparses; the document cache
 retains each tree and semantic model together and invalidates both on accepted
-changes. Formatting and live sample reading belong to later LSP tasks.
+changes. Live sample reading belongs to a later LSP task.
 
 ## Hover, completion, and inlay hints
 
@@ -159,6 +159,43 @@ leaf a constant number of times, and semantic names use a range index rather
 than repeated model searches. Each request's feature work takes linear time
 and memory in the document and model size, in addition to cached analysis.
 
+## Formatting
+
+The server advertises document and range formatting using the existing
+`iris-syntax` formatter and [fixed style](../../docs/formatting.md). It ignores
+client `tabSize`, `insertSpaces`, and other formatting options. For `file:`
+URIs, `FormatOptions::for_path` reads `max_line_length` from the document path's
+`.editorconfig` hierarchy on each request, with the same behavior as `iris fmt`.
+Unset or `off` means width 100. Invalid values and unreadable configurations
+return request failures. Non-file URIs, including `untitled:`, use width 100.
+File URI authorities must be empty or `localhost`; other authorities return
+parameter errors. Paths are percent-decoded, including `%2F` as `/`, matching
+the former Unix URL conversion. NUL bytes and relative paths are refused. Unix
+paths retain decoded bytes, including non-UTF-8 names. Windows accepts UTF-8
+`/C:/...` drive paths and converts separators; unsupported forms are refused.
+The source always comes from the latest open buffer.
+
+Document formatting returns one whole-document replacement when text changes.
+Range formatting forwards the formatter's zero or one replacement, within its
+reported extent: the smallest complete statement sequence covering the request,
+including attached comments and surrounding whitespace. Bytes outside that
+extent remain unchanged. No protocol position lies between the CR and LF of a
+CRLF pair, so an extent boundary there widens the edit by that one byte and
+the replacement restores it. Already formatted input returns an empty edit
+array.
+A syntax error returns no document edits; range formatting still accepts a
+clean statement when errors occur elsewhere, and returns no edits for a
+selection it cannot format because of syntax errors. Resolution errors do not
+prevent formatting.
+
+Edits use the negotiated position encoding and the shared position table,
+indexed once per request that returns edits. They preserve the formatter's
+exact output, including LF normalization outside protected text when the source
+uses CRLF or lone CR. Unknown or closed documents, reversed ranges, nonexistent
+lines, and positions splitting Unicode scalars return parameter errors.
+Characters beyond a line's length clamp to its end, as for other requests.
+The server does not modify the buffer or write the reader spec to disk.
+
 ## Validation
 
 From `rust/`:
@@ -175,6 +212,7 @@ lifecycle errors, navigation, ambiguous definitions, transitive rename groups,
 capture names and bounds, rename refusals, nested outlines, block and comment
 folding, semantic token roles and deltas, hover documentation and shapes,
 completion contexts and visibility, optional snippets, uncertain inlay hints,
-and representative repository reader
-specs. The CLI test starts the real binary and checks framing, diagnostics,
-and orderly exit.
+document and range formatting, syntax-error isolation, EditorConfig width,
+physical line endings and formatting edit application, and representative
+repository reader specs. The CLI test starts the real binary and checks framing,
+diagnostics, and orderly exit.

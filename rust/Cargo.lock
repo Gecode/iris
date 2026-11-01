@@ -218,7 +218,6 @@ name = "iris-cli"
 version = "0.1.0"
 dependencies = [
  "clap",
- "ec4rs",
  "iris-conformance",
  "iris-core",
  "iris-lsp",
@@ -265,6 +264,7 @@ dependencies = [
  "lsp-server",
  "lsp-types",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -278,6 +278,7 @@ dependencies = [
 name = "iris-syntax"
 version = "0.1.0"
 dependencies = [
+ "ec4rs",
  "rowan",
 ]
 

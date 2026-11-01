@@ -1,4 +1,6 @@
 //! Whitespace-only layout of the lossless syntax tree.
+#[cfg(feature = "editorconfig")]
+mod config;
 mod expressions;
 mod layout;
 mod range;

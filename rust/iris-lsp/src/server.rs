@@ -1,7 +1,7 @@
 use crate::{
     Result, assist, diagnostic,
     document::{Document, PositionEncoding},
-    navigation, semantic_tokens, structure,
+    formatting, navigation, semantic_tokens, structure,
 };
 use crossbeam_channel::RecvTimeoutError;
 use iris_syntax::ParseError;
@@ -98,6 +98,8 @@ fn initialize(
             inlay_hint_provider: Some(OneOf::Left(true)),
             definition_provider: Some(OneOf::Left(true)),
             references_provider: Some(OneOf::Left(true)),
+            document_formatting_provider: Some(OneOf::Left(true)),
+            document_range_formatting_provider: Some(OneOf::Left(true)),
             document_symbol_provider: Some(OneOf::Left(true)),
             folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
             semantic_tokens_provider: Some(
@@ -228,6 +230,11 @@ impl Server {
                 self.encoding,
                 &self.structure_options,
             )
+        } else if matches!(
+            request.method.as_str(),
+            "textDocument/formatting" | "textDocument/rangeFormatting"
+        ) {
+            formatting::handle_request(request, &self.documents, self.encoding)
         } else if matches!(
             request.method.as_str(),
             "textDocument/hover" | "textDocument/completion" | "textDocument/inlayHint"

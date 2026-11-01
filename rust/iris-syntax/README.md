@@ -85,8 +85,15 @@ assert_eq!(output, "repeat 2 {\n  x: int\n}\n");
 
 `FormatOptions` contains only `line_width`, defaulting to 100. Width counts
 Unicode scalar values, including indentation; indivisible groups and protected
-text may exceed it. Zero is invalid. Filesystem access and `.editorconfig`
-lookup belong to callers. The only supported language version is `V0_1`.
+text may exceed it. Zero is invalid. The optional `editorconfig` Cargo feature
+(off by default) provides `FormatOptions::for_path`, which reads
+`max_line_length` from the path's `.editorconfig` hierarchy, using width 100
+when unset or `off`, and reporting invalid values or unreadable configuration
+files. The CLI and language server enable this feature. Default builds and
+`--no-default-features` builds omit this API and the `ec4rs` dependency, so
+syntax and formatting remain available without filesystem lookup for browser
+and binding consumers. The formatting functions themselves do no filesystem
+access. The only supported language version is `V0_1`.
 
 `format` refuses every source failure or syntax diagnostic and returns no
 partial output. Syntax-clean input is accepted even when later name resolution

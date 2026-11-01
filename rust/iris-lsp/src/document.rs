@@ -218,7 +218,7 @@ impl LineIndex {
         Ok(line.end)
     }
 
-    fn byte_range(
+    pub(crate) fn byte_range(
         &self,
         source: &str,
         range: Range,

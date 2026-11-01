@@ -3,6 +3,7 @@ mod assist;
 mod builtins;
 mod diagnostic;
 mod document;
+mod formatting;
 mod navigation;
 mod semantic_tokens;
 mod server;
