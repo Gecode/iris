@@ -55,7 +55,7 @@ fn formats_files_and_nested_directory_operands() {
     ] {
         fs::write(path.join(name), "repeat 2 {x:int}").unwrap();
     }
-    for name in ["nested/other.txt", "nested/c.iris.bak", "nested/upper.IRIS"] {
+    for name in ["nested/other.txt", "nested/c.iris.bak", "nested/upper.Iris"] {
         fs::write(path.join(name), "keep me").unwrap();
     }
     fs::write(path.join(".gitignore"), "nested/b.iris\n").unwrap();
@@ -80,7 +80,7 @@ fn formats_files_and_nested_directory_operands() {
         b"keep me"
     );
     assert_eq!(
-        fs::read(path.join("nested/upper.IRIS")).unwrap(),
+        fs::read(path.join("nested/upper.Iris")).unwrap(),
         b"keep me"
     );
     assert_status(&fmt(path, &["--check", "."], b""), 0);
