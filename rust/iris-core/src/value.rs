@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
 /// Owned typed leaves with cumulative row offsets, outermost level first.
 #[derive(Debug, Clone)]
@@ -33,7 +33,13 @@ pub struct Data {
 }
 #[derive(Debug, Default)]
 pub(crate) struct Frame {
-    entries: Vec<Entry>,
+    entries: Vec<FrameEntry>,
+    names: HashMap<String, usize>,
+}
+#[derive(Debug)]
+struct FrameEntry {
+    name: String,
+    value: Option<Value>,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AccessError {
@@ -269,22 +275,122 @@ impl<'a> ValueRef<'a> {
 }
 impl Frame {
     pub fn set(&mut self, name: String, value: Value) {
-        if let Some(entry) = self.entries.iter_mut().find(|e| e.name == name) {
-            entry.value = value;
+        if let Some(&index) = self.names.get(&name) {
+            self.entries[index].value = Some(value);
         } else {
-            self.entries.push(Entry { name, value });
+            self.names.insert(name.clone(), self.entries.len());
+            self.entries.push(FrameEntry {
+                name,
+                value: Some(value),
+            });
         }
     }
     pub fn lookup(&self, name: &str) -> Option<&Value> {
-        self.entries
-            .iter()
-            .find(|e| e.name == name)
-            .map(|e| &e.value)
+        self.entries.get(*self.names.get(name)?)?.value.as_ref()
+    }
+    pub fn take(&mut self, name: &str) -> Option<Value> {
+        self.entries.get_mut(*self.names.get(name)?)?.value.take()
     }
     pub fn into_data(self) -> Data {
         Data {
-            entries: self.entries,
+            entries: self
+                .entries
+                .into_iter()
+                .map(|entry| Entry {
+                    name: entry.name,
+                    value: entry
+                        .value
+                        .expect("published frame values have not been collected"),
+                })
+                .collect(),
         }
+    }
+}
+
+/// Append moved local rows without rebuilding previous rows or nesting Values.
+pub(crate) struct Column {
+    fallback_type: &'static str,
+    fallback_depth: usize,
+    rows: usize,
+    value: Option<Value>,
+}
+impl Column {
+    pub fn new(fallback_type: &'static str, fallback_depth: usize) -> Self {
+        Self {
+            fallback_type,
+            fallback_depth,
+            rows: 0,
+            value: None,
+        }
+    }
+    pub fn add_row(&mut self, row: Option<Value>) -> Result<(), crate::ErrorCode> {
+        use crate::ErrorCode;
+        let Some(row) = row else {
+            if let Some(value) = &mut self.value {
+                if value.depth() == 1 {
+                    return Err(ErrorCode::RepeatMissing);
+                }
+                let offsets = &mut value.levels[1].offsets;
+                offsets.push(*offsets.last().expect("initial offset"));
+            }
+            self.rows += 1;
+            return Ok(());
+        };
+        if let Some(value) = &self.value {
+            if value.depth() != row.depth() + 1 {
+                return Err(ErrorCode::RepeatDepth);
+            }
+        } else {
+            if row.depth() == 0 && self.rows > 0 {
+                return Err(ErrorCode::RepeatMissing);
+            }
+            self.value = Some(Self::empty_rows(row.value_type(), row.depth(), self.rows));
+        }
+        let value = self
+            .value
+            .as_mut()
+            .expect("first actual row initialized column");
+        for (destination, source) in value.levels[1..].iter_mut().zip(&row.levels) {
+            let base = *destination.offsets.last().expect("initial offset");
+            destination
+                .offsets
+                .extend(source.offsets[1..].iter().map(|n| base + n));
+        }
+        // Empty rows only choose a provisional type. The first nonempty row
+        // replaces it; subsequent nonempty rows use ordinary numeric promotion.
+        if row.leaf_count() > 0 {
+            if value.leaf_count() == 0 {
+                value.leaves = row.leaves;
+            } else {
+                value.append(row)?;
+            }
+        }
+        self.rows += 1;
+        Ok(())
+    }
+    pub fn finish(self) -> Result<Value, crate::ErrorCode> {
+        let mut value = if let Some(value) = self.value {
+            value
+        } else {
+            if self.rows > 0 && self.fallback_depth == 0 {
+                return Err(crate::ErrorCode::RepeatMissing);
+            }
+            Self::empty_rows(self.fallback_type, self.fallback_depth, self.rows)
+        };
+        value.levels[0].offsets[1] = self.rows;
+        Ok(value)
+    }
+    fn empty_rows(value_type: &str, local_depth: usize, rows: usize) -> Value {
+        let mut value = Value::empty(value_type);
+        value.levels.push(ArrayLevel {
+            offsets: vec![0, rows],
+        });
+        for level in 0..local_depth {
+            value.levels.push(ArrayLevel {
+                offsets: vec![0; if level == 0 { rows + 1 } else { 1 }],
+            });
+        }
+        value
     }
 }
 #[cfg(test)]
@@ -292,36 +398,62 @@ mod tests {
     use super::*;
     #[test]
     fn borrowed_ragged_rows_and_empty_depth() {
+        let mut rows = Column::new("float", 0);
+        for integers in [vec![1, 2], vec![], vec![3]] {
+            let mut row = Value {
+                leaves: LeafStorage::Int(integers),
+                levels: vec![],
+            };
+            row.set_dimensions(&[row.leaf_count()]);
+            rows.add_row(Some(row)).unwrap();
+        }
+        let empty = Column::new("float", 1);
+        let mut nested = Column::new("int", 0);
+        nested.add_row(None).unwrap();
+        let mut actual = Value::float(2.5);
+        actual.set_dimensions(&[1, 1]);
+        nested.add_row(Some(actual)).unwrap();
+        nested.add_row(None).unwrap();
         let mut data = Data {
             entries: vec![
                 Entry {
                     name: "rows".into(),
-                    value: Value {
-                        leaves: LeafStorage::Int(vec![1, 2, 3]),
-                        levels: vec![
-                            ArrayLevel {
-                                offsets: vec![0, 3],
-                            },
-                            ArrayLevel {
-                                offsets: vec![0, 2, 2, 3],
-                            },
-                        ],
-                    },
+                    value: rows.finish().unwrap(),
                 },
                 Entry {
                     name: "empty".into(),
-                    value: Value {
-                        leaves: LeafStorage::Float(vec![]),
-                        levels: vec![
-                            ArrayLevel {
-                                offsets: vec![0, 0],
-                            },
-                            ArrayLevel { offsets: vec![0] },
-                        ],
-                    },
+                    value: empty.finish().unwrap(),
+                },
+                Entry {
+                    name: "nested".into(),
+                    value: nested.finish().unwrap(),
                 },
             ],
         };
+        assert_eq!(data.value("nested", &[]).unwrap().depth(), 3);
+        assert_eq!(
+            data.value("nested", &[1, 0, 0])
+                .unwrap()
+                .as_float()
+                .unwrap(),
+            2.5
+        );
+        assert_eq!(
+            data.value("nested", &[0])
+                .unwrap()
+                .children()
+                .unwrap()
+                .len(),
+            0
+        );
+        assert_eq!(
+            data.value("nested", &[2])
+                .unwrap()
+                .children()
+                .unwrap()
+                .len(),
+            0
+        );
         assert_eq!(data.ints("rows", &[0]).unwrap(), &[1, 2]);
         assert!(data.ints("rows", &[1]).unwrap().is_empty());
         assert_eq!(data.value("rows", &[2, 0]).unwrap().as_int().unwrap(), 3);

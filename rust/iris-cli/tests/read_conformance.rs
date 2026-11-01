@@ -27,7 +27,7 @@ fn implemented_conformance() {
         assert!(
             matches!(
                 fields[1],
-                "rust-005" | "rust-006" | "rust-007" | "rust-008" | "rust-009" | "rust-010"
+                "rust-006" | "rust-007" | "rust-008" | "rust-009" | "rust-010"
             ),
             "invalid owner: {line}"
         );

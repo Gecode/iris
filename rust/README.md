@@ -5,8 +5,8 @@ The Cargo workspace contains the standalone `iris-conformance` runner
 [iris-syntax](iris-syntax/README.md) owns source validation, the lossless parser,
 and formatting; [iris-sema](iris-sema/README.md) owns parse-time validity,
 resolution, and conservative value facts; [iris-core](iris-core/README.md) reads
-scalar and array input, evaluates expressions, and owns column data and
-canonical JSON;
+scalar and array input, executes repeats and index statements, evaluates
+expressions, and owns column data and canonical JSON;
 [iris-cli](iris-cli/README.md) provides
 `iris check SPEC`, `iris read SPEC FILE --json`, `iris fmt PATH...`, and the
 `iris-driver parse|read` conformance commands. The runner
@@ -54,7 +54,7 @@ cargo test --locked -p iris-cli --test parse_conformance -- --nocapture
 The parse integration test loads the whole version tree and selects parse cases.
 The progress test discovers both the conformance tree and `formats`,
 then excludes the exact cases in `iris-cli/tests/pending-cases.txt` before
-invoking any driver. Every pending case names its later owner (rust-005 through
+invoking any driver. Every pending case names its later owner (rust-006 through
 rust-010); newly discovered cases run by default. Catalog and dzn remain
 unsupported (exit 2), as do reached execution features owned by later tasks.
 

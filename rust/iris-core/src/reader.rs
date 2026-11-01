@@ -4,7 +4,7 @@ use crate::{
     numeric,
     value::{Frame, LeafStorage},
 };
-use iris_sema::{DefinitionId, DefinitionKind, ReferenceId, Resolution, SemanticModel};
+use iris_sema::{DefinitionId, DefinitionKind, ReferenceId, RepeatId, Resolution, SemanticModel};
 use iris_syntax::{DecodedString, SyntaxKind as K, SyntaxNode, SyntaxToken, TextRange};
 use std::collections::HashMap;
 
@@ -12,10 +12,17 @@ use std::collections::HashMap;
 pub(crate) struct ModelIndex {
     definitions: HashMap<TextRange, DefinitionId>,
     pub references: HashMap<TextRange, ReferenceId>,
+    repeats: HashMap<TextRange, RepeatId>,
 }
 impl ModelIndex {
     pub fn new(model: &SemanticModel) -> Self {
         Self {
+            repeats: model
+                .repeats()
+                .iter()
+                .enumerate()
+                .map(|(id, repeat)| (repeat.node.text_range(), RepeatId(id)))
+                .collect(),
             definitions: model
                 .definitions()
                 .iter()
@@ -33,6 +40,15 @@ impl ModelIndex {
     }
 }
 mod reads;
+mod repeat;
+use repeat::{RecordLists, RepeatState};
+
+enum Work {
+    Statement(SyntaxNode),
+    Sequence(Option<SyntaxNode>),
+    RepeatNext,
+    AfterBody,
+}
 
 #[derive(Clone)]
 enum EvaluatedType {
@@ -71,6 +87,9 @@ pub(crate) struct Interpreter<'s, 'i> {
     pub bindings: Vec<(String, Value)>,
     statement: Option<(usize, TextRange)>,
     context: Option<String>,
+    repeats: Vec<RepeatState>,
+    records: RecordLists,
+    source_lines: Vec<usize>,
 }
 impl<'s, 'i> Interpreter<'s, 'i> {
     pub fn new(spec: &'s Spec, input: Input<'i>) -> Self {
@@ -82,10 +101,21 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             bindings: vec![],
             statement: None,
             context: None,
+            repeats: vec![],
+            records: RecordLists::default(),
+            source_lines: std::iter::once(0)
+                .chain(
+                    spec.source
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, byte)| **byte == b'\n')
+                        .map(|(i, _)| i + 1),
+                )
+                .collect(),
         }
     }
     pub fn read(mut self) -> Result<crate::Data, Failure> {
-        self.execute_block(&self.spec.parsed.syntax())?;
+        self.execute(self.spec.parsed.syntax())?;
         self.statement = None;
         self.context = None;
         if !self.input.settings.ignore_trailing {
@@ -105,20 +135,65 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             .expect("root frame exists throughout a read")
             .into_data())
     }
-    fn execute_block(&mut self, node: &SyntaxNode) -> Result<(), Failure> {
-        for statement in node.children() {
-            self.execute_statement(&statement)?;
+    fn execute(&mut self, root: SyntaxNode) -> Result<(), Failure> {
+        let mut work = vec![Work::Sequence(root.first_child())];
+        while let Some(next) = work.pop() {
+            match next {
+                Work::Sequence(Some(node)) => {
+                    work.push(Work::Sequence(node.next_sibling()));
+                    work.push(Work::Statement(node));
+                }
+                Work::Sequence(None) => {}
+                Work::RepeatNext => {
+                    if self.begin_iteration()? {
+                        work.push(Work::AfterBody);
+                        work.push(Work::Statement(
+                            self.repeats.last().expect("active repeat").body.clone(),
+                        ));
+                    } else {
+                        self.finish_repeat()?;
+                    }
+                }
+                Work::AfterBody => {
+                    self.collect_iteration()?;
+                    work.push(Work::RepeatNext);
+                }
+                Work::Statement(node) => {
+                    // A block is not a statement of its own: diagnostics keep
+                    // the enclosing statement until a child statement runs.
+                    if node.kind() != K::Block {
+                        self.select_statement(&node);
+                    }
+                    match node.kind() {
+                        K::Block => work.push(Work::Sequence(node.first_child())),
+                        K::If => {
+                            let condition = self.eval(&expression(&node))?;
+                            let selected = if truth(&condition) { 0 } else { 1 };
+                            if let Some(body) = node
+                                .children()
+                                .filter(|n| !is_expression(n.kind()))
+                                .nth(selected)
+                            {
+                                work.push(Work::Statement(body));
+                            }
+                        }
+                        K::Repeat => {
+                            self.begin_repeat(&node)?;
+                            work.push(Work::RepeatNext);
+                        }
+                        _ => self.execute_statement(&node)?,
+                    }
+                }
+            }
         }
         Ok(())
     }
-    fn execute_statement(&mut self, node: &SyntaxNode) -> Result<(), Failure> {
+    fn select_statement(&mut self, node: &SyntaxNode) {
         let offset = usize::from(node.text_range().start());
-        let line = self.spec.source[..offset]
-            .iter()
-            .filter(|&&b| b == b'\n')
-            .count()
-            + 1;
+        let line = self.source_lines.partition_point(|&start| start <= offset);
         self.statement = Some((line, node.text_range()));
+    }
+    fn execute_statement(&mut self, node: &SyntaxNode) -> Result<(), Failure> {
         match node.kind() {
             K::Format => Ok(()),
             K::Setting => {
@@ -147,14 +222,9 @@ impl<'s, 'i> Interpreter<'s, 'i> {
                     .set(name, value);
                 Ok(())
             }
-            K::If => self.execute_if(node),
-            K::Block => self.execute_block(node),
             K::List => self.execute_list(node),
-            K::Repeat | K::Each | K::Index => Err(unsupported(
-                node.text_range(),
-                "repeat and index execution",
-                "rust-005",
-            )),
+            K::Each => Ok(()),
+            K::Index => self.execute_index(node),
             K::Line | K::Find | K::Skip | K::Expect | K::Sections => Err(unsupported(
                 node.text_range(),
                 "line and section execution",
@@ -173,19 +243,8 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             _ => unreachable!("valid root/block contains statements"),
         }
     }
-    fn execute_if(&mut self, node: &SyntaxNode) -> Result<(), Failure> {
-        let condition = self.eval(&expression(node))?;
-        let selected = if truth(&condition) { 0 } else { 1 };
-        if let Some(body) = node
-            .children()
-            .filter(|n| !is_expression(n.kind()))
-            .nth(selected)
-        {
-            self.execute_statement(&body)?;
-        }
-        Ok(())
-    }
     fn execute_setting(&mut self, node: &SyntaxNode) {
+        self.input.settings_changed();
         let own_tokens = tokens(node);
         let strings: Vec<_> = own_tokens
             .iter()
@@ -396,6 +455,13 @@ impl<'s, 'i> Interpreter<'s, 'i> {
         self.error_at(code, message, self.input.position())
     }
     fn error_at(&self, code: ErrorCode, message: impl Into<String>, position: Position) -> Error {
+        let mut contexts: Vec<_> = self
+            .repeats
+            .iter()
+            .filter_map(RepeatState::context)
+            .collect();
+        contexts.extend(self.context.iter().cloned());
+        let context = (!contexts.is_empty()).then(|| contexts.join(" > "));
         Error::input(
             code,
             message,
@@ -403,7 +469,7 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             position,
             self.statement
                 .map(|(line, range)| (self.spec.parsed.origin(), line, range)),
-            self.context.as_deref(),
+            context.as_deref(),
         )
     }
     fn charge_idle(&mut self, _units: u128) -> Result<(), Error> {

@@ -9,6 +9,8 @@ const SEED: u64 = 73003;
 const COUNT: usize = 256;
 const ARRAY_SEED: u64 = 73004;
 const ARRAY_COUNT: usize = 384;
+const REPEAT_SEED: u64 = 73005;
+const REPEAT_COUNT: usize = 384;
 struct Probe {
     family: &'static str,
     spec: String,
@@ -34,64 +36,70 @@ fn scalar_differential() {
         DriverCommand::parse(&format!("\"{adapter}\"")).unwrap(),
     ];
     let directory = tempfile::tempdir().unwrap();
-    let scalar = probes();
-    let arrays = array_probes();
-    println!("Scalar differential: seed={SEED} count={}", scalar.len());
-    let mut families = std::collections::BTreeMap::new();
-    for probe in &arrays {
-        *families.entry(probe.family).or_insert(0usize) += 1;
-    }
-    println!(
-        "Array differential: seed={ARRAY_SEED} count={} families={families:?}",
-        arrays.len()
-    );
-    for (index, probe) in scalar.iter().chain(&arrays).enumerate() {
-        iris_cli::check_spec(probe.spec.as_bytes(), "generated differential probe").unwrap_or_else(
-            |error| panic!("invalid generated probe {index}: {}: {error}", probe.spec),
+    let groups = [
+        ("Scalar", SEED, probes()),
+        ("Array", ARRAY_SEED, array_probes()),
+        ("Repeat", REPEAT_SEED, repeat_probes()),
+    ];
+    for (name, seed, probes) in &groups {
+        let mut families = std::collections::BTreeMap::new();
+        for (index, probe) in probes.iter().enumerate() {
+            *families.entry(probe.family).or_insert(0usize) += 1;
+            iris_cli::check_spec(probe.spec.as_bytes(), "generated differential probe")
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "invalid generated probe seed={seed} index={index}: {}: {error}",
+                        probe.spec
+                    )
+                });
+        }
+        println!(
+            "{name} differential: seed={seed} count={} families={families:?}",
+            probes.len()
         );
     }
-    for (index, probe) in scalar.iter().chain(&arrays).enumerate() {
-        let (seed, group_index) = if index < scalar.len() {
-            (SEED, index)
-        } else {
-            (ARRAY_SEED, index - scalar.len())
-        };
-        let case = write_probe(directory.path(), probe);
-        let outcomes = drivers.each_ref().map(|driver| {
-            let output = driver
-                .invoke(&case, "0.1", Duration::from_secs(5))
-                .map_err(|e| format!("{e:?}"))?;
-            let kind = match output.status.code() {
-                Some(0) => OutcomeKind::Data,
-                Some(1) => OutcomeKind::Error,
-                _ => return Err(format!("unexpected driver output: {output:?}")),
-            };
-            Outcome::decode(kind, &output.stdout, "0.1")
-        });
-        if !matches!(&outcomes,[Ok(a),Ok(b)] if a==b) {
-            let repro = directory.keep();
-            panic!(
-                "differential mismatch: seed={seed} index={group_index} family={}\nRust: {rust} read {}/spec.iris {}/input.bin --params '{{}}' --version 0.1\nGecode: {adapter} read {}/spec.iris {}/input.bin --params '{{}}' --version 0.1\nspec: {}\ninput bytes: {:?}\noutcomes: {outcomes:#?}",
-                probe.family,
-                repro.display(),
-                repro.display(),
-                repro.display(),
-                repro.display(),
-                probe.spec,
-                probe.input
-            );
+    for (name, seed, probes) in &groups {
+        for (index, probe) in probes.iter().enumerate() {
+            let case = write_probe(directory.path(), probe);
+            let outcomes = drivers.each_ref().map(|driver| {
+                let output = driver
+                    .invoke(&case, "0.1", Duration::from_secs(5))
+                    .map_err(|e| format!("{e:?}"))?;
+                let kind = match output.status.code() {
+                    Some(0) => OutcomeKind::Data,
+                    Some(1) => OutcomeKind::Error,
+                    _ => return Err(format!("unexpected driver output: {output:?}")),
+                };
+                Outcome::decode(kind, &output.stdout, "0.1")
+            });
+            if !matches!(&outcomes,[Ok(a),Ok(b)] if a==b) {
+                let repro = directory.keep();
+                panic!(
+                    "differential mismatch: seed={seed} index={index} family={}\nRust: {rust} read {}/spec.iris {}/input.bin --params '{{}}' --version 0.1\nGecode: {adapter} read {}/spec.iris {}/input.bin --params '{{}}' --version 0.1\nspec: {}\ninput bytes: {:?}\noutcomes: {outcomes:#?}",
+                    probe.family,
+                    repro.display(),
+                    repro.display(),
+                    repro.display(),
+                    repro.display(),
+                    probe.spec,
+                    probe.input
+                );
+            }
         }
+        println!(
+            "{name} differential: seed={seed} count={} mismatches=0",
+            probes.len()
+        );
     }
     println!(
-        "Scalar differential: seed={SEED} count={} mismatches=0",
-        scalar.len()
-    );
-    println!(
-        "Array differential: seed={ARRAY_SEED} count={} mismatches=0; total={}",
-        arrays.len(),
-        scalar.len() + arrays.len()
+        "Differential total={}",
+        groups
+            .iter()
+            .map(|(_, _, probes)| probes.len())
+            .sum::<usize>()
     );
 }
+
 fn write_probe(directory: &Path, probe: &Probe) -> Case {
     let spec = directory.join("spec.iris");
     let input = directory.join("input.bin");
@@ -563,6 +571,339 @@ fn array_probes() -> Vec<Probe> {
     assert_eq!(
         probes.len(),
         ARRAY_COUNT,
+        "curated probes must never be truncated"
+    );
+    probes
+}
+
+fn repeat_probes() -> Vec<Probe> {
+    let mut probes = vec![];
+    for (family, spec, input) in [
+        (
+            "count and frames",
+            "let n=2 repeat n {let n=1 x:int}",
+            "7 8",
+        ),
+        (
+            "count and frames",
+            "repeat 0 {x:int a[2][3]:float list b:word until eol let c=\"s\"}",
+            "",
+        ),
+        (
+            "count and frames",
+            "repeat 2 {k:int if k {let a=7} else {a[0]:word}}",
+            "0 0",
+        ),
+        (
+            "count and frames",
+            "repeat 2 {k:int if k {a:int} else {a[0]:word}}",
+            "0 0",
+        ),
+        (
+            "missing type depth",
+            "repeat 2 {k:int if k {let a=7}}",
+            "0 1",
+        ),
+        (
+            "missing type depth",
+            "repeat 2 {k:int if k {a[1][1]:float}}",
+            "0 1 2.5",
+        ),
+        (
+            "missing type depth",
+            "repeat 2 {k:int if k {a[0]:word} else {a[0]:float}}",
+            "1 0",
+        ),
+        (
+            "missing type depth",
+            "repeat 2 {k:int if k {a[0]:float} else {a[1]:int}}",
+            "1 0 7",
+        ),
+        (
+            "missing type depth",
+            "repeat 2 {k:int if k {a[0]:int} else {a[1]:float}}",
+            "1 0 7",
+        ),
+        (
+            "missing type depth",
+            "repeat 2 {k:int if k {a:word} else {a[1]:int}}",
+            "1 s 0 7",
+        ),
+        (
+            "progress diagnostics",
+            "repeat 2 {\nk:int\nif k {a:int}\n}",
+            "1 7 0",
+        ),
+        (
+            "progress diagnostics",
+            "repeat 1 {\nk:int\nif k {a:int}\n}",
+            "0",
+        ),
+        (
+            "progress diagnostics",
+            "repeat until eof {\nif 1 {let x=1}\n}",
+            "x",
+        ),
+        (
+            "progress diagnostics",
+            "repeat 1 {repeat until eof {x:int}}",
+            "   ",
+        ),
+        (
+            "termination scanning",
+            "repeat until \"END\" \"STOP\" store end {x:word} tail:word",
+            "a STOP z",
+        ),
+        (
+            "termination scanning",
+            "repeat until \"END\" {x:word}",
+            "ENDx END",
+        ),
+        (
+            "termination scanning",
+            "repeat until \"END\" {a:word b:word}",
+            "a END END",
+        ),
+        ("termination scanning", "repeat until \"END\" {x:word}", "a"),
+        (
+            "termination scanning",
+            "repeat until \"END\" store end {x:int}",
+            "END",
+        ),
+        (
+            "termination scanning",
+            "tokens \";\" repeat until \";\" store end {x:word} tail:word",
+            "a;b",
+        ),
+        (
+            "stores aliases",
+            "repeat until \"END\" store _ {} repeat 1 {repeat until \"STOP\" store _ {}}",
+            "END STOP",
+        ),
+        (
+            "stores aliases",
+            "repeat 1 {repeat until \"END\" store ending {x:int}}",
+            "1 END",
+        ),
+        (
+            "stores aliases",
+            "repeat 2 as rows {each row x:int repeat 0 as ys {each y z:word}}",
+            "1 2",
+        ),
+        ("index", "index missing", "oops"),
+        ("index", "repeat 1 {index 1.0}", "oops"),
+        ("index", "repeat 1 {index 2147483648}", "oops"),
+        (
+            "index",
+            "repeat 2 {index 2147483647}",
+            "2147483647 2147483648",
+        ),
+        ("index", "repeat 1 {\nindex 1\n}", "oops"),
+        ("index", "repeat 2 {\nindex 1\nx:int\n}", "1 7\n3 8"),
+        ("missing type depth", "repeat 1 {if 0 {z:int a:int}}", ""),
+        (
+            "missing type depth",
+            "repeat 2 {k:int if k {a:int b:int} else {a:word b:word}}",
+            "1 1 2 0 a b",
+        ),
+        (
+            "nested columns",
+            "repeat 2 {n:int type t=0..n x:t}",
+            "1 1 2 2",
+        ),
+        (
+            "nested columns",
+            "repeat 2 {k:int if k {repeat 1 {x:int}}}",
+            "0 1 7",
+        ),
+        ("nested columns", "repeat 2 {repeat 0 {x[1][1]:float}}", ""),
+        (
+            "nested columns",
+            "type t=word repeat 0 {a:t type u=float b[1]:u}",
+            "",
+        ),
+        (
+            "ragged lists",
+            "repeat 3 {list a:num until 0} let s=sum(row in a:count(row))",
+            "0 1 2 0 3.5 0",
+        ),
+        (
+            "ragged lists",
+            "repeat 2 {list a:word until eol}",
+            "a b\nc\n",
+        ),
+        (
+            "ragged lists",
+            "repeat 2 {list a:1..2 until 0 offset 7}",
+            "1 0 2 0",
+        ),
+        (
+            "ragged lists",
+            "repeat 2 {list a:int until 0 offset 1}",
+            "0 9223372036854775807 0",
+        ),
+        (
+            "termination scanning",
+            "comment \"#\" stop \"STOP\" repeat until eof {x:word}",
+            "#skip\r\na b\r\nSTOP\r\ntail",
+        ),
+        (
+            "termination scanning",
+            "separators \",\" repeat until \"END\" {x:word} tail:word",
+            "a,b,END,z",
+        ),
+        (
+            "count and frames",
+            "let x=9 repeat 2 {let before=x x:int let after=x let x=after}",
+            "1 2",
+        ),
+        (
+            "stores aliases",
+            "repeat until \"END\" store _ {} repeat 1 {repeat until \"STOP\" store _ {}}",
+            "END STOP",
+        ),
+        (
+            "missing type depth",
+            "repeat 2 {k:int if k {a[0]:word} else {a[1]:int}}",
+            "1 0 7",
+        ),
+        (
+            "nested columns",
+            "repeat 2 {n:int repeat n {list a:int until 0}} let n=size(a) let s=sum(row in a:sum(values in row:sum(values)))",
+            "0 2 1 0 2 3 0",
+        ),
+        (
+            "progress diagnostics",
+            "repeat until eof {repeat 0 {x:int}}",
+            "1",
+        ),
+        ("index", "repeat 2 {b:int index b x:int}", "1 1 7 5 6 8"),
+        (
+            "nested columns",
+            "repeat 2 {n:int repeat n {a[1]:int}} let row=a[1] let first=row[0] let a=a let s=sum(a)",
+            "0 1 7",
+        ),
+    ] {
+        probes.push(Probe {
+            family,
+            ..Probe::new(spec, input)
+        });
+    }
+    let mut state = REPEAT_SEED;
+    while probes.len() < REPEAT_COUNT {
+        let sample = probes.len();
+        let mut next = |limit: usize| {
+            state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+            ((state >> 32) as usize) % limit
+        };
+        let count = next(5);
+        let (family, spec, input) = match sample % 8 {
+            0 => {
+                let values = (0..count)
+                    .map(|_| next(31).to_string())
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                (
+                    "count and frames",
+                    format!(
+                        "let n={count} let x=7 repeat n {{let before=x x:int let after=x let n=0}}"
+                    ),
+                    values,
+                )
+            }
+            1 => {
+                let values = (0..count)
+                    .map(|i| format!("END{i}"))
+                    .collect::<Vec<_>>()
+                    .join(",");
+                (
+                    "termination scanning",
+                    "separators \" ,\" repeat until \"END\" \"STOP\" store end {x:word} tail:word"
+                        .into(),
+                    format!("{values},END,tail"),
+                )
+            }
+            2 => (
+                "stores aliases",
+                format!(
+                    "repeat {count} as rows {{each row repeat until \"END\" store ending {{}}}}"
+                ),
+                "END ".repeat(count),
+            ),
+            3 => {
+                let mut input = String::new();
+                for _ in 0..count {
+                    for _ in 0..next(9) {
+                        input.push_str(&format!("{} ", next(30) + 1));
+                    }
+                    input.push_str("0 ");
+                }
+                (
+                    "ragged lists",
+                    format!(
+                        "repeat {count} {{list a:num until 0 offset -1}} let s=sum(row in a:sum(row))"
+                    ),
+                    input,
+                )
+            }
+            4 => {
+                let depth = next(3) + 1;
+                let shape = "[1]".repeat(depth);
+                let mut input = String::new();
+                for _ in 0..count {
+                    let present = next(2);
+                    input.push_str(&format!("{present} "));
+                    if present == 1 {
+                        input.push_str("7 ");
+                    }
+                }
+                (
+                    "missing type depth",
+                    format!("repeat {count} {{k:int if k {{a{shape}:int}}}}"),
+                    input,
+                )
+            }
+            5 => {
+                let depth = next(if count == 4 { 3 } else { 4 }) + 1;
+                // At most 120 executed iterations and 81 stored leaves.
+                let spec = format!(
+                    "{}x:int{} let s=sum(x)",
+                    format!("repeat {count} {{").repeat(depth),
+                    "}".repeat(depth)
+                );
+                ("nested columns", spec, "7 ".repeat(count.pow(depth as u32)))
+            }
+            6 => {
+                let mut input = String::new();
+                for row in 0..count {
+                    let base = next(6);
+                    let mismatch = usize::from(sample % 3 == 0 && row + 1 == count);
+                    input.push_str(&format!("{base} {} ", base + row + mismatch));
+                }
+                ("index", format!("repeat {count} {{b:int index b}}"), input)
+            }
+            _ => {
+                let input = if next(2) == 0 {
+                    "  ".into()
+                } else {
+                    String::new()
+                };
+                (
+                    "progress diagnostics",
+                    format!("repeat {count} {{repeat 2 {{let x=1}} repeat until eof {{y:int}}}}"),
+                    input,
+                )
+            }
+        };
+        assert!(spec.len() <= 32768 && input.len() <= 32768);
+        probes.push(Probe {
+            family,
+            ..Probe::new(spec, input)
+        });
+    }
+    assert_eq!(
+        probes.len(),
+        REPEAT_COUNT,
         "curated probes must never be truncated"
     );
     probes

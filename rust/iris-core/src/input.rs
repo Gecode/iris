@@ -47,10 +47,16 @@ impl Settings {
 pub(crate) struct Input<'a> {
     pub bytes: &'a [u8],
     pub origin: &'a str,
+    cursor: Cursor,
+    next_data: Option<Position>,
+    pub settings: Settings,
+}
+#[derive(Clone, Copy)]
+struct Cursor {
     offset: usize,
     line: usize,
     line_start: usize,
-    pub settings: Settings,
+    line_blank: bool,
 }
 pub(crate) struct Token<'a> {
     pub bytes: &'a [u8],
@@ -62,17 +68,21 @@ impl<'a> Input<'a> {
         Self {
             bytes,
             origin,
-            offset: 0,
-            line: 1,
-            line_start: 0,
+            cursor: Cursor {
+                offset: 0,
+                line: 1,
+                line_start: 0,
+                line_blank: true,
+            },
+            next_data: None,
             settings: Settings::default(),
         }
     }
     pub fn position(&self) -> Position {
         Position {
-            offset: self.offset,
-            line: self.line,
-            column: self.offset - self.line_start + 1,
+            offset: self.cursor.offset,
+            line: self.cursor.line,
+            column: self.cursor.offset - self.cursor.line_start + 1,
         }
     }
     pub fn position_at(&self, offset: usize) -> Position {
@@ -87,28 +97,30 @@ impl<'a> Input<'a> {
         }
     }
     fn advance_to(&mut self, end: usize) {
-        for offset in self.offset..end {
+        if end != self.cursor.offset {
+            self.next_data = None;
+        }
+        for offset in self.cursor.offset..end {
             if self.bytes[offset] == b'\n' {
-                self.line += 1;
-                self.line_start = offset + 1;
+                self.cursor.line += 1;
+                self.cursor.line_start = offset + 1;
+                self.cursor.line_blank = true;
+            } else if !is_line_blank(self.bytes[offset]) {
+                self.cursor.line_blank = false;
             }
         }
-        self.offset = end;
+        self.cursor.offset = end;
     }
     pub fn skip_to_data(&mut self) {
         loop {
-            let mut end = self.offset;
+            let mut end = self.cursor.offset;
             while end < self.bytes.len()
                 && self.settings.classes[self.bytes[end] as usize] == Class::Separator
             {
                 end += 1;
             }
             self.advance_to(end);
-            if end == self.bytes.len()
-                || !self.bytes[self.line_start..end]
-                    .iter()
-                    .all(|b| is_line_blank(*b))
-            {
+            if end == self.bytes.len() || !self.cursor.line_blank {
                 return;
             }
             let tail = &self.bytes[end..];
@@ -133,7 +145,7 @@ impl<'a> Input<'a> {
     }
     /// Skip separators on this physical line, leaving its LF unconsumed.
     pub fn skip_to_line_data(&mut self) -> bool {
-        let mut end = self.offset;
+        let mut end = self.cursor.offset;
         while end < self.bytes.len()
             && self.bytes[end] != b'\n'
             && self.settings.classes[self.bytes[end] as usize] == Class::Separator
@@ -144,19 +156,19 @@ impl<'a> Input<'a> {
         end < self.bytes.len() && self.bytes[end] != b'\n'
     }
     pub fn peek_byte(&self) -> Option<u8> {
-        self.bytes.get(self.offset).copied()
+        self.bytes.get(self.cursor.offset).copied()
     }
     pub fn consume_byte(&mut self) {
-        self.advance_to(self.offset + 1);
+        self.advance_to(self.cursor.offset + 1);
     }
     pub fn next_token(&mut self) -> Option<Token<'a>> {
         self.skip_to_data();
-        if self.offset == self.bytes.len() {
+        if self.cursor.offset == self.bytes.len() {
             return None;
         }
         let start = self.position();
-        let mut end = self.offset + 1;
-        if self.settings.classes[self.bytes[self.offset] as usize] == Class::Plain {
+        let mut end = self.cursor.offset + 1;
+        if self.settings.classes[self.bytes[self.cursor.offset] as usize] == Class::Plain {
             while end < self.bytes.len()
                 && self.settings.classes[self.bytes[end] as usize] == Class::Plain
             {
@@ -170,25 +182,53 @@ impl<'a> Input<'a> {
             end: self.position(),
         })
     }
+    pub fn settings_changed(&mut self) {
+        self.next_data = None;
+    }
+    pub fn next_data_position(&mut self) -> Position {
+        if let Some(position) = self.next_data {
+            return position;
+        }
+        let cursor = self.cursor;
+        self.skip_to_data();
+        let position = self.position();
+        self.cursor = cursor;
+        self.next_data = Some(position);
+        position
+    }
+    pub fn peek_token(&mut self) -> Option<Token<'a>> {
+        let cursor = self.cursor;
+        let next_data = self.next_data;
+        let token = self.next_token();
+        self.cursor = cursor;
+        self.next_data = next_data;
+        token
+    }
     pub fn read_rest(&mut self) -> Option<Token<'a>> {
         self.skip_to_data();
-        if self.offset == self.bytes.len() {
+        if self.cursor.offset == self.bytes.len() {
             return None;
         }
         let start = self.position();
-        let end = self.bytes[self.offset..]
+        let end = self.bytes[self.cursor.offset..]
             .iter()
             .position(|&b| b == b'\n')
-            .map_or(self.bytes.len(), |n| self.offset + n);
+            .map_or(self.bytes.len(), |n| self.cursor.offset + n);
         let mut trimmed = end;
-        while trimmed > self.offset && is_line_blank(self.bytes[trimmed - 1]) {
+        while trimmed > self.cursor.offset && is_line_blank(self.bytes[trimmed - 1]) {
             trimmed -= 1;
         }
         self.advance_to(end);
+        // The token holds no LF, so its end lies on its start's line.
+        let end = Position {
+            offset: trimmed,
+            column: start.column + (trimmed - start.offset),
+            ..start
+        };
         Some(Token {
             bytes: &self.bytes[start.offset..trimmed],
             start,
-            end: self.position_at(trimmed),
+            end,
         })
     }
 }

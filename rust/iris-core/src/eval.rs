@@ -26,6 +26,7 @@ impl Interpreter<'_, '_> {
             }
             K::Name => {
                 let own_tokens = tokens(node);
+                self.require_value_name(&own_tokens[0])?;
                 let name = own_tokens[0].text();
                 self.lookup(name).cloned().ok_or_else(|| {
                     self.error(
@@ -58,6 +59,21 @@ impl Interpreter<'_, '_> {
             )),
             _ => unreachable!("expression kind"),
         }
+    }
+    fn require_value_name(&self, token: &iris_syntax::SyntaxToken) -> Result<(), Failure> {
+        if let Some(reference) = self.spec.index.references.get(&token.text_range())
+            && matches!(
+                self.spec.analysis.model.reference(*reference).resolution,
+                iris_sema::Resolution::Structural { .. }
+            )
+        {
+            return Err(unsupported(
+                token.text_range(),
+                "record expression evaluation",
+                "rust-007",
+            ));
+        }
+        Ok(())
     }
     fn eval_unary(&mut self, node: &SyntaxNode) -> Result<Value, Failure> {
         let value = self.eval(&expression(node))?;
@@ -200,9 +216,16 @@ impl Interpreter<'_, '_> {
             while argument.kind() == K::Parenthesized {
                 argument = expression(&argument);
             }
-            return Ok(Value::int(i64::from(
-                self.lookup(tokens(&argument)[0].text()).is_some(),
-            )));
+            if argument.kind() == K::Field {
+                return Err(unsupported(
+                    argument.text_range(),
+                    "record field evaluation",
+                    "rust-007",
+                ));
+            }
+            let name = &tokens(&argument)[0];
+            self.require_value_name(name)?;
+            return Ok(Value::int(i64::from(self.lookup(name.text()).is_some())));
         }
         if matches!(name, "size" | "count") {
             let value = self.eval(&expression(node))?;

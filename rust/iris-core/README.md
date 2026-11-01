@@ -25,7 +25,10 @@ The byte-slice interface also permits a future caller to use a memory map.
 Execution supports int, float, num, word, rest, and integer ranges;
 named types with frozen bounds, alphabet options, and aliases; fixed arrays,
 including empty rows; numeric offsets; every matrix layout; sentinel and
-end-of-line lists; and byte alphabets. Settings execute in statement order.
+end-of-line lists; and byte alphabets. Counted, token-terminated, and EOF
+repeats collect final local values into columns, including ragged and missing
+array rows. Index statements validate the innermost iteration number.
+Settings execute in statement order.
 The evaluator supports if/else and let, scalar operators and comparisons,
 array truth, flattened integer aggregates, size/count, indexing, and ordinary
 array comprehensions with scoped bindings. Integers use checked 64-bit
@@ -49,8 +52,14 @@ Its display renders runtime excerpts and byte-position carets; `to_json`
 renders the canonical error envelope. Data JSON uses shortest round-tripping
 float digits with the Specification's notation choice and signed-zero rule.
 
-Later tasks add repeat/records (rust-005), line patterns and sections (006),
-checks and record expressions (007), parameter execution and instances/catalog
+Repeat execution uses an explicit work stack for blocks, conditionals, and
+nested repeats. Private record metadata retains start positions and parent/row
+identities independently of field values; `as` and `each` create no entries.
+Column construction and JSON writing iterate over flat array levels, including
+arrays whose depth exceeds the parser's block-nesting limit.
+
+Later tasks add line patterns and sections (rust-006), checks and record
+expressions (007), parameter execution and instances/catalog
 (008), budget enforcement (009), and dzn output (010). Supplied parameter
 strings are transported and unknown names rejected; declarations/defaults do
 not execute yet. Expression and idle-work hooks are fallible and impose no
@@ -66,5 +75,5 @@ cargo test --locked -p iris-cli --test read_conformance -- --nocapture
 Conformance is the main semantic coverage. A focused column-access test checks
 borrowed ragged rows, selected-subtree copying, and empty depth/type
 preservation. The CLI's ignored `scalar_differential` test compares 256 scalar
-and 384 array/read probes with the pinned Gecode adapter; see the
-[CLI README](../iris-cli/README.md#conformance-driver).
+and 384 array/read probes, plus 384 repeat probes at seed 73005, with the pinned
+Gecode adapter; see the [CLI README](../iris-cli/README.md#conformance-driver).

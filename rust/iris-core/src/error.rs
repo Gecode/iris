@@ -31,6 +31,12 @@ pub enum ErrorCode {
     IndexType,
     IndexRange,
     ValueTypeMix,
+    RepeatTerminator,
+    NoProgress,
+    RepeatMissing,
+    RepeatDepth,
+    IndexContext,
+    IndexMismatch,
 }
 impl ErrorCode {
     pub fn as_str(self) -> &'static str {
@@ -59,6 +65,12 @@ impl ErrorCode {
             Self::IndexScalar => "E-INDEX-SCALAR",
             Self::IndexType => "E-INDEX-TYPE",
             Self::IndexRange => "E-INDEX-RANGE",
+            Self::RepeatTerminator => "E-REPEAT-TERMINATOR",
+            Self::NoProgress => "E-NO-PROGRESS",
+            Self::RepeatMissing => "E-REPEAT-MISSING",
+            Self::RepeatDepth => "E-REPEAT-DEPTH",
+            Self::IndexContext => "E-INDEX-CONTEXT",
+            Self::IndexMismatch => "E-INDEX-MISMATCH",
             Self::ValueTypeMix => "E-VALUE-TYPE-MIX",
             Self::TrailingInput => "E-TRAILING-INPUT",
         }
