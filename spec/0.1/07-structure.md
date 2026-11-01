@@ -236,6 +236,22 @@ line "{x:int"
 {"code": "E-SPEC-PATTERN", "message": "unterminated capture in pattern \"{x:int\"", "input_location": null, "spec_location": {"origin": "spec.iris", "line": 1, "column": null}, "context": null, "record_path": null}
 ```
 
+Compiling a pattern MUST first check its whole structure: capture
+delimiters, capture names, `{$x}` reference names, and the position of
+`...`. Only then MUST it lex and parse each capture's reading type, in
+capture order. A structural failure anywhere in the pattern is therefore
+reported before a type failure in an earlier capture. Here the second
+capture's name is rejected although the first capture's type is invalid.
+
+```iris example
+id: structure-pattern-structure-before-types
+operation: parse
+--- spec
+line "{x:@}{bad name}"
+--- expected error
+{"code": "E-SPEC-PATTERN", "message": "capture name 'bad name' in pattern \"{x:@}{bad name}\" is not a name", "input_location": null, "spec_location": {"origin": "spec.iris", "line": 1, "column": null}, "context": null, "record_path": null}
+```
+
 ## 7.3 Line, find, skip, and expect
 
 `line` MUST require the rest of the current line, after normal skipping,

@@ -76,7 +76,7 @@ which failure is reported when several rules would be violated.
 | Phase | Required traversal and checks |
 |---|---|
 | Complete-source lexing | Lex every token before parsing any statement. |
-| Statement parsing | Parse statements in source traversal order, compiling each pattern when reached. Syntax, type-form, function, constant, local-name, and placement failures discovered during this traversal are immediate. |
+| Statement parsing | Parse statements in source traversal order, compiling each pattern when reached: its whole structure first, then its capture types in capture order ([§7.2](07-structure.md#72-line-patterns-and-captures)). Syntax, type-form, function, constant, local-name, and placement failures discovered during this traversal are immediate. |
 | Comprehension-binding/value conflicts | Check each completed comprehension's binding against ordinary definitions anywhere in the reader spec, in comprehension completion order. Nested comprehensions complete before their enclosing comprehension. |
 | Named-type/value conflicts | Check named types against ordinary definitions anywhere in the reader spec, in type-definition completion order. |
 | Structural-name prechecks | Visit repeats in source traversal order, outer before inner. For each repeat, check its `as` name against preceding structural names and all ordinary definitions; then check whether its `as` and `each` names coincide; then check its `each` name against the same conflicts. These checks precede every expression-resolution failure. |
