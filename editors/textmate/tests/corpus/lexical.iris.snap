@@ -1,0 +1,256 @@
+># Iris 0.1: source comments may contain Unicode, such as å and λ.
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ source.iris comment.line.number-sign.iris
+>format dimacs-cnf.v2
+#^^^^^^ source.iris meta.format.iris keyword.control.iris
+#      ^ source.iris meta.format.iris
+#       ^^^^^^^^^^^^^ source.iris meta.format.iris entity.name.section.iris
+>format "a quoted format"
+#^^^^^^ source.iris meta.format.iris keyword.control.iris
+#      ^ source.iris meta.format.iris
+#       ^^^^^^^^^^^^^^^^^ source.iris meta.format.iris string.quoted.double.iris
+>comment "#" "//" stop "END" tokens ":" separators ",;" ignore trailing
+#^^^^^^^ source.iris keyword.control.iris
+#       ^ source.iris
+#        ^ source.iris string.quoted.double.iris punctuation.definition.string.begin.iris
+#         ^ source.iris string.quoted.double.iris
+#          ^ source.iris string.quoted.double.iris punctuation.definition.string.end.iris
+#           ^ source.iris
+#            ^ source.iris string.quoted.double.iris punctuation.definition.string.begin.iris
+#             ^^ source.iris string.quoted.double.iris
+#               ^ source.iris string.quoted.double.iris punctuation.definition.string.end.iris
+#                ^ source.iris
+#                 ^^^^ source.iris keyword.control.iris
+#                     ^ source.iris
+#                      ^ source.iris string.quoted.double.iris punctuation.definition.string.begin.iris
+#                       ^^^ source.iris string.quoted.double.iris
+#                          ^ source.iris string.quoted.double.iris punctuation.definition.string.end.iris
+#                           ^ source.iris
+#                            ^^^^^^ source.iris keyword.control.iris
+#                                  ^ source.iris
+#                                   ^ source.iris string.quoted.double.iris punctuation.definition.string.begin.iris
+#                                    ^ source.iris string.quoted.double.iris
+#                                     ^ source.iris string.quoted.double.iris punctuation.definition.string.end.iris
+#                                      ^ source.iris
+#                                       ^^^^^^^^^^ source.iris keyword.control.iris
+#                                                 ^ source.iris
+#                                                  ^ source.iris string.quoted.double.iris punctuation.definition.string.begin.iris
+#                                                   ^^ source.iris string.quoted.double.iris
+#                                                     ^ source.iris string.quoted.double.iris punctuation.definition.string.end.iris
+#                                                      ^ source.iris
+#                                                       ^^^^^^ source.iris keyword.control.iris
+#                                                             ^ source.iris
+#                                                              ^^^^^^^^ source.iris keyword.control.iris
+>let text = "å # {plain} {$plain} ... \n\t\\\""
+#^^^ source.iris keyword.control.iris
+#   ^ source.iris
+#    ^^^^ source.iris variable.other.definition.iris
+#        ^ source.iris
+#         ^ source.iris keyword.operator.iris
+#          ^ source.iris
+#           ^ source.iris string.quoted.double.iris punctuation.definition.string.begin.iris
+#            ^^^^^^^^^^^^^^^^^^^^^^^^^ source.iris string.quoted.double.iris
+#                                     ^^ source.iris string.quoted.double.iris constant.character.escape.iris
+#                                       ^^ source.iris string.quoted.double.iris constant.character.escape.iris
+#                                         ^^ source.iris string.quoted.double.iris constant.character.escape.iris
+#                                           ^^ source.iris string.quoted.double.iris constant.character.escape.iris
+#                                             ^ source.iris string.quoted.double.iris punctuation.definition.string.end.iris
+>let integer = 007 let decimal = 1. let exponent = 1.e2 let signed = -01e+2
+#^^^ source.iris keyword.control.iris
+#   ^ source.iris
+#    ^^^^^^^ source.iris variable.other.definition.iris
+#           ^ source.iris
+#            ^ source.iris keyword.operator.iris
+#             ^ source.iris
+#              ^^^ source.iris constant.numeric.integer.iris
+#                 ^ source.iris
+#                  ^^^ source.iris keyword.control.iris
+#                     ^ source.iris
+#                      ^^^^^^^ source.iris variable.other.definition.iris
+#                             ^ source.iris
+#                              ^ source.iris keyword.operator.iris
+#                               ^ source.iris
+#                                ^^ source.iris constant.numeric.float.iris
+#                                  ^ source.iris
+#                                   ^^^ source.iris keyword.control.iris
+#                                      ^ source.iris
+#                                       ^^^^^^^^ source.iris variable.other.definition.iris
+#                                               ^ source.iris
+#                                                ^ source.iris keyword.operator.iris
+#                                                 ^ source.iris
+#                                                  ^^^^ source.iris constant.numeric.float.iris
+#                                                      ^ source.iris
+#                                                       ^^^ source.iris keyword.control.iris
+#                                                          ^ source.iris
+#                                                           ^^^^^^ source.iris variable.other.definition.iris
+#                                                                 ^ source.iris
+#                                                                  ^ source.iris keyword.operator.iris
+#                                                                   ^ source.iris
+#                                                                    ^ source.iris keyword.operator.iris
+#                                                                     ^^^^^ source.iris constant.numeric.float.iris
+>let minimum = -9223372036854775807-1 let maximum = 9223372036854775807
+#^^^ source.iris keyword.control.iris
+#   ^ source.iris
+#    ^^^^^^^ source.iris variable.other.definition.iris
+#           ^ source.iris
+#            ^ source.iris keyword.operator.iris
+#             ^ source.iris
+#              ^ source.iris keyword.operator.iris
+#               ^^^^^^^^^^^^^^^^^^^ source.iris constant.numeric.integer.iris
+#                                  ^ source.iris keyword.operator.iris
+#                                   ^ source.iris constant.numeric.integer.iris
+#                                    ^ source.iris
+#                                     ^^^ source.iris keyword.control.iris
+#                                        ^ source.iris
+#                                         ^^^^^^^ source.iris variable.other.definition.iris
+#                                                ^ source.iris
+#                                                 ^ source.iris keyword.operator.iris
+#                                                  ^ source.iris
+#                                                   ^^^^^^^^^^^^^^^^^^^ source.iris constant.numeric.integer.iris
+>let tiny = 2.2250738585072014e-308 let large = 1.7976931348623157e308
+#^^^ source.iris keyword.control.iris
+#   ^ source.iris
+#    ^^^^ source.iris variable.other.definition.iris
+#        ^ source.iris
+#         ^ source.iris keyword.operator.iris
+#          ^ source.iris
+#           ^^^^^^^^^^^^^^^^^^^^^^^ source.iris constant.numeric.float.iris
+#                                  ^ source.iris
+#                                   ^^^ source.iris keyword.control.iris
+#                                      ^ source.iris
+#                                       ^^^^^ source.iris variable.other.definition.iris
+#                                            ^ source.iris
+#                                             ^ source.iris keyword.operator.iris
+#                                              ^ source.iris
+#                                               ^^^^^^^^^^^^^^^^^^^^^^ source.iris constant.numeric.float.iris
+>let continued = 1
+#^^^ source.iris keyword.control.iris
+#   ^ source.iris
+#    ^^^^^^^^^ source.iris variable.other.definition.iris
+#             ^ source.iris
+#              ^ source.iris keyword.operator.iris
+#               ^ source.iris
+#                ^ source.iris constant.numeric.integer.iris
+>  + 2 * 3^2 - 8/2%3
+#^^ source.iris
+#  ^ source.iris keyword.operator.iris
+#   ^ source.iris
+#    ^ source.iris constant.numeric.integer.iris
+#     ^ source.iris
+#      ^ source.iris keyword.operator.iris
+#       ^ source.iris
+#        ^ source.iris constant.numeric.integer.iris
+#         ^ source.iris keyword.operator.iris
+#          ^ source.iris constant.numeric.integer.iris
+#           ^ source.iris
+#            ^ source.iris keyword.operator.iris
+#             ^ source.iris
+#              ^ source.iris constant.numeric.integer.iris
+#               ^ source.iris keyword.operator.iris
+#                ^ source.iris constant.numeric.integer.iris
+#                 ^ source.iris keyword.operator.iris
+#                  ^ source.iris constant.numeric.integer.iris
+>let logic = !0 && 1 || (1 != 2 && 3 >= 2 && 2 <= 3 && 1 < 2 && 3 > 2)
+#^^^ source.iris keyword.control.iris
+#   ^ source.iris
+#    ^^^^^ source.iris variable.other.definition.iris
+#         ^ source.iris
+#          ^ source.iris keyword.operator.iris
+#           ^ source.iris
+#            ^ source.iris keyword.operator.iris
+#             ^ source.iris constant.numeric.integer.iris
+#              ^ source.iris
+#               ^^ source.iris keyword.operator.iris
+#                 ^ source.iris
+#                  ^ source.iris constant.numeric.integer.iris
+#                   ^ source.iris
+#                    ^^ source.iris keyword.operator.iris
+#                      ^ source.iris
+#                       ^ source.iris punctuation.section.group.iris
+#                        ^ source.iris constant.numeric.integer.iris
+#                         ^ source.iris
+#                          ^^ source.iris keyword.operator.iris
+#                            ^ source.iris
+#                             ^ source.iris constant.numeric.integer.iris
+#                              ^ source.iris
+#                               ^^ source.iris keyword.operator.iris
+#                                 ^ source.iris
+#                                  ^ source.iris constant.numeric.integer.iris
+#                                   ^ source.iris
+#                                    ^^ source.iris keyword.operator.iris
+#                                      ^ source.iris
+#                                       ^ source.iris constant.numeric.integer.iris
+#                                        ^ source.iris
+#                                         ^^ source.iris keyword.operator.iris
+#                                           ^ source.iris
+#                                            ^ source.iris constant.numeric.integer.iris
+#                                             ^ source.iris
+#                                              ^^ source.iris keyword.operator.iris
+#                                                ^ source.iris
+#                                                 ^ source.iris constant.numeric.integer.iris
+#                                                  ^ source.iris
+#                                                   ^^ source.iris keyword.operator.iris
+#                                                     ^ source.iris
+#                                                      ^ source.iris constant.numeric.integer.iris
+#                                                       ^ source.iris
+#                                                        ^ source.iris keyword.operator.iris
+#                                                         ^ source.iris
+#                                                          ^ source.iris constant.numeric.integer.iris
+#                                                           ^ source.iris
+#                                                            ^^ source.iris keyword.operator.iris
+#                                                              ^ source.iris
+#                                                               ^ source.iris constant.numeric.integer.iris
+#                                                                ^ source.iris
+#                                                                 ^ source.iris keyword.operator.iris
+#                                                                  ^ source.iris
+#                                                                   ^ source.iris constant.numeric.integer.iris
+#                                                                    ^ source.iris punctuation.section.group.iris
+>line: int type: 0.. list: word each: int layout: int
+#^^^^ source.iris variable.other.definition.iris
+#    ^ source.iris punctuation.separator.type.iris
+#     ^ source.iris
+#      ^^^ source.iris storage.type.iris
+#         ^ source.iris
+#          ^^^^ source.iris variable.other.definition.iris
+#              ^ source.iris punctuation.separator.type.iris
+#               ^ source.iris
+#                ^ source.iris constant.numeric.integer.iris
+#                 ^^ source.iris keyword.operator.range.iris
+#                   ^ source.iris
+#                    ^^^^ source.iris variable.other.definition.iris
+#                        ^ source.iris punctuation.separator.type.iris
+#                         ^ source.iris
+#                          ^^^^ source.iris storage.type.iris
+#                              ^ source.iris
+#                               ^^^^ source.iris variable.other.definition.iris
+#                                   ^ source.iris punctuation.separator.type.iris
+#                                    ^ source.iris
+#                                     ^^^ source.iris storage.type.iris
+#                                        ^ source.iris
+#                                         ^^^^^^ source.iris variable.other.definition.iris
+#                                               ^ source.iris punctuation.separator.type.iris
+#                                                ^ source.iris
+#                                                 ^^^ source.iris storage.type.iris
+>repeat 1 { format:int comment:int offset[1]:int }
+#^^^^^^ source.iris keyword.control.iris
+#      ^ source.iris
+#       ^ source.iris constant.numeric.integer.iris
+#        ^ source.iris
+#         ^ source.iris meta.block.iris punctuation.section.block.begin.iris
+#          ^ source.iris meta.block.iris
+#           ^^^^^^ source.iris meta.block.iris variable.other.definition.iris
+#                 ^ source.iris meta.block.iris punctuation.separator.type.iris
+#                  ^^^ source.iris meta.block.iris storage.type.iris
+#                     ^ source.iris meta.block.iris
+#                      ^^^^^^^ source.iris meta.block.iris variable.other.definition.iris
+#                             ^ source.iris meta.block.iris punctuation.separator.type.iris
+#                              ^^^ source.iris meta.block.iris storage.type.iris
+#                                 ^ source.iris meta.block.iris
+#                                  ^^^^^^ source.iris meta.block.iris variable.other.definition.iris
+#                                        ^ source.iris meta.block.iris punctuation.section.brackets.iris
+#                                         ^ source.iris meta.block.iris constant.numeric.integer.iris
+#                                          ^ source.iris meta.block.iris punctuation.section.brackets.iris
+#                                           ^ source.iris meta.block.iris punctuation.separator.type.iris
+#                                            ^^^ source.iris meta.block.iris storage.type.iris
+#                                               ^ source.iris meta.block.iris
+#                                                ^ source.iris meta.block.iris punctuation.section.block.end.iris
+>

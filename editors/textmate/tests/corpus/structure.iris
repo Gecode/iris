@@ -1,0 +1,35 @@
+format structure
+param count = 2
+param title
+expect "BEGIN" "DATA"
+skip line skip 2 lines
+skip
+  # Source line breaks do not end statements.
+  line
+line
+  # Pattern after a comment.
+  "header {heading}"
+find "count {n:int}"
+if n > 0 { let active = 1 } else if n == 0 { let active = 0 } else { let active = -1 }
+if 0 {} else if:int
+repeat count as rows {
+  each row
+  index 1
+  item: int
+  list values: int until eol
+  repeat until "END" "STOP" store end_marker { value: num }
+}
+repeat until eof { tail: rest }
+sections until "END {literal}" store terminator skip other {
+  "optional {optional_value:int}" optional
+  "nested" {
+    sections skip other {
+      "inner {inner_value:word}" optional last { skip line }
+    }
+    let plain = "{not_a_capture} ..."
+    check 1 "{not_a_capture_either}"
+  }
+  "final {final_value:int}" optional last { expect "!" }
+}
+instances { line "instance {name}" value: int }
+format last-name.v2

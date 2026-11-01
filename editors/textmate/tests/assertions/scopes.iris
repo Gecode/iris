@@ -1,0 +1,154 @@
+# SYNTAX TEST "source.iris" "Iris 0.1 scope boundaries"
+line: int type: 0.. list: word each: int layout: int
+# <---- variable.other.definition.iris - keyword.control.iris
+#         ^^^^ variable.other.definition.iris - keyword.control.iris
+#                   ^^^^ variable.other.definition.iris - keyword.control.iris
+#                              ^^^^ variable.other.definition.iris - keyword.control.iris
+#                                        ^^^^^^ variable.other.definition.iris - keyword.control.iris
+#     ^^^ storage.type.iris
+#                ^^ keyword.operator.range.iris
+let dims = 2
+line[dims]: int
+# <---- variable.other.definition.iris - keyword.control.iris
+repeat[dims]: int
+# <------ variable.other.definition.iris - keyword.control.iris
+if[size("[")]:int
+# <- variable.other.definition.iris - keyword.control.iris
+let values = dims
+sections[values[0]]: int
+# <-------- variable.other.definition.iris - keyword.control.iris
+base: int offset: int blank: int strip: int
+# <---- variable.other.definition.iris - keyword.control.iris
+#         ^^^^^^ variable.other.definition.iris - keyword.control.iris
+#                     ^^^^^ variable.other.definition.iris - keyword.control.iris
+#                                ^^^^^ variable.other.definition.iris - keyword.control.iris
+line "{x:int} {word} {:int} {_} {$x} ..."
+# <---- keyword.control.iris - variable.other.definition.iris
+#      ^ variable.other.definition.iris
+#        ^^^ storage.type.iris
+#              ^^^^ variable.other.definition.iris
+#                      ^^^ storage.type.iris
+#                            ^ variable.other.definition.iris
+#                                ^ punctuation.definition.variable.iris
+#                                 ^ variable.other.reference.iris - variable.other.definition.iris
+#                                    ^^^ keyword.operator.wildcard.iris
+let literal = "{x:int} {$x} ..."
+#              ^^^^^^^^^^^^^^^ string.quoted.double.iris - meta.capture.iris meta.reference.iris keyword.operator.wildcard.iris
+find "{found:float}"
+# <---- keyword.control.iris
+#      ^^^^^ variable.other.definition.iris
+#            ^^^^^ storage.type.iris
+skip line
+expect "{plain}"
+#       ^^^^^^^ string.quoted.double.iris - meta.capture.iris
+sections until "{plain}" {
+#               ^^^^^^^ string.quoted.double.iris - meta.capture.iris
+  "{arm:int}" optional {
+#   ^^^ variable.other.definition.iris
+#       ^^^ storage.type.iris
+#             ^^^^^^^^ keyword.control.iris
+    let ordinary = "{plain}"
+#                   ^^^^^^^ string.quoted.double.iris - meta.capture.iris
+    line "{$arm}"
+#           ^^^ variable.other.reference.iris
+  }
+  "last ..." last
+#       ^^^ keyword.operator.wildcard.iris
+}
+type positive = 1..
+#    ^^^^^^^^ entity.name.type.iris
+let line = 1
+#   ^^^^ variable.other.definition.iris - keyword.control.iris
+let f = 1.e2 let i = 007
+#       ^^^^ constant.numeric.float.iris
+#                    ^^^ constant.numeric.integer.iris
+let escapes = "\n\t\\\""
+#              ^^^^^^^^ constant.character.escape.iris
+let host = gecode.int_max
+#          ^^^^^^^^^^^^^^ constant.language.iris
+check sum(values) >= 0
+#     ^^^ support.function.iris
+#                 ^^ keyword.operator.iris
+# A comment with "quotes", {braces}, and λ.
+# <----------------------------------------- comment.line.number-sign.iris
+let integer = 1 let keyword = integer + 1
+#                             ^^^^^^^ variable.other.iris - storage.type.iris keyword.control.iris
+line "{escaped_type:\nint}"
+#                     ^^^ storage.type.iris
+repeat 1 as fields { line:int type:int }
+check fields[0].type == fields[0].line
+#               ^^^^ variable.other.member.iris - keyword.control.iris
+#                                 ^^^^ variable.other.member.iris - keyword.control.iris
+
+# Contextual references must not open statement scopes.
+let sections=1
+check sections "{message}"
+#     ^^^^^^^^ variable.other.iris - meta.sections.iris keyword.control.iris
+#               ^^^^^^^^^ string.quoted.double.iris - meta.capture.iris meta.sections.iris
+line "{real:int}"
+#      ^^^^ variable.other.definition.iris - meta.sections.iris
+let line=1 check line "{message}"
+#                ^^^^ variable.other.iris - meta.line.iris keyword.control.iris
+#                      ^^^^^^^^^ string.quoted.double.iris - meta.capture.iris
+let type=1 let skip=2 let find=3
+check type + skip * find == (sections) "{message}"
+#     ^^^^ variable.other.iris - keyword.control.iris meta.type.definition.iris meta.skip.iris meta.line.iris meta.sections.iris
+#            ^^^^ variable.other.iris - keyword.control.iris meta.type.definition.iris meta.skip.iris meta.line.iris meta.sections.iris
+#                   ^^^^ variable.other.iris - keyword.control.iris meta.type.definition.iris meta.skip.iris meta.line.iris meta.sections.iris
+#                            ^^^^^^^^ variable.other.iris - keyword.control.iris meta.type.definition.iris meta.skip.iris meta.line.iris meta.sections.iris
+type bounded = sections..3
+#              ^^^^^^^^ variable.other.iris - meta.sections.iris
+check
+  # A reference may follow a comment on another line.
+  sections "{message}"
+# ^^^^^^^^ variable.other.iris - meta.sections.iris
+line "{after:int}"
+#      ^^^^^ variable.other.definition.iris - meta.sections.iris
+
+# Quoted format names include all glued joins.
+format "quoted"-sections
+#              ^^^^^^^^^ meta.format.iris entity.name.section.iris - meta.sections.iris keyword.control.iris
+format "quoted"-gecode.int_max
+#              ^^^^^^^^^^^^^^^ meta.format.iris entity.name.section.iris - constant.language.iris
+line "{after_format:int}"
+#      ^^^^^^^^^^^^ variable.other.definition.iris - meta.format.iris meta.sections.iris
+
+# Capture-type strings have both source and decoded-string escapes.
+line "{x:0..size(\"a\\\"b\")}"
+#                   ^^^^ string.quoted.double.type.iris constant.character.escape.iris
+#                       ^ string.quoted.double.type.iris - variable.other.iris
+#                          ^ punctuation.section.group.iris - string.quoted.double.type.iris
+
+# A count keyword must not keep skip open through the next statement.
+let if=1 skip if lines
+#             ^^ variable.other.iris - keyword.control.iris
+line "{after:int}"
+#      ^^^^^ meta.capture.iris variable.other.definition.iris - meta.skip.iris
+#            ^^^ meta.capture.iris storage.type.iris - meta.skip.iris
+
+# format is permitted as a range upper bound.
+let format=2 value:0..format line "{after:int}"
+#                     ^^^^^^ variable.other.iris - meta.format.iris
+#                                   ^^^^^ meta.capture.iris variable.other.definition.iris - meta.format.iris
+#                                         ^^^ meta.capture.iris storage.type.iris - meta.format.iris
+
+# A member name may follow a comment and physical line ending.
+repeat 1 as rows {sections:int} check rows[0]. # member
+sections "{message}"
+# <-------- variable.other.member.iris - meta.sections.iris
+#          ^^^^^^^ string.quoted.double.iris - meta.capture.iris meta.sections.iris
+line "{after:int}"
+#      ^^^^^ meta.capture.iris variable.other.definition.iris - meta.sections.iris
+#            ^^^ meta.capture.iris storage.type.iris - meta.sections.iris
+
+# A numeric format join stops before a glued identifier.
+format "quoted"-1sections {"{first:int}" last}
+#              ^^ entity.name.section.iris - keyword.control.iris
+#                ^^^^^^^^ keyword.control.iris - meta.format.iris
+#                            ^^^^^ meta.capture.iris variable.other.definition.iris
+#                                  ^^^ meta.capture.iris storage.type.iris
+
+# A keyword inside a capture bound cannot open a binding past its punctuation.
+line "{bound:0..(as)}" line "{after:int}"
+#                             ^^^^^ meta.capture.iris variable.other.definition.iris
+#                                   ^^^ meta.capture.iris storage.type.iris

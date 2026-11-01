@@ -1,0 +1,16 @@
+format patterns
+type positive = 1..9
+let current = "value" let number = 7
+line "{typed:int} {default} {:int} {_} {_:float} {}"
+line "{$current}:{$number} {ranged:0..9} {named:positive}"
+find "{floating:float}, {numeric:num}; {word:word}! {tail:rest}"
+line "a literal closing brace } and a quote \" {value:int} ...\t"
+line "{bounded:0..(1+2)*3} {negative:-9..0} {open:1..} {upper:..<9}"
+line "{quoted:\"a\"..\"z\"}"
+line "a\nb {newline_type:\nint}"
+sections until "{this_is_literal}" {
+  "{$current} {section_value:int}" optional
+  "last ..." last { line "body {body_value:word}" }
+}
+expect "{literal} {$literal} ..." check 1 "{literal} ..."
+line "{unicode:\"å\"..\"ö\"} {commented:int # quoted \"comment\"\n}"

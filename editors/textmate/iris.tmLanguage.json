@@ -1,0 +1,283 @@
+{
+  "name": "Iris",
+  "scopeName": "source.iris",
+  "fileTypes": ["iris"],
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#declaration-name" },
+    { "include": "#range-bound" },
+    { "include": "#operand" },
+    { "include": "#expression-group" },
+    { "include": "#block" },
+    { "include": "#sections" },
+    { "include": "#skip" },
+    { "include": "#line" },
+    { "include": "#type-definition" },
+    { "include": "#format" },
+    { "include": "#string" },
+    { "include": "#expression" }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.number-sign.iris",
+      "match": "#.*$"
+    },
+    "declaration-name": {
+      "comment": "Prioritize names over keywords. The recursive lookahead ignores brackets in strings and balances nested indices on the current physical line.",
+      "name": "variable.other.definition.iris",
+      "match": "[A-Za-z_][A-Za-z0-9_]*(?=[ \\t\\r\\x0b\\x0c]*(?:(?<dimension>\\[(?:[^\\[\\]\\\"#]|\\\"(?:\\\\.|[^\\\"\\\\])*\\\"|\\g<dimension>)*\\])[ \\t\\r\\x0b\\x0c]*)*:)"
+    },
+    "block": {
+      "name": "meta.block.iris",
+      "begin": "\\{",
+      "beginCaptures": { "0": { "name": "punctuation.section.block.begin.iris" } },
+      "end": "\\}",
+      "endCaptures": { "0": { "name": "punctuation.section.block.end.iris" } },
+      "patterns": [{ "include": "$self" }]
+    },
+    "sections": {
+      "name": "meta.sections.iris",
+      "comment": "Limit the scope to header options and arms; return at the next other token instead of leaking a mistaken sections context.",
+      "begin": "sections(?![A-Za-z0-9_])",
+      "beginCaptures": { "0": { "name": "keyword.control.iris" } },
+      "end": "\\}|(?=\\S)",
+      "endCaptures": { "0": { "name": "punctuation.section.block.end.iris" } },
+      "applyEndPatternLast": true,
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#string" },
+        {
+          "name": "meta.sections.arms.iris",
+          "begin": "\\{",
+          "beginCaptures": { "0": { "name": "punctuation.section.block.begin.iris" } },
+          "end": "(?=\\})",
+          "patterns": [
+            { "include": "#comment" },
+            { "include": "#pattern-string" },
+            { "include": "#block" },
+            { "name": "keyword.control.iris", "match": "(?:optional|last)(?![A-Za-z0-9_])" }
+          ]
+        },
+        { "name": "keyword.control.iris", "match": "(?:until|skip|other)(?![A-Za-z0-9_])" },
+        {
+          "begin": "store(?![A-Za-z0-9_])",
+          "beginCaptures": { "0": { "name": "keyword.control.iris" } },
+          "end": "([A-Za-z_][A-Za-z0-9_]*)|(?=[^\\s#])",
+          "endCaptures": { "1": { "name": "variable.other.definition.iris" } },
+          "patterns": [{ "include": "#comment" }]
+        }
+      ]
+    },
+    "skip": {
+      "name": "meta.skip.iris",
+      "comment": "Consume only skip line or the first count operand. Later tokens return to the enclosing context before they can start another statement.",
+      "begin": "skip(?![A-Za-z0-9_])",
+      "beginCaptures": { "0": { "name": "keyword.control.iris" } },
+      "end": "(line(?![A-Za-z0-9_]))|([A-Za-z_][A-Za-z0-9_]*)|(?=[^\\s#!\\-])",
+      "endCaptures": {
+        "1": { "name": "keyword.control.iris" },
+        "2": { "name": "variable.other.iris" }
+      },
+      "patterns": [
+        { "include": "#comment" },
+        { "name": "keyword.operator.iris", "match": "[!\\-]" }
+      ]
+    },
+    "line": {
+      "name": "meta.line.iris",
+      "begin": "(?:line|find)(?![A-Za-z0-9_])",
+      "beginCaptures": { "0": { "name": "keyword.control.iris" } },
+      "end": "(?=\\S)",
+      "applyEndPatternLast": true,
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#pattern-string" }
+      ]
+    },
+    "type-definition": {
+      "name": "meta.type.definition.iris",
+      "begin": "type(?![A-Za-z0-9_])",
+      "beginCaptures": { "0": { "name": "keyword.control.iris" } },
+      "end": "([A-Za-z_][A-Za-z0-9_]*)|(?=[^\\s#])",
+      "endCaptures": { "1": { "name": "entity.name.type.iris" } },
+      "patterns": [{ "include": "#comment" }]
+    },
+    "format": {
+      "name": "meta.format.iris",
+      "begin": "format(?![A-Za-z0-9_])",
+      "beginCaptures": { "0": { "name": "keyword.control.iris" } },
+      "end": "([A-Za-z_][A-Za-z0-9_]*(?:[-.](?:gecode\\.[A-Za-z0-9_]+|[A-Za-z_][A-Za-z0-9_]*|[0-9]+))*)|(\"(?:\\\\.|[^\"\\\\])*\")((?:[-.](?:gecode\\.[A-Za-z0-9_]+|[A-Za-z_][A-Za-z0-9_]*|[0-9]+))*)|(?=[^\\s#])",
+      "endCaptures": {
+        "1": { "name": "entity.name.section.iris" },
+        "2": {
+          "name": "string.quoted.double.iris",
+          "patterns": [{ "include": "#escape" }]
+        },
+        "3": { "name": "entity.name.section.iris" }
+      },
+      "patterns": [{ "include": "#comment" }]
+    },
+    "string": {
+      "name": "string.quoted.double.iris",
+      "begin": "\"",
+      "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.iris" } },
+      "end": "\"|$",
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.iris" } },
+      "patterns": [{ "include": "#escape" }]
+    },
+    "escape": {
+      "patterns": [
+        { "name": "constant.character.escape.iris", "match": "\\\\[nt\\\\\"]" },
+        { "name": "invalid.illegal.escape.iris", "match": "\\\\." }
+      ]
+    },
+    "pattern-string": {
+      "name": "string.quoted.double.pattern.iris",
+      "begin": "\"",
+      "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.iris" } },
+      "end": "\"|$",
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.iris" } },
+      "patterns": [
+        { "include": "#escape" },
+        {
+          "name": "meta.reference.iris",
+          "match": "(\\{)(\\$)([A-Za-z_][A-Za-z0-9_]*)(\\})",
+          "captures": {
+            "1": { "name": "punctuation.section.interpolation.begin.iris" },
+            "2": { "name": "punctuation.definition.variable.iris" },
+            "3": { "name": "variable.other.reference.iris" },
+            "4": { "name": "punctuation.section.interpolation.end.iris" }
+          }
+        },
+        {
+          "name": "meta.capture.iris",
+          "begin": "(\\{)([A-Za-z_][A-Za-z0-9_]*)?(:)?",
+          "beginCaptures": {
+            "1": { "name": "punctuation.section.interpolation.begin.iris" },
+            "2": { "name": "variable.other.definition.iris" },
+            "3": { "name": "punctuation.separator.type.iris" }
+          },
+          "end": "\\}|(?=\"|$)",
+          "endCaptures": { "0": { "name": "punctuation.section.interpolation.end.iris" } },
+          "patterns": [
+            {
+              "name": "comment.line.number-sign.iris",
+              "match": "#(?:\\\\[t\\\\\"]|[^}\"\\\\])*"
+            },
+            {
+              "name": "string.quoted.double.type.iris",
+              "begin": "\\\\\"",
+              "end": "\\\\\"|(?=\\}|$)",
+              "patterns": [
+                {
+                  "comment": "Escapes in the decoded type string also escape their backslash in the outer source string.",
+                  "name": "constant.character.escape.iris",
+                  "match": "\\\\\\\\(?:[nt]|\\\\\\\\|\\\\\")"
+                },
+                { "include": "#escape" }
+              ]
+            },
+            { "include": "#escape" },
+            { "include": "#expression" }
+          ]
+        },
+        { "name": "keyword.operator.wildcard.iris", "match": "\\.\\.\\.(?=(?:[ \\t]|\\\\t)*\")" }
+      ]
+    },
+    "range-bound": {
+      "comment": "A range may have no upper bound. Return before the Specification's exact stop set; other names, including format, are expression operands.",
+      "begin": "\\.\\.<|\\.\\.",
+      "beginCaptures": { "0": { "name": "keyword.operator.range.iris" } },
+      "end": "(gecode\\.[A-Za-z0-9_]+)|(?!(?:comment|stop|expect|tokens|separators|ignore|param|list|line|find|skip|index|repeat|each|instances|sections|if|let|check|type|layout|offset|until)\\b)([A-Za-z_][A-Za-z0-9_]*)|(?=[^\\s#])",
+      "endCaptures": {
+        "1": { "name": "constant.language.iris" },
+        "2": { "name": "variable.other.iris" }
+      },
+      "applyEndPatternLast": true,
+      "patterns": [
+        { "include": "#declaration-name" },
+        { "include": "#comment" }
+      ]
+    },
+    "member": {
+      "comment": "Field names remain names across whitespace and comments, including physical line endings.",
+      "begin": "(?<!\\.)(\\.)(?!\\.)",
+      "beginCaptures": { "1": { "name": "punctuation.accessor.iris" } },
+      "end": "([A-Za-z_][A-Za-z0-9_]*)|(?=[^\\s#])",
+      "endCaptures": { "1": { "name": "variable.other.member.iris" } },
+      "patterns": [{ "include": "#comment" }]
+    },
+    "operand": {
+      "comment": "Consume the first expression name after an introducer or operator before statement rules can see it. Non-name primaries return to strings, numbers, or expression groups; comments and unary operators can precede the name across lines.",
+      "begin": "(check|index|if|repeat|layout|offset|until)(?![A-Za-z0-9_])|(==|!=|<=|>=|&&|\\|\\||[=<>+*/%^!\\-])|(:)",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.iris" },
+        "2": { "name": "keyword.operator.iris" },
+        "3": { "name": "punctuation.separator.type.iris" }
+      },
+      "end": "(gecode\\.[A-Za-z0-9_]+)|((?:int|float|num|word|rest|alphabet)\\b)|((?:until|eol|eof)\\b)|([A-Za-z_][A-Za-z0-9_]*(?=[ \\t]*\\())|([A-Za-z_][A-Za-z0-9_]*)|(?=[^\\s#!\\-])",
+      "endCaptures": {
+        "1": { "name": "constant.language.iris" },
+        "2": { "name": "storage.type.iris" },
+        "3": { "name": "keyword.control.iris" },
+        "4": { "name": "support.function.iris" },
+        "5": { "name": "variable.other.iris" }
+      },
+      "patterns": [
+        { "include": "#comment" },
+        { "name": "keyword.operator.iris", "match": "[!\\-]" }
+      ]
+    },
+    "expression-group": {
+      "comment": "Parentheses and indices contain expressions, so contextual names cannot begin statements here.",
+      "begin": "(\\()|(\\[)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.section.group.iris" },
+        "2": { "name": "punctuation.section.brackets.iris" }
+      },
+      "end": "(\\))|(\\])",
+      "endCaptures": {
+        "1": { "name": "punctuation.section.group.iris" },
+        "2": { "name": "punctuation.section.brackets.iris" }
+      },
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#string" },
+        { "include": "#expression-group" },
+        { "name": "constant.language.iris", "match": "gecode\\.[A-Za-z0-9_]+" },
+        { "name": "keyword.control.iris", "match": "in\\b" },
+        { "name": "support.function.iris", "match": "[A-Za-z_][A-Za-z0-9_]*(?=[ \\t]*\\()" },
+        { "name": "variable.other.iris", "match": "[A-Za-z_][A-Za-z0-9_]*" },
+        { "include": "#expression" }
+      ]
+    },
+    "expression": {
+      "patterns": [
+        { "include": "#operand" },
+        {
+          "begin": "(?:let|param|as|each|store)(?![A-Za-z0-9_])",
+          "beginCaptures": { "0": { "name": "keyword.control.iris" } },
+          "end": "[A-Za-z_][A-Za-z0-9_]*|(?=[^\\s#])",
+          "endCaptures": { "0": { "name": "variable.other.definition.iris" } },
+          "patterns": [{ "include": "#comment" }]
+        },
+        { "name": "constant.language.iris", "match": "gecode\\.[A-Za-z0-9_]+" },
+        { "include": "#range-bound" },
+        { "include": "#member" },
+        { "name": "storage.type.iris", "match": "(?:int|float|num|word|rest|alphabet)(?![A-Za-z0-9_])" },
+        { "name": "keyword.control.iris", "match": "(?:skip|lines|comment|stop|tokens|separators|ignore|trailing|expect|param|list|index|repeat|until|eol|eof|as|each|store|instances|if|else|let|check|layout|offset|blank|strip|base|in|other)(?![A-Za-z0-9_])" },
+        { "name": "support.function.iris", "match": "[A-Za-z_][A-Za-z0-9_]*(?=[ \\t]*\\()" },
+        { "name": "constant.numeric.float.iris", "match": "[0-9]+(?:\\.(?!\\.)[0-9]*(?:[eE][+-]?[0-9]+)?|[eE][+-]?[0-9]+)" },
+        { "name": "constant.numeric.integer.iris", "match": "[0-9]+" },
+        { "name": "keyword.operator.range.iris", "match": "\\.\\.<|\\.\\." },
+        { "name": "keyword.operator.iris", "match": "==|!=|<=|>=|&&|\\|\\||[=<>+*/%^!\\-]" },
+        { "name": "punctuation.separator.type.iris", "match": ":" },
+        { "name": "punctuation.separator.iris", "match": "[,\\.]" },
+        { "name": "punctuation.section.group.iris", "match": "[()]" },
+        { "name": "punctuation.section.brackets.iris", "match": "[\\[\\]]" },
+        { "name": "variable.other.iris", "match": "[A-Za-z_][A-Za-z0-9_]*" },
+        { "name": "invalid.illegal.character.iris", "match": "[^ \\t\\r\\n\\x0b\\x0c{}]" }
+      ]
+    }
+  }
+}

@@ -1,0 +1,364 @@
+>format structure
+#^^^^^^ source.iris meta.format.iris keyword.control.iris
+#      ^ source.iris meta.format.iris
+#       ^^^^^^^^^ source.iris meta.format.iris entity.name.section.iris
+>param count = 2
+#^^^^^ source.iris keyword.control.iris
+#     ^ source.iris
+#      ^^^^^ source.iris variable.other.definition.iris
+#           ^ source.iris
+#            ^ source.iris keyword.operator.iris
+#             ^ source.iris
+#              ^ source.iris constant.numeric.integer.iris
+>param title
+#^^^^^ source.iris keyword.control.iris
+#     ^ source.iris
+#      ^^^^^ source.iris variable.other.definition.iris
+>expect "BEGIN" "DATA"
+#^^^^^^ source.iris keyword.control.iris
+#      ^ source.iris
+#       ^ source.iris string.quoted.double.iris punctuation.definition.string.begin.iris
+#        ^^^^^ source.iris string.quoted.double.iris
+#             ^ source.iris string.quoted.double.iris punctuation.definition.string.end.iris
+#              ^ source.iris
+#               ^ source.iris string.quoted.double.iris punctuation.definition.string.begin.iris
+#                ^^^^ source.iris string.quoted.double.iris
+#                    ^ source.iris string.quoted.double.iris punctuation.definition.string.end.iris
+>skip line skip 2 lines
+#^^^^ source.iris meta.skip.iris keyword.control.iris
+#    ^ source.iris meta.skip.iris
+#     ^^^^ source.iris meta.skip.iris keyword.control.iris
+#         ^ source.iris
+#          ^^^^ source.iris meta.skip.iris keyword.control.iris
+#              ^ source.iris meta.skip.iris
+#               ^ source.iris constant.numeric.integer.iris
+#                ^ source.iris
+#                 ^^^^^ source.iris keyword.control.iris
+>skip
+#^^^^ source.iris meta.skip.iris keyword.control.iris
+>  # Source line breaks do not end statements.
+#^^ source.iris meta.skip.iris
+#  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ source.iris meta.skip.iris comment.line.number-sign.iris
+>  line
+#^^ source.iris meta.skip.iris
+#  ^^^^ source.iris meta.skip.iris keyword.control.iris
+>line
+#^^^^ source.iris meta.line.iris keyword.control.iris
+>  # Pattern after a comment.
+#^^ source.iris meta.line.iris
+#  ^^^^^^^^^^^^^^^^^^^^^^^^^^ source.iris meta.line.iris comment.line.number-sign.iris
+>  "header {heading}"
+#^^ source.iris meta.line.iris
+#  ^ source.iris meta.line.iris string.quoted.double.pattern.iris punctuation.definition.string.begin.iris
+#   ^^^^^^^ source.iris meta.line.iris string.quoted.double.pattern.iris
+#          ^ source.iris meta.line.iris string.quoted.double.pattern.iris meta.capture.iris punctuation.section.interpolation.begin.iris
+#           ^^^^^^^ source.iris meta.line.iris string.quoted.double.pattern.iris meta.capture.iris variable.other.definition.iris
+#                  ^ source.iris meta.line.iris string.quoted.double.pattern.iris meta.capture.iris punctuation.section.interpolation.end.iris
+#                   ^ source.iris meta.line.iris string.quoted.double.pattern.iris punctuation.definition.string.end.iris
+>find "count {n:int}"
+#^^^^ source.iris meta.line.iris keyword.control.iris
+#    ^ source.iris meta.line.iris
+#     ^ source.iris meta.line.iris string.quoted.double.pattern.iris punctuation.definition.string.begin.iris
+#      ^^^^^^ source.iris meta.line.iris string.quoted.double.pattern.iris
+#            ^ source.iris meta.line.iris string.quoted.double.pattern.iris meta.capture.iris punctuation.section.interpolation.begin.iris
+#             ^ source.iris meta.line.iris string.quoted.double.pattern.iris meta.capture.iris variable.other.definition.iris
+#              ^ source.iris meta.line.iris string.quoted.double.pattern.iris meta.capture.iris punctuation.separator.type.iris
+#               ^^^ source.iris meta.line.iris string.quoted.double.pattern.iris meta.capture.iris storage.type.iris
+#                  ^ source.iris meta.line.iris string.quoted.double.pattern.iris meta.capture.iris punctuation.section.interpolation.end.iris
+#                   ^ source.iris meta.line.iris string.quoted.double.pattern.iris punctuation.definition.string.end.iris
+>if n > 0 { let active = 1 } else if n == 0 { let active = 0 } else { let active = -1 }
+#^^ source.iris keyword.control.iris
+#  ^ source.iris
+#   ^ source.iris variable.other.iris
+#    ^ source.iris
+#     ^ source.iris keyword.operator.iris
+#      ^ source.iris
+#       ^ source.iris constant.numeric.integer.iris
+#        ^ source.iris
+#         ^ source.iris meta.block.iris punctuation.section.block.begin.iris
+#          ^ source.iris meta.block.iris
+#           ^^^ source.iris meta.block.iris keyword.control.iris
+#              ^ source.iris meta.block.iris
+#               ^^^^^^ source.iris meta.block.iris variable.other.definition.iris
+#                     ^ source.iris meta.block.iris
+#                      ^ source.iris meta.block.iris keyword.operator.iris
+#                       ^ source.iris meta.block.iris
+#                        ^ source.iris meta.block.iris constant.numeric.integer.iris
+#                         ^ source.iris meta.block.iris
+#                          ^ source.iris meta.block.iris punctuation.section.block.end.iris
+#                           ^ source.iris
+#                            ^^^^ source.iris keyword.control.iris
+#                                ^ source.iris
+#                                 ^^ source.iris keyword.control.iris
+#                                   ^ source.iris
+#                                    ^ source.iris variable.other.iris
+#                                     ^ source.iris
+#                                      ^^ source.iris keyword.operator.iris
+#                                        ^ source.iris
+#                                         ^ source.iris constant.numeric.integer.iris
+#                                          ^ source.iris
+#                                           ^ source.iris meta.block.iris punctuation.section.block.begin.iris
+#                                            ^ source.iris meta.block.iris
+#                                             ^^^ source.iris meta.block.iris keyword.control.iris
+#                                                ^ source.iris meta.block.iris
+#                                                 ^^^^^^ source.iris meta.block.iris variable.other.definition.iris
+#                                                       ^ source.iris meta.block.iris
+#                                                        ^ source.iris meta.block.iris keyword.operator.iris
+#                                                         ^ source.iris meta.block.iris
+#                                                          ^ source.iris meta.block.iris constant.numeric.integer.iris
+#                                                           ^ source.iris meta.block.iris
+#                                                            ^ source.iris meta.block.iris punctuation.section.block.end.iris
+#                                                             ^ source.iris
+#                                                              ^^^^ source.iris keyword.control.iris
+#                                                                  ^ source.iris
+#                                                                   ^ source.iris meta.block.iris punctuation.section.block.begin.iris
+#                                                                    ^ source.iris meta.block.iris
+#                                                                     ^^^ source.iris meta.block.iris keyword.control.iris
+#                                                                        ^ source.iris meta.block.iris
+#                                                                         ^^^^^^ source.iris meta.block.iris variable.other.definition.iris
+#                                                                               ^ source.iris meta.block.iris
+#                                                                                ^ source.iris meta.block.iris keyword.operator.iris
+#                                                                                 ^ source.iris meta.block.iris
+#                                                                                  ^ source.iris meta.block.iris keyword.operator.iris
+#                                                                                   ^ source.iris meta.block.iris constant.numeric.integer.iris
+#                                                                                    ^ source.iris meta.block.iris
+#                                                                                     ^ source.iris meta.block.iris punctuation.section.block.end.iris
+>if 0 {} else if:int
+#^^ source.iris keyword.control.iris
+#  ^ source.iris
+#   ^ source.iris constant.numeric.integer.iris
+#    ^ source.iris
+#     ^ source.iris meta.block.iris punctuation.section.block.begin.iris
+#      ^ source.iris meta.block.iris punctuation.section.block.end.iris
+#       ^ source.iris
+#        ^^^^ source.iris keyword.control.iris
+#            ^ source.iris
+#             ^^ source.iris variable.other.definition.iris
+#               ^ source.iris punctuation.separator.type.iris
+#                ^^^ source.iris storage.type.iris
+>repeat count as rows {
+#^^^^^^ source.iris keyword.control.iris
+#      ^ source.iris
+#       ^^^^^ source.iris variable.other.iris
+#            ^ source.iris
+#             ^^ source.iris keyword.control.iris
+#               ^ source.iris
+#                ^^^^ source.iris variable.other.definition.iris
+#                    ^ source.iris
+#                     ^ source.iris meta.block.iris punctuation.section.block.begin.iris
+>  each row
+#^^ source.iris meta.block.iris
+#  ^^^^ source.iris meta.block.iris keyword.control.iris
+#      ^ source.iris meta.block.iris
+#       ^^^ source.iris meta.block.iris variable.other.definition.iris
+>  index 1
+#^^ source.iris meta.block.iris
+#  ^^^^^ source.iris meta.block.iris keyword.control.iris
+#       ^ source.iris meta.block.iris
+#        ^ source.iris meta.block.iris constant.numeric.integer.iris
+>  item: int
+#^^ source.iris meta.block.iris
+#  ^^^^ source.iris meta.block.iris variable.other.definition.iris
+#      ^ source.iris meta.block.iris punctuation.separator.type.iris
+#       ^ source.iris meta.block.iris
+#        ^^^ source.iris meta.block.iris storage.type.iris
+>  list values: int until eol
+#^^ source.iris meta.block.iris
+#  ^^^^ source.iris meta.block.iris keyword.control.iris
+#      ^ source.iris meta.block.iris
+#       ^^^^^^ source.iris meta.block.iris variable.other.definition.iris
+#             ^ source.iris meta.block.iris punctuation.separator.type.iris
+#              ^ source.iris meta.block.iris
+#               ^^^ source.iris meta.block.iris storage.type.iris
+#                  ^ source.iris meta.block.iris
+#                   ^^^^^ source.iris meta.block.iris keyword.control.iris
+#                        ^ source.iris meta.block.iris
+#                         ^^^ source.iris meta.block.iris keyword.control.iris
+>  repeat until "END" "STOP" store end_marker { value: num }
+#^^ source.iris meta.block.iris
+#  ^^^^^^ source.iris meta.block.iris keyword.control.iris
+#        ^ source.iris meta.block.iris
+#         ^^^^^ source.iris meta.block.iris keyword.control.iris
+#              ^ source.iris meta.block.iris
+#               ^ source.iris meta.block.iris string.quoted.double.iris punctuation.definition.string.begin.iris
+#                ^^^ source.iris meta.block.iris string.quoted.double.iris
+#                   ^ source.iris meta.block.iris string.quoted.double.iris punctuation.definition.string.end.iris
+#                    ^ source.iris meta.block.iris
+#                     ^ source.iris meta.block.iris string.quoted.double.iris punctuation.definition.string.begin.iris
+#                      ^^^^ source.iris meta.block.iris string.quoted.double.iris
+#                          ^ source.iris meta.block.iris string.quoted.double.iris punctuation.definition.string.end.iris
+#                           ^ source.iris meta.block.iris
+#                            ^^^^^ source.iris meta.block.iris keyword.control.iris
+#                                 ^ source.iris meta.block.iris
+#                                  ^^^^^^^^^^ source.iris meta.block.iris variable.other.definition.iris
+#                                            ^ source.iris meta.block.iris
+#                                             ^ source.iris meta.block.iris meta.block.iris punctuation.section.block.begin.iris
+#                                              ^ source.iris meta.block.iris meta.block.iris
+#                                               ^^^^^ source.iris meta.block.iris meta.block.iris variable.other.definition.iris
+#                                                    ^ source.iris meta.block.iris meta.block.iris punctuation.separator.type.iris
+#                                                     ^ source.iris meta.block.iris meta.block.iris
+#                                                      ^^^ source.iris meta.block.iris meta.block.iris storage.type.iris
+#                                                         ^ source.iris meta.block.iris meta.block.iris
+#                                                          ^ source.iris meta.block.iris meta.block.iris punctuation.section.block.end.iris
+>}
+#^ source.iris meta.block.iris punctuation.section.block.end.iris
+>repeat until eof { tail: rest }
+#^^^^^^ source.iris keyword.control.iris
+#      ^ source.iris
+#       ^^^^^ source.iris keyword.control.iris
+#            ^ source.iris
+#             ^^^ source.iris keyword.control.iris
+#                ^ source.iris
+#                 ^ source.iris meta.block.iris punctuation.section.block.begin.iris
+#                  ^ source.iris meta.block.iris
+#                   ^^^^ source.iris meta.block.iris variable.other.definition.iris
+#                       ^ source.iris meta.block.iris punctuation.separator.type.iris
+#                        ^ source.iris meta.block.iris
+#                         ^^^^ source.iris meta.block.iris storage.type.iris
+#                             ^ source.iris meta.block.iris
+#                              ^ source.iris meta.block.iris punctuation.section.block.end.iris
+>sections until "END {literal}" store terminator skip other {
+#^^^^^^^^ source.iris meta.sections.iris keyword.control.iris
+#        ^ source.iris meta.sections.iris
+#         ^^^^^ source.iris meta.sections.iris keyword.control.iris
+#              ^ source.iris meta.sections.iris
+#               ^ source.iris meta.sections.iris string.quoted.double.iris punctuation.definition.string.begin.iris
+#                ^^^^^^^^^^^^^ source.iris meta.sections.iris string.quoted.double.iris
+#                             ^ source.iris meta.sections.iris string.quoted.double.iris punctuation.definition.string.end.iris
+#                              ^ source.iris meta.sections.iris
+#                               ^^^^^ source.iris meta.sections.iris keyword.control.iris
+#                                    ^ source.iris meta.sections.iris
+#                                     ^^^^^^^^^^ source.iris meta.sections.iris variable.other.definition.iris
+#                                               ^ source.iris meta.sections.iris
+#                                                ^^^^ source.iris meta.sections.iris keyword.control.iris
+#                                                    ^ source.iris meta.sections.iris
+#                                                     ^^^^^ source.iris meta.sections.iris keyword.control.iris
+#                                                          ^ source.iris meta.sections.iris
+#                                                           ^ source.iris meta.sections.iris meta.sections.arms.iris punctuation.section.block.begin.iris
+>  "optional {optional_value:int}" optional
+#^^ source.iris meta.sections.iris meta.sections.arms.iris
+#  ^ source.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris punctuation.definition.string.begin.iris
+#   ^^^^^^^^^ source.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris
+#            ^ source.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris meta.capture.iris punctuation.section.interpolation.begin.iris
+#             ^^^^^^^^^^^^^^ source.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris meta.capture.iris variable.other.definition.iris
+#                           ^ source.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris meta.capture.iris punctuation.separator.type.iris
+#                            ^^^ source.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris meta.capture.iris storage.type.iris
+#                               ^ source.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris meta.capture.iris punctuation.section.interpolation.end.iris
+#                                ^ source.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris punctuation.definition.string.end.iris
+#                                 ^ source.iris meta.sections.iris meta.sections.arms.iris
+#                                  ^^^^^^^^ source.iris meta.sections.iris meta.sections.arms.iris keyword.control.iris
+>  "nested" {
+#^^ source.iris meta.sections.iris meta.sections.arms.iris
+#  ^ source.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris punctuation.definition.string.begin.iris
+#   ^^^^^^ source.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris
+#         ^ source.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris punctuation.definition.string.end.iris
+#          ^ source.iris meta.sections.iris meta.sections.arms.iris
+#           ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris punctuation.section.block.begin.iris
+>    sections skip other {
+#^^^^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris
+#    ^^^^^^^^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris keyword.control.iris
+#            ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris
+#             ^^^^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris keyword.control.iris
+#                 ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris
+#                  ^^^^^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris keyword.control.iris
+#                       ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris
+#                        ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris meta.sections.arms.iris punctuation.section.block.begin.iris
+>      "inner {inner_value:word}" optional last { skip line }
+#^^^^^^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris meta.sections.arms.iris
+#      ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris punctuation.definition.string.begin.iris
+#       ^^^^^^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris
+#             ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris meta.capture.iris punctuation.section.interpolation.begin.iris
+#              ^^^^^^^^^^^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris meta.capture.iris variable.other.definition.iris
+#                         ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris meta.capture.iris punctuation.separator.type.iris
+#                          ^^^^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris meta.capture.iris storage.type.iris
+#                              ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris meta.capture.iris punctuation.section.interpolation.end.iris
+#                               ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris punctuation.definition.string.end.iris
+#                                ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris meta.sections.arms.iris
+#                                 ^^^^^^^^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris meta.sections.arms.iris keyword.control.iris
+#                                         ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris meta.sections.arms.iris
+#                                          ^^^^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris meta.sections.arms.iris keyword.control.iris
+#                                              ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris meta.sections.arms.iris
+#                                               ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris meta.sections.arms.iris meta.block.iris punctuation.section.block.begin.iris
+#                                                ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris meta.sections.arms.iris meta.block.iris
+#                                                 ^^^^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.skip.iris keyword.control.iris
+#                                                     ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.skip.iris
+#                                                      ^^^^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.skip.iris keyword.control.iris
+#                                                          ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris meta.sections.arms.iris meta.block.iris
+#                                                           ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris meta.sections.arms.iris meta.block.iris punctuation.section.block.end.iris
+>    }
+#^^^^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris meta.sections.arms.iris
+#    ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris meta.sections.iris punctuation.section.block.end.iris
+>    let plain = "{not_a_capture} ..."
+#^^^^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris
+#    ^^^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris keyword.control.iris
+#       ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris
+#        ^^^^^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris variable.other.definition.iris
+#             ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris
+#              ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris keyword.operator.iris
+#               ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris
+#                ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris string.quoted.double.iris punctuation.definition.string.begin.iris
+#                 ^^^^^^^^^^^^^^^^^^^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris string.quoted.double.iris
+#                                    ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris string.quoted.double.iris punctuation.definition.string.end.iris
+>    check 1 "{not_a_capture_either}"
+#^^^^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris
+#    ^^^^^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris keyword.control.iris
+#         ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris
+#          ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris constant.numeric.integer.iris
+#           ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris
+#            ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris string.quoted.double.iris punctuation.definition.string.begin.iris
+#             ^^^^^^^^^^^^^^^^^^^^^^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris string.quoted.double.iris
+#                                   ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris string.quoted.double.iris punctuation.definition.string.end.iris
+>  }
+#^^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris
+#  ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris punctuation.section.block.end.iris
+>  "final {final_value:int}" optional last { expect "!" }
+#^^ source.iris meta.sections.iris meta.sections.arms.iris
+#  ^ source.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris punctuation.definition.string.begin.iris
+#   ^^^^^^ source.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris
+#         ^ source.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris meta.capture.iris punctuation.section.interpolation.begin.iris
+#          ^^^^^^^^^^^ source.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris meta.capture.iris variable.other.definition.iris
+#                     ^ source.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris meta.capture.iris punctuation.separator.type.iris
+#                      ^^^ source.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris meta.capture.iris storage.type.iris
+#                         ^ source.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris meta.capture.iris punctuation.section.interpolation.end.iris
+#                          ^ source.iris meta.sections.iris meta.sections.arms.iris string.quoted.double.pattern.iris punctuation.definition.string.end.iris
+#                           ^ source.iris meta.sections.iris meta.sections.arms.iris
+#                            ^^^^^^^^ source.iris meta.sections.iris meta.sections.arms.iris keyword.control.iris
+#                                    ^ source.iris meta.sections.iris meta.sections.arms.iris
+#                                     ^^^^ source.iris meta.sections.iris meta.sections.arms.iris keyword.control.iris
+#                                         ^ source.iris meta.sections.iris meta.sections.arms.iris
+#                                          ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris punctuation.section.block.begin.iris
+#                                           ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris
+#                                            ^^^^^^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris keyword.control.iris
+#                                                  ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris
+#                                                   ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris string.quoted.double.iris punctuation.definition.string.begin.iris
+#                                                    ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris string.quoted.double.iris
+#                                                     ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris string.quoted.double.iris punctuation.definition.string.end.iris
+#                                                      ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris
+#                                                       ^ source.iris meta.sections.iris meta.sections.arms.iris meta.block.iris punctuation.section.block.end.iris
+>}
+#^ source.iris meta.sections.iris punctuation.section.block.end.iris
+>instances { line "instance {name}" value: int }
+#^^^^^^^^^ source.iris keyword.control.iris
+#         ^ source.iris
+#          ^ source.iris meta.block.iris punctuation.section.block.begin.iris
+#           ^ source.iris meta.block.iris
+#            ^^^^ source.iris meta.block.iris meta.line.iris keyword.control.iris
+#                ^ source.iris meta.block.iris meta.line.iris
+#                 ^ source.iris meta.block.iris meta.line.iris string.quoted.double.pattern.iris punctuation.definition.string.begin.iris
+#                  ^^^^^^^^^ source.iris meta.block.iris meta.line.iris string.quoted.double.pattern.iris
+#                           ^ source.iris meta.block.iris meta.line.iris string.quoted.double.pattern.iris meta.capture.iris punctuation.section.interpolation.begin.iris
+#                            ^^^^ source.iris meta.block.iris meta.line.iris string.quoted.double.pattern.iris meta.capture.iris variable.other.definition.iris
+#                                ^ source.iris meta.block.iris meta.line.iris string.quoted.double.pattern.iris meta.capture.iris punctuation.section.interpolation.end.iris
+#                                 ^ source.iris meta.block.iris meta.line.iris string.quoted.double.pattern.iris punctuation.definition.string.end.iris
+#                                  ^ source.iris meta.block.iris meta.line.iris
+#                                   ^^^^^ source.iris meta.block.iris variable.other.definition.iris
+#                                        ^ source.iris meta.block.iris punctuation.separator.type.iris
+#                                         ^ source.iris meta.block.iris
+#                                          ^^^ source.iris meta.block.iris storage.type.iris
+#                                             ^ source.iris meta.block.iris
+#                                              ^ source.iris meta.block.iris punctuation.section.block.end.iris
+>format last-name.v2
+#^^^^^^ source.iris meta.format.iris keyword.control.iris
+#      ^ source.iris meta.format.iris
+#       ^^^^^^^^^^^^ source.iris meta.format.iris entity.name.section.iris
+>

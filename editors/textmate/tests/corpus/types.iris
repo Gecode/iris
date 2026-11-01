@@ -1,0 +1,19 @@
+format types
+param n = 2
+integer: int floating: float number: num text: word tail: rest
+values[n]: 0..n matrix[n][n]: ..<n layout "FULL_MATRIX" offset -1
+lower: 1.. upper: ..9 bounded: -n..n exclusive: 0..<n
+# An option word followed by a colon ends the preceding range or alphabet.
+open: 0.. offset: int
+symbols[n][n]: alphabet "ab" blank "." strip "|" base -2 blank "_"
+blank: int strip: int base: int
+list row: 0.. until eol offset -1 list sentinel: int until 0
+list words: word until "END"
+type positive = 1..gecode.int_max
+type alias = positive
+value: alias
+let bounds = gecode.int_min + gecode.int_max
+let dimensions = 2
+line[dimensions]: int
+repeat[values[0]]: int
+if[size("[")]: int

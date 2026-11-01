@@ -1,0 +1,33 @@
+name: TextMate
+
+on:
+  push:
+    paths:
+      - 'editors/textmate/**'
+      - '**/*.iris'
+      - 'conformance/cases/**/error.json'
+      - '.github/workflows/textmate.yml'
+  pull_request:
+    paths:
+      - 'editors/textmate/**'
+      - '**/*.iris'
+      - 'conformance/cases/**/error.json'
+      - '.github/workflows/textmate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: editors/textmate
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 'lts/*'
+          cache: npm
+          cache-dependency-path: editors/textmate/package-lock.json
+      - run: npm ci && npm test

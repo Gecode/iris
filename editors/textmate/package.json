@@ -1,0 +1,35 @@
+{
+  "name": "iris-textmate",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TextMate highlighting for Iris 0.1 reader specs",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs && npm run test:assertions && npm run test:snapshots && npm run check-repo-specs",
+    "test:assertions": "vscode-tmgrammar-test 'tests/assertions/*.iris'",
+    "test:snapshots": "vscode-tmgrammar-snap 'tests/corpus/**/*.iris'",
+    "update-snapshots": "npm run test:snapshots -- --updateSnapshot",
+    "check-repo-specs": "node tests/check-repo-specs.mjs"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "iris",
+        "extensions": [
+          ".iris"
+        ]
+      }
+    ],
+    "grammars": [
+      {
+        "language": "iris",
+        "scopeName": "source.iris",
+        "path": "./iris.tmLanguage.json"
+      }
+    ]
+  },
+  "devDependencies": {
+    "vscode-oniguruma": "1.7.0",
+    "vscode-textmate": "7.0.4",
+    "vscode-tmgrammar-test": "0.1.3"
+  }
+}

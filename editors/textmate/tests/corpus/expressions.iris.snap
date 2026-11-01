@@ -1,0 +1,254 @@
+>format expressions
+#^^^^^^ source.iris meta.format.iris keyword.control.iris
+#      ^ source.iris meta.format.iris
+#       ^^^^^^^^^^^ source.iris meta.format.iris entity.name.section.iris
+>param n = 2
+#^^^^^ source.iris keyword.control.iris
+#     ^ source.iris
+#      ^ source.iris variable.other.definition.iris
+#       ^ source.iris
+#        ^ source.iris keyword.operator.iris
+#         ^ source.iris
+#          ^ source.iris constant.numeric.integer.iris
+>values[n]: int
+#^^^^^^ source.iris variable.other.definition.iris
+#      ^ source.iris punctuation.section.brackets.iris
+#       ^ source.iris variable.other.iris
+#        ^ source.iris punctuation.section.brackets.iris
+#         ^ source.iris punctuation.separator.type.iris
+#          ^ source.iris
+#           ^^^ source.iris storage.type.iris
+>repeat n as rows { each row item:int }
+#^^^^^^ source.iris keyword.control.iris
+#      ^ source.iris
+#       ^ source.iris variable.other.iris
+#        ^ source.iris
+#         ^^ source.iris keyword.control.iris
+#           ^ source.iris
+#            ^^^^ source.iris variable.other.definition.iris
+#                ^ source.iris
+#                 ^ source.iris meta.block.iris punctuation.section.block.begin.iris
+#                  ^ source.iris meta.block.iris
+#                   ^^^^ source.iris meta.block.iris keyword.control.iris
+#                       ^ source.iris meta.block.iris
+#                        ^^^ source.iris meta.block.iris variable.other.definition.iris
+#                           ^ source.iris meta.block.iris
+#                            ^^^^ source.iris meta.block.iris variable.other.definition.iris
+#                                ^ source.iris meta.block.iris punctuation.separator.type.iris
+#                                 ^^^ source.iris meta.block.iris storage.type.iris
+#                                    ^ source.iris meta.block.iris
+#                                     ^ source.iris meta.block.iris punctuation.section.block.end.iris
+>let result = values[0] + values [1]
+#^^^ source.iris keyword.control.iris
+#   ^ source.iris
+#    ^^^^^^ source.iris variable.other.definition.iris
+#          ^ source.iris
+#           ^ source.iris keyword.operator.iris
+#            ^ source.iris
+#             ^^^^^^ source.iris variable.other.iris
+#                   ^ source.iris punctuation.section.brackets.iris
+#                    ^ source.iris constant.numeric.integer.iris
+#                     ^ source.iris punctuation.section.brackets.iris
+#                      ^ source.iris
+#                       ^ source.iris keyword.operator.iris
+#                        ^ source.iris
+#                         ^^^^^^ source.iris variable.other.iris
+#                               ^ source.iris
+#                                ^ source.iris punctuation.section.brackets.iris
+#                                 ^ source.iris constant.numeric.integer.iris
+#                                  ^ source.iris punctuation.section.brackets.iris
+>let field = rows[0].item let spaced = rows [0] . item
+#^^^ source.iris keyword.control.iris
+#   ^ source.iris
+#    ^^^^^ source.iris variable.other.definition.iris
+#         ^ source.iris
+#          ^ source.iris keyword.operator.iris
+#           ^ source.iris
+#            ^^^^ source.iris variable.other.iris
+#                ^ source.iris punctuation.section.brackets.iris
+#                 ^ source.iris constant.numeric.integer.iris
+#                  ^ source.iris punctuation.section.brackets.iris
+#                   ^ source.iris punctuation.accessor.iris
+#                    ^^^^ source.iris variable.other.member.iris
+#                        ^ source.iris
+#                         ^^^ source.iris keyword.control.iris
+#                            ^ source.iris
+#                             ^^^^^^ source.iris variable.other.definition.iris
+#                                   ^ source.iris
+#                                    ^ source.iris keyword.operator.iris
+#                                     ^ source.iris
+#                                      ^^^^ source.iris variable.other.iris
+#                                          ^ source.iris
+#                                           ^ source.iris punctuation.section.brackets.iris
+#                                            ^ source.iris constant.numeric.integer.iris
+#                                             ^ source.iris punctuation.section.brackets.iris
+#                                              ^ source.iris
+#                                               ^ source.iris punctuation.accessor.iris
+#                                                ^ source.iris
+#                                                 ^^^^ source.iris variable.other.member.iris
+>check defined(values) && distinct(values) "all values differ"
+#^^^^^ source.iris keyword.control.iris
+#     ^ source.iris
+#      ^^^^^^^ source.iris support.function.iris
+#             ^ source.iris punctuation.section.group.iris
+#              ^^^^^^ source.iris variable.other.iris
+#                    ^ source.iris punctuation.section.group.iris
+#                     ^ source.iris
+#                      ^^ source.iris keyword.operator.iris
+#                        ^ source.iris
+#                         ^^^^^^^^ source.iris support.function.iris
+#                                 ^ source.iris punctuation.section.group.iris
+#                                  ^^^^^^ source.iris variable.other.iris
+#                                        ^ source.iris punctuation.section.group.iris
+#                                         ^ source.iris
+#                                          ^ source.iris string.quoted.double.iris punctuation.definition.string.begin.iris
+#                                           ^^^^^^^^^^^^^^^^^ source.iris string.quoted.double.iris
+#                                                            ^ source.iris string.quoted.double.iris punctuation.definition.string.end.iris
+>check count(values) == size(values)
+#^^^^^ source.iris keyword.control.iris
+#     ^ source.iris
+#      ^^^^^ source.iris support.function.iris
+#           ^ source.iris punctuation.section.group.iris
+#            ^^^^^^ source.iris variable.other.iris
+#                  ^ source.iris punctuation.section.group.iris
+#                   ^ source.iris
+#                    ^^ source.iris keyword.operator.iris
+#                      ^ source.iris
+#                       ^^^^ source.iris support.function.iris
+#                           ^ source.iris punctuation.section.group.iris
+#                            ^^^^^^ source.iris variable.other.iris
+#                                  ^ source.iris punctuation.section.group.iris
+>check min(values, 0) <= max(values, 1)
+#^^^^^ source.iris keyword.control.iris
+#     ^ source.iris
+#      ^^^ source.iris support.function.iris
+#         ^ source.iris punctuation.section.group.iris
+#          ^^^^^^ source.iris variable.other.iris
+#                ^ source.iris punctuation.separator.iris
+#                 ^ source.iris
+#                  ^ source.iris constant.numeric.integer.iris
+#                   ^ source.iris punctuation.section.group.iris
+#                    ^ source.iris
+#                     ^^ source.iris keyword.operator.iris
+#                       ^ source.iris
+#                        ^^^ source.iris support.function.iris
+#                           ^ source.iris punctuation.section.group.iris
+#                            ^^^^^^ source.iris variable.other.iris
+#                                  ^ source.iris punctuation.separator.iris
+#                                   ^ source.iris
+#                                    ^ source.iris constant.numeric.integer.iris
+#                                     ^ source.iris punctuation.section.group.iris
+>check sum(values) >= 0
+#^^^^^ source.iris keyword.control.iris
+#     ^ source.iris
+#      ^^^ source.iris support.function.iris
+#         ^ source.iris punctuation.section.group.iris
+#          ^^^^^^ source.iris variable.other.iris
+#                ^ source.iris punctuation.section.group.iris
+#                 ^ source.iris
+#                  ^^ source.iris keyword.operator.iris
+#                    ^ source.iris
+#                     ^ source.iris constant.numeric.integer.iris
+>check all(r in rows: r.item >= 0)
+#^^^^^ source.iris keyword.control.iris
+#     ^ source.iris
+#      ^^^ source.iris support.function.iris
+#         ^ source.iris punctuation.section.group.iris
+#          ^ source.iris variable.other.iris
+#           ^ source.iris
+#            ^^ source.iris keyword.control.iris
+#              ^ source.iris
+#               ^^^^ source.iris variable.other.iris
+#                   ^ source.iris punctuation.separator.type.iris
+#                    ^ source.iris
+#                     ^ source.iris variable.other.iris
+#                      ^ source.iris punctuation.accessor.iris
+#                       ^^^^ source.iris variable.other.member.iris
+#                           ^ source.iris
+#                            ^^ source.iris keyword.operator.iris
+#                              ^ source.iris
+#                               ^ source.iris constant.numeric.integer.iris
+#                                ^ source.iris punctuation.section.group.iris
+>check any(r in rows: r.item > 0)
+#^^^^^ source.iris keyword.control.iris
+#     ^ source.iris
+#      ^^^ source.iris support.function.iris
+#         ^ source.iris punctuation.section.group.iris
+#          ^ source.iris variable.other.iris
+#           ^ source.iris
+#            ^^ source.iris keyword.control.iris
+#              ^ source.iris
+#               ^^^^ source.iris variable.other.iris
+#                   ^ source.iris punctuation.separator.type.iris
+#                    ^ source.iris
+#                     ^ source.iris variable.other.iris
+#                      ^ source.iris punctuation.accessor.iris
+#                       ^^^^ source.iris variable.other.member.iris
+#                           ^ source.iris
+#                            ^ source.iris keyword.operator.iris
+#                             ^ source.iris
+#                              ^ source.iris constant.numeric.integer.iris
+#                               ^ source.iris punctuation.section.group.iris
+>check sum(r in rows: r.item) >= count(r in rows: r.item != 0)
+#^^^^^ source.iris keyword.control.iris
+#     ^ source.iris
+#      ^^^ source.iris support.function.iris
+#         ^ source.iris punctuation.section.group.iris
+#          ^ source.iris variable.other.iris
+#           ^ source.iris
+#            ^^ source.iris keyword.control.iris
+#              ^ source.iris
+#               ^^^^ source.iris variable.other.iris
+#                   ^ source.iris punctuation.separator.type.iris
+#                    ^ source.iris
+#                     ^ source.iris variable.other.iris
+#                      ^ source.iris punctuation.accessor.iris
+#                       ^^^^ source.iris variable.other.member.iris
+#                           ^ source.iris punctuation.section.group.iris
+#                            ^ source.iris
+#                             ^^ source.iris keyword.operator.iris
+#                               ^ source.iris
+#                                ^^^^^ source.iris support.function.iris
+#                                     ^ source.iris punctuation.section.group.iris
+#                                      ^ source.iris variable.other.iris
+#                                       ^ source.iris
+#                                        ^^ source.iris keyword.control.iris
+#                                          ^ source.iris
+#                                           ^^^^ source.iris variable.other.iris
+#                                               ^ source.iris punctuation.separator.type.iris
+#                                                ^ source.iris
+#                                                 ^ source.iris variable.other.iris
+#                                                  ^ source.iris punctuation.accessor.iris
+#                                                   ^^^^ source.iris variable.other.member.iris
+#                                                       ^ source.iris
+#                                                        ^^ source.iris keyword.operator.iris
+#                                                          ^ source.iris
+#                                                           ^ source.iris constant.numeric.integer.iris
+#                                                            ^ source.iris punctuation.section.group.iris
+>let power = -2^2 + 2^-1 + 2^3^2
+#^^^ source.iris keyword.control.iris
+#   ^ source.iris
+#    ^^^^^ source.iris variable.other.definition.iris
+#         ^ source.iris
+#          ^ source.iris keyword.operator.iris
+#           ^ source.iris
+#            ^ source.iris keyword.operator.iris
+#             ^ source.iris constant.numeric.integer.iris
+#              ^ source.iris keyword.operator.iris
+#               ^ source.iris constant.numeric.integer.iris
+#                ^ source.iris
+#                 ^ source.iris keyword.operator.iris
+#                  ^ source.iris
+#                   ^ source.iris constant.numeric.integer.iris
+#                    ^ source.iris keyword.operator.iris
+#                     ^ source.iris keyword.operator.iris
+#                      ^ source.iris constant.numeric.integer.iris
+#                       ^ source.iris
+#                        ^ source.iris keyword.operator.iris
+#                         ^ source.iris
+#                          ^ source.iris constant.numeric.integer.iris
+#                           ^ source.iris keyword.operator.iris
+#                            ^ source.iris constant.numeric.integer.iris
+#                             ^ source.iris keyword.operator.iris
+#                              ^ source.iris constant.numeric.integer.iris
+>

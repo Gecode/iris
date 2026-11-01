@@ -1,0 +1,14 @@
+format expressions
+param n = 2
+values[n]: int
+repeat n as rows { each row item:int }
+let result = values[0] + values [1]
+let field = rows[0].item let spaced = rows [0] . item
+check defined(values) && distinct(values) "all values differ"
+check count(values) == size(values)
+check min(values, 0) <= max(values, 1)
+check sum(values) >= 0
+check all(r in rows: r.item >= 0)
+check any(r in rows: r.item > 0)
+check sum(r in rows: r.item) >= count(r in rows: r.item != 0)
+let power = -2^2 + 2^-1 + 2^3^2

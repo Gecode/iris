@@ -1,0 +1,13 @@
+# Iris 0.1: source comments may contain Unicode, such as å and λ.
+format dimacs-cnf.v2
+format "a quoted format"
+comment "#" "//" stop "END" tokens ":" separators ",;" ignore trailing
+let text = "å # {plain} {$plain} ... \n\t\\\""
+let integer = 007 let decimal = 1. let exponent = 1.e2 let signed = -01e+2
+let minimum = -9223372036854775807-1 let maximum = 9223372036854775807
+let tiny = 2.2250738585072014e-308 let large = 1.7976931348623157e308
+let continued = 1
+  + 2 * 3^2 - 8/2%3
+let logic = !0 && 1 || (1 != 2 && 3 >= 2 && 2 <= 3 && 1 < 2 && 3 > 2)
+line: int type: 0.. list: word each: int layout: int
+repeat 1 { format:int comment:int offset[1]:int }

@@ -1,0 +1,118 @@
+>format tsptw
+#^^^^^^ source.iris meta.format.iris keyword.control.iris
+#      ^ source.iris meta.format.iris
+#       ^^^^^ source.iris meta.format.iris entity.name.section.iris
+>
+>comment "#"
+#^^^^^^^ source.iris keyword.control.iris
+#       ^ source.iris
+#        ^ source.iris string.quoted.double.iris punctuation.definition.string.begin.iris
+#         ^ source.iris string.quoted.double.iris
+#          ^ source.iris string.quoted.double.iris punctuation.definition.string.end.iris
+>n: 2..1000
+#^ source.iris variable.other.definition.iris
+# ^ source.iris punctuation.separator.type.iris
+#  ^ source.iris
+#   ^ source.iris constant.numeric.integer.iris
+#    ^^ source.iris keyword.operator.range.iris
+#      ^^^^ source.iris constant.numeric.integer.iris
+>dist[n][n]: 0..gecode.int_max / 2 / n
+#^^^^ source.iris variable.other.definition.iris
+#    ^ source.iris punctuation.section.brackets.iris
+#     ^ source.iris variable.other.iris
+#      ^ source.iris punctuation.section.brackets.iris
+#       ^ source.iris punctuation.section.brackets.iris
+#        ^ source.iris variable.other.iris
+#         ^ source.iris punctuation.section.brackets.iris
+#          ^ source.iris punctuation.separator.type.iris
+#           ^ source.iris
+#            ^ source.iris constant.numeric.integer.iris
+#             ^^ source.iris keyword.operator.range.iris
+#               ^^^^^^^^^^^^^^ source.iris constant.language.iris
+#                             ^ source.iris
+#                              ^ source.iris keyword.operator.iris
+#                               ^ source.iris
+#                                ^ source.iris constant.numeric.integer.iris
+#                                 ^ source.iris
+#                                  ^ source.iris keyword.operator.iris
+#                                   ^ source.iris
+#                                    ^ source.iris variable.other.iris
+>
+>type time = 0..gecode.int_max / 2
+#^^^^ source.iris meta.type.definition.iris keyword.control.iris
+#    ^ source.iris meta.type.definition.iris
+#     ^^^^ source.iris meta.type.definition.iris entity.name.type.iris
+#         ^ source.iris
+#          ^ source.iris keyword.operator.iris
+#           ^ source.iris
+#            ^ source.iris constant.numeric.integer.iris
+#             ^^ source.iris keyword.operator.range.iris
+#               ^^^^^^^^^^^^^^ source.iris constant.language.iris
+#                             ^ source.iris
+#                              ^ source.iris keyword.operator.iris
+#                               ^ source.iris
+#                                ^ source.iris constant.numeric.integer.iris
+>repeat n as nodes {
+#^^^^^^ source.iris keyword.control.iris
+#      ^ source.iris
+#       ^ source.iris variable.other.iris
+#        ^ source.iris
+#         ^^ source.iris keyword.control.iris
+#           ^ source.iris
+#            ^^^^^ source.iris variable.other.definition.iris
+#                 ^ source.iris
+#                  ^ source.iris meta.block.iris punctuation.section.block.begin.iris
+>  each node
+#^^ source.iris meta.block.iris
+#  ^^^^ source.iris meta.block.iris keyword.control.iris
+#      ^ source.iris meta.block.iris
+#       ^^^^ source.iris meta.block.iris variable.other.definition.iris
+>  ready: time
+#^^ source.iris meta.block.iris
+#  ^^^^^ source.iris meta.block.iris variable.other.definition.iris
+#       ^ source.iris meta.block.iris punctuation.separator.type.iris
+#        ^ source.iris meta.block.iris
+#         ^^^^ source.iris meta.block.iris variable.other.iris
+>  due: time
+#^^ source.iris meta.block.iris
+#  ^^^ source.iris meta.block.iris variable.other.definition.iris
+#     ^ source.iris meta.block.iris punctuation.separator.type.iris
+#      ^ source.iris meta.block.iris
+#       ^^^^ source.iris meta.block.iris variable.other.iris
+>}
+#^ source.iris meta.block.iris punctuation.section.block.end.iris
+>
+>check node.ready <= node.due "the time window of a node is invalid"
+#^^^^^ source.iris keyword.control.iris
+#     ^ source.iris
+#      ^^^^ source.iris variable.other.iris
+#          ^ source.iris punctuation.accessor.iris
+#           ^^^^^ source.iris variable.other.member.iris
+#                ^ source.iris
+#                 ^^ source.iris keyword.operator.iris
+#                   ^ source.iris
+#                    ^^^^ source.iris variable.other.iris
+#                        ^ source.iris punctuation.accessor.iris
+#                         ^^^ source.iris variable.other.member.iris
+#                            ^ source.iris
+#                             ^ source.iris string.quoted.double.iris punctuation.definition.string.begin.iris
+#                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ source.iris string.quoted.double.iris
+#                                                                  ^ source.iris string.quoted.double.iris punctuation.definition.string.end.iris
+>check nodes[0].ready == 0 "the depot (node 0) must open at time 0"
+#^^^^^ source.iris keyword.control.iris
+#     ^ source.iris
+#      ^^^^^ source.iris variable.other.iris
+#           ^ source.iris punctuation.section.brackets.iris
+#            ^ source.iris constant.numeric.integer.iris
+#             ^ source.iris punctuation.section.brackets.iris
+#              ^ source.iris punctuation.accessor.iris
+#               ^^^^^ source.iris variable.other.member.iris
+#                    ^ source.iris
+#                     ^^ source.iris keyword.operator.iris
+#                       ^ source.iris
+#                        ^ source.iris constant.numeric.integer.iris
+#                         ^ source.iris
+#                          ^ source.iris string.quoted.double.iris punctuation.definition.string.begin.iris
+#                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ source.iris string.quoted.double.iris
+#                                                                 ^ source.iris string.quoted.double.iris punctuation.definition.string.end.iris
+>

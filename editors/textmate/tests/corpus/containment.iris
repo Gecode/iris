@@ -1,0 +1,16 @@
+# Each contextual-name regression must leave the following pattern intact.
+let if=1 skip if lines
+line "{after:int}"
+
+let format=2 value:0..format
+line "{after:int}"
+
+repeat 1 as rows {sections:int} check rows[0]. # member
+sections "{message}"
+line "{after:int}"
+
+format "quoted"-1sections {"{first:int}" last}
+line "{after:int}"
+
+let type=1 let a=1check type
+line "{after:int}"

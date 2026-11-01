@@ -1,0 +1,65 @@
+>format dimacs-cnf
+#^^^^^^ source.iris meta.format.iris keyword.control.iris
+#      ^ source.iris meta.format.iris
+#       ^^^^^^^^^^ source.iris meta.format.iris entity.name.section.iris
+>
+>comment "c"
+#^^^^^^^ source.iris keyword.control.iris
+#       ^ source.iris
+#        ^ source.iris string.quoted.double.iris punctuation.definition.string.begin.iris
+#         ^ source.iris string.quoted.double.iris
+#          ^ source.iris string.quoted.double.iris punctuation.definition.string.end.iris
+>stop "%"                    # SATLIB files end with "%" and "0"
+#^^^^ source.iris keyword.control.iris
+#    ^ source.iris
+#     ^ source.iris string.quoted.double.iris punctuation.definition.string.begin.iris
+#      ^ source.iris string.quoted.double.iris
+#       ^ source.iris string.quoted.double.iris punctuation.definition.string.end.iris
+#        ^^^^^^^^^^^^^^^^^^^^ source.iris
+#                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ source.iris comment.line.number-sign.iris
+>line "p cnf {vars:0..gecode.int_max} {clauses:0..}"
+#^^^^ source.iris meta.line.iris keyword.control.iris
+#    ^ source.iris meta.line.iris
+#     ^ source.iris meta.line.iris string.quoted.double.pattern.iris punctuation.definition.string.begin.iris
+#      ^^^^^^ source.iris meta.line.iris string.quoted.double.pattern.iris
+#            ^ source.iris meta.line.iris string.quoted.double.pattern.iris meta.capture.iris punctuation.section.interpolation.begin.iris
+#             ^^^^ source.iris meta.line.iris string.quoted.double.pattern.iris meta.capture.iris variable.other.definition.iris
+#                 ^ source.iris meta.line.iris string.quoted.double.pattern.iris meta.capture.iris punctuation.separator.type.iris
+#                  ^ source.iris meta.line.iris string.quoted.double.pattern.iris meta.capture.iris constant.numeric.integer.iris
+#                   ^^ source.iris meta.line.iris string.quoted.double.pattern.iris meta.capture.iris keyword.operator.range.iris
+#                     ^^^^^^^^^^^^^^ source.iris meta.line.iris string.quoted.double.pattern.iris meta.capture.iris constant.language.iris
+#                                   ^ source.iris meta.line.iris string.quoted.double.pattern.iris meta.capture.iris punctuation.section.interpolation.end.iris
+#                                    ^ source.iris meta.line.iris string.quoted.double.pattern.iris
+#                                     ^ source.iris meta.line.iris string.quoted.double.pattern.iris meta.capture.iris punctuation.section.interpolation.begin.iris
+#                                      ^^^^^^^ source.iris meta.line.iris string.quoted.double.pattern.iris meta.capture.iris variable.other.definition.iris
+#                                             ^ source.iris meta.line.iris string.quoted.double.pattern.iris meta.capture.iris punctuation.separator.type.iris
+#                                              ^ source.iris meta.line.iris string.quoted.double.pattern.iris meta.capture.iris constant.numeric.integer.iris
+#                                               ^^ source.iris meta.line.iris string.quoted.double.pattern.iris meta.capture.iris keyword.operator.range.iris
+#                                                 ^ source.iris meta.line.iris string.quoted.double.pattern.iris meta.capture.iris punctuation.section.interpolation.end.iris
+#                                                  ^ source.iris meta.line.iris string.quoted.double.pattern.iris punctuation.definition.string.end.iris
+>repeat clauses {
+#^^^^^^ source.iris keyword.control.iris
+#      ^ source.iris
+#       ^^^^^^^ source.iris variable.other.iris
+#              ^ source.iris
+#               ^ source.iris meta.block.iris punctuation.section.block.begin.iris
+>  list clause: -vars..vars until 0   # the terminating 0 is not stored
+#^^ source.iris meta.block.iris
+#  ^^^^ source.iris meta.block.iris keyword.control.iris
+#      ^ source.iris meta.block.iris
+#       ^^^^^^ source.iris meta.block.iris variable.other.definition.iris
+#             ^ source.iris meta.block.iris punctuation.separator.type.iris
+#              ^ source.iris meta.block.iris
+#               ^ source.iris meta.block.iris keyword.operator.iris
+#                ^^^^ source.iris meta.block.iris variable.other.iris
+#                    ^^ source.iris meta.block.iris keyword.operator.range.iris
+#                      ^^^^ source.iris meta.block.iris variable.other.iris
+#                          ^ source.iris meta.block.iris
+#                           ^^^^^ source.iris meta.block.iris keyword.control.iris
+#                                ^ source.iris meta.block.iris
+#                                 ^ source.iris meta.block.iris constant.numeric.integer.iris
+#                                  ^^^ source.iris meta.block.iris
+#                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ source.iris meta.block.iris comment.line.number-sign.iris
+>}
+#^ source.iris meta.block.iris punctuation.section.block.end.iris
+>
