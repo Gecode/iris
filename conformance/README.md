@@ -88,9 +88,8 @@ tags = ["instances", "dzn"]
 ```
 
 The selected suite version and runner options supply execution policy; case metadata has
-no version, timeout, command, skip flag or assertion language. A future grammar checker
-may add a grammar-validity marker; error codes alone cannot distinguish syntactic
-rejection from resolution failure.
+no version, timeout, command, skip flag or assertion language. The grammar check
+classifies primary error codes as described below; it needs no additional metadata.
 
 ## Parameters
 
@@ -345,6 +344,59 @@ These are fixed annotations reviewed against appendix C. The extractor never inv
 a driver or infers exemptions from its output. `input-invalid-utf8-split` reports
 UNREPRESENTABLE only when its annotation
 matches the exact serialization failure; every other failure remains FAIL.
+
+## Checking the formal grammar
+
+From `rust/`, check reader specs independently of any implementation or driver:
+
+```sh
+cargo run --locked -p iris-conformance -- check-grammar
+cargo run --locked -p iris-conformance -- check-grammar ../conformance/cases ../formats
+```
+
+The command interprets [grammar.ebnf](../spec/0.1/grammar.ebnf), including its named
+predicates, lexical rules, decoded patterns and parser limits. The grammar is embedded
+at build time; `cargo run` rebuilds after it changes. With no paths, the command uses
+`conformance/cases/0.1` and `formats` in the build-time checkout. Supply explicit,
+invocation-relative case roots when using an installed or moved binary. Discovery,
+loading and canonical deduplication use the same rules as the runner, including
+`spec.bin` and file symlinks. Overlapping roots do not inflate counts.
+
+Success expectations require grammar acceptance. A primary error expectation requires
+rejection for these codes:
+
+- `E-SPEC-UTF8`, `E-SPEC-CHARACTER`, `E-SPEC-STRING`, `E-SPEC-NUMBER`;
+- `E-SPEC-SYNTAX`, `E-SPEC-PLACEMENT`, `E-SPEC-PATTERN`;
+- `E-SPEC-UNKNOWN-TYPE`, `E-SPEC-NESTING`.
+
+Other registered codes require acceptance. Parse-time semantic failures, such as an
+unknown function or record-field error, therefore remain grammar-positive. The
+operation, tags and driver-specific alternate expectations do not change this
+classification. No additional `case.toml` field is required. When adding an error code
+to the registry, check whether it belongs in the rejection set under
+[appendix A.5](../spec/0.1/appendix-a-grammar.md#a5-syntax-and-other-parse-time-checks)
+and [error ownership](../spec/0.1/errors.md#114-parse-time-codes).
+
+The check recognizes source only. It does not reproduce expected error codes or
+coordinates, perform static semantic checks, or execute the reader spec. It maintains
+only the type visibility and alphabet-alias information required by grammar dispatch
+and capture restrictions. Each disagreement prints its case path and expected class,
+with recognition details for unexpected rejections; checking continues through the
+remaining cases. Pattern diagnostics identify the outer string's source line and a
+decoded byte offset. Successful cases have no individual output line.
+
+The final line has this format (counts shown for the current corpus):
+
+```text
+Grammar summary: total=932 valid=873 invalid=59 accepted=873 rejected=59 fail=0
+```
+
+`valid` and `invalid` count expected classes; `accepted` and `rejected` count actual
+recognition results. Each pair partitions `total`; `fail` counts disagreements. Exit
+**0** means no disagreements, **1** means at least one disagreement, and **2** means a
+CLI, grammar configuration, case-loading, IO or zero-selection error. Counts are per
+case, including cases that share a reader spec. The checker uses no driver-specific
+known-failure handling.
 
 ## Running cases
 

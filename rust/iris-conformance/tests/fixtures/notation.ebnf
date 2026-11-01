@@ -1,0 +1,4 @@
+(* Every notation form from §2.2; neither quoting style interprets escapes. *)
+source = lead, ( 'b' | "c" ) [ 'd' ], { tail }, '\' ;
+lead = 'a' ;
+tail = 'e' | ? tab character ? ;

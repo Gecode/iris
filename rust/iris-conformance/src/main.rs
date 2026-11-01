@@ -17,6 +17,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Check reader specs against the formal grammar, independently of drivers.
+    CheckGrammar { paths: Vec<PathBuf> },
     /// Generate conformance cases from executable Specification examples.
     ExtractExamples {
         source: PathBuf,
@@ -42,6 +44,18 @@ enum Commands {
 
 fn main() -> ExitCode {
     match Cli::parse().command {
+        Commands::CheckGrammar { paths } => {
+            match iris_conformance::grammar::check_grammar(&paths) {
+                Ok(report) => {
+                    print!("{}", report.render());
+                    ExitCode::from(report.exit_code())
+                }
+                Err(error) => {
+                    eprintln!("error: {error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
         Commands::ExtractExamples {
             source,
             destination,

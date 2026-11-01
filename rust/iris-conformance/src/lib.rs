@@ -3,6 +3,7 @@ pub mod canonical;
 pub mod case;
 pub mod driver;
 pub mod examples;
+pub mod grammar;
 pub mod report;
 
 use std::path::PathBuf;
