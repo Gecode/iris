@@ -1,0 +1,1 @@
+n: int  repeat n { list row: int until eol  check count(row) == 2 "two" }

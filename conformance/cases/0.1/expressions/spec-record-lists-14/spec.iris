@@ -1,0 +1,1 @@
+repeat 2 { repeat 2 as steps { a: int } }  check size(steps) == 2

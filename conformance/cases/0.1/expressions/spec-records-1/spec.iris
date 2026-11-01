@@ -1,0 +1,3 @@
+n: int  repeat n { a: int }
+repeat n { b: int }
+check a < b

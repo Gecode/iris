@@ -1,0 +1,4 @@
+n: int  repeat n as nodes { each node  ready: int  due: int }
+check node.ready <= node.due "window"
+check nodes[0].ready == 0 "depot"
+let k = size(nodes)  let d = nodes[1].due  let c = count(x in nodes: x.due > 4)

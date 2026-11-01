@@ -1,0 +1,3 @@
+n: int  repeat n { list row: int until eol }
+check size(row) == 2 && count(row) == 3 && sum(r in row: sum(r)) == 21
+check count(r in row: count(r) == 3) == size(row) && defined(row)

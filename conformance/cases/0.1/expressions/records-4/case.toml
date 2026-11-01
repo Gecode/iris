@@ -1,0 +1,3 @@
+operation = "read"
+section = "spec/0.1/08-expressions-and-checks.md#813-checks-and-failure-witnesses"
+source = "gecode:test/instance.cpp:Read::Records"

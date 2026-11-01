@@ -1,0 +1,2 @@
+let a = gecode.int_max  let b = gecode.int_min  let c = gecode.int_max / 2
+gecode: int  check gecode == 3

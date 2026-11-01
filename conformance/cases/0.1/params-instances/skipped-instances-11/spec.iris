@@ -1,0 +1,1 @@
+instances { n: int  check n > 0 "positive"  name: word }

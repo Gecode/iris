@@ -1,0 +1,1 @@
+{"code":"E-SPEC-PLACEMENT","message":"'each' must be the first statement of a repeat, and comes at most once","input_location":null,"spec_location":{"origin":"spec.iris","line":1,"column":null},"context":null,"record_path":null}

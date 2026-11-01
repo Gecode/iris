@@ -1,0 +1,1 @@
+n: int  repeat n { x: int }  let s = sum(x)  let f = x[0]  if count(x) == 2 { let t = 1 }

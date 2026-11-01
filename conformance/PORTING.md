@@ -100,6 +100,18 @@ Specification examples are extracted separately under the
 | `Spec::Comprehensions`: binding conflicts, invalid calls, and valid nested/reused bindings | 811–819, 822–827 | `expressions/comprehensions-{1..5}`, `expressions/comprehensions-{8..9}` | — |
 | `Spec::Comprehensions`: missing colon/bracket and 300-suffix index chain | 820–821, 829–832 | `reader-specs/comprehensions-{6..7}`, `reader-specs/comprehensions-10` | — |
 | `Read::Effort`: two successful reads and three budget errors | 838–854 | `work-budgets/effort-{1..5}` | — |
+| `Read::SkippedInstances`: ordinal/name selection, deferred checks and sections rejections, hard errors, and five catalogs | 858–899, 902–919 | `params-instances/skipped-instances-{1..20}` | The secondary earlier-error note at 898–899 is checked against the raw Gecode diagnostic; case 14 retains its primary integer-conversion error. |
+| `Read::SkippedInstances`: `steady_clock::now() - start < seconds(10)` | 900 | — | Host wall-clock timing is not a language result or protocol field. Both timed error executions remain in `skipped-instances-{13..14}`. |
+| `Read::Power` | 921–944 | `expressions/power-{1..7}` | — |
+| `Spec::GecodeConstants`: successful read and unknown constant | 946–954 | `expressions/gecode-constants-{1..2}` | — |
+| `Spec::GecodeConstants`: seven reserved-prefix definition/binding loop iterations | 955–964 | `reader-specs/gecode-constants-{3..9}` | — |
+| `Read::Records` | 966–1014 | `expressions/records-{1..18}` | — |
+| `Spec::Records` | 1016–1031 | `expressions/spec-records-{1..6}` | — |
+| `Read::RecordEffort` | 1033–1042 | `work-budgets/record-effort-{1..2}` | — |
+| `Read::SkippedInstanceRecords` | 1044–1056 | `params-instances/skipped-instance-records-{1..3}` | — |
+| `Read::RecordLists` | 1058–1095 | `expressions/record-lists-{1..11}` | — |
+| `Spec::RecordLists` | 1097–1137 | `expressions/spec-record-lists-{1..24}` | — |
+| `Read::FailureLocations` | 1139–1170 | `expressions/failure-locations-{1..13}` | — |
 
 ## Batch 1 review: lines 131–386
 
@@ -293,3 +305,89 @@ Parse columns are null. Validation against
 `gecode-6.5.0-5e7bbd5c26b0`, including batches 1 and 2 and the 15 unchanged
 smoke cases:
 `Summary: total=226 pass=226 xfail=0 fail=0 xpass=0` (exit 0).
+
+
+## Batch 4 review: lines 858–1170
+
+This batch contains 113 cases: 25 successful reads, six successful catalogs,
+two successful parses, and 80 errors (36 parse, 44 read). By chapter area,
+81 are in `expressions`, 23 in `params-instances`, seven in `reader-specs`,
+and two in `work-budgets`. There are no dzn operations, appendix C exclusions,
+or known-failure annotations in this range. The only excluded assertion is
+the host wall-clock limit at line 900, listed individually above.
+
+Suffixes follow execution order within each group, including all seven
+reserved-prefix loop iterations. `spec-records` and `spec-record-lists`
+distinguish the parse groups from the read groups with the same short names.
+The two identical successful row reads and the two identical failing local
+checks in `Read::Records` retain their separate original executions.
+Reader-spec and input bytes are decoded from the pinned C++ literals without
+adding final LF. Parameters are read from the source's pair assignments, and
+the effort input expands its source loop to 4000 copies of `"1 "`.
+
+A temporary Python script reads the pinned source and evaluates all 121
+`CHECK` expressions in this range against the expected files, excluding only
+the timing assertion. It also expands the seven reserved-prefix failures
+outside `CHECK` and retains both standalone parse successes. In total, all
+127 retained assertion expressions agree: 47 successful `CHECK` expressions
+and 80 error assertions. Successful checks use typed data accessors with
+entry counts, presence, paths, sizes, and flattened arrays. Every error's
+original message fragment and explicitly asserted coordinate is checked
+against the raw Gecode diagnostic and, when represented, the canonical error.
+All false-check paths are checked against the source's named record/element
+witnesses in outermost-first, zero-based order. Other errors have null paths.
+
+Independently written complete entry lists, derived from the original reads
+and the Specification, agree with all 31 successful read/catalog documents.
+The comparison checks names, order, value types, depths, full shapes, and
+every scalar leaf, including unasserted values. The two parse documents are
+also checked. All 113 cases retain complete adapter output, with case-relative
+origins; their source strings, operation metadata, section anchors, parameter
+maps, input bytes, and valid UTF-8 reader-spec source were checked separately.
+
+| Group and successful suffixes | Assertion lines | Review against complete expected data |
+|---|---|---|
+| SkippedInstances 1–2, 10, 15, 18, 20 | 870–871, 890, 904, 911, 917 | Cases 1 and 2 have string `name = "b"`, integer `n = 1`, matrix `x = [[7]]`; case 15 changes only that matrix to `[[8]]`. Case 10 has `n = 5`, `name = "y"`; case 18 has `n = 2`, `m = 3`; case 20 has `n = 2`, `name = "3x"`. |
+| SkippedInstances 7–9, 17, 19 (catalog) | 881–885, 907, 912–913 | Case 7 has `instances = 2`, `name = ["a","b"]`, `failed = ["n is at most 3",""]`. Case 8 has `instances = 1`, `name = ["a"]`, no `failed`. Case 9 has `instances = 2`, no names, `failed = ["","check on line 1 of the spec"]`. Case 17 retains replacement name `"x"` before `"b"` and the exact repeated-line summary. Case 19 has no names and the exact missing-`m` summary before `""`. |
+| Power 1 | 926–936 | All eleven integer entries remain in definition order: `a = 18`, `b = 512`, `c = 64`, `e = -4`, `f = 13`, `k = 4`, `m = -512`, `g = 1`, `h = -9223372036854775808`, `i = 1`, `j = 4052555153018976267`. |
+| GecodeConstants 1 | 949–951 | Integer scalars `a = 2147483646`, `b = -2147483646`, `c = 1073741823`, then ordinary entry `gecode = 3`. |
+| Records 1, 3–4, 6, 8, 10–11, 15, 17–18 | 971, 974, 977, 981, 987, 994–995, 1003, 1008–1012 | Cases 1 and 3 have `n = 2`, ragged `row = [[1,1],[2]]`, `width = 3`, exactly three entries. Case 4 has `ready = [3,0]`, `due = [5,1]`. Case 6 has `j = m = 2`, `k = [5,3]`, `x = [[1,2],[1,2]]`. Case 8 has `n = 2`, `row = [[1,2,3],[4,5,6]]`. Case 10 has no entries; case 11 has only `x = [1,2]`; case 15 has `x = [[1,2],[3,4]]`. Case 17 has `n = 2`, `x = [3,4]`, `s = 7`, `f = 3`, `t = 1`. Case 18 has `n = 0` and empty depth-1 integer `x`. |
+| Spec::Records 5–6 (parse) | 1028–1029 | Both valid repeat-scope programs parse without executing their reads or defaults. |
+| RecordEffort 1 | 1038 | Integer `n = 2000`, then depth-1 integer `x` and `a`, each containing all 2000 ones. |
+| SkippedInstanceRecords 1, 3 | 1051, 1054 | Read has `n = 1`, `x = [5]`, `name = "b"`. Catalog has `instances = 2`, `name = ["a","b"]`, `failed = ["positive",""]`. |
+| RecordLists 1, 5, 7–8, 11 | 1065–1067, 1073, 1078, 1087, 1093 | Case 1 has `n = 3`, `ready = [0,2,6]`, `due = [5,4,7]`, `k = 3`, `d = 4`, `c = 2`; neither structural name is an entry. Case 5 has `a = [3,4]`, `s = 7`. Case 7 has `a = [1,2]`, `b = [4,2]`, `w = [3,0]`. Case 8 has `n = m = 2`, `machine = [[0,1],[1,0]]`, `duration = [[5,6],[2,3]]`, `x = 1`, `y = 2`, `z = 16`. Case 11 retains definition order `t = "stop"`, `a = [1,2]`, `k = 2`. |
+
+Error codes were chosen by failure meaning from
+[errors.md](../spec/0.1/errors.md) before comparing the adapter output.
+Power overflow, negative exponents, and float operands retain three distinct
+codes. Record resolution failures distinguish check-scope, name conflicts,
+placement, reserved names, record scope, fields, and non-value record uses.
+Explicit record bounds use `E-INDEX-RANGE`; indexing each lifted scalar uses
+`E-INDEX-SCALAR`, not record-list indexing. False checks use
+`E-CHECK-FAILED`, including empty paths for local or non-witness checks.
+The effort failure uses `E-BUDGET`, null path, and cursor (2, 8000).
+
+The skipped `n = 1000000000` instance fails its structural size check with
+`E-SIZE-LIMIT`. The `n = 40000` scenario instead reaches the token `instance`
+where an integer is required, so `skipped-instances-14` retains
+`E-EXPECTED-VALUE` at (4, 1), with null path. Its original assertion checks
+the secondary earlier-error note; the raw diagnostic contains that note.
+The canonical adapter correctly omits it under §11.1, leaving the hard error
+primary. Catalog cases retain exact summary strings as data, including the
+replaced first instance name `"x"` after a repeated sections line.
+
+Validation against `gecode-6.5.0-5e7bbd5c26b0`, including all four batches and
+the 15 unchanged smoke cases:
+`Summary: total=339 pass=339 xfail=0 fail=0 xpass=0` (exit 0).
+
+## Whole-file coverage after four batches
+
+The assigned ranges are contiguous: 131–386, 387–615, 616–857, and 858–1170.
+An enumeration of every `Case` declaration in the entire pinned
+`test/instance.cpp` finds 40 groups, all represented in the table above by
+cases and individually listed exclusions. None starts before line 131 or
+after line 1170. Lines 1–130 contain includes, helpers, and the test wrapper;
+the remainder after line 1170 closes the harness and contains no test group.
+The four batches contribute 84, 82, 45, and 113 cases, respectively: 324
+ported cases, plus 15 smoke cases. There are no uncovered test groups between
+batches and no test groups outside their combined range.

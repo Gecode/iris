@@ -1,0 +1,6 @@
+instance a
+2
+1 2 3 x
+instance b
+1
+7

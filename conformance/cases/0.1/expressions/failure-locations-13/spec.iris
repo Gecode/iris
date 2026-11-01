@@ -1,0 +1,1 @@
+n: int  repeat n as nodes { ready: int }  check ready[0] == 0

@@ -1,0 +1,1 @@
+n: int  repeat n { list row: int until eol }  check all(r in row: min(r) > 0) "positive"

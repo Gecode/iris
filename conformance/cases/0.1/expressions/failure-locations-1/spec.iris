@@ -1,0 +1,1 @@
+a[4]: int  check all(x in a: x > 0) "positive"

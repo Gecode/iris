@@ -1,0 +1,1 @@
+repeat 2 as xs { a: int }  let s = sum(x in xs: x.a)

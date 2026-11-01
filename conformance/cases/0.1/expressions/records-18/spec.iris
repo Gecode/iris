@@ -1,0 +1,1 @@
+n: int  repeat n { x: int }  check x > 0 && 1 > 2

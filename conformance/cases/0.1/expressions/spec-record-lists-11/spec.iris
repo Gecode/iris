@@ -1,0 +1,1 @@
+repeat 2 as xs { a: int }  check all(xs in xs: 1)

@@ -1,0 +1,6 @@
+instance a
+1000000000
+1 2
+instance b
+1
+7

@@ -1,0 +1,1 @@
+repeat 2 as xs { a: int }  let a = 1  check xs[0].a > 0

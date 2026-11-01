@@ -1,0 +1,2 @@
+repeat 2 as xs { a: int }
+repeat 2 { each xs }

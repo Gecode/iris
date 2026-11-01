@@ -1,0 +1,1 @@
+repeat 2 { a: int }  repeat 2 { a: int }  check a < 1

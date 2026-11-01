@@ -1,0 +1,1 @@
+{"code":"E-SPEC-FIELD","message":"'nodes' is a list of records, so '.ready' needs one of them: use 'nodes[i].ready', or 'node.ready' for each record","input_location":null,"spec_location":{"origin":"spec.iris","line":1,"column":null},"context":null,"record_path":null}

@@ -1,0 +1,1 @@
+{"iris":"0.1","entries":[{"name":"instances","type":"int","depth":0,"value":2},{"name":"name","type":"string","depth":1,"value":["x","b"]},{"name":"failed","type":"string","depth":1,"value":["a second line matching \"instance {name:word}\"",""]}]}

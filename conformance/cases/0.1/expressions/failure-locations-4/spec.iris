@@ -1,0 +1,2 @@
+repeat 2 as jobs { each job  repeat 2 as steps { d: int } }
+check all(j in jobs: all(s in j.steps: s.d > 0)) "positive"

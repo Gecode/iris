@@ -1,0 +1,1 @@
+{"code":"E-SPEC-RECORD-SCOPE","message":"'x' is each record of a repeat, so only checks can use it outside that repeat","input_location":null,"spec_location":{"origin":"spec.iris","line":1,"column":null},"context":null,"record_path":null}

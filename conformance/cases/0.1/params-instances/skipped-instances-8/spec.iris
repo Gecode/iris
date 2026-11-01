@@ -1,0 +1,6 @@
+instances {
+  sections skip other {
+    "instance {name:word}" optional
+    "{n:int}" last { check n <= 3 "n is at most 3"  x[n][n]: int }
+  }
+}

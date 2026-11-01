@@ -1,0 +1,1 @@
+repeat 2 as nodes { ready: int  due: int }  check nodes[0].read > 0

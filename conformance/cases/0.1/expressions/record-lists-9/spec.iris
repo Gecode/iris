@@ -1,0 +1,6 @@
+n: int  m: int
+repeat n as jobs { each job  repeat m as steps { each step  machine: int  duration: int } }
+check step.machine < m "exists"
+check distinct(job.machine) "twice"
+check size(job.steps) == m && all(s in job.steps: s.duration >= 0)
+let x = jobs[1].steps[0].machine  let y = size(jobs[0].steps)  let z = sum(j in jobs: sum(j.duration))

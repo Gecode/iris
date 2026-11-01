@@ -1,0 +1,1 @@
+repeat 2 { k: int  if k > 0 { a: int } else { let a = 0 } }  check a >= 0

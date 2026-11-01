@@ -1,0 +1,1 @@
+n: int  repeat n { ready: int  due: int }  check ready <= due "window"

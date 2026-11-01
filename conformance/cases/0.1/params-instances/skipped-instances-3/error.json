@@ -1,0 +1,1 @@
+{"code":"E-CHECK-FAILED","message":"check failed: n is at most 3","input_location":{"origin":"input.txt","line":2,"column":2},"spec_location":{"origin":"spec.iris","line":4,"column":null},"context":"instance [1] > section \"{n:int}\"","record_path":[]}

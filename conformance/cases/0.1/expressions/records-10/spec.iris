@@ -1,0 +1,1 @@
+sections { "A" optional { repeat 2 { x: int } }  "B" optional }  check !defined(x) || x > 0 "positive"

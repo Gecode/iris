@@ -1,0 +1,2 @@
+n: int  repeat n { list row: int until eol }  width: int
+check sum(row) + count(row) - 1 <= width "the clues do not fit"

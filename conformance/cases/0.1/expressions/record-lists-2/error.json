@@ -1,0 +1,1 @@
+{"code":"E-CHECK-FAILED","message":"check failed for record 3 of 'nodes': window","input_location":{"origin":"input.txt","line":4,"column":1},"spec_location":{"origin":"spec.iris","line":2,"column":null},"context":null,"record_path":[2]}

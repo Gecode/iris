@@ -1,0 +1,1 @@
+a[2]: int  check 1 > 2 || all(x in a: x > 1) "m"

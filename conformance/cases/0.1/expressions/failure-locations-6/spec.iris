@@ -1,0 +1,1 @@
+a[2][2]: int  check all(r in a: all(x in r: x > 0)) "positive"

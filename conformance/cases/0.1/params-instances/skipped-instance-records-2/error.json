@@ -1,0 +1,1 @@
+{"code":"E-CHECK-FAILED","message":"check failed for record 2 of 'x': positive","input_location":{"origin":"input.txt","line":1,"column":5},"spec_location":{"origin":"spec.iris","line":1,"column":null},"context":"instance [1]","record_path":[1]}

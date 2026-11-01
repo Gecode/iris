@@ -1,0 +1,1 @@
+j: int  m: int  repeat j { k: int  repeat m { x: int } }  check x < k "x below k"

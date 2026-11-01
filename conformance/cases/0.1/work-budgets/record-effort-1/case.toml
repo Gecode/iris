@@ -1,0 +1,3 @@
+operation = "read"
+section = "spec/0.1/10-work-budgets.md#104-lifted-check-traversal"
+source = "gecode:test/instance.cpp:Read::RecordEffort"

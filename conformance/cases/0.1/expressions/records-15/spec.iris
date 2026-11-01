@@ -1,0 +1,1 @@
+repeat 2 { repeat 2 { x: int }  check size(x) == 2 && x > 0 }

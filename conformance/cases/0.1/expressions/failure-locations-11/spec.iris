@@ -1,0 +1,1 @@
+a[2]: int  check count(x in a: all(y in a: y > x)) == 2 "m"

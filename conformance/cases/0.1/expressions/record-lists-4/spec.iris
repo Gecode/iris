@@ -1,0 +1,1 @@
+n: int  repeat n as nodes { a: int }  let x = nodes[3].a

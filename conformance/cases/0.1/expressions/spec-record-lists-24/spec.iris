@@ -1,0 +1,1 @@
+repeat 2 as xs { a: int }  check xs[0][1] > 0
