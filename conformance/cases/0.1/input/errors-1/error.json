@@ -1,0 +1,1 @@
+{"code":"E-EXPECTED-VALUE","message":"expected int, found 'z'","input_location":{"origin":"input.txt","line":3,"column":3},"spec_location":{"origin":"spec.iris","line":1,"column":null},"context":"repeat [3 of 3] > x","record_path":null}

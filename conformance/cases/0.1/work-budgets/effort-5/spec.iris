@@ -1,0 +1,1 @@
+n: int  a[n]: int  repeat n { k: int  check sum(a) > 0 }

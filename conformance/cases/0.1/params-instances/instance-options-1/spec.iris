@@ -1,0 +1,1 @@
+param k = 3  param m = 0  n: int  x[n * k - m]: int

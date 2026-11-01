@@ -1,0 +1,2 @@
+a[0]: int  let s = sum(x in a: x)  let c = count(x in a: 1)
+check all(x in a: 0) && !any(x in a: 1) && distinct(a)

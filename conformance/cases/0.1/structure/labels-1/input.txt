@@ -1,0 +1,25 @@
+****
+jobs (incl. supersource/sink ):  3
+horizon                       :  9
+RESOURCES
+  - renewable                 :  1   R
+  - nonrenewable              :  0   N
+  - doubly constrained        :  0   D
+****
+PRECEDENCE RELATIONS:
+jobnr.    #modes  #successors   successors
+   1        1          1           2
+   2        1          1           3
+   3        1          0
+****
+REQUESTS/DURATIONS:
+jobnr. mode duration  R 1
+------------------------
+  1      1     0       0
+  2      1     4       2
+  3      1     0       0
+****
+RESOURCEAVAILABILITIES:
+  R 1
+   3
+****

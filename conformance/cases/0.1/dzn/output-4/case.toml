@@ -1,0 +1,3 @@
+operation = "dzn"
+section = "spec/0.1/appendix-b-dzn.md#b6-ragged-and-deeper-arrays"
+source = "gecode:test/instance.cpp:Data::Output"

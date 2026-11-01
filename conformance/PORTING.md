@@ -78,6 +78,28 @@ Specification examples are extracted separately under the
 | `Spec::Strings` | 584–596 | `reader-specs/strings-{1..4}` | — |
 | `Spec::Settings`: five loop bodies and multiline placement error | 598–610 | `reader-specs/settings-{1..6}` | — |
 | `Spec::Settings`: literal tokens inside a repeat | 611–612 | `structure/settings-7` | — |
+| `Driver::InstanceOptions`: three successful reads | 627–657 | `params-instances/instance-options-{1..2}`, `types/instance-options-3` | All resulting data are retained; option parsing and filesystem assertions are accounted for separately below. |
+| `Driver::InstanceOptions`: repeated `-param` options | 636–640 | — | Host command-line parsing; `instance-options-1` supplies the equivalent string map, without an argv operation. |
+| `Driver::InstanceOptions`: comma-separated `-param` assignments | 645–648 | — | Host command-line and assignment-list parsing; `instance-options-2` supplies the equivalent string map. |
+| `Driver::InstanceOptions`: `o.is_file()` | 641 | — | Host filesystem query; protocol operations receive explicit spec and input files and return no file-status flag. |
+| `Driver::InstanceOptions`: `-spec` replaces an embedded reader spec | 651–656 | — | Host command-line source selection; `instance-options-3` retains the replacement reader spec's complete read, but the protocol has no embedded-spec override operation. |
+| `Driver::InstanceOptions`: `!s.is_file()` for `s.instance(".")` | 659–660 | — | Host directory classification, outside language parsing and reading supplied text. |
+| `Read::Errors`: three read errors and three parse errors | 671–676 | `input/errors-{1..3}`, `reader-specs/errors-{4..5}`, `types/errors-6` | — |
+| `Read::Errors`: `Spec::load("/nonexistent/x.reader")` | 677 | — | Host file acquisition fails before parsing; the protocol has no reader-spec file-acquisition expectation. |
+| `Read::Errors`: `Spec::load(".")` | 678 | — | Host directory acquisition fails before parsing, outside the supplied-text language contract. |
+| `Data::Access`: two successful int64 reads | 683–684, 690 | `types/access-{1..2}` | — |
+| `Data::Access`: `d.ints("big")` fails with `is not an array` | 685 | — | Host array accessor applied to a scalar; the protocol returns complete data, without accessor requests. |
+| `Data::Access`: `d.integer("w")` fails with `is not an integer` | 686 | — | Host accessor type mismatch after a successful read; `access-1` retains the string entry. |
+| `Data::Access`: `d.integer("nope")` fails with `no value named` | 687 | — | Host lookup of an absent entry, not a reader expression; `access-1` retains the complete entry list. |
+| `Data::Access`: `d.size("x", {2})` fails with `index out of range` | 688 | — | Host accessor path bounds check; no accessor request exists in the protocol. |
+| `Data::Access`: `d.integer("x", {0})` fails with `is not a single value` | 689 | — | Host scalar accessor applied to an array row; `access-1` retains the full ragged array. |
+| `Data::Access`: `e.ints("v")` fails with `does not fit into an int` | 691 | — | Host `IntArgs` narrowing to int; `access-2` retains the valid int64 array leaf 9999999999. |
+| `Data::Output`: four read-and-render executions | 696–718 | `dzn/output-{1..4}` | — |
+| `Read::Labels` | 724–764 | `structure/labels-1` | — |
+| `Read::Expressions`: two successful reads and twelve read errors | 770–805 | `expressions/expressions-{1..14}` | — |
+| `Spec::Comprehensions`: binding conflicts, invalid calls, and valid nested/reused bindings | 811–819, 822–827 | `expressions/comprehensions-{1..5}`, `expressions/comprehensions-{8..9}` | — |
+| `Spec::Comprehensions`: missing colon/bracket and 300-suffix index chain | 820–821, 829–832 | `reader-specs/comprehensions-{6..7}`, `reader-specs/comprehensions-10` | — |
+| `Read::Effort`: two successful reads and three budget errors | 838–854 | `work-budgets/effort-{1..5}` | — |
 
 ## Batch 1 review: lines 131–386
 
@@ -190,3 +212,84 @@ line/column; all parse columns are null.
 Validation against `gecode-6.5.0-5e7bbd5c26b0`, including batch 1 and the
 15 unchanged smoke cases:
 `Summary: total=181 pass=181 xfail=0 fail=0 xpass=0` (exit 0).
+
+## Batch 3 review: lines 616–857
+
+This batch contains 45 cases: 11 successful reads, four successful dzn
+operations, and 30 errors (12 parse, 18 read). The 13 host/API exclusions
+are listed individually in the table above. There are no appendix C
+exclusions or known-failure annotations. The dzn cases introduce the
+appendix B area `dzn`; all other cases reuse existing chapter areas.
+Suffixes follow source execution order within each group. Excluded
+host/API checks do not consume suffixes.
+
+There are no catalog executions in this range. `Read::SkippedInstances`
+starts at line 858 and belongs to the next batch. The effort tests use
+ordinary-sized budget arithmetic, outside appendix C.3, and the sole
+dzn float value, 20, is outside appendix C.4. The ESC byte in `output-2`
+is valid UTF-8; none of these reader specs or inputs needs an appendix
+C.1 or C.2 exclusion.
+
+Reader-spec and input bytes were decoded directly from the pinned C++
+string literals, including adjacent literals and the octal ESC escape,
+without adding final newlines. Loop expansion preserves the 300 index
+suffixes, 2000-value vector, 100-by-500 matrix, and 4000-value input for
+the repeated-sum failure. Both parameterized option reads retain string
+values `k = "2"` and `m = "2"` in that order. They remain distinct cases
+despite having identical language inputs and results.
+
+A temporary Python script reads all 63 `CHECK` expressions in this source
+range using balanced delimiters and quoted-string decoding. It evaluates
+all 16 retained successful-data assertions against typed accessors over
+the expected JSON and checks all nine original dzn substring assertions
+against the exact expected bytes. For each of the 30 retained error
+assertions, it compares the original message fragment, context, and any
+explicitly asserted reader-spec or input coordinates with the expected
+error. It accounts individually for the eight excluded `CHECK` assertions.
+The driver group uses `ok &&` instead of `CHECK`; the script separately
+evaluates its three retained data assertions and accounts for its two
+filesystem queries. Its remaining three CLI-only scenarios have individual
+table rows. Every retained assertion agrees.
+
+Independently written full entry lists were also compared with all 11
+successful read documents. This checks every entry's name, definition
+order, value type, depth, complete shape, and scalar leaves, including
+the 50000 matrix elements and data not asserted by the original tests.
+Four independently written complete dzn byte sequences were compared with
+the adapter output under appendix B, including type comments, unasserted
+entries, spaces, escapes, and final LF. The case files retain the complete
+adapter output. Source-derived spec/input bytes, parameter maps, valid
+UTF-8 source, metadata source names, and section anchors were checked for
+every case.
+
+| Group and successful suffixes | Assertion lines | Review against complete expected output |
+|---|---|---|
+| InstanceOptions 1–3 | 642, 649, 657 | Cases 1 and 2 have integer `k = 2`, `m = 2`, `n = 2`, then `x = [3,4]`. Case 3 has integer `a = 2`, `b = 3`, `c = 4`. |
+| Access 1–2 | 684; successful read at 690 | Case 1 has int64 `big = 9999999999`, string `w = "hi"`, integer `n = 2`, `k = [1,2]`, and depth-2 `x = [[5],[6,7]]`. Case 2 has `n = 1` and int64 vector `v = [9999999999]`, preserving the read before excluded host narrowing. |
+| Output 1–4 (dzn) | 699–703, 707–708, 713–714, 718 | Case 1 renders `n`, float `f = 20.0`, `w`, matrix `m`, vector `k`, and ragged `x` in definition order. Case 2 quotes keyword `var` and escapes ESC as `\x1b`. Case 3 retains empty matrix `e`, vector `k`, and depth-3 ragged `y`, including its empty inner list. Case 4 uses the nested tuple representation and full type comment for depth-7 `a`. |
+| Labels 1 | 762–764 | Integer scalars `jobs = 3`, `renewable = 1`; vectors `modes = [1,1,1]`, `nsucc = [1,1,0]`; depth-2 offset `successors = [[1],[2],[]]`; `duration = [0,4,0]`; depth-2 `request = [[0],[2],[0]]`; `capacity = [3]`. Discarded indices and fields create no entries. |
+| Expressions 1–2 | 780–787, 791 | Case 1 retains `n = 3`, ragged `r = [[1,2],[3,3,4],[5]]`, float `f = [0.5,2.5]`, string `w = ["a","b"]`, then `a = [3,3,4]`, `b = 9`, float `g = 2.5`, string `v = "a"`, integers `s = 18`, `c = 2`, `t = 64`, `k = 1`, and `d = 1`. Case 2 has empty integer `a`, followed by `s = 0`, `c = 0`. All source checks execute successfully. |
+| Comprehensions 9 | 827 | Integer matrix `a = [[1,2],[3,4]]`, then scalar `s = 14`, including both nested and separately reused bindings. |
+| Effort 1, 3 | 841, 849 | Case 1 has `n = 2000`, depth-1 integer `a` with 2000 ones. Case 3 has `m = 100`, `k = 500`, and depth-2 integer `a` with 100 rows of 500 ones. Both full checks execute within the expression budget. |
+
+Each error code was selected by failure meaning from
+[errors.md](../spec/0.1/errors.md) before comparing adapter output.
+Invalid and missing integers use `E-EXPECTED-VALUE`; unknown capture types
+use `E-SPEC-UNKNOWN-TYPE`. Array bounds, scalar bases, and noninteger
+indices use the three distinct indexing codes. A scalar comprehension
+domain uses `E-FUNCTION-TYPE`, while an array-valued comprehension sum
+body uses `E-INTEGER-TYPE`. References to bindings after their comprehension
+use `E-NAME-UNDEFINED`;
+noninteger `distinct` input uses `E-FUNCTION-TYPE`; sum overflow uses
+`E-INTEGER-OVERFLOW`. Binding conflicts, discard bindings, call forms,
+missing punctuation, and excessive postfix nesting retain their parse
+codes. All three effort failures use `E-BUDGET`, including the repeated
+sum's active context `repeat [589 of 2000]`.
+
+All errors retain complete adapter documents with case-relative origins.
+All record paths are null: the repeat conversion errors and budget
+failures are hard errors, not false checks with record witnesses.
+Parse columns are null. Validation against
+`gecode-6.5.0-5e7bbd5c26b0`, including batches 1 and 2 and the 15 unchanged
+smoke cases:
+`Summary: total=226 pass=226 xfail=0 fail=0 xpass=0` (exit 0).

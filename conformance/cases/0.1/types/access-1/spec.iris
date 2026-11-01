@@ -1,0 +1,1 @@
+big: int  w: word  n: int  repeat n { k: int  x[k]: int }

@@ -1,0 +1,1 @@
+m: int  k: int  a[m][k]: int  check all(r in a: all(s in r: s == 1))

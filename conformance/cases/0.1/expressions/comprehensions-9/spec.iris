@@ -1,0 +1,1 @@
+a[2][2]: int  let s = sum(x in a: sum(y in x: y)) + sum(y in a: count(y))

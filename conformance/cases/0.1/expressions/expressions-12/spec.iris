@@ -1,0 +1,2 @@
+n: int  repeat n { list r: int until eol }  f[2]: float  w[2]: word
+let z = all(x in r: q)

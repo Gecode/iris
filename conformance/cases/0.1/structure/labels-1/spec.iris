@@ -1,0 +1,12 @@
+comment "***" "---"
+find "jobs (incl. supersource/sink ): {jobs:int}"
+find "- renewable : {renewable:int} R"
+find "PRECEDENCE RELATIONS:"
+line "jobnr. #modes #successors successors"
+repeat jobs { index 1  modes: int  nsucc: int  successors[nsucc]: int offset -1 }
+line "REQUESTS/DURATIONS:"
+line "jobnr. mode duration ..."
+repeat jobs { index 1  _: int  duration: int  request[renewable]: int }
+line "RESOURCEAVAILABILITIES:"
+line "R 1 ..."
+capacity[renewable]: int

@@ -1,0 +1,2 @@
+% a: array[int] of tuple(array[int] of tuple(array[int] of tuple(array[int] of tuple(array[int] of tuple(array[int] of tuple(array[int] of int))))))
+a = [([([([([([([5],)],)],)],)],)],)];

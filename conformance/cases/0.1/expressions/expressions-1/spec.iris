@@ -1,0 +1,8 @@
+n: int  repeat n { list r: int until eol }  f[2]: float  w[2]: word
+let a = r[1]  let b = r[1][2] + r[2][0]  let g = f[1]  let v = w[0]
+let s = sum(x in r: sum(x))  let c = count(x in r: count(x) > 1)
+let t = sum(x in r: sum(y in x: y * y))  let k = count(x in f: x > 1)
+check all(x in r: sum(x) + count(x) - 1 <= 12) && !all(x in r: count(x) == 2)
+check any(x in r: !distinct(x)) && !any(x in w: x == "c") && any(x in w: x == "b")
+let d = distinct(r[0], 3) && !distinct(r[0], r[2], 2) && distinct(r[1][1])  check d
+check all(x in r: defined(x)) && !defined(x)

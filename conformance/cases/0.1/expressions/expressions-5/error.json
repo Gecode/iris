@@ -1,0 +1,1 @@
+{"code":"E-INDEX-RANGE","message":"index 3 is out of range for an element of 'r' (size 3, indices start at 0)","input_location":{"origin":"input.txt","line":5,"column":12},"spec_location":{"origin":"spec.iris","line":2,"column":null},"context":null,"record_path":null}

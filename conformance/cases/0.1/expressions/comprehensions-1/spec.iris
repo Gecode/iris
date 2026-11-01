@@ -1,0 +1,1 @@
+n: int  a[n]: int  check all(n in a: n > 0)

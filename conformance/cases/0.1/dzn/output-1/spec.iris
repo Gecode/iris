@@ -1,0 +1,1 @@
+n: int  f: float  w: word  m[2][2]: int  repeat n { k: int  x[k]: int }
