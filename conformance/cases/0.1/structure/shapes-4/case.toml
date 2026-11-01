@@ -1,0 +1,3 @@
+operation = "read"
+section = "spec/0.1/07-structure.md#75-column-construction-and-missing-rows"
+source = "gecode:test/instance.cpp:Read::Shapes"

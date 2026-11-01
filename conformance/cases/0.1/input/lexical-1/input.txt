@@ -1,0 +1,7 @@
+c comment
+# another
+p cnf
+a; b ;
+c x
+%
+0

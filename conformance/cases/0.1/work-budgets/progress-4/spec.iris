@@ -1,0 +1,1 @@
+n: int  repeat n { a[0]: int }

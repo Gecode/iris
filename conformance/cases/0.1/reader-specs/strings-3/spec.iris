@@ -1,0 +1,4 @@
+a: int
+let s = "a\
+b"
+b: int

@@ -1,0 +1,3 @@
+operation = "catalog"
+section = "spec/0.1/09-params-and-instances.md#96-catalog-results"
+source = "gecode:test/instance.cpp:Read::Instances"

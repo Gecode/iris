@@ -1,0 +1,3 @@
+operation = "read"
+section = "spec/0.1/06-types-and-values.md#67-offsets-and-evaluation-order"
+source = "gecode:test/instance.cpp:Read::Robustness"

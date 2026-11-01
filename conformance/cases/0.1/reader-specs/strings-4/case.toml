@@ -1,0 +1,3 @@
+operation = "parse"
+section = "spec/0.1/05-reader-specs.md#53-strings"
+source = "gecode:test/instance.cpp:Spec::Strings"

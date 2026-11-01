@@ -1,0 +1,10 @@
+header text
+instance a
+2
+1 2
++++
+instance b
+description
+1
+7
++++ end

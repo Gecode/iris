@@ -1,0 +1,1 @@
+{"code":"E-NO-PROGRESS","message":"the body of a repeat until read no input","input_location":{"origin":"input.txt","line":1,"column":1},"spec_location":{"origin":"spec.iris","line":1,"column":null},"context":"repeat [1]","record_path":null}

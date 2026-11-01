@@ -1,0 +1,3 @@
+operation = "read"
+section = "spec/0.1/07-structure.md#72-line-patterns-and-captures"
+source = "gecode:test/instance.cpp:Read::Robustness"

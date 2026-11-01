@@ -1,0 +1,3 @@
+operation = "read"
+section = "spec/0.1/09-params-and-instances.md#92-parameter-evaluation-and-conversion"
+source = "gecode:test/instance.cpp:Read::Parameters"

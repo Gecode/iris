@@ -1,0 +1,1 @@
+{"code":"E-TRAILING-INPUT","message":"unexpected input after the end of the spec: '2'","input_location":{"origin":"input.txt","line":1,"column":3},"spec_location":null,"context":null,"record_path":null}

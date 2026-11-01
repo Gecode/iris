@@ -1,0 +1,1 @@
+r: int  c: int  x[r][c]: int

@@ -1,0 +1,3 @@
+operation = "read"
+section = "spec/0.1/07-structure.md#74-repeat-forms-and-termination"
+source = "gecode:test/instance.cpp:Read::Progress"

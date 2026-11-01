@@ -1,0 +1,3 @@
+operation = "read"
+section = "spec/0.1/04-input.md#43-tokens-and-separators"
+source = "gecode:test/instance.cpp:Read::Lexical"

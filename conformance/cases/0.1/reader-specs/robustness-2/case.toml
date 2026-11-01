@@ -1,0 +1,3 @@
+operation = "read"
+section = "spec/0.1/05-reader-specs.md#59-format-metadata"
+source = "gecode:test/instance.cpp:Read::Robustness"

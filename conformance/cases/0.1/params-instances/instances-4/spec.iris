@@ -1,0 +1,7 @@
+comment "+++"
+instances {
+  sections skip other {
+    "instance {name:word}" optional
+    "{n:int}" last { x[n]: int }
+  }
+}

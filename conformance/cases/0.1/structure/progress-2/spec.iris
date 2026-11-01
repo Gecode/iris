@@ -1,0 +1,1 @@
+repeat until "END" { if 1 > 2 { w: word } }

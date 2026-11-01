@@ -1,0 +1,5 @@
+comment "c" "#"
+stop "%"
+tokens ";"
+expect "p" "cnf"
+repeat until eof { w: word  expect ";" }

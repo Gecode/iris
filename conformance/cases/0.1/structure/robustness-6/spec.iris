@@ -1,0 +1,2 @@
+line "{a:float}x{b:int}-{c:num}"  f: float
+check 1.5e+1 == 15 && 5-2 == 3

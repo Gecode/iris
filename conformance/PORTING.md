@@ -53,6 +53,31 @@ Specification examples are extracted separately under the
 | `Read::Ranges` | 308–329 | `types/ranges-{1..12}` | — |
 | `Spec::Types` | 331–365 | `types/types-{1..4}`, `reader-specs/types-{5..7}`, `types/types-{8..18}`, `structure/types-{19..20}` | — |
 | `Read::Control` | 367–385 | `expressions/control-1`, `structure/control-2`, `expressions/control-{3..5}` | — |
+| `Read::Lexical` | 387–399 | `input/lexical-{1..3}` | — |
+| `Read::Robustness`: separators and list terminators | 403–405 | `input/robustness-1` | — |
+| `Read::Robustness`: format name syntax and subtraction | 407–409 | `reader-specs/robustness-2` | The read is retained; the metadata accessor is accounted for separately below. |
+| `Read::Robustness`: `f.name() == "dimacs-cnf.v2"` | 408 | — | Format metadata is not returned by any protocol operation. Parsing the format declaration and reading with it remain covered by `robustness-2`. |
+| `Read::Robustness`: multiplication and offset overflow | 411–412 | `expressions/robustness-3`, `types/robustness-4` | — |
+| `Read::Robustness`: invalid float and signed captures | 413–421 | `input/robustness-5`, `structure/robustness-6` | — |
+| `Read::Robustness`: malformed numeric tokens and excessive dimension | 422–424 | `input/robustness-{7..8}`, `types/robustness-9` | — |
+| `Read::Robustness`: integer list/array tokens and conversion failures | 426–432 | `input/robustness-{10..15}`, `types/robustness-16` | — |
+| `Read::Robustness`: malformed pattern and missing repeat field | 433–434 | `structure/robustness-{17..18}` | — |
+| `Read::Robustness`: large dimensions with insufficient input | 436–437 | `types/robustness-{19..20}` | — |
+| `Read::Robustness`: excessive and small empty arrays | 438–440 | `work-budgets/robustness-{21..22}`, `types/robustness-23` | — |
+| `Read::Instances`: selection, single-instance reads, three catalogs, and read errors | 444–475, 482 | `params-instances/instances-{1..11}`, `params-instances/instances-14` | — |
+| `Read::Instances`: misplaced instance blocks | 476–481 | `reader-specs/instances-{12..13}` | — |
+| `Read::Arithmetic` | 486–504 | `expressions/arithmetic-{1..5}`, `types/arithmetic-6` | — |
+| `Read::Progress`: indefinite repeat progress | 508–510 | `structure/progress-{1..3}` | — |
+| `Read::Progress`: counted repeats and run-wide idle work | 511–515 | `work-budgets/progress-{4..7}` | — |
+| `Read::Shapes`: empty columns, missing scalar, deep paths, and word list | 519–536, 539 | `structure/shapes-{1..4}`, `types/shapes-{5..6}` | — |
+| `Read::Shapes`: `e.text("s", {0,2,0})` fails with `index out of range` | 537 | — | Host data-accessor bounds check after a successful read. The protocol returns the complete data, with no accessor request; `shapes-5` retains that read and all valid-path assertions. |
+| `Read::Parameters` | 543–559 | `params-instances/parameters-{1..4}` | — |
+| `Spec::Checks`: function calls and capture name | 563–567 | `expressions/checks-{1..2}`, `structure/checks-3` | — |
+| `Spec::Checks`: parentheses, operator chain, else-if chain, and discard name | 568–579 | `reader-specs/checks-{4..7}` | — |
+| `Spec::Checks`: offset on a word | 580 | `types/checks-8` | — |
+| `Spec::Strings` | 584–596 | `reader-specs/strings-{1..4}` | — |
+| `Spec::Settings`: five loop bodies and multiline placement error | 598–610 | `reader-specs/settings-{1..6}` | — |
+| `Spec::Settings`: literal tokens inside a repeat | 611–612 | `structure/settings-7` | — |
 
 ## Batch 1 review: lines 131–386
 
@@ -103,3 +128,65 @@ check in `control-3` has path `[]`; every other error has a null path.
 
 Validation against `gecode-6.5.0-5e7bbd5c26b0`, including the 15 unchanged smoke
 cases: `Summary: total=99 pass=99 xfail=0 fail=0 xpass=0` (exit 0).
+
+## Batch 2 review: lines 387–615
+
+This batch contains 82 cases: 25 successful reads, three successful catalogs,
+and 54 errors (20 parse, 34 read). There are no dzn operations, appendix C
+exclusions, or known-failure annotations in this source range. The two
+host/API exclusions are listed individually in the table above. New areas
+`input` and `work-budgets` follow chapters 4 and 10; the other cases reuse the
+existing chapter areas. Suffixes follow source execution order within each
+group, including the repeated number-selected reads and all five settings-loop
+iterations. The excluded accessor in Shapes does not consume a suffix.
+
+Reader-spec and input bytes were decoded from the pinned C++ string literals,
+without adding final newlines or normalizing CR LF. The three parser-depth
+cases retain the source's 300 nested parentheses, 300 additions, and 300
+else-if additions. Parameter maps preserve each supplied string, including
+the distinct name and ordinal selectors.
+
+A temporary Python script reads the pinned source, extracts all 96 `CHECK`
+expressions in this range, and checks them against the expected files. It
+evaluates the 44 successful assertions through typed data accessors, including
+paths, flattened arrays, presence, depth, and size. It checks all 54 error
+executions against the original message fragments and every explicitly
+asserted coordinate, expanding the five settings-loop iterations separately.
+The remaining two `CHECK` expressions are the individual API exclusions.
+Every retained assertion agrees.
+
+Complete success entry lists were also written independently from the source
+and the Specification and compared with the adapter output. That comparison
+checks every entry's name, order, value type, depth, shape, and scalar leaves,
+including values not asserted by the original tests. The expected files retain
+the complete adapter output. The source-derived reader-spec/input bytes and
+parameter maps were checked separately against every case file.
+
+| Group and successful suffixes | Assertion lines | Review against complete expected data |
+|---|---|---|
+| Lexical 1, 3 | 394–395, 397 | Case 1 has string `w = ["a","b"]` after comment, stop, token, and CR LF handling; case 3 has only integer `a = 1`, ignoring the trailing token. |
+| Robustness 1, 2, 6, 10, 11, 23 | 404–405, 409, 418–421, 426–427, 440 | Case 1 has integer `a = [1,2,3]`, `b = [4,5]`; case 2 has `n = 5`, `x = 2`, `k = 3`. Case 6 has float `a = -150`, integer `b = 3`, float `c = 2.5`, float `f = 0.25`. Cases 10 and 11 have integer `a = [5,-7,5]` and `[1,-2,3]`; case 23 has `r = 3`, `c = 0`, depth-2 `x = [[],[],[]]`. |
+| Instances 1–3, 6 | 458–460, 464 | Case 1 has `name = "b"`, `n = 1`, `x = [7]`; cases 2 and 3 each have `name = "a"`, `n = 2`, `x = [1,2]`, preserving both original executions. Case 6 has no name, only `n = 3`, `x = [4,5,6]`. |
+| Instances 7–9 (catalog) | 468–469, 471–472 | Case 7 has integer `instances = 2` and string `name = ["a","b"]`. Cases 8 and 9 each have only `instances = 1`, with no name or read-data entries. |
+| Arithmetic 1, 4 | 491–493, 498–500 | Case 1 has integer `a = [-5,2,1]`, floats `g = -1.5`, `h = 4`, then integer `s = -2`, `lo = -5`, `hi = 7`. Case 4 retains full int64 `a`, `p`, and `r` at -9223372036854775808, with `q = 0`. |
+| Progress 2, 5 | 509, 512 | Immediate termination produces empty string `w` at depth 1. The small counted repeat has `n = 3` and integer `a = [[],[],[]]` at depth 2. |
+| Shapes 1–3, 5–6 | 522–523, 525–527, 529, 533–536, 539 | Case 1 has float `x = [[],[]]` at depth 3. Case 2 has empty float `x` at depth 3, empty string `w` at depth 1, and empty integer `l` at depth 2. Case 3 has `k = [1,2]` and integer `x = [[],[]]` at depth 3. Case 5 has string `s = [[["a","b"],["c","d"]]]` and integer `v = [[[1,2]],[[3,4]]]`, both at depth 3; all four path assertions agree. Case 6 has string `w = ["a","b"]`, without its sentinel. |
+| Parameters 1, 3 | 546, 554 | Case 1 has inferred float `k = 1.5`; case 3 has string `s = "3"` and integer `i = 4`, in definition order. |
+| Strings 1 | 587 | The sole string entry `s` contains the exact LF, tab, backslash, and double quote asserted by the source. |
+| Settings 7 | 612 | Literal tokens inside the repeat produce only integer `a = [1,2]`. |
+
+Each error code was selected by failure meaning from
+[errors.md](../spec/0.1/errors.md) before comparing adapter results. Numeric
+input overflow uses `E-EXPECTED-VALUE`, while multiplication, offset, and
+alphabet adjustment overflow use `E-INTEGER-OVERFLOW`. Excessive dimensions
+use `E-COUNT`; insufficient large arrays still fail at the first missing
+value or symbol. Nonprogressing indefinite repeats and instances use
+`E-NO-PROGRESS`; excessive counted repeats and empty rows use `E-BUDGET`.
+The latter remain ordinary-sized budget arithmetic, outside appendix C.3.
+All errors retain the adapter's full location document with case-relative
+origins and null record paths. The unknown parameter has null reader-spec
+line/column; all parse columns are null.
+
+Validation against `gecode-6.5.0-5e7bbd5c26b0`, including batch 1 and the
+15 unchanged smoke cases:
+`Summary: total=181 pass=181 xfail=0 fail=0 xpass=0` (exit 0).
