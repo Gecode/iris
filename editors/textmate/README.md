@@ -44,9 +44,9 @@ npm test
 
 `npm test` runs:
 
-- Node tests for the repository sweep's lexical-negative rule and for
-  scope containment: each problematic statement in
-  [`tests/corpus/containment.iris`](tests/corpus/containment.iris) is followed
+- Node tests for the repository sweep's grammar-negative rule, failure on
+  a deliberately broken grammar copy, and scope containment: each problematic
+  statement in [`tests/corpus/containment.iris`](tests/corpus/containment.iris) is followed
   by a pattern whose name and type must retain their capture scopes.
 - Scope assertions in [`tests/assertions/scopes.iris`](tests/assertions/scopes.iris),
   including positive name scopes and excluded keyword scopes for
@@ -56,26 +56,33 @@ npm test
   `tests/corpus/`: six focused handwritten files and the six unchanged
   Gecode fixtures. Their [upstream notice](tests/corpus/gecode/README.md)
   accompanies the copies.
-- `npm run check-repo-specs`, which uses `git ls-files -z` to tokenize every
-  tracked `.iris` file, plus the local test corpus before staging. It
-  strictly decodes UTF-8, carries the TextMate state between lines, and
-  fails with a path, line, and column for any `invalid` scope. A conformance
-  case is skipped only when its adjacent `error.json` expects
-  `E-SPEC-STRING`, `E-SPEC-NUMBER`, `E-SPEC-CHARACTER`, or `E-SPEC-UTF8`:
-  the source lexical errors in [§11.4](../../spec/0.1/errors.md#114-parse-time-codes)
-  and source UTF-8 validation error in [§11.6](../../spec/0.1/errors.md#116-iris-only-errors)
-  of the Specification. These fixtures deliberately violate source validity.
-  All other tracked reader specs, including syntax, pattern, and semantic
-  negatives, must have no `invalid` scopes. The check reports checked and
-  skipped file counts.
+- `npm run check-repo-specs`, which uses `git ls-files -z` to select every
+  tracked `.iris` file, plus the local test corpus before staging. It follows
+  symlinks and tokenizes each real file once, including `formats/` reader
+  specs shared by case `spec.iris` symlinks. `spec.bin` is outside this sweep.
+  It strictly decodes UTF-8, carries the TextMate state between lines, and
+  fails with a path, line, and column for any `invalid` scope.
+  Case selection follows conformance-010's classification in
+  [Checking the formal grammar](../../conformance/README.md#checking-the-formal-grammar):
+  a case under `conformance/cases/` or `formats/` is skipped when its primary
+  `error.json` expects `E-SPEC-UTF8`, `E-SPEC-CHARACTER`, `E-SPEC-STRING`,
+  `E-SPEC-NUMBER`, `E-SPEC-SYNTAX`, `E-SPEC-PLACEMENT`, `E-SPEC-PATTERN`,
+  `E-SPEC-UNKNOWN-TYPE`, or `E-SPEC-NESTING`. All other cases remain covered,
+  including read-error, catalog, dzn, and semantic-error cases; operations,
+  tags, and driver-specific alternate expectations do not affect selection.
+  Matching this classification avoids false failures on deliberately invalid
+  syntax, such as an illegal character inside a rejected pattern. The check
+  reports tokenized files, grammar negatives skipped, and duplicate paths
+  skipped separately. Tokenized counts are per real file rather than per case.
   The invalid scopes currently identify illegal source characters and
   string escapes; absence of those scopes does not establish syntax validity.
 
 The tokenization check uses the same pinned TextMate and Oniguruma versions
-as the assertion and snapshot runner.
+as the assertion and snapshot runner. Its optional grammar-path argument lets
+the regression test run the full sweep with a mutated temporary grammar copy.
 
 To inspect an intended highlighting change, run `npm run update-snapshots`
 and review the `.iris.snap` diffs. Commit the snapshots with the grammar
 change. The [CI workflow](../../.github/workflows/textmate.yml) runs
 `npm ci && npm test` when this component, its workflow, any `.iris` file,
-or a conformance case's `error.json` changes.
+or anything under `conformance/` or `formats/` changes.

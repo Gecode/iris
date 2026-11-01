@@ -6,12 +6,16 @@ on:
       - 'editors/textmate/**'
       - '**/*.iris'
       - 'conformance/cases/**/error.json'
+      - 'conformance/**'
+      - 'formats/**'
       - '.github/workflows/textmate.yml'
   pull_request:
     paths:
       - 'editors/textmate/**'
       - '**/*.iris'
       - 'conformance/cases/**/error.json'
+      - 'conformance/**'
+      - 'formats/**'
       - '.github/workflows/textmate.yml'
 
 permissions:
