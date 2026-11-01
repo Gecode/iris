@@ -1,0 +1,6 @@
+n: int
+m: int
+repeat n as jobs {
+  repeat m as steps { x: int }
+}
+check x > 0 "positive"

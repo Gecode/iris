@@ -4,8 +4,8 @@ This directory holds the language-neutral conformance contract for Iris.
 [PLAN.md §7](../PLAN.md#7-conformance-suite) describes the suite; milestone
 M2 builds the runner, Gecode adapter and cases. This README is authoritative
 for the case format and driver protocol. The standalone runner is available in
-[rust/iris-conformance](../rust/iris-conformance/); real suite cases and the
-Gecode adapter are added separately.
+[rust/iris-conformance](../rust/iris-conformance/), with a
+[Gecode adapter](adapters/gecode/README.md) and 15 [smoke cases](cases/0.1/smoke/).
 
 ## Case files and discovery
 
@@ -320,10 +320,19 @@ exit 1. XFAIL lines include the driver ID, reason and any difference link. XPASS
 identifies a stale annotation and requires its removal.
 
 See [Rust build instructions](../rust/README.md) for the canned driver demonstration.
-Once the adapter and cases exist, the real-suite invocation is:
+Build the adapter and run the real suite from the repository root:
 
 ```sh
-cd rust
-cargo run --locked -p iris-conformance -- run --driver '<adapter command>' \
-  --driver-id gecode-6.5.0-5e7bbd5c26b0 ../conformance/cases/0.1
+adapter=$(conformance/adapters/gecode/build.sh)
+ctest --test-dir "$(dirname "$adapter")" --output-on-failure
+(cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$adapter\"" \
+  --driver-id gecode-6.5.0-5e7bbd5c26b0 ../conformance/cases/0.1)
 ```
+
+The build prints the absolute executable path, so the driver works from the runner's
+current directory. For a direct invocation, use
+`"$adapter" read /absolute/spec.iris /absolute/input.bin`. The adapter preserves
+the reference's UTF-8 behavior rather than implementing the Iris-only validation
+differences in appendix C.1–C.2.
+Non-Unicode reference string results fail at the serialization boundary with
+exit 3 and empty stdout, for both JSON and dzn; they are not language errors.

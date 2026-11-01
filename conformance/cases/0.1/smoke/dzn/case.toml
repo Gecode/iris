@@ -1,0 +1,4 @@
+operation = "dzn"
+title = "Dzn"
+section = "spec/0.1/appendix-b-dzn.md#b3-floating-point-text"
+source = "spec:spec/0.1/appendix-b-dzn.md#dzn-float-spellings"

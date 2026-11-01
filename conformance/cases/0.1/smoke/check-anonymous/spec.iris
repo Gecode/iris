@@ -1,0 +1,6 @@
+n:int
+m:int
+repeat n {
+ repeat m {x:int}
+}
+check x>0 "positive"

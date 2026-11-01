@@ -1,0 +1,4 @@
+f[18]:float
+let negative=-0.0
+param supplied=0.0
+line "{captured:float}"

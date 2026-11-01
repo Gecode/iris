@@ -1,0 +1,4 @@
+operation = "read"
+title = "Check named"
+section = "spec/0.1/03-data-model.md#374-nested-check-witnesses"
+source = "spec:spec/0.1/03-data-model.md#data-nested-check"

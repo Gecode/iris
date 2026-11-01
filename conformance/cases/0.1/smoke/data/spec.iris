@@ -1,0 +1,7 @@
+z: int
+a: word
+let z=9
+integral:float precise:float thousand:float
+x[3]:num
+let negative=-0.0
+repeat 2 {list row:int until eol}

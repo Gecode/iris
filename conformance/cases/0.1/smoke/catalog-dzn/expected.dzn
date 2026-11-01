@@ -1,0 +1,3 @@
+instances = 5;
+name = ["a", "c", "d", "e", "f"];
+failed = ["positive", "a second line matching \"NAME {name}\"", "no line matching \"X {x:int}\"", "check on line 8 of the spec", ""];

@@ -1,0 +1,5 @@
+operation = "catalog"
+output = "dzn"
+title = "Catalog dzn"
+section = "spec/0.1/appendix-b-dzn.md#b7-catalog-data-and-executable-examples"
+source = "spec:spec/0.1/appendix-b-dzn.md#dzn-catalog-summaries"

@@ -1,0 +1,4 @@
+operation = "read"
+title = "Empty arrays"
+section = "spec/0.1/03-data-model.md#32-depth-arrays-and-paths"
+source = "spec:spec/0.1/03-data-model.md#data-empty-arrays"

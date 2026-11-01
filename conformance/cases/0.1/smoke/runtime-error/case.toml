@@ -1,0 +1,4 @@
+operation = "read"
+title = "Runtime error"
+section = "spec/0.1/03-data-model.md#373-input-error-and-execution-context"
+source = "spec:spec/0.1/03-data-model.md#data-repeat-input-error"

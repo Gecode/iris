@@ -1,0 +1,4 @@
+operation = "read"
+title = "Failed check without witness indices"
+section = "spec/0.1/03-data-model.md#37-canonical-error-document"
+source = "spec:spec/0.1/03-data-model.md#37-canonical-error-document"

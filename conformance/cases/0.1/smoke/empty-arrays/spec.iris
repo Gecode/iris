@@ -1,0 +1,6 @@
+a[0]: int
+b[0]: float
+c[0]: word
+d[2][0]: float
+e[0]: num
+repeat 0 { f[2][3]: float }

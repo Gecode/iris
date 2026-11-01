@@ -1,0 +1,4 @@
+operation = "read"
+title = "Entry order and canonical numeric data"
+section = "spec/0.1/03-data-model.md#31-entries-and-definition-order"
+source = "spec:spec/0.1/03-data-model.md#31-entries-and-definition-order"

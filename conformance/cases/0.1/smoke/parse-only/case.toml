@@ -1,0 +1,4 @@
+operation = "parse"
+title = "Parse without evaluating defaults"
+section = "spec/0.1/05-reader-specs.md#51-reader-specs-and-parsing"
+source = "spec:spec/0.1/05-reader-specs.md#51-reader-specs-and-parsing"

@@ -1,0 +1,9 @@
+instances {
+ sections {
+  "NAME {name}" optional
+  "X {x:int}"
+  "END" last
+ }
+ check !defined(x)||x>0 "positive"
+ check !defined(x)||(x!=0 && x!=2)
+}

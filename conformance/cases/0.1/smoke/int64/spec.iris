@@ -1,0 +1,2 @@
+lo:int hi:int
+repeat 2 {a[2]:int}

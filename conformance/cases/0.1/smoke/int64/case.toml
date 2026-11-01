@@ -1,0 +1,4 @@
+operation = "read"
+title = "Signed 64-bit integer bounds"
+section = "spec/0.1/03-data-model.md#34-integers"
+source = "spec:spec/0.1/03-data-model.md#34-integers"
