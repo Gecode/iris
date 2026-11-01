@@ -1,12 +1,12 @@
 # iris-cli
 
 The `iris` command and Rust conformance driver, part of milestone M3 in
-[PLAN.md §8.1](../../PLAN.md#81-rust-rust) and the
-[§4.2 layers](../../PLAN.md#42-the-rust-reference-implementation-is-layered).
-The user command checks and formats reader specs, reads inputs through
+[PLAN.md §8.1](../../PLAN.md#81-rust-rust) and the [§4.2
+layers](../../PLAN.md#42-the-rust-reference-implementation-is-layered). The
+user command checks and formats reader specs, reads inputs through
 [iris-core](../iris-core/README.md), and starts the language server. The driver
-implements parse-and-resolve, reading, and catalog. Parse-only requests never
-execute expressions or parameter defaults.
+implements parse-and-resolve, reading, catalog, and dzn output. Parse-only
+requests never execute expressions or parameter defaults.
 
 From `rust/`:
 
@@ -14,7 +14,9 @@ From `rust/`:
 cargo run --locked -p iris-cli -- lsp
 cargo run --locked -p iris-cli -- check path/to/spec.iris
 cargo run --locked -p iris-cli -- read path/to/spec.iris path/to/input.txt --json --param instance=2
+cargo run --locked -p iris-cli -- read path/to/spec.iris path/to/input.txt --dzn
 cargo run --locked -p iris-cli -- list path/to/spec.iris path/to/input.txt
+cargo run --locked -p iris-cli -- list path/to/spec.iris path/to/input.txt --dzn
 cargo run --locked -p iris-cli -- fmt path/to/spec.iris
 cargo run --locked -p iris-cli -- fmt --check --diff path/to/directory
 cargo run --locked -p iris-cli --bin iris-driver -- parse path/to/spec.iris --version 0.1
@@ -33,20 +35,28 @@ Usage errors exit 2; file acquisition and resource failures exit 1.
 
 ## Reading input
 
-`iris read SPEC FILE... --json [--param NAME=VALUE]` prints one canonical data
-document per input file. It requires `--json`. Split assignments at the first
-`=`; the remainder is the exact string value. Repeated keys replace their earlier
-values without moving their supplied positions. Parameters apply to every file.
-Runtime language errors exit 1 with an input location, bounded excerpt,
-byte-position caret, and active reader-spec line. No partial read data is printed.
-File/serialization failures exit 1; usage errors exit 2. Summary and dzn output
-belong to later tasks.
+`iris read SPEC FILE... (--json|--dzn) [--param NAME=VALUE]` prints one data
+document per input file. Exactly one output option is required: `--json` uses
+canonical JSON; `--dzn` uses the exact bytes in [Specification appendix
+B](../../spec/0.1/appendix-b-dzn.md), including its float spelling, type
+comments, and final LF rules. Multiple files concatenate documents without
+headers or extra separators. Output is buffered until all files have been read
+successfully. Split assignments at the first `=`; the remainder is the exact
+string value. Repeated keys replace their earlier values without moving their
+supplied positions. Parameters apply to every file. Runtime language errors
+exit 1 with an input location, bounded excerpt, byte-position caret, and active
+reader-spec line. No partial read data is printed. File/serialization failures
+exit 1; usage errors exit 2. Summary output belongs to a later task.
 
-`iris list SPEC FILE... [--param NAME=VALUE]` matches Gecode's `-list`: print each
-file's instance count, then numbered names when all are usable, with first
+`iris list SPEC FILE... [--param NAME=VALUE]` matches Gecode's `-list`: print
+each file's instance count, then numbered names when all are usable, with first
 rejection summaries in `(failed: MESSAGE)`. Without usable names, only failed
 instances get individual lines. Catalog traverses every instance even when the
-caller supplies a selector.
+caller supplies a selector. Add `--dzn` to render that catalog data with the
+same writer as `iris-driver catalog --format dzn`, without listing headers. The
+plain listing keeps Gecode's command-line behavior; catalog dzn is an
+additional CLI representation (Gecode's `-list` and `-dzn` select separate
+modes).
 
 ## Language server
 
@@ -125,10 +135,13 @@ exit 2, both with empty stdout. Parameters are decoded as ordered string pairs,
 with exact values and duplicate rejection. Unknown names fail before input
 UTF-8 validation. Parameter defaults execute even when overridden.
 
-`iris-driver catalog SPEC INPUT [--params JSON] [--version 0.1] [--format json]`
-returns canonical catalog data. Both operations defer eligible instance
-rejections while keeping hard errors immediate. `dzn` and catalog's dzn format
-remain unsupported (exit 2).
+`iris-driver dzn SPEC INPUT [--params JSON] [--version 0.1]` performs the same
+read and emits dzn on success. `iris-driver catalog SPEC INPUT [--params JSON]
+[--version 0.1] [--format json|dzn]` renders catalog data, defaulting to JSON.
+Both read and catalog defer eligible instance rejections while keeping hard
+errors immediate. Language failures remain canonical error JSON (exit 1) for
+both output formats. All driver documents are buffered before stdout; writer
+and stdout I/O failures use the existing host-failure status 3.
 
 The integration test discovers and loads the entire `conformance/cases/0.1`
 tree through the runner library, selects exactly `Operation::Parse`, and gives
@@ -142,10 +155,10 @@ single-byte message can be invalid Unicode and cannot always be reproduced
 byte for byte in canonical JSON. Codes and locations follow the Specification.
 
 The `read_conformance` progress test discovers both case roots, validates the
-exact pending list and its rust-010 owner, and excludes those
-paths before driver invocation. Newly discovered cases run automatically.
-The selection is 911 cases (155 parse, 730 read, 26 catalog), with 21 pending;
-counts follow inventory changes. No known-failure driver ID is used.
+pending-list format and excludes listed paths before driver invocation. The
+file is empty; newly discovered cases run automatically. The selection is all
+932 cases (155 parse, 730 read, 28 catalog, 19 dzn); counts follow inventory
+changes. No known-failure driver ID is used.
 
 ```sh
 cargo test --locked -p iris-cli --test read_conformance -- --nocapture
@@ -160,25 +173,27 @@ budgeted execution.
 
 The ignored differential test runs 256 bounded scalar probes with fixed seed
 73003, 384 array/read probes with seed 73004, 384 repeat probes with seed
-73005, 384 line/sections probes with seed 73006, and 512 checks probes with seed
-73007, plus 512 params/instances/catalog probes with seed 73008 (2,432 total).
-Both drivers are decoded through the independent canonical validator. Scalar probes cover input spellings,
-arithmetic boundaries, frozen types, settings, control flow, functions,
-comparisons, and error order. Array/read probes cover ranks 1–4, zeros,
-subtree copies, offsets and promotion, all nine layouts, byte alphabets,
+73005, 384 line/sections probes with seed 73006, and 512 checks probes with
+seed 73007, plus 512 params/instances/catalog probes with seed 73008 and 640
+dzn probes with seed 73010 (3,072 total). JSON results use the independent
+canonical validator; dzn bytes compare exactly. Scalar probes cover input
+spellings, arithmetic boundaries, frozen types, settings, control flow,
+functions, comparisons, and error order. Array/read probes cover ranks 1–4,
+zeros, subtree copies, offsets and promotion, all nine layouts, byte alphabets,
 sentinel/eol lists, aggregates, indexing, and comprehensions. Per-family counts
 are printed. Repeat probes cover count admission and fresh frames, termination
 and scanning, stores and aliases, ragged lists, missing rows and type/depth
 consistency, nested columns, index statements, and progress diagnostics.
 Line/sections probes cover capture boundaries and references, selected
 commitment and ranges, line search, skips and token expectations, arm order,
-termination and stores, and nested execution. CLI diagnostics also check capture
-spans, repeated-arm precedence, missing-arm locations and interleaved section
-and repeat contexts. Both CLI entry points exercise sections at the parser's
-nesting boundary and serialize deeply dimensional arrays in arm bodies. Every
-generated reader spec is validated before either driver runs. The test preserves
-a temporary reproducer and prints commands on the first mismatch. Build the pinned adapter from the repository root, then
-run from `rust/`:
+termination and stores, and nested execution. CLI diagnostics also check
+capture spans, repeated-arm precedence, missing-arm locations and interleaved
+section and repeat contexts. Both CLI entry points exercise sections at the
+parser's nesting boundary and serialize deeply dimensional arrays in arm
+bodies. Every generated reader spec is validated before either driver runs. The
+test preserves a temporary reproducer and prints commands on the first
+mismatch. Build the pinned adapter from the repository root, then run from
+`rust/`:
 
 ```sh
 adapter=$(../conformance/adapters/gecode/build.sh)
@@ -200,3 +215,13 @@ sections, local frames and records, and usable names. Bounds are 1–8 instances
 1–4 array leaves, sampled payloads -3–5, and 1–8 parameters. Another 34 pinned
 location probes assert code, input coordinates, reader-spec line, context, and
 record path for parameters, selection, skipped bodies, and deferred rejections.
+
+The seed-73010 group covers finite binary64 bit patterns and spelling
+boundaries, including signed zero, extremes and subnormals; all ASCII string
+bytes and multibyte UTF-8; the frozen name quoting set; empty, rectangular,
+ragged and cross-parent shapes at depths 1–10; records; catalog summaries; and
+read failures. A separate differential test checks all 50 signed values in
+appendix C.4: Iris emits their exact fixed spelling, and the pinned reference
+omits leaf text. The CLI test compares all 21 dzn cases against the driver,
+including catalog, parameters, repeated input files, empty documents, and error
+output boundaries.

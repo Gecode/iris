@@ -2,17 +2,17 @@
 
 The Cargo workspace contains the standalone `iris-conformance` runner
 (milestone M2), and four implementation crates for Iris 0.1 (milestone M3):
-[iris-syntax](iris-syntax/README.md) owns source validation, the lossless parser,
-and formatting; [iris-sema](iris-sema/README.md) owns parse-time validity,
-resolution, and conservative value facts; [iris-core](iris-core/README.md) reads
-scalar and array input, executes repeats, index statements, line operations and
-sections, evaluates expressions, and owns column data and canonical JSON;
-[iris-cli](iris-cli/README.md) provides
-`iris check SPEC`, `iris read SPEC FILE... --json [--param k=v]`,
-`iris list SPEC FILE...`, `iris fmt PATH...`, and the
-`iris-driver parse|read|catalog` conformance commands. The runner
-uses the [conformance protocol](../conformance/README.md) and has no dependency
-on implementation crates.
+[iris-syntax](iris-syntax/README.md) owns source validation, the lossless
+parser, and formatting; [iris-sema](iris-sema/README.md) owns parse-time
+validity, resolution, and conservative value facts;
+[iris-core](iris-core/README.md) reads scalar and array input, executes
+repeats, index statements, line operations and sections, evaluates expressions,
+and owns column data, canonical JSON, and dzn output;
+[iris-cli](iris-cli/README.md) provides `iris check SPEC`, `iris read SPEC
+FILE... (--json|--dzn) [--param k=v]`, `iris list SPEC FILE...`, `iris fmt
+PATH...`, and the `iris-driver parse|read|catalog|dzn` conformance commands.
+The runner uses the [conformance protocol](../conformance/README.md) and has no
+dependency on implementation crates.
 
 [iris-lsp](iris-lsp/README.md) provides `iris lsp`, the stdio language server
 with parse and resolution diagnostics (milestone M4b).
@@ -52,29 +52,34 @@ cargo run --locked -p iris-cli -- check path/to/spec.iris
 cargo test --locked -p iris-cli --test parse_conformance -- --nocapture
 ```
 
-The parse integration test loads the whole version tree and selects parse cases.
-The progress test discovers both the conformance tree and `formats`,
+The parse integration test loads the whole version tree and selects parse
+cases. The progress test discovers both the conformance tree and `formats`,
 then excludes the exact cases in `iris-cli/tests/pending-cases.txt` before
-invoking any driver. Every pending case names its later owner (rust-010);
-newly discovered cases run by default. Read and catalog enforce the idle and
-expression budgets in [Specification §10](../spec/0.1/10-work-budgets.md),
-with limits 2^20 and 2^20 + 16*N for the full original input byte length N.
-Equality succeeds; an excess charge immediately reports `E-BUDGET`.
-The allowances span every traversed instance, including deferred rejections,
-and restart for each operation. dzn remains unsupported (exit 2).
+invoking any driver. The pending file is empty; newly discovered cases run by
+default. Read and catalog enforce the idle and expression budgets in
+[Specification §10](../spec/0.1/10-work-budgets.md), with limits 2^20 and 2^20
++ 16*N for the full original input byte length N. Equality succeeds; an excess
+charge immediately reports `E-BUDGET`. The allowances span every traversed
+instance, including deferred rejections, and restart for each operation.
+Rendering dzn consumes no language work budget.
 
 Read input and run the current progress selection:
 
 ```sh
 cargo run --locked -p iris-cli -- read path/to/spec.iris path/to/input.txt --json
+cargo run --locked -p iris-cli -- read path/to/spec.iris path/to/input.txt --dzn
+cargo run --locked -p iris-cli -- list path/to/spec.iris path/to/input.txt --dzn
 cargo test --locked -p iris-cli --test read_conformance -- --nocapture
 ```
 
-The read command requires `--json` and accepts multiple input files and repeated
-`--param k=v` options. `iris list SPEC FILE...` lists counts, usable names, and
-first rejection summaries in Gecode's `-list` format. Parameters retain exact
-strings; defaults execute even when overridden. Later tasks add summary/dzn
-output.
+The read command requires exactly one of `--json` and `--dzn`, and accepts
+multiple input files and repeated `--param k=v` options. `iris list SPEC
+FILE...` lists counts, usable names, and first rejection summaries in Gecode's
+`-list` format. Parameters retain exact strings; defaults execute even when
+overridden. `iris list --dzn` renders catalog data instead of the listing.
+Driver `dzn` reads and renders one input; `catalog --format dzn` catalogs and
+renders it. Both use the public `Data::write_dzn` API; `to_dzn` returns a
+buffered byte vector like `to_json`. Later work adds summary output.
 
 Format reader specs in place, preview changes, or format standard input:
 
@@ -122,9 +127,11 @@ crate's tests directory. Another implementation needs only to supply the four
 protocol commands; it does not need to link this library.
 
 Checks and structural record expressions are implemented. The progress gate
-selects 911 cases (155 parse, 730 read, 26 catalog), with 21 pending cases owned
-by rust-010. Expression and lifted traversal use iterative borrowed views;
-false-check diagnostics retain witness paths and saved record positions.
-The differential test retains the earlier 1,920 probes and adds 512
-params/instances/catalog probes at seed 73008. See the
-[core README](iris-core/README.md) for the complexity regressions and separate read/evaluator doubling measurements.
+selects all 932 cases (155 parse, 730 read, 28 catalog, 19 dzn), with no
+pending cases. Expression and lifted traversal use iterative borrowed views;
+false-check diagnostics retain witness paths and saved record positions. The
+differential test has 3,072 probes, including 640 dzn probes at seed 73010, and
+a separate 50-value check of the documented Gecode float precision gap. Dzn
+tests check linear work at 4× input size, I/O failures, and 65,536 dimensions
+without recursion. See the [core README](iris-core/README.md) for the
+complexity regressions and separate read/evaluator doubling measurements.

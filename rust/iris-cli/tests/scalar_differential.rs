@@ -17,6 +17,7 @@ struct Probe {
     input: Vec<u8>,
     params: String,
     operation: Operation,
+    output: OutputFormat,
 }
 impl Probe {
     fn new(spec: impl Into<String>, input: impl AsRef<[u8]>) -> Self {
@@ -26,6 +27,7 @@ impl Probe {
             input: input.as_ref().to_vec(),
             params: "{}".into(),
             operation: Operation::Read,
+            output: OutputFormat::Json,
         }
     }
 }
@@ -47,6 +49,7 @@ fn scalar_differential() {
         ("Sections", 73006, section_probes()),
         ("Checks", 73007, check_probes()),
         ("Params/instances/catalog", 73008, instance_probes()),
+        ("Dzn", 73010, dzn_probes()),
     ];
     for (name, seed, probes) in &groups {
         let mut families = std::collections::BTreeMap::new();
@@ -73,6 +76,7 @@ fn scalar_differential() {
                     .invoke(&case, "0.1", Duration::from_secs(5))
                     .map_err(|e| format!("{e:?}"))?;
                 let kind = match output.status.code() {
+                    Some(0) if probe.output == OutputFormat::Dzn => OutcomeKind::Dzn,
                     Some(0) => OutcomeKind::Data,
                     Some(1) => OutcomeKind::Error,
                     _ => return Err(format!("unexpected driver output: {output:?}")),
@@ -118,7 +122,7 @@ fn write_probe(directory: &Path, probe: &Probe) -> Case {
         path: directory.into(),
         display_path: "generated differential probe".into(),
         operation: probe.operation,
-        output: OutputFormat::Json,
+        output: probe.output,
         spec,
         input: Some(input),
         params: Some(probe.params.clone()),
@@ -1557,4 +1561,246 @@ fn instance_probes() -> Vec<Probe> {
     }
     assert_eq!(probes.len(), 512);
     probes
+}
+
+fn dzn_probes() -> Vec<Probe> {
+    // Seed 73010: binary64 samples, arbitrary ASCII plus Unicode, frozen names,
+    // ranks 1..=10, and 1..=4 records/instances.
+    let mut state = 73010u64;
+    let mut next = || {
+        state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+        state
+    };
+    let mut probes = vec![];
+    let boundary_bits = [
+        0,
+        1,
+        2,
+        3,
+        0x000f_ffff_ffff_ffff,
+        0x0010_0000_0000_0000,
+        0x0010_0000_0000_0001,
+        0x7fef_ffff_ffff_ffff,
+    ];
+    let boundaries = [
+        -0.0,
+        0.0,
+        0.00001,
+        0.0001,
+        0.1,
+        1.0,
+        1.25,
+        20.0,
+        1000.0,
+        1e16,
+        1e17,
+        1e20,
+        1e100,
+        1e-100,
+        1.2345678901234567,
+        9007199254740992.0,
+        9999999999999998.0,
+        99999999999999584.0,
+    ];
+    for index in 0..256 {
+        let value = if index < boundary_bits.len() * 2 {
+            f64::from_bits(boundary_bits[index / 2] | ((index % 2) as u64) << 63)
+        } else if index < boundary_bits.len() * 2 + boundaries.len() * 2 {
+            let i = index - boundary_bits.len() * 2;
+            boundaries[i / 2] * if i % 2 == 0 { 1.0 } else { -1.0 }
+        } else {
+            loop {
+                let value = f64::from_bits(next());
+                // Appendix C.4's exception is checked separately below.
+                if value.is_finite() && !(99999999999999600.0..1e17).contains(&value.abs()) {
+                    break value;
+                }
+            }
+        };
+        let mut probe = Probe::new("param p=0.0 let copy=p", "");
+        probe.params = serde_json::json!({"p":format!("{value:e}")}).to_string();
+        probe.family = "float spelling";
+        probes.push(probe);
+    }
+    for index in 0..128 {
+        let mut text = String::from(char::from(index as u8));
+        text.extend((0..64).map(|_| char::from((next() % 128) as u8)));
+        text.push_str("é e\u{301} \u{85} 😀 \\\n\"\t\r\0");
+        let mut probe = Probe::new("param p=\"\"", "");
+        probe.params = serde_json::json!({"p":text}).to_string();
+        probe.family = "string bytes";
+        probes.push(probe);
+    }
+    let names = [
+        "ann",
+        "annotation",
+        "any",
+        "array",
+        "bool",
+        "case",
+        "constraint",
+        "default",
+        "diff",
+        "div",
+        "else",
+        "elseif",
+        "endif",
+        "enum",
+        "false",
+        "float",
+        "function",
+        "if",
+        "in",
+        "include",
+        "int",
+        "intersect",
+        "let",
+        "list",
+        "maximize",
+        "minimize",
+        "mod",
+        "not",
+        "of",
+        "op",
+        "opt",
+        "output",
+        "par",
+        "predicate",
+        "record",
+        "satisfy",
+        "set",
+        "solve",
+        "string",
+        "subset",
+        "superset",
+        "symdiff",
+        "test",
+        "then",
+        "true",
+        "tuple",
+        "type",
+        "union",
+        "var",
+        "where",
+        "xor",
+        "Var",
+        "annotation_2",
+        "_name",
+        "_",
+    ];
+    for index in 0..64 {
+        let name = names[index % names.len()];
+        let mut probe = if name == "_" {
+            Probe::new("repeat until \"END\" store _ {}", "END")
+        } else {
+            Probe::new(format!("{name}:int"), (next() as i64).to_string())
+        };
+        probe.family = "names";
+        probes.push(probe);
+    }
+    for index in 0..96 {
+        let depth = 1 + index / 4 % 10;
+        let width = 1 + next() as usize % 2;
+        let (source, input) = match index % 4 {
+            0 | 1 => {
+                let mut dimensions = vec![width; depth];
+                if index % 4 == 1 {
+                    dimensions[next() as usize % depth] = 0;
+                }
+                let leaves: usize = dimensions.iter().product();
+                let dimensions = dimensions
+                    .iter()
+                    .map(|n| format!("[{n}]"))
+                    .collect::<String>();
+                (
+                    format!("a{dimensions}:float"),
+                    vec!["1.2345678901234567"; leaves].join(" "),
+                )
+            }
+            2 => (
+                "repeat 3 {list a:int until 0}".into(),
+                format!("0 {width} 0 1 2 0"),
+            ),
+            _ => (
+                "repeat 2 {n:int a[2][n]:int}".into(),
+                "1 1 2 2 3 4 5 6".into(),
+            ),
+        };
+        let mut probe = Probe::new(source, input);
+        probe.family = "array shape";
+        probes.push(probe);
+    }
+    for index in 0..32 {
+        let count = 1 + next() as usize % 4;
+        let width = 1 + next() as usize % 4;
+        let source = if index % 2 == 0 {
+            format!("repeat {count} as rows {{each row a[{width}]:int let total=sum(row.a)}}")
+        } else {
+            format!(
+                "repeat {count} as rows {{each row repeat {width} as cells {{each cell x:int}}}}"
+            )
+        };
+        let mut probe = Probe::new(source, vec!["7"; count * width].join(" "));
+        probe.family = "records";
+        probes.push(probe);
+    }
+    for _ in 0..32 {
+        let count = 1 + next() as usize % 4;
+        let mut probe = Probe::new(
+            "instances {x:int name:word check x>0 \"quotes \\\" \\\\ \\n\\t \r\0 é\"}",
+            (0..count)
+                .map(|i| format!("{} n{i}\n", i as i64 - 1))
+                .collect::<String>(),
+        );
+        probe.operation = Operation::Catalog;
+        probe.family = "catalog summaries";
+        probes.push(probe);
+    }
+    for index in 0..32 {
+        let (source, input) = [
+            ("x:int", "bad"),
+            ("x:int", "1 trailing"),
+            ("x:int check x", "0"),
+            ("instances {x:int}", "1 2"),
+        ][index % 4];
+        let mut probe = Probe::new(source, input);
+        probe.family = "read errors";
+        probes.push(probe);
+    }
+    for probe in &mut probes {
+        if probe.operation == Operation::Read {
+            probe.operation = Operation::Dzn;
+        }
+        probe.output = OutputFormat::Dzn;
+    }
+    assert_eq!(probes.len(), 640);
+    probes
+}
+
+#[test]
+#[ignore = "requires pinned Gecode adapter in GECODE_ADAPTER"]
+fn dzn_precision_gap_differential() {
+    let adapter = std::env::var("GECODE_ADAPTER").expect("set GECODE_ADAPTER");
+    let drivers = [
+        DriverCommand::parse(&format!("\"{}\"", env!("CARGO_BIN_EXE_iris-driver"))).unwrap(),
+        DriverCommand::parse(&format!("\"{adapter}\"")).unwrap(),
+    ];
+    let directory = tempfile::tempdir().unwrap();
+    for magnitude in (99_999_999_999_999_600u64..100_000_000_000_000_000).step_by(16) {
+        for sign in ["", "-"] {
+            let mut probe = Probe::new(format!("let x={sign}{magnitude}.0"), "");
+            probe.operation = Operation::Dzn;
+            probe.output = OutputFormat::Dzn;
+            let case = write_probe(directory.path(), &probe);
+            for (driver, expected) in drivers
+                .iter()
+                .zip([format!("x = {sign}{magnitude}.0;\n"), "x = ;\n".into()])
+            {
+                let output = driver.invoke(&case, "0.1", Duration::from_secs(5)).unwrap();
+                assert!(output.status.success(), "{output:?}");
+                assert_eq!(output.stdout, expected.as_bytes(), "{}", probe.spec);
+            }
+        }
+    }
+    println!("Dzn precision gap: 50/50 match appendix C.4's exact Iris/reference outputs");
 }

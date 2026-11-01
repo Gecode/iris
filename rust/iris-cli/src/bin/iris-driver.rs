@@ -11,17 +11,19 @@ enum Operation {
     Parse,
     Read { input: PathBuf },
     Catalog { input: PathBuf },
+    Dzn { input: PathBuf },
 }
 struct Request {
     operation: Operation,
     spec: PathBuf,
     params: Params,
+    dzn: bool,
 }
 fn parse_request() -> Result<Request, String> {
     let mut args = std::env::args_os().skip(1);
-    let operation = args.next().ok_or("expected parse, read, or catalog")?;
-    if operation != "parse" && operation != "read" && operation != "catalog" {
-        return Err("only parse, read, and catalog operations are supported".into());
+    let operation = args.next().ok_or("expected parse, read, catalog, or dzn")?;
+    if operation != "parse" && operation != "read" && operation != "catalog" && operation != "dzn" {
+        return Err("only parse, read, catalog, and dzn operations are supported".into());
     }
     let spec = required_path(&mut args, "a reader-spec path")?;
     let operation = if operation == "read" {
@@ -32,6 +34,10 @@ fn parse_request() -> Result<Request, String> {
         Operation::Catalog {
             input: required_path(&mut args, "an input path")?,
         }
+    } else if operation == "dzn" {
+        Operation::Dzn {
+            input: required_path(&mut args, "an input path")?,
+        }
     } else {
         Operation::Parse
     };
@@ -39,6 +45,7 @@ fn parse_request() -> Result<Request, String> {
     let mut params_seen = false;
     let mut format_seen = false;
     let mut params = Params::new();
+    let mut dzn = matches!(operation, Operation::Dzn { .. });
     while let Some(option) = args.next() {
         let option = option.to_str().ok_or("options must be Unicode")?;
         let seen = match option {
@@ -56,8 +63,12 @@ fn parse_request() -> Result<Request, String> {
             .ok_or_else(|| format!("missing value for {option}"))?;
         let value = value.to_str().ok_or("option values must be Unicode")?;
         match option {
-            "--format" if value != "json" => {
-                return Err("only catalog format json is supported".into());
+            "--format" => {
+                dzn = match value {
+                    "json" => false,
+                    "dzn" => true,
+                    _ => return Err("expected catalog format json or dzn".into()),
+                };
             }
             "--version" if value != "0.1" => {
                 return Err(format!(
@@ -80,6 +91,7 @@ fn parse_request() -> Result<Request, String> {
         operation,
         spec,
         params,
+        dzn,
     })
 }
 fn required_path(
@@ -93,7 +105,9 @@ fn required_path(
 }
 fn read_document(request: &Request, bytes: &[u8]) -> Result<(u8, Vec<u8>), (u8, String)> {
     let input = match &request.operation {
-        Operation::Read { input } | Operation::Catalog { input } => input,
+        Operation::Read { input } | Operation::Catalog { input } | Operation::Dzn { input } => {
+            input
+        }
         Operation::Parse => unreachable!("read dispatch"),
     };
     match Spec::parse(bytes, &request.spec.to_string_lossy()).and_then(|spec| {
@@ -102,7 +116,14 @@ fn read_document(request: &Request, bytes: &[u8]) -> Result<(u8, Vec<u8>), (u8, 
             _ => spec.read_path(input, &request.params),
         }
     }) {
-        Ok(data) => Ok((0, data.to_json().map_err(|e| (3, e.to_string()))?)),
+        Ok(data) => {
+            let document = if request.dzn {
+                data.to_dzn().map_err(|e| (3, e.to_string()))?
+            } else {
+                data.to_json().map_err(|e| (3, e.to_string()))?
+            };
+            Ok((0, document))
+        }
         Err(Failure::Language(error)) => Ok((1, error.to_json().map_err(|e| (3, e.to_string()))?)),
         Err(Failure::Host(error)) => Err((3, error.to_string())),
         Err(Failure::Unsupported(error)) => Err((2, error.to_string())),
@@ -121,7 +142,9 @@ fn run() -> Result<u8, (u8, String)> {
             ),
             Err(error) => return Err((3, error.to_string())),
         },
-        Operation::Read { .. } | Operation::Catalog { .. } => read_document(&request, &bytes)?,
+        Operation::Read { .. } | Operation::Catalog { .. } | Operation::Dzn { .. } => {
+            read_document(&request, &bytes)?
+        }
     };
     io::stdout()
         .lock()

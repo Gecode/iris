@@ -13,6 +13,9 @@ pub struct Arguments {
     input: Vec<PathBuf>,
     #[command(flatten)]
     params: super::read::Parameters,
+    /// Render catalog data as dzn instead of the instance listing.
+    #[arg(long)]
+    dzn: bool,
 }
 pub fn run(arguments: Arguments) -> ExitCode {
     match list(&arguments) {
@@ -31,7 +34,11 @@ fn list(arguments: &Arguments) -> Result<(), Box<dyn std::error::Error>> {
     let mut out = io::stdout().lock();
     for input in &arguments.input {
         let catalog = spec.catalog_path(input, &params)?;
-        write_catalog(&mut out, &input.to_string_lossy(), &catalog)?;
+        if arguments.dzn {
+            catalog.write_dzn(&mut out)?;
+        } else {
+            write_catalog(&mut out, &input.to_string_lossy(), &catalog)?;
+        }
     }
     Ok(())
 }

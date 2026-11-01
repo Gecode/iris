@@ -7,6 +7,7 @@ use std::{
 };
 
 #[derive(Args)]
+#[group(id = "output", required = true, multiple = false, args = ["json", "dzn"])]
 pub struct Arguments {
     spec: PathBuf,
     #[arg(required = true, num_args = 1..)]
@@ -14,8 +15,11 @@ pub struct Arguments {
     #[command(flatten)]
     params: Parameters,
     /// Print canonical JSON.
-    #[arg(long, required = true)]
+    #[arg(long)]
     json: bool,
+    /// Print MiniZinc data using the Specification's exact dzn spelling.
+    #[arg(long)]
+    dzn: bool,
 }
 pub fn run(arguments: Arguments) -> ExitCode {
     match read(&arguments) {
@@ -61,7 +65,12 @@ fn read(arguments: &Arguments) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let params = arguments.params.params();
     let mut document = vec![];
     for input in &arguments.input {
-        document.extend(spec.read_path(input, &params)?.to_json()?);
+        let data = spec.read_path(input, &params)?;
+        if arguments.dzn {
+            data.write_dzn(&mut document)?;
+        } else {
+            document.extend(data.to_json()?);
+        }
     }
     Ok(document)
 }

@@ -1,10 +1,10 @@
 # iris-core
 
-Input reading, expression evaluation, column data, and canonical JSON
-for Iris 0.1. This is the runtime layer in
-[PLAN.md §4.2](../../PLAN.md#42-the-rust-reference-implementation-is-layered),
-part of milestone M3 ([§8.1](../../PLAN.md#81-rust-rust)). It depends on
-`iris-syntax` and `iris-sema`; parsing and resolution use their existing APIs.
+Input reading, expression evaluation, column data, canonical JSON, and dzn
+output for Iris 0.1. This is the runtime layer in [PLAN.md
+§4.2](../../PLAN.md#42-the-rust-reference-implementation-is-layered), part of
+milestone M3 ([§8.1](../../PLAN.md#81-rust-rust)). It depends on `iris-syntax`
+and `iris-sema`; parsing and resolution use their existing APIs.
 
 ```rust
 use iris_core::{Params, Spec};
@@ -13,6 +13,8 @@ let spec = Spec::parse(b"x:int let square=x^2", "scalar.iris")?;
 let data = spec.read(b"7", "input.txt", &Params::new())?;
 assert_eq!(data.int("square")?, 49);
 let json = data.to_json()?;
+let dzn = data.to_dzn()?;
+assert_eq!(dzn, b"x = 7;\nsquare = 49;\n");
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
@@ -92,17 +94,36 @@ Instance record bindings are restored after skipped passes, with occurrence
 identities separating cached marker summaries. Execution retains record metadata
 in flat vectors, with work proportional to executed reads and statements.
 
-Each read or catalog operation enforces the two work budgets in
-[Specification §10](../../spec/0.1/10-work-budgets.md): 2^20 idle units and
-2^20 + 16*N expression units, where N counts all original input bytes.
-Counters span the prefix and every traversed instance, including deferred
-rejections; each separate operation starts fresh. Equality succeeds, and an
-excess charge immediately reports `E-BUDGET` at the current cursor with the
-active statement and execution context. Budget failures are hard errors.
-The reader owns both remaining allowances; evaluators charge the shared
-expression allowance while borrowing values. Each charge uses checked `u128`
-subtraction, with constant accounting work and no allocation or rescan.
-Later work adds dzn output (010).
+Each read or catalog operation enforces the two work budgets in [Specification
+§10](../../spec/0.1/10-work-budgets.md): 2^20 idle units and 2^20 + 16*N
+expression units, where N counts all original input bytes. Counters span the
+prefix and every traversed instance, including deferred rejections; each
+separate operation starts fresh. Equality succeeds, and an excess charge
+immediately reports `E-BUDGET` at the current cursor with the active statement
+and execution context. Budget failures are hard errors. The reader owns both
+remaining allowances; evaluators charge the shared expression allowance while
+borrowing values. Each charge uses checked `u128` subtraction, with constant
+accounting work and no allocation or rescan. `Data::write_dzn(&mut impl
+io::Write)` streams the exact bytes in [Specification appendix
+B](../../spec/0.1/appendix-b-dzn.md). `Data::to_dzn()` returns an owned byte
+vector, matching `to_json`'s buffered interface. Both return `io::Result`;
+stream errors can leave partial bytes in the supplied destination. Callers that
+need a complete document before publication should buffer it, as the
+conformance driver does.
+
+The writer preserves entry order, quotes names and UTF-8 bytes, and chooses
+matrix, arrayNd, or nested one-tuple syntax from stored offsets. Shape checks
+inspect every existing row at each level, including rows under different
+parents. Empty extents come from data. An explicit stack handles deep arrays;
+no traversal recurses with depth. Each entry and leaf is emitted once, without
+rescanning earlier output. Work is linear in stored data and output size,
+with O(depth) temporary storage. Rendering consumes no language work budget.
+
+Float formatting searches increasing significant-digit precisions with Rust's
+round-to-nearest, ties-to-even formatter and parser. Exact power-of-ten
+comparisons choose the starting precision; notation follows appendix B.3,
+including signed zero, subnormals, and the appendix C.4 correction just below
+1e17. Each binary64 value needs at most 17 conversions. No dependency is added.
 
 From `rust/`:
 
@@ -116,18 +137,19 @@ Conformance is the main semantic coverage. A focused column-access test checks
 borrowed ragged rows, selected-subtree copying, and empty depth/type
 preservation. The CLI's ignored `scalar_differential` test compares 256 scalar
 and 384 array/read probes, plus 384 repeat probes at seed 73005 and 384
-line/sections probes at seed 73006 and 512 checks probes at seed 73007
-and 512 params/instances/catalog probes at seed 73008
-(2,432 total), with the pinned Gecode adapter; see the [CLI README](../iris-cli/README.md#conformance-driver).
+line/sections probes at seed 73006 and 512 checks probes at seed 73007 and 512
+params/instances/catalog probes at seed 73008 plus 640 dzn probes at seed 73010
+(3,072 total), with the pinned Gecode adapter; see the [CLI
+README](../iris-cli/README.md#conformance-driver).
 
-The progress gate selects 911 cases (155 parse, 730 read, 26 catalog), leaving
-21 for rust-010. Budget tests cover exact limits, atomic charges, arithmetic
-overflow, fresh operations, and hard errors after deferred rejections.
-`budgets_scale_linearly` bounds work for 4× problem sizes by 6× work, and
-`budget_exhaustion_stops_work_promptly` checks that enormous repeats stop at
-the same charge and work count as minimally excessive ones.
-`checks_scale_linearly` counts actual dispatches, metadata advances,
-lookups, copies, leaves, and witness links. The ignored release measurement
+The progress gate selects all 932 cases (155 parse, 730 read, 28 catalog, 19
+dzn), with no pending cases. Budget tests cover exact limits, atomic charges,
+arithmetic overflow, fresh operations, and hard errors after deferred
+rejections. `budgets_scale_linearly` bounds work for 4× problem sizes by 6×
+work, and `budget_exhaustion_stops_work_promptly` checks that enormous repeats
+stop at the same charge and work count as minimally excessive ones.
+`checks_scale_linearly` counts actual dispatches, metadata advances, lookups,
+copies, leaves, and witness links. The ignored release measurement
 `check_doubling_measurements` prints read/collection and evaluator timings
 separately across record count, row width, depth, expression size, and check
 count. It parses each program before measurement.
@@ -137,3 +159,10 @@ ordinal/name selection, catalog, deferred rejections, instance size, and paramet
 count. `instance_doubling_measurements` prints release timings for instance count,
 instance size, and parameter count. Separate-execution tests reuse a `Spec` after
 a failed read and after catalog.
+
+`dzn_work_scales_linearly` checks 4× inputs against a 6× work bound for
+entries, leaves, float conversions, string bytes, rows, and empty/deep arrays.
+Counters include output bytes, inspected offsets, stack steps, leaves, and
+precision attempts. The deep writer test renders 65,536 dimensions on a 128 KiB
+thread stack. Output-failure tests exercise every byte boundary of a nested
+document.

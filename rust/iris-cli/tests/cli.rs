@@ -20,6 +20,68 @@ fn check(args: &[&str]) -> Output {
         .unwrap()
 }
 #[test]
+fn dzn_cli_matches_driver_for_every_dzn_case() {
+    use iris_conformance::case::{self, Case, Operation, OutputFormat};
+    let repo = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let paths = case::discover(
+        &[repo.join("conformance/cases/0.1"), repo.join("formats")],
+        None,
+    )
+    .unwrap();
+    let mut count = 0;
+    for path in paths {
+        let case = Case::load(&path, "0.1").unwrap();
+        if case.output != OutputFormat::Dzn {
+            continue;
+        }
+        count += 1;
+        let spec = case.spec.to_str().unwrap();
+        let input = case.input.as_ref().unwrap().to_str().unwrap();
+        let catalog = case.operation == Operation::Catalog;
+        let mut driver_args = vec![if catalog { "catalog" } else { "dzn" }, spec, input];
+        if catalog {
+            driver_args.extend(["--format", "dzn"]);
+        }
+        let mut cli_args = vec![if catalog { "list" } else { "read" }, spec, input, "--dzn"];
+        let mut assignments = vec![];
+        if let Some(params) = &case.params {
+            driver_args.extend(["--params", params]);
+            let values: serde_json::Map<String, serde_json::Value> =
+                serde_json::from_str(params).unwrap();
+            assignments.extend(
+                values
+                    .iter()
+                    .map(|(key, value)| format!("{key}={}", value.as_str().unwrap())),
+            );
+        }
+        for assignment in &assignments {
+            cli_args.extend(["--param", assignment]);
+        }
+        let expected = driver(&driver_args);
+        let actual = check(&cli_args);
+        assert_eq!(
+            actual.status.code(),
+            expected.status.code(),
+            "{}",
+            path.display()
+        );
+        if expected.status.success() {
+            assert_eq!(actual.stdout, expected.stdout, "{}", path.display());
+            assert!(actual.stderr.is_empty());
+            // Multiple input operands concatenate the exact documents.
+            cli_args.insert(3, input);
+            let twice = check(&cli_args);
+            assert!(twice.status.success());
+            assert_eq!(twice.stdout, expected.stdout.repeat(2));
+        } else {
+            assert_eq!(expected.status.code(), Some(1));
+            assert!(actual.stdout.is_empty());
+        }
+    }
+    assert!(count >= 21);
+    println!("CLI/driver dzn equality: {count} cases (including read errors and catalog)");
+}
+#[test]
 fn check_exit_and_caret() {
     let (_dir, path) = fixture(b"format test x:int");
     let output = check(&["check", &path]);
@@ -94,7 +156,7 @@ fn driver_misuse_and_host_failures() {
         assert!(output.stdout.is_empty());
         assert!(!output.stderr.is_empty());
     }
-    let output = driver(&["dzn", &path, &path]);
+    let output = driver(&["dzn", &path, &path, "--format", "dzn"]);
     assert_eq!(output.status.code(), Some(2));
     assert!(output.stdout.is_empty());
     let output = driver(&["parse", &format!("{path}.missing")]);
@@ -159,7 +221,7 @@ fn read_json_and_instance_caret() {
     for args in [
         vec!["read", &path],
         vec!["read", &path, input],
-        vec!["read", &path, input, "--dzn"],
+        vec!["read", &path, input, "--json", "--dzn"],
     ] {
         assert_eq!(check(&args).status.code(), Some(2));
     }
