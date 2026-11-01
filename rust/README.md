@@ -1,11 +1,14 @@
 # rust
 
-The Cargo workspace currently contains the standalone `iris-conformance` library
-and binary for milestone M2. It runs language-neutral cases against any
-implementation's driver using the [conformance protocol](../conformance/README.md).
-It has no dependency on future Iris implementation crates.
+The Cargo workspace contains `iris-syntax`, the shared lossless parser for
+Iris 0.1 (milestone M3), and the standalone `iris-conformance` library and binary
+(milestone M2). The runner uses the
+[conformance protocol](../conformance/README.md) and has no dependency on the
+implementation crates. [iris-syntax](iris-syntax/README.md) owns source validation,
+lexing, syntax trees, and error recovery; name resolution and type checking
+belong to `iris-sema`.
 
-The reference implementation will add `iris-syntax`, `iris-sema`, `iris-core`,
+The reference implementation will add `iris-sema`, `iris-core`,
 `iris-cli`, `iris-lsp`, `iris-wasm` and, if built, `iris-lint`, published under
 `gecode-iris`. [PLAN.md §4.2](../PLAN.md#42-the-rust-reference-implementation-is-layered)
 describes the layers; §8.1, §8.7, §8.12 and §8.13 describe the crates. Milestones
@@ -21,6 +24,17 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
 ```
+
+Check reconstruction of every valid-UTF-8 reader spec in the repository:
+
+```sh
+cargo test --locked -p iris-syntax repository_losslessness -- --nocapture
+```
+
+The parser tests also cover the six pinned Gecode reader specs, embedded pattern
+nodes, malformed-input recovery, and all published nesting boundaries. See the
+[crate README](iris-syntax/README.md) for its syntax/semantic boundary and fixture
+regeneration.
 
 Run cases with an implementation's executable or wrapper command:
 

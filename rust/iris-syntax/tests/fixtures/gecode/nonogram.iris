@@ -1,0 +1,16 @@
+format nonogram
+
+separators ","
+sections skip other {
+  "width {width:1..}"
+  "height {height:1..}"
+  "rows" { repeat height { list row: 0.. until eol } }
+  "columns" { repeat width { list col: 0.. until eol } }
+}
+
+check height <= 1000000 / width "the board must have at most a million fields"
+check size(row) == height && size(col) == width "the numbers of rows and columns differ from the board size"
+check count(row) <= 1 || min(row) > 0 "a 0 must be the only clue of its row"
+check count(col) <= 1 || min(col) > 0 "a 0 must be the only clue of its column"
+check sum(row) + count(row) - 1 <= width "the clues of a row do not fit into the width of the board"
+check sum(col) + count(col) - 1 <= height "the clues of a column do not fit into the height of the board"
