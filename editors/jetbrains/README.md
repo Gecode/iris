@@ -2,8 +2,9 @@
 
 This is the minimal plugin spike for [PLAN.md §8.14](../../PLAN.md#814-jetbrains-plugin-editorsjetbrains),
 part of milestone M4b. It registers `.iris` reader specs and starts a
-configurable command through the IntelliJ Platform LSP API. The LSP client
-and server acquisition choices remain open in [PLAN.md §12](../../PLAN.md#12-decisions).
+configurable command through the IntelliJ Platform LSP API, the client
+[PLAN.md §12](../../PLAN.md#12-decisions) settles on. The plugin will find
+`iris` on a configured path or `PATH`, or offer to download it.
 TextMate highlighting, a restart action, and server installation are later
 tasks; this spike does not bundle the grammar or a server.
 
