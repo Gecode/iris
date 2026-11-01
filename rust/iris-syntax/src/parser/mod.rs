@@ -1,6 +1,7 @@
 mod expressions;
 mod patterns;
 mod types;
+mod work;
 
 use crate::{
     Diagnostic, DiagnosticCode as C, DiagnosticPhase, ParseCheck, ParseCheckKind as Check,
@@ -9,7 +10,7 @@ use crate::{
     lexer::{Lexed, Token},
 };
 use rowan::{GreenNode, GreenNodeBuilder};
-use std::{ops::Range, sync::Arc};
+use std::{borrow::Borrow, collections::HashMap, ops::Range, sync::Arc};
 
 type PResult<T = ()> = Result<T, ()>;
 
@@ -57,8 +58,26 @@ struct Parser<'a> {
     checks: Vec<ParseCheck>,
     block_depth: usize,
     expression_depth: usize,
-    type_names: Vec<String>,
+    // Declaration order supports scope rollback; counts retain shadowed names.
+    type_names: Vec<TypeName>,
+    type_name_counts: HashMap<TypeName, usize>,
     instances_seen: bool,
+}
+
+/// A declared type name. Scaling tests count comparisons with source text,
+/// so a scan over earlier declarations shows up as work.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct TypeName(String);
+impl PartialEq<str> for TypeName {
+    fn eq(&self, other: &str) -> bool {
+        work::record();
+        self.0 == other
+    }
+}
+impl Borrow<str> for TypeName {
+    fn borrow(&self) -> &str {
+        &self.0
+    }
 }
 
 pub(crate) fn parse(
@@ -76,6 +95,7 @@ pub(crate) fn parse(
         block_depth: 0,
         expression_depth: 0,
         type_names: Vec::new(),
+        type_name_counts: HashMap::new(),
         instances_seen: false,
     };
     parser.start(K::Root);
@@ -438,6 +458,9 @@ impl Parser<'_> {
                 self.require("=")?;
                 self.read_type()?;
                 self.checkpoint(Check::TypeDefinitionComplete, target);
+                work::record();
+                let name = TypeName(name);
+                *self.type_name_counts.entry(name.clone()).or_default() += 1;
                 self.type_names.push(name);
                 Ok(())
             }
@@ -595,7 +618,17 @@ impl Parser<'_> {
             } else {
                 self.require("}")
             };
-            self.type_names.truncate(scope);
+            for name in self.type_names.drain(scope..) {
+                work::record();
+                let count = self
+                    .type_name_counts
+                    .get_mut(&name)
+                    .expect("every recorded type has a live count");
+                *count -= 1;
+                if *count == 0 {
+                    self.type_name_counts.remove(&name);
+                }
+            }
             self.block_depth -= 1;
             result
         })();

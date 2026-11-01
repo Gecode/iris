@@ -23,7 +23,8 @@ impl Parser<'_> {
             if self.at("alphabet") {
                 return self.alphabet();
             }
-            if self.type_names.iter().any(|name| name == self.text()) {
+            super::work::record();
+            if self.type_name_counts.contains_key(self.text()) {
                 self.start(K::TypeName);
                 self.bump();
                 self.finish();
