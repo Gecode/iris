@@ -1,0 +1,63 @@
+# formatting rules across widths
+param first_value = 1
+param second_value = 2
+param third_value = 3
+param maximum_allowed_value = 100
+let spelling = 007 + 1.e2 - -2 ^ 3 ^ 2
+let escaped = "a\nb\tc\\d\"e"
+format dimacs-cnf.v2
+
+values[2][2]: first_value..maximum_allowed_value layout "FULL_MATRIX" offset -1
+grid[2][2]: alphabet "ab" base -2 blank "." strip "|" base 0
+list words: word until "END_OF_THE_WORD_LIST" offset -1
+comment "LONG_COMMENT_PREFIX" "ANOTHER_COMMENT_PREFIX" "THIRD_COMMENT_PREFIX"
+stop "END_OF_RECORDS" "END_OF_FILE"
+expect "BEGIN_RECORDS" "BEGIN_VALUES" "BEGIN_DATA"
+line "{value: 0 .. 9 } {$first_value} ..."
+repeat first_value + second_value + third_value as rows {
+  each row
+  index first_value + second_value
+  x: # keep this token attachment
+    int
+
+  check first_value > 0 && second_value > 0 && third_value > 0
+    "all values must be positive"
+}
+repeat until "END_OF_RECORDS" "END_OF_FILE" store ending {
+  value: int
+}
+sections
+  until "FIRST_END"
+  store first
+  skip other
+  until "SECOND_END"
+  store ending {
+  "A {a:int}" optional
+  # an arm comment
+  "B {b:int}" {
+    x: int
+  }
+  "DONE" optional last {}
+}
+if first_value {
+  let x = 2
+} else if second_value {
+  let x = 3
+} else {}
+if first_value {} else {}
+if 0 {} else if[1]: int
+let total = sum(first_value, second_value, third_value)
+check all(value in values: value >= first_value)
+let nested = sum(
+  first_value,
+  max(second_value, third_value),
+  sum(v in values: v + first_value)
+)
+let precedence = first_value ||
+  second_value &&
+    third_value ==
+      first_value <
+        second_value + third_value * maximum_allowed_value ^ first_value
+let chosen = values[0][first_value + second_value].value
+let numeric = 1 . value
+let named = gecode . value

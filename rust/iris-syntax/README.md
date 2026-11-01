@@ -1,7 +1,7 @@
 # iris-syntax
 
-`iris-syntax` validates reader-spec bytes, lexes them, and parses Iris 0.1 into
-a lossless rowan concrete syntax tree. Broken syntax yields a tree and
+`iris-syntax` validates reader-spec bytes, parses Iris 0.1 into a lossless
+rowan concrete syntax tree, and formats reader specs. Broken syntax yields a tree and
 diagnostics so reading tools, the language server, and the formatter can share
 one parser. This is part of milestone M3; see
 [PLAN.md §§4.2](../../PLAN.md#42-the-rust-reference-implementation-is-layered),
@@ -62,6 +62,71 @@ Global name-conflict phases run after statement parsing succeeds. Returning
 `diagnostics()[0]` unconditionally cannot implement full parse-and-resolve
 error ordering.
 
+## Formatting
+
+The formatter implements [the approved style](../../docs/formatting.md) for
+milestone M4e ([PLAN.md §8.12](../../PLAN.md#812-formatter-iris-fmt-in-iris-syntax)).
+It changes whitespace and line breaks outside protected text. String contents,
+whole line patterns (including capture whitespace), comments, token spellings,
+and statement order are preserved.
+
+```rust
+use iris_syntax::{FormatOptions, LanguageVersion, format};
+
+let output = format(
+    b"repeat 2 {x:int}",
+    "rows.iris",
+    LanguageVersion::V0_1,
+    FormatOptions::default(),
+)?;
+assert_eq!(output, "repeat 2 {\n  x: int\n}\n");
+# Ok::<(), iris_syntax::FormatError>(())
+```
+
+`FormatOptions` contains only `line_width`, defaulting to 100. Width counts
+Unicode scalar values, including indentation; indivisible groups and protected
+text may exceed it. Zero is invalid. Filesystem access and `.editorconfig`
+lookup belong to callers. The only supported language version is `V0_1`.
+
+`format` refuses every source failure or syntax diagnostic and returns no
+partial output. Syntax-clean input is accepted even when later name resolution
+or type checking would reject it. `FormatError` distinguishes source failures,
+syntax diagnostics, invalid width, and invalid byte ranges.
+
+`format_range` accepts half-open UTF-8 byte offsets and widens them to the
+smallest complete statement sequence in a common root or block. A selection
+inside an arm's block can format body statements; one spanning arms formats
+the entire sections statement. Selecting a header, brace, or else-declaration
+includes its containing statement. Trailing comments stay with their token.
+Indentation comes from the surrounding syntax, rather than the source's spaces.
+
+The extent includes the complete whitespace run on either side of the selected
+statements and comments, ending at the nearest exterior token or comment, or
+at the file edge. A run partly inside the requested range is included in full;
+no whitespace run is split between formatted and untouched text. Within the
+extent, whitespace follows the whole-document rules: collapse blank lines,
+trim them at file and brace edges, use LF and spaces, and normalize indentation.
+This can change whitespace before the following unselected token; that token
+and all bytes outside the widened extent stay unchanged. For example, selecting
+`x` in `first:int\n\n\nx :int\nlast:int` includes both surrounding runs and
+produces `first:int\n\nx: int\nlast:int`.
+
+The returned `RangeFormat` reports the widened range and zero or one
+`FormatEdit`, entirely within that range. Applying it preserves every exterior
+byte. Selected syntax errors cause refusal, including missing-token errors
+reported at the following statement; errors in other statements do not. For
+example, a selection inside `good:int` in `let bad=+ good:int` formats the
+recovered declaration while preserving the malformed definition.
+
+A cursor selects its containing statement, the following statement at an exact
+boundary, or the previous statement at EOF. A whitespace-only document yields
+no edits; a comment-only document widens to the whole document. Ranges outside
+the source or splitting a UTF-8 scalar are rejected. LSP callers convert byte
+offsets to their negotiated position encoding.
+
+Formatter output changes only in minor package releases. Each style change
+must appear in the changelog.
+
 ## Development
 
 From `rust/`, run the workspace build, formatting, Clippy, and test commands in
@@ -86,3 +151,12 @@ UTF-8-boundary prefix of those fixtures.
 checked, invalid UTF-8 sources excluded, and reconstruction failures. It checks
 reconstruction regardless of syntax diagnostics; it does not claim semantic
 conformance or invoke an implementation driver.
+
+`repository_formatting` walks the same tracked and nonignored reader specs. For
+each syntax-clean source it checks widths 40, 80 and 100 for idempotence, the
+same CST without whitespace, and byte-identical protected text. It reports
+syntax-clean, syntax-invalid and invalid UTF-8 counts separately. Run it with
+`cargo test --locked -p iris-syntax repository_formatting -- --nocapture` to see
+the counts. Formatter tests also reproduce all 22 guide pairs at their stated
+widths, compare [rule snapshots](tests/fixtures/format/README.md), and exercise
+range widening and error isolation. No test rewrites reader specs in place.

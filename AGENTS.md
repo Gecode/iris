@@ -70,7 +70,7 @@ the component.
 |---|---|
 | Repository | `scripts/check-repo.sh` checks required files, name spelling, and relative Markdown links (see `scripts/README.md`). |
 | Gecode reference | `scripts/gecode-reference.sh` builds the pinned reference; `eval "$(scripts/gecode-reference.sh --print-env)"` exports its paths (see `scripts/README.md`). |
-| `rust/` | In `rust/`: `cargo build --workspace --locked`; `cargo fmt --all -- --check`; `cargo clippy --workspace --all-targets --locked -- -D warnings`; `cargo test --workspace --locked`. Parser only: `cargo test --locked -p iris-syntax`; add `repository_losslessness -- --nocapture` to report byte-for-byte reconstruction of every `.iris` file (see [rust/README.md](rust/README.md)). |
+| `rust/` | In `rust/`: `cargo build --workspace --locked`; `cargo fmt --all -- --check`; `cargo clippy --workspace --all-targets --locked -- -D warnings`; `cargo test --workspace --locked`. Parser only: `cargo test --locked -p iris-syntax`; add `repository_losslessness -- --nocapture` to report byte-for-byte reconstruction of every `.iris` file. Formatter only: `cargo test --locked -p iris-syntax repository_formatting -- --nocapture` reports same-tree and idempotence counts at widths 40, 80 and 100; `guide_examples -- --nocapture` checks the pairs in [docs/formatting.md](docs/formatting.md) (see [rust/README.md](rust/README.md)). |
 | `python/` | To be added by the Python area. |
 | `cpp/` | To be added by the C++ area. |
 | `java/` | To be added by the Java area. |

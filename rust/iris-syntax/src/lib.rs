@@ -1,7 +1,8 @@
-//! Lossless, error-tolerant syntax analysis for Iris 0.1.
+//! Lossless syntax analysis and whitespace-only formatting for Iris 0.1.
 //!
 //! Syntax acceptance does not include name resolution or type checking.
 mod diagnostic;
+mod format;
 mod lexer;
 mod parser;
 mod syntax;
@@ -9,6 +10,7 @@ mod syntax;
 use std::{fmt, sync::Arc};
 
 pub use diagnostic::{Diagnostic, DiagnosticCode, DiagnosticPhase, SourceLocation};
+pub use format::{FormatEdit, FormatError, FormatOptions, RangeFormat, format, format_range};
 pub use rowan::{TextRange, TextSize};
 pub use syntax::{IrisLanguage, SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken};
 
