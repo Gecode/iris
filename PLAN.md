@@ -638,7 +638,8 @@ dark mode.
   points: one statement per line (statements have no separators), two
   spaces of indentation inside `{ }`, no column alignment (it causes diff
   noise), single blank lines kept and longer runs collapsed, and comments
-  kept where they are.
+  kept where they are. The decided style is in
+  [`docs/formatting.md`](docs/formatting.md).
 - **It never changes meaning.** It changes only whitespace and line
   breaks: it never rewrites strings, line patterns, numbers, or names, and
   never reorders statements. Rewrites belong to lint fixes and

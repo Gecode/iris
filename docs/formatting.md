@@ -1,9 +1,10 @@
 # Formatting reader specs
 
-This guide proposes the style for `iris fmt`. It covers Iris 0.1 reader
-specs. The formatter is planned; the rules marked R1–R14 below are
-recommendations awaiting review. [Choices for review](#choices-for-review)
-lists their alternatives and the evidence behind them.
+This guide defines the style for `iris fmt`. It covers Iris 0.1 reader
+specs. The formatter is planned; the guide comes first, so the format
+library is written in this style from the start. The rules marked R1–R14
+below were decided on 2026-11-01; [Decisions](#decisions) records the
+alternatives considered and the evidence behind each.
 
 The [Iris Language Specification](../spec/0.1/README.md) defines the
 language. Formatting changes whitespace and line breaks while preserving
@@ -14,7 +15,7 @@ changes a range's spelling to make a line fit.
 
 Every Iris code block in this guide is a complete, valid reader spec.
 “Before” means valid source with a different layout; “after” applies the
-proposed rules. The two versions in each pair have the same meaning.
+rules. The two versions in each pair have the same meaning.
 
 ## Fixed points
 
@@ -32,7 +33,7 @@ layout rules are settled in [PLAN.md §8.12](../PLAN.md#812-formatter-iris-fmt-i
 - Change the style only in minor package releases and record changes in
   the changelog.
 
-The remaining sections spell out the proposed details. A statement may
+The remaining sections spell out the details. A statement may
 occupy several lines when it needs to wrap.
 
 ## Source, comments, and blank lines
@@ -799,13 +800,13 @@ declaration or alphabet options, all using one separating space. The
 corpus supplies no example of a whitespace change that must keep `gecode`
 separate from a field dot.
 
-## Choices for review
+## Decisions
 
-The fixed points above are already settled. Every further layout rule in
-this draft belongs to one of these recommendations. “No example” means
-the survey supplies no preference, rather than evidence of agreement.
+Beyond the fixed points above, every layout rule in this guide belongs to
+one of these decisions, made on 2026-11-01. “No example” means the survey
+supplies no preference, rather than evidence of agreement.
 
-| Choice | Recommendation | Alternative | Reason and evidence |
+| Rule | Decision | Rejected alternative | Reason and evidence |
 |---|---|---|---|
 | R1: source whitespace and file ending | Spaces, LF outside protected text, trim trailing whitespace, one final LF for nonempty files; empty files stay empty. | Preserve original whitespace bytes and file endings. | All six Gecode specs end in LF; the Specification has 191 with and 162 without. A predictable file ending is useful, but the latter intentionally test optional LF. Preserve literal bytes inside strings and comments. |
 | R2: comment spacing and attachment | One space before trailing `#`; preserve its token attachment and line, and indent standalone comments at their position. Never reflow comment text. | Retain original spacing before `#`, or move long trailing comments above statements. | Gecode has two padded comments (20 and three spaces); the Specification has one with one space. One space follows the settled no-alignment rule. There are zero standalone or between-arm comments to settle their indentation. |
@@ -819,7 +820,7 @@ the survey supplies no preference, rather than evidence of agreement.
 | R10: sections arms | One arm per line, modifiers on its pattern line, expanded body indented another two spaces. Preserve bodyless arms. | Inline short arms or put modifiers on separate lines. | All 9 Gecode bodyless arms occupy their own line; both multiline and inline arm bodies occur. The two inline nonogram arm bodies expand under R9. There are no comments between arms in the sample. |
 | R11: width measurement and overflow | Count Unicode scalar values; permit overflow for protected tokens, comments, and groups with no useful permitted break. | Count UTF-8 bytes or terminal display cells; treat the width as a hard limit. | Gecode already has 3 lines over 100; the Specification has 10. Neither has a Unicode-width layout example. Scalar counting is predictable without a terminal or font; a hard limit would require rewriting some string or comment contents. |
 | R12: continuation indentation and expressions | Two additional spaces per continuation level; break after every operator at the loosest available precedence before recursing. Keep fitting constructs flat. | Align continuations under an operand, use four extra spaces, or put operators at line starts. | Gecode's only wrapped expression uses a trailing `||` and six additional spaces. Two additional spaces follows the settled brace indentation without column alignment. There is only one wrapped expression in the Specification too. The exact recursive policy has no existing example. |
-| R13: messages, options, and string lists | Move a check message first, then option groups, then string items, before breaking expressions; vertical lists when broken, brace after last header token. | Break expressions first, greedily pack continued list items, or move the opening brace to its own line. | Neither corpus supplies a wrapped message, option list, or string list. This keeps checks and declarations readable while retaining Gecode's compact common case. The priority and vertical layout are proposals rather than surveyed conventions. |
+| R13: messages, options, and string lists | Move a check message first, then option groups, then string items, before breaking expressions; vertical lists when broken, brace after last header token. | Break expressions first, greedily pack continued list items, or move the opening brace to its own line. | Neither corpus supplies a wrapped message, option list, or string list. This keeps checks and declarations readable while retaining Gecode's compact common case. The priority and vertical layout are design choices rather than surveyed conventions. |
 | R14: calls, comprehensions, and delimiters | Broken calls have one argument per line and a separate closer. Break comprehensions after `:` first. Break inside parentheses and brackets only as needed, retaining unary and simple postfix groups. Move an expression with no internal break after its introducer if that makes it fit. | Pack arguments on continuation lines or align them under the opener. | All 20 Gecode calls and 102 Specification calls attach the opener; neither corpus supplies a wrapped argument list or an expression moved after its introducer. This supplies a consistent fallback at narrow widths without introducing alignment or changing tokens. |
 
 ## Checking the examples
