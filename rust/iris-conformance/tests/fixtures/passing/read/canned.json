@@ -1,0 +1,8 @@
+{
+  "operation": "read",
+  "output_file": "expected.json",
+  "exit": 0,
+  "spec_hex": "63616e6e6564206669787475726500ff0d0a",
+  "input_hex": "00ff0d0a",
+  "params": "{\"n\":\"0007\",\"label\":\"a,b\",\"empty\":\"\",\"unicode\":\"\u03bb\",\"z\":\"-0.0\"}\n"
+}

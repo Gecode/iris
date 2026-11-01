@@ -1,0 +1,6 @@
+
+[[known_failure]]
+driver = "canned"
+outcome = "data"
+expected_file = "known/canned/alternate.json"
+reason = "Controlled alternate outcome for runner tests"

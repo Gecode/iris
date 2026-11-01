@@ -70,11 +70,11 @@ the component.
 |---|---|
 | Repository | `scripts/check-repo.sh` checks required files, name spelling, and relative Markdown links (see `scripts/README.md`). |
 | Gecode reference | `scripts/gecode-reference.sh` builds the pinned reference; `eval "$(scripts/gecode-reference.sh --print-env)"` exports its paths (see `scripts/README.md`). |
-| `rust/` | To be added by the Rust area. |
+| `rust/` | In `rust/`: `cargo build --workspace --locked`; `cargo fmt --all -- --check`; `cargo clippy --workspace --all-targets --locked -- -D warnings`; `cargo test --workspace --locked` (see [rust/README.md](rust/README.md)). |
 | `python/` | To be added by the Python area. |
 | `cpp/` | To be added by the C++ area. |
 | `java/` | To be added by the Java area. |
 | `tree-sitter-iris/` | To be added by the tree-sitter area. |
 | `editors/` | To be added by the editors area. |
 | `site/` | To be added by the site area. |
-| `conformance/` | To be added by the conformance area. |
+| `conformance/` | Runner tests: `cd rust && cargo test --workspace --locked`. After an adapter and cases exist: `cd rust && cargo run --locked -p iris-conformance -- run --driver '<command>' --driver-id '<stable-id>' ../conformance/cases/0.1` (see [conformance/README.md](conformance/README.md)). |

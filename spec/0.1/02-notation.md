@@ -42,7 +42,8 @@ There are no blank header lines.
 
 Each marker is a whole line consisting of `--- ` followed by a part name
 and, when allowed, one space and one modifier. Part names are `spec`,
-`input`, `params`, `expected data`, `expected dzn`, and `expected error`.
+`input`, `params`, `expected data`, `expected parse`, `expected dzn`, and
+`expected error`.
 The byte parts (`spec`, `input`, `expected dzn`) allow either no modifier,
 `no-final-newline`, or `hex`. Other parts allow no modifier. Markers have
 no leading or trailing spaces. Parts MUST occur in this order:
@@ -57,15 +58,16 @@ The operations mean:
 | Operation | Action | Successful expected part |
 |---|---|---|
 | `read` | Parse the reader spec and read one selected instance. | `expected data` |
-| `parse` | Parse and resolve the reader spec without reading input. | Reserved for the conformance protocol; see below. |
+| `parse` | Parse and resolve the reader spec without reading input. | `expected parse` |
 | `catalog` | Parse the reader spec and catalog the input's instances; render the returned data when expecting dzn. | `expected data` or `expected dzn` |
 | `dzn` | Read as for `read`, then [render dzn](appendix-b-dzn.md#b1-rendering-data-and-operation-boundaries). | `expected dzn` |
 
 Any operation MAY have `expected error` instead. A `parse` example MAY omit
 input; if present, the operation MUST NOT read it. Its params MUST be absent
-or empty. Parse-success examples are reserved until conformance-001 defines
-their result and extends this notation. Empty read data MUST NOT stand in
-for parse success. [§9.6](09-params-and-instances.md#96-catalog-results) defines catalog
+or empty. Only successful `parse` examples may use `expected parse`, a JSON
+part containing `{"iris":"0.1","parsed":true}` as defined by the
+[conformance protocol](../../conformance/README.md#parse-success). Empty read
+data MUST NOT stand in for parse success. [§9.6](09-params-and-instances.md#96-catalog-results) defines catalog
 entries using chapter 3's ordinary data document. With `expected dzn`, a
 `catalog` example MUST instead render that same returned data under
 [appendix B.7](appendix-b-dzn.md#b7-catalog-data-and-executable-examples).

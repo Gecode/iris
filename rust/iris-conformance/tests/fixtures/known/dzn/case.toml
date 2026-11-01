@@ -1,0 +1,7 @@
+operation = "dzn"
+
+[[known_failure]]
+driver = "canned"
+outcome = "dzn"
+expected_file = "known/canned/alternate.dzn"
+reason = "Controlled alternate outcome for runner tests"

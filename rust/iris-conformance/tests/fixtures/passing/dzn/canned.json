@@ -1,0 +1,7 @@
+{
+  "operation": "dzn",
+  "output_file": "expected.dzn",
+  "exit": 0,
+  "spec_hex": "63616e6e6564206669787475726500ff0d0a",
+  "input_hex": "00ff0d0a"
+}

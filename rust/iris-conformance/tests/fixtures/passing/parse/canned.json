@@ -1,0 +1,6 @@
+{
+  "operation": "parse",
+  "output_file": "actual.bin",
+  "exit": 0,
+  "spec_hex": "63616e6e6564206669787475726500ff0d0a"
+}
