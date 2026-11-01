@@ -1,0 +1,66 @@
+name: Conformance
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Read Gecode pin
+        id: reference
+        run: |
+          # --print-env requires an installed reference, so read its pin before restoring.
+          sha=$(sed -n 's/^gecode_sha=//p' scripts/gecode-reference.sh)
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - name: Cache Gecode reference
+        uses: actions/cache@v6
+        with:
+          path: .cache/gecode/${{ steps.reference.outputs.sha }}
+          key: ${{ runner.os }}-${{ runner.arch }}-gecode-${{ steps.reference.outputs.sha }}-${{ hashFiles('scripts/gecode-reference.sh') }}
+      - name: Build Gecode reference
+        env:
+          EXPECTED_SHA: ${{ steps.reference.outputs.sha }}
+        run: |
+          scripts/gecode-reference.sh
+          eval "$(scripts/gecode-reference.sh --print-env)"
+          test "$GECODE_REFERENCE_SHA" = "$EXPECTED_SHA"
+      - name: Build Gecode adapter
+        run: |
+          adapter=$(conformance/adapters/gecode/build.sh)
+          echo "adapter=$adapter" >> "$GITHUB_ENV"
+      - name: Test Gecode adapter
+        run: ctest --test-dir "$(dirname "$adapter")" --output-on-failure
+      - name: Build Rust workspace and runner
+        working-directory: rust
+        run: cargo build --workspace --locked
+      - name: Check Specification examples
+        run: (cd rust && cargo run --locked -p iris-conformance -- extract-examples ../spec/0.1 ../conformance/cases/0.1/spec-examples --check)
+      - name: Check formal grammar
+        run: (cd rust && cargo run --locked -p iris-conformance -- check-grammar)
+      - name: Run conformance cases
+        run: (cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$adapter\"" --driver-id gecode-6.5.0-5e7bbd5c26b0 ../conformance/cases/0.1)
+      - name: Run format cases
+        run: (cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$adapter\"" --driver-id gecode-6.5.0-5e7bbd5c26b0 ../formats)
+      - name: Check Rust formatting
+        working-directory: rust
+        run: cargo fmt --all -- --check
+      - name: Lint Rust workspace
+        working-directory: rust
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Test Rust workspace
+        working-directory: rust
+        run: cargo test --workspace --locked

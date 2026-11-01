@@ -305,8 +305,9 @@ example or the extractor:
 The extractor fully owns `cases/0.1/spec-examples/`: regeneration replaces its contents,
 including deleting stale cases and support files. Keep generated cases in Git; edit
 examples or extractor-owned annotations rather than generated files. The command needs
-a Rust build, so `scripts/check-repo.sh` does not invoke it. CI wiring belongs to the
-conformance CI task.
+a Rust build, so `scripts/check-repo.sh` does not invoke it. The
+[conformance workflow](../.github/workflows/conformance.yml) runs it on pushes and
+pull requests, alongside the grammar check, all cases, formats, and Rust checks.
 
 Chapters are read in filename order. Each case is named `<chapter-stem>--<example-id>`,
 for example `02-notation--notation-no-final-newline`. Notation §2.3 requires explicit,
