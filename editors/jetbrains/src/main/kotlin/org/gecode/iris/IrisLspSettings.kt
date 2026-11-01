@@ -10,14 +10,14 @@ import com.intellij.openapi.components.StoragePathMacros
 @State(name = "IrisLspSettings", storages = [Storage(StoragePathMacros.WORKSPACE_FILE)])
 class IrisLspSettings : PersistentStateComponent<IrisLspSettings.Options> {
     class Options {
-        var command: String = "iris lsp"
+        var executablePath: String = ""
     }
 
     private var options = Options()
 
-    var command: String
-        get() = options.command
-        set(value) { options.command = value }
+    var executablePath: String
+        get() = options.executablePath
+        set(value) { options.executablePath = value }
 
     override fun getState(): Options = options
     override fun loadState(state: Options) { options = state }

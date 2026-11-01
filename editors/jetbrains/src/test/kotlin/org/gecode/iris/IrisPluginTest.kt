@@ -1,18 +1,34 @@
 package org.gecode.iris
 
+import com.intellij.notification.Notification
+import com.intellij.notification.Notifications
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.actionSystem.impl.SimpleDataContext
+import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.fileTypes.FileTypeManager
+import com.intellij.openapi.fileTypes.SyntaxHighlighterFactory
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.lsp.api.LspServer
+import com.intellij.platform.lsp.api.LspServerDescriptor
 import com.intellij.platform.lsp.api.LspServerManager
 import com.intellij.platform.lsp.api.LspServerManagerListener
 import com.intellij.platform.lsp.api.LspServerState
+import com.intellij.platform.lsp.api.LspServerSupportProvider
 import com.intellij.testFramework.LightProjectDescriptor
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.PsiTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.testFramework.fixtures.IdeaTestFixtureFactory
 import com.intellij.testFramework.fixtures.TempDirTestFixture
+import com.intellij.util.ui.UIUtil
+import com.intellij.util.xmlb.XmlSerializer
+import org.jetbrains.plugins.textmate.TextMateService
+import org.jetbrains.plugins.textmate.language.syntax.highlighting.TextMateHighlighter
+import java.io.File
 import java.util.concurrent.atomic.AtomicReference
+import javax.swing.JTextField
 
 class IrisPluginTest : BasePlatformTestCase() {
     // LSP descriptors retain the project directory; each test needs a fresh project.
@@ -32,22 +48,84 @@ class IrisPluginTest : BasePlatformTestCase() {
         assertTrue(icon.toString().contains("icons/iris.svg"))
     }
 
-    fun testConfiguredCommandLine() {
-        val settings = project.getService(IrisLspSettings::class.java)
-        settings.command = "\"/path with spaces/iris\" lsp --stdio"
-        val descriptor = IrisLspServerDescriptor(project)
+    fun testExecutableLookupAndCommandLine() {
+        val directory = File(myFixture.tempDirFixture.tempDirPath, "path with spaces").apply { mkdirs() }
+        val name = if (System.getProperty("os.name").startsWith("Windows")) "iris.exe" else "iris"
+        val executable = File(directory, name).apply { writeText("test executable"); setExecutable(true) }
+        assertEquals(executable.path, findIrisExecutable("", directory.path))
+        assertEquals(executable.path, findIrisExecutable(executable.path, ""))
+        assertNull(findIrisExecutable(File(directory, "absent").path, directory.path))
+        assertNull(findIrisExecutable("", ""))
+        val descriptor = IrisLspServerDescriptor(project, executable.path)
         val command = descriptor.createCommandLine()
-        assertEquals("/path with spaces/iris", command.exePath)
-        assertEquals(listOf("lsp", "--stdio"), command.parametersList.list)
+        assertEquals(executable.path, command.exePath)
+        assertEquals(listOf("lsp"), command.parametersList.list)
         assertEquals(project.basePath, command.workDirectory?.path)
-        val file = myFixture.tempDirFixture.createFile("example.iris")
-        assertTrue(descriptor.isSupportedFile(file))
-        val other = myFixture.tempDirFixture.createFile("example.txt")
-        assertFalse(descriptor.isSupportedFile(other))
+        assertTrue(descriptor.isSupportedFile(myFixture.tempDirFixture.createFile("example.iris")))
+        assertFalse(descriptor.isSupportedFile(myFixture.tempDirFixture.createFile("example.txt")))
     }
 
-    fun testStubDiagnosticThroughPlatformClient() {
-        project.getService(IrisLspSettings::class.java).command = "python3 \"${System.getProperty("iris.stub")}\""
+    fun testSettingsPersistenceAndConfigurable() {
+        val settings = project.getService(IrisLspSettings::class.java)
+        val configurable = IrisLspConfigurable(project)
+        try {
+            val field = requireNotNull(UIUtil.findComponentOfType(configurable.createComponent(), JTextField::class.java))
+            assertFalse(configurable.isModified)
+            field.text = "/path with spaces/iris"
+            assertTrue(configurable.isModified)
+            configurable.apply()
+            assertEquals(field.text, settings.executablePath)
+            val saved = XmlSerializer.serialize(settings.state)
+            val restored = IrisLspSettings()
+            restored.loadState(XmlSerializer.deserialize(saved, IrisLspSettings.Options::class.java))
+            assertEquals(field.text, restored.executablePath)
+            field.text = "discarded"
+            configurable.reset()
+            assertEquals(settings.executablePath, field.text)
+            field.text = ""
+            configurable.apply()
+            assertEquals("", settings.executablePath)
+            assertFalse(configurable.isModified)
+        } finally {
+            configurable.disposeUIResources()
+        }
+    }
+
+    fun testMissingExecutableNotification() {
+        val received = mutableListOf<Notification>()
+        project.messageBus.connect(testRootDisposable).subscribe(Notifications.TOPIC, object : Notifications {
+            override fun notify(notification: Notification) {
+                if (notification.groupId == "Iris language server") received.add(notification)
+            }
+        })
+        project.getService(IrisLspSettings::class.java).executablePath = ""
+        val provider = IrisLspSupportProvider { "" }
+        val starter = object : LspServerSupportProvider.LspServerStarter {
+            override fun ensureServerStarted(descriptor: LspServerDescriptor) { fail("Missing iris must not start a process") }
+        }
+        val file = myFixture.tempDirFixture.createFile("missing.iris")
+        try {
+            provider.fileOpened(project, file, starter)
+            PlatformTestUtil.waitWithEventsDispatching("Iris install notification", { received.isNotEmpty() }, 10)
+            val notification = received.single()
+            assertEquals("Iris executable not found", notification.title)
+            assertTrue(notification.content.contains("cargo build --locked -p iris-cli --bin iris"))
+            assertTrue(notification.content.contains("Executable path"))
+            assertTrue(notification.content.contains("PATH"))
+            assertEquals("Configure Iris", notification.actions.single().templatePresentation.text)
+            provider.fileOpened(project, file, starter)
+            UIUtil.dispatchAllInvocationEvents()
+            assertEquals("One notification per unresolved attempt", 1, received.size)
+        } finally {
+            project.getService(IrisLspNotifications::class.java).clear()
+        }
+    }
+
+    fun testHighlightingDiagnosticAndRestartThroughPlatformClient() {
+        val realExecutable = System.getProperty("iris.executable")
+        val executable = realExecutable ?: stubExecutable()
+        val diagnosticText = if (realExecutable == null) "Iris stub diagnostic" else "not_defined"
+        project.getService(IrisLspSettings::class.java).executablePath = executable
         val serverManager = LspServerManager.getInstance(project)
         val diagnosticFile = AtomicReference<VirtualFile>()
         serverManager.addLspServerManagerListener(object : LspServerManagerListener {
@@ -55,28 +133,54 @@ class IrisPluginTest : BasePlatformTestCase() {
                 if (lspServer.providerClass == IrisLspSupportProvider::class.java) diagnosticFile.set(file)
             }
         }, testRootDisposable)
-        val file = myFixture.tempDirFixture.createFile(
-            "example.iris", requireNotNull(javaClass.getResource("/example.iris")).readText()
-        )
+        val file = myFixture.tempDirFixture.createFile("example.iris", "format \"Example\"\nn: not_defined\n")
         PsiTestUtil.addContentRoot(module, file.parent)
+        TextMateService.getInstance().reloadEnabledBundles()
         myFixture.configureFromExistingVirtualFile(file)
         try {
-            PlatformTestUtil.waitWithEventsDispatching("Iris stub initialization", {
+            PlatformTestUtil.waitWithEventsDispatching("Iris initialization", {
                 serverManager.getServersForProvider(IrisLspSupportProvider::class.java)
-                    .any { it.initializeResult?.serverInfo?.name == "iris-stub" }
+                    .any { it.state == LspServerState.Running }
             }, 30)
-            PlatformTestUtil.waitWithEventsDispatching("Iris stub diagnostic received by the platform", {
-                diagnosticFile.get() == myFixture.file.virtualFile
+            PlatformTestUtil.waitWithEventsDispatching("Iris diagnostic received by the platform", {
+                diagnosticFile.get() == file
             }, 30)
-            PlatformTestUtil.waitWithEventsDispatching("Iris stub diagnostic in the editor", {
-                myFixture.doHighlighting().any { it.description?.contains("Iris stub diagnostic") == true }
+            PlatformTestUtil.waitWithEventsDispatching("Iris diagnostic in the editor", {
+                myFixture.doHighlighting().any { it.description?.contains(diagnosticText) == true }
             }, 30)
+            assertTrue("TextMate editor highlighter is applied",
+                (myFixture.editor as EditorEx).highlighter.javaClass.name.contains("TextMate"))
+            val highlighter = requireNotNull(SyntaxHighlighterFactory.getSyntaxHighlighter(IrisFileType, project, file))
+            assertTrue("TextMate highlighter on the Iris file", highlighter is TextMateHighlighter)
+            val lexer = highlighter.highlightingLexer
+            lexer.start(myFixture.editor.document.charsSequence)
+            assertTrue("TextMate assigns attributes to format", highlighter.getTokenHighlights(requireNotNull(lexer.tokenType)).isNotEmpty())
+            val firstServer = serverManager.getServersForProvider(IrisLspSupportProvider::class.java).single()
+            diagnosticFile.set(null)
+            val action = requireNotNull(ActionManager.getInstance().getAction("org.gecode.iris.RestartLsp"))
+            val context = SimpleDataContext.getSimpleContext(CommonDataKeys.PROJECT, project)
+            val event = AnActionEvent.createFromAnAction(action, null, "test", context)
+            action.actionPerformed(event)
+            PlatformTestUtil.waitWithEventsDispatching("Iris replacement server", {
+                serverManager.getServersForProvider(IrisLspSupportProvider::class.java)
+                    .any { it !== firstServer && it.state == LspServerState.Running }
+            }, 30)
+            PlatformTestUtil.waitWithEventsDispatching("Iris diagnostics after restart", { diagnosticFile.get() == file }, 30)
         } finally {
             serverManager.stopServers(IrisLspSupportProvider::class.java)
-            PlatformTestUtil.waitWithEventsDispatching("Iris stub shutdown", {
+            PlatformTestUtil.waitWithEventsDispatching("Iris shutdown", {
                 serverManager.getServersForProvider(IrisLspSupportProvider::class.java)
                     .none { it.state == LspServerState.Initializing || it.state == LspServerState.Running }
             }, 10)
         }
+    }
+
+    private fun stubExecutable(): String {
+        // Give the executable-path setting a real executable, without changing the production command contract.
+        val launcher = File(myFixture.tempDirFixture.tempDirPath, "iris-stub")
+        val script = requireNotNull(System.getProperty("iris.stub"))
+        launcher.writeText("#!/bin/sh\nexec python3 '${script.replace("'", "'\\''")}' \"\$@\"\n")
+        check(launcher.setExecutable(true))
+        return launcher.path
     }
 }

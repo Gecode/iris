@@ -1,3 +1,4 @@
+import org.jetbrains.intellij.platform.gradle.tasks.PrepareSandboxTask
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 
@@ -17,6 +18,7 @@ repositories {
 dependencies {
     intellijPlatform {
         intellijIdea("2025.3.3")
+        bundledPlugin("org.jetbrains.plugins.textmate")
         testFramework(TestFrameworkType.Platform)
         pluginVerifier()
     }
@@ -57,7 +59,19 @@ tasks.processResources {
     }
 }
 
+// Keep one tracked grammar. Both the ZIP and test sandbox contain this directory.
+val prepareTextMateBundle = tasks.register<Sync>("prepareTextMateBundle") {
+    from("../textmate/iris.tmLanguage.json")
+    from("src/main/textmate/package.json")
+    into(layout.buildDirectory.dir("textmate/iris"))
+}
+
+tasks.withType<PrepareSandboxTask>().configureEach {
+    from(prepareTextMateBundle) { into(pluginName.map { "$it/textmate/iris" }) }
+}
+
 tasks.test {
+    providers.environmentVariable("IRIS_TEST_EXECUTABLE").orNull?.let { systemProperty("iris.executable", it) }
     systemProperty("iris.stub", layout.projectDirectory.file("src/test/resources/stub_server.py").asFile.absolutePath)
     systemProperty("idea.log.debug.categories", "#com.intellij.platform.lsp")
 }
