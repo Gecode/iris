@@ -307,7 +307,9 @@ including deleting stale cases and support files. Keep generated cases in Git; e
 examples or extractor-owned annotations rather than generated files. The command needs
 a Rust build, so `scripts/check-repo.sh` does not invoke it. The
 [conformance workflow](../.github/workflows/conformance.yml) runs it on pushes and
-pull requests, alongside the grammar check, all cases, formats, and Rust checks.
+pull requests on Ubuntu and macOS, alongside the grammar check and Rust checks.
+It builds the Rust driver with the workspace and runs all 0.1 cases and formats
+against both `iris-driver` and the pinned Gecode adapter.
 
 Chapters are read in filename order. Each case is named `<chapter-stem>--<example-id>`,
 for example `02-notation--notation-no-final-newline`. Notation §2.3 requires explicit,
@@ -436,6 +438,18 @@ Counts partition total. Runner exits: **0** when fail and xpass are both zero;
 errors. Help and version exit 0. A driver exit 2 is a case failure, hence runner
 exit 1. XFAIL and UNREPRESENTABLE lines include the driver ID, reason and any difference
 link. XPASS identifies a stale annotation and requires its removal.
+
+Build the Rust workspace and run both roots from the repository root:
+
+```sh
+(cd rust && cargo build --workspace --locked)
+(cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$PWD/target/debug/iris-driver\"" ../conformance/cases/0.1)
+(cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$PWD/target/debug/iris-driver\"" ../formats)
+```
+
+The Rust driver needs no `--driver-id`: every case must match its primary
+expectation, with no exemptions. CI uses `iris-conformance run` for both drivers
+so they share the same command and report format.
 
 See [Rust build instructions](../rust/README.md) for the canned driver demonstration.
 Build the adapter and run the real suite from the repository root:

@@ -58,17 +58,17 @@ cargo test --locked -p iris-cli --test parse_conformance -- --nocapture
 ```
 
 The parse integration test loads the whole version tree and selects parse
-cases. The progress test discovers both the conformance tree and `formats`,
-then excludes the exact cases in `iris-cli/tests/pending-cases.txt` before
-invoking any driver. The pending file is empty; newly discovered cases run by
-default. Read and catalog enforce the idle and expression budgets in
+cases. The `read_conformance` test requires every discovered case in
+`conformance/cases/0.1` and `formats` to pass through `iris-driver`, with no
+exemptions. It prints counts by operation and area; new cases run automatically.
+Read and catalog enforce the idle and expression budgets in
 [Specification §10](../spec/0.1/10-work-budgets.md), with limits 2^20 and 2^20
 + 16*N for the full original input byte length N. Equality succeeds; an excess
 charge immediately reports `E-BUDGET`. The allowances span every traversed
 instance, including deferred rejections, and restart for each operation.
 Rendering dzn consumes no language work budget.
 
-Read input and run the current progress selection:
+Read input and run the full conformance test:
 
 ```sh
 cargo run --locked -p iris-cli -- read path/to/spec.iris path/to/input.txt
@@ -140,6 +140,18 @@ operand. The same roots, options, and driver produce the same report and exits:
 0 when all cases pass or have selected exemptions, 1 for failures or unexpected
 passes, and 2 for configuration, case-loading, or zero-selection errors.
 
+Run the full Rust driver suite with the standalone runner after the workspace build:
+
+```sh
+cargo run --locked -p iris-conformance -- run --driver "\"$PWD/target/debug/iris-driver\"" ../conformance/cases/0.1
+cargo run --locked -p iris-conformance -- run --driver "\"$PWD/target/debug/iris-driver\"" ../formats
+```
+
+The [conformance workflow](../.github/workflows/conformance.yml) runs both roots
+against Rust and the pinned Gecode adapter on every push and pull request, on
+Ubuntu and macOS. The workspace build supplies both the runner and `iris-driver`;
+Rust uses no driver ID or exemptions.
+
 Driver IDs select precise known-failure annotations and are independent of the
 executable's name. Omit the ID to apply no exemptions. See
 `iris conformance --help` and the
@@ -159,9 +171,9 @@ reports and a stale known-failure annotation. All fixtures remain under the
 crate's tests directory. Another implementation needs only to supply the four
 protocol commands; it does not need to link this library.
 
-Checks and structural record expressions are implemented. The progress gate
-selects all 932 cases (155 parse, 730 read, 28 catalog, 19 dzn), with no
-pending cases. Expression and lifted traversal use iterative borrowed views;
+Checks and structural record expressions are implemented. The full conformance
+test runs all 932 cases (155 parse, 730 read, 28 catalog, 19 dzn). Expression
+and lifted traversal use iterative borrowed views;
 false-check diagnostics retain witness paths and saved record positions. The
 differential test has 3,072 probes, including 640 dzn probes at seed 73010, and
 a separate 50-value check of the documented Gecode float precision gap. Dzn

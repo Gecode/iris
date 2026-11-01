@@ -44,17 +44,21 @@ jobs:
           echo "adapter=$adapter" >> "$GITHUB_ENV"
       - name: Test Gecode adapter
         run: ctest --test-dir "$(dirname "$adapter")" --output-on-failure
-      - name: Build Rust workspace and runner
+      - name: Build Rust workspace, runner and driver
         working-directory: rust
         run: cargo build --workspace --locked
       - name: Check Specification examples
         run: (cd rust && cargo run --locked -p iris-conformance -- extract-examples ../spec/0.1 ../conformance/cases/0.1/spec-examples --check)
       - name: Check formal grammar
         run: (cd rust && cargo run --locked -p iris-conformance -- check-grammar)
-      - name: Run conformance cases
+      - name: Run Gecode conformance cases
         run: (cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$adapter\"" --driver-id gecode-6.5.0-5e7bbd5c26b0 ../conformance/cases/0.1)
-      - name: Run format cases
+      - name: Run Gecode format cases
         run: (cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$adapter\"" --driver-id gecode-6.5.0-5e7bbd5c26b0 ../formats)
+      - name: Run Rust conformance cases
+        run: (cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$PWD/target/debug/iris-driver\"" ../conformance/cases/0.1)
+      - name: Run Rust format cases
+        run: (cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$PWD/target/debug/iris-driver\"" ../formats)
       - name: Check Rust formatting
         working-directory: rust
         run: cargo fmt --all -- --check

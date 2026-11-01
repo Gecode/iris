@@ -190,11 +190,14 @@ character rejected by the lexer is rendered as its Unicode scalar; Gecode's
 single-byte message can be invalid Unicode and cannot always be reproduced
 byte for byte in canonical JSON. Codes and locations follow the Specification.
 
-The `read_conformance` progress test discovers both case roots, validates the
-pending-list format and excludes listed paths before driver invocation. The
-file is empty; newly discovered cases run automatically. The selection is all
-932 cases (155 parse, 730 read, 28 catalog, 19 dzn); counts follow inventory
-changes. No known-failure driver ID is used.
+The `read_conformance` test requires every discovered case in
+`conformance/cases/0.1` and `formats` to pass through `iris-driver`. It prints
+counts by operation and area; new cases run automatically. The current total
+is 932 cases (155 parse, 730 read, 28 catalog, 19 dzn). No driver ID is needed:
+Rust must match the primary expectations without exemptions. The
+[conformance workflow](../../.github/workflows/conformance.yml) also runs both
+roots through `iris-conformance run` against the built driver on every push
+and pull request, on Ubuntu and macOS, alongside the Gecode adapter runs.
 
 ```sh
 cargo test --locked -p iris-cli --test read_conformance -- --nocapture

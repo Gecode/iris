@@ -145,8 +145,8 @@ params/instances/catalog probes at seed 73008 plus 640 dzn probes at seed 73010
 (3,072 total), with the pinned Gecode adapter; see the [CLI
 README](../iris-cli/README.md#conformance-driver).
 
-The progress gate selects all 932 cases (155 parse, 730 read, 28 catalog, 19
-dzn), with no pending cases. Budget tests cover exact limits, atomic charges,
+The full conformance test runs all 932 cases (155 parse, 730 read, 28 catalog,
+19 dzn) without exemptions. Budget tests cover exact limits, atomic charges,
 arithmetic overflow, fresh operations, and hard errors after deferred
 rejections. `budgets_scale_linearly` bounds work for 4× problem sizes by 6×
 work, and `budget_exhaustion_stops_work_promptly` checks that enormous repeats
