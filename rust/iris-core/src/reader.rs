@@ -12,7 +12,11 @@ use std::collections::HashMap;
 pub(crate) struct ModelIndex {
     definitions: HashMap<TextRange, DefinitionId>,
     pub references: HashMap<TextRange, ReferenceId>,
-    repeats: HashMap<TextRange, RepeatId>,
+    pub repeats: HashMap<TextRange, RepeatId>,
+    pub checks: HashMap<TextRange, usize>,
+    pub expressions: HashMap<TextRange, usize>,
+    pub comprehensions: HashMap<TextRange, usize>,
+    pub structural: HashMap<String, iris_sema::Denotation>,
     patterns: HashMap<TextRange, pattern::Pattern>,
     pub pattern_literals: HashMap<TextRange, String>,
     sections: HashMap<TextRange, sections::Sections>,
@@ -58,6 +62,45 @@ impl ModelIndex {
             })
             .collect();
         Self {
+            checks: model
+                .checks()
+                .iter()
+                .enumerate()
+                .map(|(i, c)| (c.node.text_range(), i))
+                .collect(),
+            expressions: model
+                .expressions()
+                .iter()
+                .enumerate()
+                .map(|(i, e)| (e.node.text_range(), i))
+                .collect(),
+            comprehensions: model
+                .comprehensions()
+                .iter()
+                .enumerate()
+                .map(|(i, c)| (c.node.text_range(), i))
+                .collect(),
+            structural: model
+                .repeats()
+                .iter()
+                .enumerate()
+                .flat_map(|(i, r)| {
+                    [
+                        (
+                            r.list_definition,
+                            iris_sema::Denotation::RecordList(RepeatId(i)),
+                        ),
+                        (
+                            r.each_definition,
+                            iris_sema::Denotation::Record(RepeatId(i)),
+                        ),
+                    ]
+                    .into_iter()
+                    .filter_map(|(id, denotation)| {
+                        id.map(|id| (model.definition(id).name.clone(), denotation))
+                    })
+                })
+                .collect(),
             patterns,
             sections,
             pattern_literals,
@@ -83,9 +126,10 @@ impl ModelIndex {
         }
     }
 }
+pub(crate) mod checks;
 mod pattern;
 mod reads;
-mod repeat;
+pub(crate) mod repeat;
 mod sections;
 use repeat::{RecordLists, RepeatState};
 use sections::SectionsState;
@@ -138,16 +182,19 @@ pub(crate) struct Interpreter<'s, 'i> {
     pub input: Input<'i>,
     pub frames: Vec<Frame>,
     types: HashMap<DefinitionId, EvaluatedType>,
-    pub bindings: Vec<(String, Value)>,
-    statement: Option<(usize, TextRange)>,
-    context: Option<String>,
-    repeats: Vec<RepeatState>,
-    records: RecordLists,
+    pub(crate) statement: Option<(usize, TextRange)>,
+    pub(crate) context: Option<String>,
+    pub repeats: Vec<RepeatState>,
+    pub records: RecordLists,
     sections: Vec<SectionsState>,
     contexts: Vec<ExecutionContext>,
     source_lines: Vec<usize>,
     #[cfg(test)]
-    charges: Vec<Charge>,
+    pub(crate) charges: Vec<Charge>,
+    #[cfg(test)]
+    pub(crate) capture_charges: bool,
+    #[cfg(test)]
+    pub(crate) work: std::cell::Cell<[usize; 6]>,
 }
 impl<'s, 'i> Interpreter<'s, 'i> {
     pub fn new(spec: &'s Spec, input: Input<'i>) -> Self {
@@ -156,7 +203,6 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             input,
             frames: vec![Frame::default()],
             types: HashMap::new(),
-            bindings: vec![],
             statement: None,
             context: None,
             repeats: vec![],
@@ -165,6 +211,10 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             contexts: vec![],
             #[cfg(test)]
             charges: vec![],
+            #[cfg(test)]
+            capture_charges: true,
+            #[cfg(test)]
+            work: std::cell::Cell::new([0; 6]),
             source_lines: std::iter::once(0)
                 .chain(
                     spec.source
@@ -197,7 +247,7 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             .expect("root frame exists throughout a read")
             .into_data())
     }
-    fn execute(&mut self, root: SyntaxNode) -> Result<(), Failure> {
+    pub(crate) fn execute(&mut self, root: SyntaxNode) -> Result<(), Failure> {
         let mut work = vec![Work::Sequence(root.first_child())];
         while let Some(next) = work.pop() {
             match next {
@@ -256,7 +306,7 @@ impl<'s, 'i> Interpreter<'s, 'i> {
         }
         Ok(())
     }
-    fn select_statement(&mut self, node: &SyntaxNode) {
+    pub(crate) fn select_statement(&mut self, node: &SyntaxNode) {
         let offset = usize::from(node.text_range().start());
         let line = self.source_lines.partition_point(|&start| start <= offset);
         self.statement = Some((line, node.text_range()));
@@ -296,11 +346,7 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             K::Line | K::Find => self.execute_pattern(node),
             K::Skip => self.execute_skip(node),
             K::Expect => self.execute_expect(node),
-            K::Check => Err(unsupported(
-                node.text_range(),
-                "check execution",
-                "rust-007",
-            )),
+            K::Check => self.execute_check(node),
             K::Param | K::Instances => Err(unsupported(
                 node.text_range(),
                 "parameters and instances",
@@ -509,22 +555,21 @@ impl<'s, 'i> Interpreter<'s, 'i> {
         error
     }
     pub fn lookup(&self, name: &str) -> Option<&Value> {
-        self.bindings
+        self.frames
             .iter()
             .rev()
-            .find(|(bound, _)| bound == name)
-            .map(|(_, value)| value)
-            .or_else(|| {
-                self.frames
-                    .iter()
-                    .rev()
-                    .find_map(|frame| frame.lookup(name))
-            })
+            .find_map(|frame| frame.lookup(name))
     }
+
     pub fn error(&self, code: ErrorCode, message: impl Into<String>) -> Error {
         self.error_at(code, message, self.input.position())
     }
-    fn error_at(&self, code: ErrorCode, message: impl Into<String>, position: Position) -> Error {
+    pub(crate) fn error_at(
+        &self,
+        code: ErrorCode,
+        message: impl Into<String>,
+        position: Position,
+    ) -> Error {
         let context = self.execution_context();
         Error::input(
             code,
@@ -536,7 +581,7 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             context.as_deref(),
         )
     }
-    fn execution_context(&self) -> Option<String> {
+    pub(crate) fn execution_context(&self) -> Option<String> {
         let mut contexts: Vec<_> = self
             .contexts
             .iter()
@@ -556,13 +601,11 @@ impl<'s, 'i> Interpreter<'s, 'i> {
         self.observe_charge(false, _units);
         Ok(())
     }
-    pub fn charge_expression(&mut self, _units: u128) -> Result<(), Error> {
-        #[cfg(test)]
-        self.observe_charge(true, _units);
-        Ok(())
-    }
     #[cfg(test)]
     fn observe_charge(&mut self, expression: bool, units: u128) {
+        if !self.capture_charges {
+            return;
+        }
         self.charges.push(Charge {
             expression,
             units,
@@ -624,9 +667,30 @@ pub(crate) fn truth(value: &Value) -> bool {
 
 #[cfg(test)]
 #[derive(Debug, PartialEq, Eq)]
-struct Charge {
-    expression: bool,
-    units: u128,
-    statement_line: Option<usize>,
-    context: Option<String>,
+pub(crate) struct Charge {
+    pub(crate) expression: bool,
+    pub(crate) units: u128,
+    pub(crate) statement_line: Option<usize>,
+    pub(crate) context: Option<String>,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum WorkKind {
+    Dispatch,
+    Metadata,
+    Probe,
+    Copy,
+    Link,
+    Leaf,
+}
+impl Interpreter<'_, '_> {
+    #[inline]
+    pub(crate) fn work(&self, _kind: WorkKind, _count: usize) {
+        #[cfg(test)]
+        {
+            let mut counts = self.work.get();
+            counts[_kind as usize] += _count;
+            self.work.set(counts);
+        }
+    }
 }

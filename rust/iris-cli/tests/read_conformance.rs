@@ -25,7 +25,7 @@ fn implemented_conformance() {
         let fields: Vec<_> = line.split_whitespace().collect();
         assert_eq!(fields.len(), 2, "invalid pending line: {line}");
         assert!(
-            matches!(fields[1], "rust-007" | "rust-008" | "rust-009" | "rust-010"),
+            matches!(fields[1], "rust-008" | "rust-009" | "rust-010"),
             "invalid owner: {line}"
         );
         let path = repo.join(fields[0]);

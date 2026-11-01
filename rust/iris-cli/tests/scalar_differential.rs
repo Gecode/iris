@@ -41,6 +41,7 @@ fn scalar_differential() {
         ("Array", ARRAY_SEED, array_probes()),
         ("Repeat", REPEAT_SEED, repeat_probes()),
         ("Sections", 73006, section_probes()),
+        ("Checks", 73007, check_probes()),
     ];
     for (name, seed, probes) in &groups {
         let mut families = std::collections::BTreeMap::new();
@@ -1215,5 +1216,186 @@ fn section_probes() -> Vec<Probe> {
         }
     }
     assert_eq!(probes.len(), 384, "curated probes must never be truncated");
+    probes
+}
+
+fn check_probes() -> Vec<Probe> {
+    let mut state = 73007u64;
+    let mut next = |bound: usize| {
+        state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+        ((state >> 32) as usize) % bound
+    };
+    let mut probes = Vec::new();
+    for (family, count) in [
+        ("plain/local checks and timing", 64),
+        ("implicit records and alignment", 80),
+        ("explicit records and fields", 80),
+        ("record and array comprehensions", 80),
+        ("witness propagation and labels", 96),
+        ("numeric and hard-error precedence", 64),
+        ("positions, blocks and context", 48),
+    ] {
+        for sample in 0..count {
+            // Fixed boundary sizes precede seeded fill in each family.
+            let n = if sample < 5 { sample } else { next(5) };
+            let m = n.clamp(1, 4);
+            let v = next(5) as i64 - 2;
+            let values = (0..n)
+                .map(|i| {
+                    if i + 1 == n {
+                        v.to_string()
+                    } else {
+                        "1".into()
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
+            let rows = (0..m)
+                .map(|i| {
+                    if i + 1 == m {
+                        v.to_string()
+                    } else {
+                        "1".into()
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
+            let (spec, input) = match family {
+                "plain/local checks and timing" => match sample % 16 {
+                    0 => (format!("check {v}"), String::new()),
+                    1 => ("check missing let missing=1".into(), String::new()),
+                    2 => ("let x=1 check x x:int check x".into(), v.to_string()),
+                    3 => ("check defined(x)&&x x:int".into(), v.to_string()),
+                    4 => ("check !defined(x)||x x:int".into(), v.to_string()),
+                    5 => ("check 1||missing".into(), String::new()),
+                    6 => ("check 0&&missing".into(), String::new()),
+                    7 => (format!("a[{n}][0]:int check a"), String::new()),
+                    8 => ("check -0.0".into(), String::new()),
+                    9 => ("check \"\"".into(), String::new()),
+                    10 => ("check \"é\"".into(), String::new()),
+                    11 => (format!("repeat {n} {{x:int check x>0}}"), values),
+                    12 => ("sections {\"A {x:int}\" last {check x}}".into(), format!("A {v}\n")),
+                    13 => ("repeat 1 {sections {\"A {x:int}\" last {check x}}}".into(), format!("A {v}\n")),
+                    14 => ("check 1 check 0 \"second\"".into(), String::new()),
+                    _ => ("x:int check x ignore trailing".into(), format!("{v} tail")),
+                },
+                "implicit records and alignment" => match sample % 16 {
+                    0 => (format!("repeat {n} {{x:int let y=x+1}} check x<y"), values),
+                    1 => ("repeat 3 {k:int repeat k {x:int}} check x>0".into(), "0 1 1 2 1 0".into()),
+                    2 => ("repeat 2 {repeat 2 {x:int} check x>0}".into(), "1 1 1 0".into()),
+                    3 => ("repeat 0 {x:int} check 0&&x>0".into(), String::new()),
+                    4 => ("check x>0 repeat 0 {x:int}".into(), String::new()),
+                    5 => (format!("repeat {n} {{x:int let y=x}} check y&&x"), values),
+                    6 => (format!("repeat {n} {{x:int}} check size((x))=={n}"), values),
+                    7 => (format!("repeat {n} {{a[1]:int}} check count(a)==1"), values),
+                    8 => (format!("repeat {n} {{a[1][0]:int}} check size(a[0])==0"), String::new()),
+                    9 => (format!("repeat {n} as rows {{each row a[2]:int}} check size(row.a)==2"), vec!["1";n*2].join(" ")),
+                    10 => (format!("repeat {n} {{x:int}} check all(v in x:v>0)"), values),
+                    11 => ("check !defined(x)||x>0 repeat 0 {x:int}".into(), String::new()),
+                    12 => ("repeat 2 as rows {k:int if k {repeat 1 as steps {each step let x=1}}} check step.x>0".into(), "0 0".into()),
+                    13 => (format!("repeat {n} as rows {{each row}} check 0&&size(rows)>0"), String::new()),
+                    14 => (format!("repeat {n} {{x:int}} check defined(x)&&count(x)>0"), values),
+                    _ => (format!("repeat {n} {{x:int}} check x[0]>0"), values),
+                },
+                "explicit records and fields" => match sample % 16 {
+                    0 => (format!("repeat {m} as rows {{x:int}} let a=rows[0].x check rows[{}].x", m-1), rows),
+                    1 => (format!("repeat {m} {{each row x:int check row.x}}"), rows),
+                    2 => (format!("repeat {m} as rows {{each row x:int}} check row.x"), rows),
+                    3 => ("repeat 1 as rows {each row let before=row.x x:int}".into(), "7".into()),
+                    4 => ("repeat 1 as rows {each row let before=row.x x:int}".into(), "7".into()),
+                    5 => ("repeat 2 as jobs {k:int if k {repeat 1 as steps {x:int}}} let n=sum(j in jobs:size(j.steps))".into(), "0 1 7".into()),
+                    6 => ("repeat 2 as jobs {k:int if k {repeat 1 as steps {x:int}}} let n=sum(j in jobs:size(j.steps))".into(), "0 0".into()),
+                    7 => (format!("repeat {n} as rows {{}} check size(rows)=={n} && defined(rows)"), String::new()),
+                    8 => ("repeat until \"END\" store _ as _ {} check size(_)==0".into(), "END".into()),
+                    9 => ("repeat 1 as rows {x:int} if rows[0].x {let y=1}".into(), v.to_string()),
+                    10 => ("repeat 1 as rows {x:int} repeat rows[0].x {}".into(), (n as i64).to_string()),
+                    11 => ("repeat 1 as rows {x:int} y:0..rows[0].x".into(), format!("{m} 1")),
+                    12 => ("let n=defined(rows) repeat 0 as rows {} check defined(rows)".into(), String::new()),
+                    13 => ("let v=rows[missing].x repeat 0 as rows {x:int}".into(), String::new()),
+                    14 => ("repeat 1 as jobs {each job repeat 1 as steps {x:int}} let v=jobs[0].steps[0].x".into(), v.to_string()),
+                    _ => ("repeat 1 as jobs {each job let n=size(job.steps) repeat 1 as steps {x:int}}".into(), "7".into()),
+                },
+                "record and array comprehensions" => match sample % 16 {
+                    0 => (format!("a[{n}]:int let x=sum(v in a:v) let y=count(v in a:v) check all(v in a:v)"), values),
+                    1 => (format!("repeat {n} as rows {{x:int}} check any(r in rows:r.x)"), values),
+                    2 => ("a[0]:float let a0=all(v in a:missing) let a1=any(v in a:missing) let a2=sum(v in a:missing) let a3=count(v in a:missing)".into(), String::new()),
+                    3 => (format!("repeat {n} as rows {{x:int}} let s=sum(r in rows:r.x) let c=count(r in rows:r.x)"), values),
+                    4 => ("a[2][2]:int check all(r in a:any(v in r:v))".into(), format!("1 2 0 {v}")),
+                    5 => ("repeat 2 as jobs {repeat 2 as steps {x:int}} check all(j in jobs:all(s in j.steps:s.x))".into(), format!("1 1 1 {v}")),
+                    6 => ("a[1]:int check all(v in a:defined(v)) && !defined(v)".into(), v.to_string()),
+                    7 => ("type v=int a[1]:int let s=sum(v in a:v)".into(), v.to_string()),
+                    8 => ("a[1]:float let s=sum(v in a:v)".into(), "1.0".into()),
+                    9 => ("a[1][0]:int let s=sum(v in a:v)".into(), String::new()),
+                    10 => ("repeat 2 as jobs {repeat 2 as steps {x:int}} check all(j in jobs:all(v in j.x:v))".into(), format!("1 1 1 {v}")),
+                    11 => ("repeat 2 as jobs {each job a[2]:int} let s=sum(j in jobs:sum(j.a))".into(), format!("1 2 3 {v}")),
+                    12 => ("a[1]:int check all(v in a:v) && all(v in a:v)".into(), v.to_string()),
+                    13 => ("a[1]:int check all(v in a[0]:missing)".into(), v.to_string()),
+                    14 => ("repeat 0 as rows {} check all(r in rows:missing)".into(), String::new()),
+                    _ => ("a[2]:int let s=sum(v in a:v) let c=count(v in a:v) let n=size(a)".into(), format!("{v} {m}")),
+                },
+                "witness propagation and labels" => match sample % 16 {
+                    0 => (format!("a[{m}]:int check all(v in a:v)"), (0..m).map(|i|if i==0 {"0"}else{"1"}).collect::<Vec<_>>().join(" ")),
+                    1 => (format!("a[{m}]:int check all(v in a:v)"), (0..m).map(|i|if i+1==m {"0"}else{"1"}).collect::<Vec<_>>().join(" ")),
+                    2 => ("a[2][2]:int check all(r in a:all(v in r:v))".into(), "1 1 1 0".into()),
+                    3 => ("a[2][2]:int check any(r in a:all(v in r:v))".into(), "0 1 1 0".into()),
+                    4 => ("a[2]:int check !all(v in a:v)".into(), "1 1".into()),
+                    5 => ("a[2]:int check all(v in a:v)==1".into(), "1 0".into()),
+                    6 => ("a[2]:int check all(v in a:v>1)&&all(w in a:w>2)".into(), "1 2".into()),
+                    7 => ("a[2]:int check all(v in a:v>2)||all(w in a:w>1)".into(), "2 1".into()),
+                    8 => ("repeat 2 as jobs {repeat 2 as steps {x:int}} check x".into(), "1 1 1 0".into()),
+                    9 => ("repeat 2 as jobs {repeat 2 {x:int}} check x".into(), "1 1 1 0".into()),
+                    10 => ("repeat 2 {repeat 2 {x:int}} check x".into(), "1 1 1 0".into()),
+                    11 => ("repeat 2 as rows {each row a[2]:int} check all(v in row.a:v)".into(), "1 1 1 0".into()),
+                    12 => ("repeat 2 as rows {a[2]:int} check all(v in rows[1].a:v)".into(), "1 1 1 0".into()),
+                    13 => ("a[2][2]:int check all(r in a:all(v in r:v))".into(), "1 1 0 1".into()),
+                    14 => ("repeat 2 as rows {x:int} check rows[1].x".into(), "1 0".into()),
+                    _ => ("lim[2]:int repeat 2 {x:int} check all(l in lim:x<l)".into(), "5 3 1 4".into()),
+                },
+                "numeric and hard-error precedence" => match sample % 16 {
+                    0 => ("repeat 2 as rows {x:num} check all(r in rows:r.x==9007199254740992)".into(), "9007199254740993 9007199254740992.0".into()),
+                    1 => ("repeat 2 as rows {x:num check x==9007199254740992}".into(), "9007199254740993 9007199254740992.0".into()),
+                    2 => ("check 9007199254740993==9007199254740992.0".into(), String::new()),
+                    3 => ("check 9007199254740993==9007199254740992".into(), String::new()),
+                    4 => ("let z=-0.0 check !z let positive=-z".into(), String::new()),
+                    5 => ("check 9223372036854775807+1".into(), String::new()),
+                    6 => ("check (-9223372036854775807-1)%-1".into(), String::new()),
+                    7 => (format!("repeat {m} {{x:int}} check 1/x"), rows),
+                    8 => ("check 1.0+missing".into(), String::new()),
+                    9 => ("check 1[missing]".into(), String::new()),
+                    10 => ("check distinct(1,1,missing)".into(), String::new()),
+                    11 => ("a[0]:float check sum(a)==0".into(), String::new()),
+                    12 => ("check sum(9223372036854775807,1,-1)".into(), String::new()),
+                    13 => ("check (-2)^63==(-9223372036854775807-1)".into(), String::new()),
+                    14 => ("repeat 2 as rows {x:int} check all(r in rows:1/r.x)".into(), "1 0".into()),
+                    _ => ("check min(1,\"x\")".into(), String::new()),
+                },
+                _ => match sample % 16 {
+                    0 => ("if 1 {}\ncheck 0\nif 1 {}".into(), String::new()),
+                    1 => ("if 1 {\ncheck 0\n}".into(), String::new()),
+                    2 => ("repeat 2 {\nx:int\nif 1 {}\ncheck x\n}".into(), "1 0".into()),
+                    3 => ("comment \"#\" repeat 2 as rows {a:word x:int}\ncheck x".into(), "# c\r\né 1\r\n😀 0".into()),
+                    4 => ("a[2][2]:int\ncheck all(r in a:all(v in r:v))".into(), "1\t2\r\n3 0".into()),
+                    5 => ("sections {\n\"X {x:int}\" {\nif 1 {}\ncheck x\n}\n}".into(), "X 0\n".into()),
+                    6 => ("sections {\"GO\" {repeat 2 {x:int\ncheck x}}}".into(), "GO\n1 0".into()),
+                    7 => ("repeat 1 {sections {\"X {x:int}\" last {if 1 {}\ncheck x}}}".into(), "X 0\n".into()),
+                    8 => ("sections {\"NEED\" \"END\" last {check 1\nif 1 {}}}".into(), "END\n".into()),
+                    9 => ("repeat 1 {if 0 {x:int} check 1 if 1 {}}".into(), String::new()),
+                    10 => ("repeat 2 as rows {x:int}\ncheck rows[1].x".into(), "1 0".into()),
+                    11 => ("repeat 2 as rows {x:int}\ncheck x".into(), "1\n#bad".into()),
+                    12 => ("comment \"#\" repeat 2 as rows {x:int}\ncheck x".into(), "1 # skip\n0\t".into()),
+                    13 => ("repeat 2 as jobs {each job repeat 3 as steps {each step}}\ncheck all(j in jobs:all(s in j.steps:0))".into(), String::new()),
+                    14 => ("x:int\ncheck (\nx>0\n)".into(), v.to_string()),
+                    _ => ("sections {\"END\" last {check 1}}".into(), "END\n".into()),
+                },
+            };
+            assert!(spec.len() <= 32768 && input.len() <= 32768);
+            probes.push(Probe {
+                family,
+                spec,
+                input: input.into_bytes(),
+            });
+        }
+    }
+    assert_eq!(probes.len(), 512);
     probes
 }

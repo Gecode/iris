@@ -2,14 +2,14 @@ use super::*;
 use crate::value::Column;
 use iris_sema::{Possibilities, ValueType};
 
-pub(super) struct RepeatState {
+pub(crate) struct RepeatState {
     node: SyntaxNode,
     pub body: SyntaxNode,
     mode: Mode,
     columns: Vec<(String, Column)>,
-    row: usize,
+    pub row: usize,
     before: Option<usize>,
-    occurrence: usize,
+    pub occurrence: usize,
 }
 enum Mode {
     Count(usize),
@@ -29,23 +29,35 @@ impl RepeatState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-struct RecordId {
-    occurrence: usize,
-    row: usize,
+pub(crate) struct RecordId {
+    pub occurrence: usize,
+    pub row: usize,
 }
-struct RecordList {
-    starts: Vec<Position>,
-    complete: bool,
+pub(crate) struct RecordList {
+    pub repeat: RepeatId,
+    pub parent: Option<RecordId>,
+    pub starts: Vec<Position>,
+    pub complete: bool,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct MarkerSubtree {
+    pub target: RepeatId,
+    pub next: RepeatId,
+    pub parent: Option<RecordId>,
 }
 #[derive(Default)]
-pub(super) struct RecordLists {
-    lists: Vec<RecordList>,
-    occurrences: HashMap<(RepeatId, Option<RecordId>), usize>,
+pub(crate) struct RecordLists {
+    pub lists: Vec<RecordList>,
+    pub active: HashMap<RepeatId, RecordId>,
+    pub occurrences: HashMap<(RepeatId, Option<RecordId>), usize>,
+    pub marker_counts: std::cell::RefCell<HashMap<MarkerSubtree, usize>>,
 }
 impl RecordLists {
     fn begin(&mut self, repeat: RepeatId, parent: Option<RecordId>) -> usize {
         let index = self.lists.len();
         self.lists.push(RecordList {
+            repeat,
+            parent,
             starts: vec![],
             complete: false,
         });
@@ -168,6 +180,13 @@ impl Interpreter<'_, '_> {
         let start = self.input.next_data_position();
         let repeat = self.repeats.last_mut().expect("active repeat");
         self.records.lists[repeat.occurrence].starts.push(start);
+        self.records.active.insert(
+            self.records.lists[repeat.occurrence].repeat,
+            RecordId {
+                occurrence: repeat.occurrence,
+                row: repeat.row,
+            },
+        );
         repeat.before = Some(self.input.position().offset);
         self.frames.push(Frame::default());
         self.contexts
@@ -200,6 +219,9 @@ impl Interpreter<'_, '_> {
         self.contexts.pop();
         let repeat = self.repeats.last_mut().expect("active repeat");
         repeat.columns = columns;
+        self.records
+            .active
+            .remove(&self.records.lists[repeat.occurrence].repeat);
         repeat.row += 1;
         repeat.before = None;
         let node = repeat.node.clone();

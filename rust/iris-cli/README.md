@@ -129,9 +129,9 @@ single-byte message can be invalid Unicode and cannot always be reproduced
 byte for byte in canonical JSON. Codes and locations follow the Specification.
 
 The `read_conformance` progress test discovers both case roots, validates the
-exact pending list and its rust-007 through rust-010 owners, and excludes those
+exact pending list and its rust-008 through rust-010 owners, and excludes those
 paths before driver invocation. Newly discovered cases run automatically.
-The selection is 606 cases (155 parse, 451 read), with 326 pending;
+The selection is 717 cases (155 parse, 562 read), with 215 pending;
 counts follow inventory changes. No known-failure driver ID is used.
 
 ```sh
@@ -140,7 +140,8 @@ cargo test --locked -p iris-cli --test read_conformance -- --nocapture
 
 The ignored differential test runs 256 bounded scalar probes with fixed seed
 73003, 384 array/read probes with seed 73004, 384 repeat probes with seed
-73005, and 384 line/sections probes with seed 73006. Both drivers are decoded
+73005, 384 line/sections probes with seed 73006, and 512 checks probes with seed
+73007 (1,920 total). Both drivers are decoded
 through the independent canonical validator. Scalar probes cover input spellings,
 arithmetic boundaries, frozen types, settings, control flow, functions,
 comparisons, and error order. Array/read probes cover ranks 1–4, zeros,
@@ -163,3 +164,12 @@ run from `rust/`:
 adapter=$(../conformance/adapters/gecode/build.sh)
 GECODE_ADAPTER="$adapter" cargo test --locked -p iris-cli --test scalar_differential -- --ignored --nocapture
 ```
+
+Checks execute immediately outside instances. False checks report a saved
+record start when a record witness exists, the current input cursor otherwise,
+and a path of lifted indices followed by retained `all` indices. Hard errors
+inside checks retain a null path. The CLI location table asserts all 33 pinned
+probes beyond conformance's primary comparison, including source lines, raw
+spans, contexts, empty bodies, Unicode byte positions, and explicit selections.
+Deep checks exercise both user and driver routes at parser admission limits
+and on 16,384-dimensional values without recursive JSON decoding.

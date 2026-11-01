@@ -192,19 +192,17 @@ impl Value {
     }
 }
 impl<'a> ValueRef<'a> {
-    pub(crate) fn leaf_range(self) -> std::ops::Range<usize> {
-        let mut rows = self.row..self.row + 1;
-        for level in &self.value.levels[self.level..] {
-            rows = level.offsets[rows.start]..level.offsets[rows.end];
-        }
-        rows
-    }
+    #[cfg(test)]
     pub(crate) fn to_owned(self) -> Value {
+        self.copy_with(|_| {})
+    }
+    pub(crate) fn copy_with(self, mut copied: impl FnMut(usize)) -> Value {
         let mut rows = self.row..self.row + 1;
         let mut levels = vec![];
         for level in &self.value.levels[self.level..] {
             let start = level.offsets[rows.start];
             let end = level.offsets[rows.end];
+            copied(rows.len() + 1);
             levels.push(ArrayLevel {
                 offsets: level.offsets[rows.start..=rows.end]
                     .iter()
@@ -213,6 +211,7 @@ impl<'a> ValueRef<'a> {
             });
             rows = start..end;
         }
+        copied(rows.len());
         let leaves = match &self.value.leaves {
             LeafStorage::Int(v) => LeafStorage::Int(v[rows].to_vec()),
             LeafStorage::Float(v) => LeafStorage::Float(v[rows].to_vec()),

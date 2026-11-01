@@ -512,3 +512,593 @@ fn deeply_nested_repeats_respect_parser_admission() {
         }
     }
 }
+
+#[test]
+fn check_locations_contexts_paths_and_spans() {
+    // Pinned location probes also check the fields omitted by differential equality.
+    let probes = [
+        (
+            r####"bare-check"####,
+            r####"check 0 "plain""####,
+            r####""####,
+            r####"{"code": "E-CHECK-FAILED", "message": "check failed: plain", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 1, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 1, "column": null}, "context": null, "record_path": []}"####,
+        ),
+        (
+            r####"empty-block-check"####,
+            r####"if 1 {}
+check 0
+if 1 {}"####,
+            r####""####,
+            r####"{"code": "E-CHECK-FAILED", "message": "check failed", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 1, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 2, "column": null}, "context": null, "record_path": []}"####,
+        ),
+        (
+            r####"bare-block-check"####,
+            r####"if 1 {
+check 0
+}"####,
+            r####""####,
+            r####"{"code": "E-CHECK-FAILED", "message": "check failed", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 1, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 2, "column": null}, "context": null, "record_path": []}"####,
+        ),
+        (
+            r####"local-after-empty"####,
+            r####"repeat 2 {
+x:int
+if 1 {}
+check x>0 "positive"
+}"####,
+            r####"1 0"####,
+            r####"{"code": "E-CHECK-FAILED", "message": "check failed: positive", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 1, "column": 4}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 4, "column": null}, "context": "repeat [2 of 2]", "record_path": []}"####,
+        ),
+        (
+            r####"lifted-named"####,
+            r####"repeat 2 as rows {x:int}
+if 1 {}
+check x>0"####,
+            r####"1 0"####,
+            r####"{"code": "E-CHECK-FAILED", "message": "check failed for record 2 of 'rows'", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 1, "column": 3}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 3, "column": null}, "context": null, "record_path": [1]}"####,
+        ),
+        (
+            r####"lifted-unnamed-asymmetric"####,
+            r####"repeat 3 {repeat 2 {x:int}}
+check x>0"####,
+            r####"1 2 3 4 5 0"####,
+            r####"{"code": "E-CHECK-FAILED", "message": "check failed for record 2 of record 3 of 'x'", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 1, "column": 11}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 2, "column": null}, "context": null, "record_path": [2, 1]}"####,
+        ),
+        (
+            r####"mixed-witness"####,
+            r####"lim[2]:int repeat 2 {x:int}
+check all(l in lim:x<l)"####,
+            r####"5 3 1 4"####,
+            r####"{"code": "E-CHECK-FAILED", "message": "check failed for element 2 of 'lim' in record 2 of 'x'", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 1, "column": 7}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 2, "column": null}, "context": null, "record_path": [1, 1]}"####,
+        ),
+        (
+            r####"array-cursor"####,
+            r####"a[2][3]:int
+check all(r in a:all(x in r:x>0))"####,
+            r####"1 2 3
+4 5 0"####,
+            r####"{"code": "E-CHECK-FAILED", "message": "check failed for element 3 of 'r' in element 2 of 'a'", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 2, "column": 6}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 2, "column": null}, "context": null, "record_path": [1, 2]}"####,
+        ),
+        (
+            r####"explicit-index-direct"####,
+            r####"repeat 2 as rows {x:int}
+check rows[1].x>0"####,
+            r####"1 0"####,
+            r####"{"code": "E-CHECK-FAILED", "message": "check failed", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 1, "column": 4}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 2, "column": null}, "context": null, "record_path": []}"####,
+        ),
+        (
+            r####"explicit-index-all"####,
+            r####"repeat 2 as jobs {repeat 2 as steps {x:int}}
+check all(s in jobs[1].steps:s.x>0)"####,
+            r####"1 2 3 0"####,
+            r####"{"code": "E-CHECK-FAILED", "message": "check failed for record 2 of 'steps'", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 1, "column": 7}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 2, "column": null}, "context": null, "record_path": [1]}"####,
+        ),
+        (
+            r####"hard-inside-check"####,
+            r####"repeat 2 {x:int}
+check 1/x>0"####,
+            r####"1 0"####,
+            r####"{"code": "E-DIVISION-ZERO", "message": "division by zero", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 1, "column": 4}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 2, "column": null}, "context": null, "record_path": null}"####,
+        ),
+        (
+            r####"all-recognized-field"####,
+            r####"repeat 2 as jobs {repeat 2 as steps {x:int}}
+check all(j in jobs:all(v in j.x:v>0))"####,
+            r####"1 2 3 0"####,
+            r####"{"code": "E-CHECK-FAILED", "message": "check failed for record 2 of 'steps' in record 2 of 'jobs'", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 1, "column": 7}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 2, "column": null}, "context": null, "record_path": [1, 1]}"####,
+        ),
+        (
+            r####"section-check"####,
+            r####"sections {
+"X {x:int}" {
+if 1 {}
+check x>0 "positive"
+}
+}"####,
+            r####"X 0
+"####,
+            r####"{"code": "E-CHECK-FAILED", "message": "check failed: positive", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 1, "column": 4}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 4, "column": null}, "context": "section \"X {x:int}\"", "record_path": []}"####,
+        ),
+        (
+            r####"section-repeat-check"####,
+            r####"sections {
+"GO" {
+repeat 2 {
+x:int
+if 1 {}
+check x>0
+}
+}
+}"####,
+            r####"GO
+1 0"####,
+            r####"{"code": "E-CHECK-FAILED", "message": "check failed", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 2, "column": 4}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 6, "column": null}, "context": "section \"GO\" > repeat [2 of 2]", "record_path": []}"####,
+        ),
+        (
+            r####"repeat-section-check"####,
+            r####"repeat 1 {
+sections {
+"X {x:int}" last {
+if 1 {}
+check x>0
+}
+}
+}"####,
+            r####"X 0
+"####,
+            r####"{"code": "E-CHECK-FAILED", "message": "check failed", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 1, "column": 4}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 5, "column": null}, "context": "repeat [1 of 1] > section \"X {x:int}\"", "record_path": []}"####,
+        ),
+        (
+            r####"section-check-hard"####,
+            r####"sections {
+"X {x:int}" last {
+if 1 {}
+check 1/x
+}
+}"####,
+            r####"X 0
+"####,
+            r####"{"code": "E-DIVISION-ZERO", "message": "division by zero", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 1, "column": 4}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 4, "column": null}, "context": "section \"X {x:int}\"", "record_path": null}"####,
+        ),
+        (
+            r####"empty-last-after-check"####,
+            r####"sections {
+"NEED"
+"END" last {
+check 1
+if 1 {}
+}
+}"####,
+            r####"END
+"####,
+            r####"{"code": "E-LINE-MATCH", "message": "expected a line matching \"NEED\" before the line matching \"END\"", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 1, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 5, "column": null}, "context": null, "record_path": null}"####,
+        ),
+        (
+            r####"bare-last-after-check"####,
+            r####"sections {
+"NEED"
+"END" last {
+if 1 {check 1}
+if 1 {}
+}
+}"####,
+            r####"END
+"####,
+            r####"{"code": "E-LINE-MATCH", "message": "expected a line matching \"NEED\" before the line matching \"END\"", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 1, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 5, "column": null}, "context": null, "record_path": null}"####,
+        ),
+        (
+            r####"empty-body-after-check"####,
+            r####"repeat 1 {
+if 0 {x:int}
+check 1
+if 1 {}
+}"####,
+            r####""####,
+            r####"{"code": "E-REPEAT-MISSING", "message": "'x' is defined in no repetition", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 1, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 1, "column": null}, "context": null, "record_path": null}"####,
+        ),
+        (
+            r####"unicode-crlf-record"####,
+            r####"comment "#" repeat 2 as rows {a:word x:int}
+check x>0"####,
+            r####"# c
+é 1
+😀 0"####,
+            r####"{"code": "E-CHECK-FAILED", "message": "check failed for record 2 of 'rows'", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 3, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 2, "column": null}, "context": null, "record_path": [1]}"####,
+        ),
+        (
+            r####"absent-nested-list"####,
+            r####"repeat 2 as jobs {k:int if k {repeat 1 as steps {x:int}}}
+let n=sum(j in jobs:size(j.steps))"####,
+            r####"0 1 7"####,
+            r####"{"iris": "0.1", "entries": [{"name": "k", "type": "int", "depth": 1, "value": [0, 1]}, {"name": "x", "type": "int", "depth": 2, "value": [[], [7]]}, {"name": "n", "type": "int", "depth": 0, "value": 1}]}"####,
+        ),
+        (
+            r####"never-nested-list"####,
+            r####"repeat 2 as jobs {k:int if k {repeat 1 as steps {x:int}}}
+let n=sum(j in jobs:size(j.steps))"####,
+            r####"0 0"####,
+            r####"{"iris": "0.1", "entries": [{"name": "k", "type": "int", "depth": 1, "value": [0, 0]}, {"name": "x", "type": "int", "depth": 2, "value": [[], []]}, {"name": "n", "type": "int", "depth": 0, "value": 0}]}"####,
+        ),
+        (
+            r####"absent-nested-each"####,
+            r####"repeat 2 as jobs {k:int if k {repeat 1 as steps {each step let z=1}}}
+check step.z>0"####,
+            r####"0 0"####,
+            r####"{"iris": "0.1", "entries": [{"name": "k", "type": "int", "depth": 1, "value": [0, 0]}, {"name": "z", "type": "int", "depth": 2, "value": [[], []]}]}"####,
+        ),
+        (
+            r####"empty-nested-records"####,
+            r####"repeat 2 as jobs {each job repeat 3 as steps {each step}}
+check all(j in jobs:all(s in j.steps:0))"####,
+            r####""####,
+            r####"{"code": "E-CHECK-FAILED", "message": "check failed for record 1 of 'steps' in record 1 of 'jobs'", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 1, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 2, "column": null}, "context": null, "record_path": [0, 0]}"####,
+        ),
+        (
+            r####"current-outer-before-inner"####,
+            r####"repeat 1 as jobs {each job let before=job.x repeat 1 {x:int}}"####,
+            r####"7"####,
+            r####"{"code": "E-NAME-UNDEFINED", "message": "'x' is not defined yet", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 1, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 1, "column": null}, "context": "repeat [1 of 1]", "record_path": null}"####,
+        ),
+        (
+            r####"all-error-clears-path"####,
+            r####"repeat 2 as rows {x:int}
+check all(r in rows:1/r.x)"####,
+            r####"1 0"####,
+            r####"{"code": "E-DIVISION-ZERO", "message": "division by zero", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 1, "column": 4}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 2, "column": null}, "context": null, "record_path": null}"####,
+        ),
+        (
+            r####"and-first"####,
+            r####"a[2]:int
+check all(x in a:x>1)&&all(y in a:y>2)"####,
+            r####"1 2"####,
+            r####"{"code": "E-CHECK-FAILED", "message": "check failed for element 1 of 'a'", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 1, "column": 4}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 2, "column": null}, "context": null, "record_path": [0]}"####,
+        ),
+        (
+            r####"or-last"####,
+            r####"a[2]:int
+check all(x in a:x>2)||all(y in a:y>1)"####,
+            r####"2 1"####,
+            r####"{"code": "E-CHECK-FAILED", "message": "check failed for element 2 of 'a'", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 1, "column": 4}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 2, "column": null}, "context": null, "record_path": [1]}"####,
+        ),
+        (
+            r####"list-index-before-availability"####,
+            r####"let v=rows[missing].x repeat 0 as rows {x:int}"####,
+            r####""####,
+            r####"{"code": "E-NAME-UNDEFINED", "message": "'rows' is not defined yet", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 1, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 1, "column": null}, "context": null, "record_path": null}"####,
+        ),
+        (
+            r####"list-index-type-before-availability"####,
+            r####"let v=rows[0.0].x repeat 0 as rows {x:int}"####,
+            r####""####,
+            r####"{"code": "E-NAME-UNDEFINED", "message": "'rows' is not defined yet", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 1, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 1, "column": null}, "context": null, "record_path": null}"####,
+        ),
+        (
+            r####"list-index-unavailable"####,
+            r####"let v=rows[0].x repeat 0 as rows {x:int}"####,
+            r####""####,
+            r####"{"code": "E-NAME-UNDEFINED", "message": "'rows' is not defined yet", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 1, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 1, "column": null}, "context": null, "record_path": null}"####,
+        ),
+        (
+            r####"current-outer-fallback"####,
+            r####"let x=9 repeat 1 as jobs {each job let v=job.x x:int}"####,
+            r####"7"####,
+            r####"{"code": "E-SPEC-FIELD", "message": "'x' is defined inside and outside the repeat of 'jobs', so it cannot be a field of its records", "input_location": null, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 1, "column": null}, "context": null, "record_path": null}"####,
+        ),
+        (
+            r####"before-nested-list"####,
+            r####"repeat 1 as jobs {each job let v=size(job.steps) repeat 1 as steps {x:int}}"####,
+            r####"7"####,
+            r####"{"code": "E-NAME-UNDEFINED", "message": "'steps' is not defined yet", "input_location": {"origin": "/tmp/iris-zdev/rust-007-probe-input.txt", "line": 1, "column": 1}, "spec_location": {"origin": "/tmp/iris-zdev/rust-007-probe.iris", "line": 1, "column": null}, "context": "repeat [1 of 1]", "record_path": null}"####,
+        ),
+    ];
+    for (name, source, bytes, expected) in probes {
+        let (dir, path) = fixture(source.as_bytes());
+        let input = dir.path().join("input.bin");
+        std::fs::write(&input, bytes).unwrap();
+        let input = input.to_str().unwrap();
+        let expected: serde_json::Value = serde_json::from_str(expected).unwrap();
+        if expected.get("code").is_some() && expected["input_location"].is_null() {
+            let iris_core::Failure::Language(error) =
+                iris_core::Spec::parse(source.as_bytes(), &path).unwrap_err()
+            else {
+                panic!("{name}: language error")
+            };
+            assert_eq!(error.code.as_str(), expected["code"].as_str().unwrap());
+            let output = driver(&["read", &path, input]);
+            let actual: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert_eq!(actual["code"], expected["code"], "{name}");
+            assert_eq!(actual["message"], expected["message"], "{name}");
+            assert_eq!(
+                actual["input_location"], expected["input_location"],
+                "{name}"
+            );
+            assert_eq!(actual["context"], expected["context"], "{name}");
+            assert_eq!(actual["record_path"], expected["record_path"], "{name}");
+            assert_eq!(
+                actual["spec_location"]["line"], expected["spec_location"]["line"],
+                "{name}"
+            );
+            continue;
+        }
+        let spec = iris_core::Spec::parse(source.as_bytes(), &path).unwrap();
+        let result = spec.read(bytes.as_bytes(), input, &iris_core::Params::new());
+        let output = driver(&["read", &path, input]);
+        assert!(output.stderr.is_empty(), "{name}: {output:?}");
+        let actual: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        if expected.get("code").is_none() {
+            assert_eq!(output.status.code(), Some(0), "{name}");
+            assert_eq!(actual, expected, "{name}");
+            assert!(result.is_ok(), "{name}");
+            continue;
+        }
+        assert_eq!(output.status.code(), Some(1), "{name}");
+        for field in ["code", "message", "context", "record_path"] {
+            assert_eq!(actual[field], expected[field], "{name}: {field}");
+        }
+        for location in ["spec_location", "input_location"] {
+            for field in ["line", "column"] {
+                assert_eq!(
+                    actual[location][field], expected[location][field],
+                    "{name}: {location}.{field}"
+                );
+            }
+        }
+        let iris_core::Failure::Language(error) = result.unwrap_err() else {
+            panic!("{name}: language error")
+        };
+        assert_eq!(
+            error.record_path().map(|p| p.to_vec()),
+            serde_json::from_value::<Option<Vec<usize>>>(expected["record_path"].clone()).unwrap(),
+            "{name}"
+        );
+        let spec_line = expected["spec_location"]["line"].as_u64().unwrap() as usize;
+        let start = usize::from(error.spec_span().unwrap().start());
+        assert_eq!(
+            source[..start].bytes().filter(|&b| b == b'\n').count() + 1,
+            spec_line,
+            "{name}"
+        );
+        if matches!(
+            error.code,
+            iris_core::ErrorCode::CheckFailed | iris_core::ErrorCode::DivisionZero
+        ) {
+            let parsed =
+                iris_syntax::parse(source.as_bytes(), &path, iris_syntax::LanguageVersion::V0_1)
+                    .unwrap();
+            let node = parsed
+                .syntax()
+                .descendants()
+                .find(|node| {
+                    node.kind() == iris_syntax::SyntaxKind::Check
+                        && source[..usize::from(node.text_range().start())]
+                            .bytes()
+                            .filter(|&b| b == b'\n')
+                            .count()
+                            + 1
+                            == spec_line
+                })
+                .unwrap();
+            assert_eq!(
+                error.spec_span(),
+                Some(node.text_range()),
+                "{name}: complete check statement span"
+            );
+        }
+        let line = expected["input_location"]["line"].as_u64().unwrap() as usize;
+        let column = expected["input_location"]["column"].as_u64().unwrap() as usize;
+        let offset = bytes
+            .split_inclusive('\n')
+            .take(line - 1)
+            .map(str::len)
+            .sum::<usize>()
+            + column
+            - 1;
+        assert_eq!(error.input_span().unwrap().bytes, offset..offset, "{name}");
+        let output = check(&["read", &path, input, "--json"]);
+        assert_eq!(output.status.code(), Some(1), "{name}");
+        assert!(output.stdout.is_empty(), "{name}");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(stderr.contains('^'), "{name}: {stderr}");
+        assert!(
+            stderr.contains(&format!("spec: {path}:{spec_line}")),
+            "{name}: {stderr}"
+        );
+    }
+    let spec = iris_core::Spec::parse(
+        b"repeat 2 as rows {x:int} check all(r in rows:r.x>0)",
+        "spec",
+    )
+    .unwrap();
+    for input in [b"1 0", b"1 2", b"0 1", b"3 4"] {
+        let result = spec.read(input, "input", &iris_core::Params::new());
+        assert_eq!(result.is_ok(), input == b"1 2" || input == b"3 4");
+    }
+}
+
+#[test]
+fn deeply_nested_checks_respect_parser_admission() {
+    for mixed in [false, true] {
+        for levels in [256, 4096] {
+            for truth in [0, 1] {
+                let mut source = String::new();
+                let mut suffix = String::new();
+                let mut input = String::new();
+                for level in 0..levels {
+                    if mixed && level % 2 == 1 {
+                        source.push_str("sections {\"A\" last {");
+                        suffix.push_str("}}");
+                        input.push_str("A\n");
+                    } else {
+                        source.push_str("repeat 1 {");
+                        suffix.push('}');
+                    }
+                }
+                source.push_str(&format!("check {truth}"));
+                source.extend(suffix.chars().rev());
+                let (dir, path) = fixture(source.as_bytes());
+                let input_path = dir.path().join("input.bin");
+                std::fs::write(&input_path, input).unwrap();
+                let input = input_path.to_str().unwrap();
+                for output in [
+                    check(&["read", &path, input, "--json"]),
+                    driver(&["read", &path, input]),
+                ] {
+                    assert_eq!(
+                        output.status.code(),
+                        Some(i32::from(levels == 4096 || truth == 0)),
+                        "{output:?}"
+                    );
+                    let diagnostic = format!(
+                        "{}{}",
+                        String::from_utf8_lossy(&output.stdout),
+                        String::from_utf8_lossy(&output.stderr)
+                    );
+                    if levels == 4096 {
+                        assert!(
+                            diagnostic.contains("blocks are nested too deeply"),
+                            "{diagnostic}"
+                        );
+                    } else if truth == 0 {
+                        assert!(diagnostic.contains("check failed"), "{diagnostic}");
+                    } else {
+                        assert_eq!(output.stdout, b"{\"iris\":\"0.1\",\"entries\":[]}\n");
+                    }
+                }
+            }
+        }
+    }
+    println!(
+        "Checks execute at 256 admitted bodies, including mixed repeat/sections; 4096 bodies reject cleanly"
+    );
+    let mut largest = 0;
+    for depth in [16, 32, 64, 128, 254, 255, 256, 4096] {
+        let mut source = (0..depth)
+            .map(|i| format!("repeat 1 as rows{i} {{"))
+            .collect::<String>();
+        source.push_str(&"}".repeat(depth));
+        source.push_str("check ");
+        for i in 0..depth {
+            source.push_str(&format!(
+                "all(r{i} in {}: ",
+                if i == 0 {
+                    "rows0".into()
+                } else {
+                    format!("r{}.rows{i}", i - 1)
+                }
+            ));
+        }
+        source.push('0');
+        source.push_str(&")".repeat(depth));
+        let (dir, path) = fixture(source.as_bytes());
+        let input = dir.path().join("input.bin");
+        std::fs::write(&input, []).unwrap();
+        let input = input.to_str().unwrap();
+        let parsed = check(&["check", &path]);
+        if parsed.status.success() {
+            largest = depth;
+        }
+        for output in [
+            check(&["read", &path, input, "--json"]),
+            driver(&["read", &path, input]),
+        ] {
+            assert_eq!(output.status.code(), Some(1), "{output:?}");
+            let diagnostic = format!(
+                "{}{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            if parsed.status.success() {
+                assert!(diagnostic.contains("check failed"), "{diagnostic}");
+            } else {
+                assert!(diagnostic.contains("nested too deeply"), "{diagnostic}");
+            }
+        }
+    }
+    assert!(largest >= 64);
+    println!("Largest tested admitted nested record comprehension: {largest}");
+    for depth in [255, 4096] {
+        let source = format!("check {}0{}", "(".repeat(depth), ")".repeat(depth));
+        let (dir, path) = fixture(source.as_bytes());
+        let input = dir.path().join("input.bin");
+        std::fs::write(&input, []).unwrap();
+        let input = input.to_str().unwrap();
+        for output in [
+            check(&["read", &path, input, "--json"]),
+            driver(&["read", &path, input]),
+        ] {
+            assert_eq!(output.status.code(), Some(1), "{output:?}");
+            let diagnostic = format!(
+                "{}{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert!(
+                diagnostic.contains(if depth == 4096 {
+                    "expressions are nested too deeply"
+                } else {
+                    "check failed"
+                }),
+                "{diagnostic}"
+            );
+        }
+    }
+    for repeats in [0, 256] {
+        for (dimensions, value, condition) in [
+            (
+                "[1]".repeat(16384),
+                "7",
+                "sum(a)==7 && sum(a[0])==7 && all(r in a:sum(r)==7)",
+            ),
+            (
+                format!("[0]{}", "[1]".repeat(16383)),
+                "",
+                "sum(a)==0 && all(r in a:sum(r)==0)",
+            ),
+        ] {
+            let source = format!(
+                "{}a{dimensions}:int{} check {condition}",
+                "repeat 1 {".repeat(repeats),
+                "}".repeat(repeats)
+            );
+            let (dir, path) = fixture(source.as_bytes());
+            let input = dir.path().join("input.bin");
+            std::fs::write(&input, value).unwrap();
+            let input = input.to_str().unwrap();
+            for output in [
+                check(&["read", &path, input, "--json"]),
+                driver(&["read", &path, input]),
+            ] {
+                assert_eq!(output.status.code(), Some(0), "{output:?}");
+                let depth = 16384 + repeats;
+                let array = if value.is_empty() {
+                    format!("{}[]{}", "[".repeat(repeats), "]".repeat(repeats))
+                } else {
+                    format!("{}7{}", "[".repeat(depth), "]".repeat(depth))
+                };
+                assert_eq!(
+                    String::from_utf8(output.stdout).unwrap(),
+                    format!(
+                        "{{\"iris\":\"0.1\",\"entries\":[{{\"name\":\"a\",\"type\":\"int\",\"depth\":{depth},\"value\":{array}}}]}}\n"
+                    )
+                );
+            }
+        }
+        let source = format!(
+            "{}a{}:int{} check all(r in a:0)",
+            "repeat 1 {".repeat(repeats),
+            "[1]".repeat(16384),
+            "}".repeat(repeats)
+        );
+        let (dir, path) = fixture(source.as_bytes());
+        let input = dir.path().join("input.bin");
+        std::fs::write(&input, "7").unwrap();
+        let input = input.to_str().unwrap();
+        let output = driver(&["read", &path, input]);
+        assert_eq!(output.status.code(), Some(1), "{output:?}");
+        let error: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(error["record_path"], serde_json::json!([0]));
+        let output = check(&["read", &path, input, "--json"]);
+        assert_eq!(output.status.code(), Some(1));
+        assert!(output.stdout.is_empty());
+    }
+}

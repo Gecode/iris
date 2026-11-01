@@ -54,7 +54,7 @@ cargo test --locked -p iris-cli --test parse_conformance -- --nocapture
 The parse integration test loads the whole version tree and selects parse cases.
 The progress test discovers both the conformance tree and `formats`,
 then excludes the exact cases in `iris-cli/tests/pending-cases.txt` before
-invoking any driver. Every pending case names its later owner (rust-007 through
+invoking any driver. Every pending case names its later owner (rust-008 through
 rust-010); newly discovered cases run by default. Catalog and dzn remain
 unsupported (exit 2), as do reached execution features owned by later tasks.
 
@@ -114,3 +114,11 @@ The first two exit 0; the third intentionally exits 1 and demonstrates failure
 reports and a stale known-failure annotation. All fixtures remain under the
 crate's tests directory. Another implementation needs only to supply the four
 protocol commands; it does not need to link this library.
+
+Checks and structural record expressions are implemented. The progress gate
+selects 717 cases (155 parse and 562 read), with 215 pending cases owned by
+rust-008/009/010. Expression and lifted traversal use iterative borrowed views;
+false-check diagnostics retain witness paths and saved record positions.
+The differential test adds 512 Checks probes at seed 73007 to the existing
+1,408 probes. See the [core README](iris-core/README.md) for the complexity
+regressions and separate read/evaluator doubling measurements.

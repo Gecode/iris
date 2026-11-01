@@ -12,6 +12,9 @@ pub enum ErrorCode {
     RangeBounds,
     TypeUndefined,
     NameUndefined,
+    CheckFailed,
+    CheckRecords,
+    FieldUndefined,
     IntegerType,
     ComparisonType,
     DivisionZero,
@@ -48,6 +51,9 @@ impl ErrorCode {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Spec(code) => code.as_str(),
+            Self::CheckFailed => "E-CHECK-FAILED",
+            Self::CheckRecords => "E-CHECK-RECORDS",
+            Self::FieldUndefined => "E-FIELD-UNDEFINED",
             Self::LineMatch => "E-LINE-MATCH",
             Self::FindMatch => "E-FIND-MATCH",
             Self::SkipEof => "E-SKIP-EOF",

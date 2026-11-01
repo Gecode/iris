@@ -34,7 +34,10 @@ sections select arms in declaration order with optional/last arms, terminators,
 stores and skip-other handling. Settings execute in statement order.
 The evaluator supports if/else and let, scalar operators and comparisons,
 array truth, flattened integer aggregates, size/count, indexing, and ordinary
-array comprehensions with scoped bindings. Integers use checked 64-bit
+array and record-list comprehensions with scoped bindings. Checks run where
+written and align lifted columns or logical record markers in record order.
+Structural `as`/`each` names support current records, list indexing, nested
+lists, and borrowed ordinary fields, including completed empty lists. Integers use checked 64-bit
 arithmetic. Numeric reads promote the complete value before applying offsets.
 Whole-input UTF-8 validation follows unknown-parameter admission; consumed
 word/rest values are validated again after byte-wise tokenization.
@@ -44,8 +47,10 @@ Values store typed contiguous leaves and cumulative offsets for each array
 level, preserving ragged rows, empty arrays, value types, and depths.
 `Data::value(name, path)` selects a borrowed value; `int(name)` reads an
 integer scalar, and `ints(name, path)` returns a borrowed integer row.
-Expression indexing copies the selected subtree and rebases its offsets;
-let owns its result before replacing an entry. Accessor misuse returns
+Expression evaluation retains borrowed row views internally; only a result
+stored by a statement copies its selected subtree and rebases its offsets.
+Comprehension bindings use semantic definition identities, and free names
+are cached only while the value frames remain unchanged. Accessor misuse returns
 `AccessError`, separate from language failures.
 
 `Failure` distinguishes language `Error`, host acquisition/resource failures,
@@ -56,7 +61,10 @@ renders the canonical error envelope. Data JSON uses shortest round-tripping
 float digits with the Specification's notation choice and signed-zero rule.
 
 Repeat and sections execution use an explicit work stack for blocks,
-conditionals and nested bodies. Pattern metadata is decoded once per `Spec`;
+conditionals and nested bodies. Expressions use a continuation stack; check
+traversal, record selection, marker summaries, and witness links are iterative.
+Model ranges are indexed once per `Spec`. Row selections retain parent cursors
+and lazy leaf boundaries instead of reconstructing values or paths. Pattern metadata is decoded once per `Spec`;
 matching borrows one prepared physical line for every candidate arm. Failed
 candidates publish nothing, and selected captures validate strings before
 publishing names and checking ranges. Positions use incremental cursor and
@@ -65,8 +73,13 @@ parent/row identities independently of field values; `as` and `each` create no e
 Column construction and JSON writing iterate over flat array levels, including
 arrays whose depth exceeds the parser's block-nesting limit.
 
-Later tasks add checks and record expressions (rust-007), parameter execution
-and instances/catalog (008), budget enforcement (009), and dzn output (010). Supplied parameter
+False checks preserve the check statement range and saved record starts. Their
+paths contain lifted indices followed by retained failed `all` indices; active
+execution indices and explicit record indices are omitted. False checks
+without an indexed witness have `[]`; hard evaluation failures have a null
+path. Successful checks add no data entries.
+
+Later tasks add parameter execution and instances/catalog (008), budget enforcement (009), and dzn output (010). Supplied parameter
 strings are transported and unknown names rejected; declarations/defaults do
 not execute yet. Expression and idle-work hooks are fallible and impose no
 limit. They mark the work events defined by Specification §10.
@@ -82,4 +95,13 @@ Conformance is the main semantic coverage. A focused column-access test checks
 borrowed ragged rows, selected-subtree copying, and empty depth/type
 preservation. The CLI's ignored `scalar_differential` test compares 256 scalar
 and 384 array/read probes, plus 384 repeat probes at seed 73005 and 384
-line/sections probes at seed 73006, with the pinned Gecode adapter; see the [CLI README](../iris-cli/README.md#conformance-driver).
+line/sections probes at seed 73006 and 512 checks probes at seed 73007
+(1,920 total), with the pinned Gecode adapter; see the [CLI README](../iris-cli/README.md#conformance-driver).
+
+The progress gate selects 717 cases (155 parse, 562 read), leaving 215 for
+rust-008/009/010. Core tests cover the new charge events without enforcing
+budgets. `checks_scale_linearly` counts actual dispatches, metadata advances,
+lookups, copies, leaves, and witness links. The ignored release measurement
+`check_doubling_measurements` prints read/collection and evaluator timings
+separately across record count, row width, depth, expression size, and check
+count. It parses each program before measurement.
