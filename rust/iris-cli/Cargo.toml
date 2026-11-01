@@ -18,6 +18,7 @@ name = "iris-driver"
 path = "src/bin/iris-driver.rs"
 
 [dependencies]
+iris-core = { path = "../iris-core" }
 iris-lsp = { path = "../iris-lsp" }
 iris-syntax = { path = "../iris-syntax" }
 iris-sema = { path = "../iris-sema" }

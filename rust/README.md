@@ -1,18 +1,21 @@
 # rust
 
 The Cargo workspace contains the standalone `iris-conformance` runner
-(milestone M2), and three implementation crates for Iris 0.1 (milestone M3):
+(milestone M2), and four implementation crates for Iris 0.1 (milestone M3):
 [iris-syntax](iris-syntax/README.md) owns source validation, the lossless parser,
 and formatting; [iris-sema](iris-sema/README.md) owns parse-time validity,
-resolution, and conservative value facts; [iris-cli](iris-cli/README.md) provides
-`iris check SPEC`, `iris fmt PATH...`, and the `iris-driver parse` conformance command. The runner
+resolution, and conservative value facts; [iris-core](iris-core/README.md) reads
+scalar input, evaluates expressions, and owns column data and canonical JSON;
+[iris-cli](iris-cli/README.md) provides
+`iris check SPEC`, `iris read SPEC FILE --json`, `iris fmt PATH...`, and the
+`iris-driver parse|read` conformance commands. The runner
 uses the [conformance protocol](../conformance/README.md) and has no dependency
 on implementation crates.
 
 [iris-lsp](iris-lsp/README.md) provides `iris lsp`, the stdio language server
 with parse and resolution diagnostics (milestone M4b).
 
-Later work adds `iris-core`, `iris-wasm` and, if built, `iris-lint`,
+Later work adds `iris-wasm` and, if built, `iris-lint`,
 published under `gecode-iris`.
 [PLAN.md §4.2](../PLAN.md#42-the-rust-reference-implementation-is-layered)
 describes the layers; §8.1, §8.7, §8.12 and §8.13 describe the crates. Milestones
@@ -47,9 +50,24 @@ cargo run --locked -p iris-cli -- check path/to/spec.iris
 cargo test --locked -p iris-cli --test parse_conformance -- --nocapture
 ```
 
-The integration test loads the whole version tree and selects cases by their
-operation. Read, catalog, and dzn await `iris-core`; the driver reports them as
-unsupported misuse (exit 2) if invoked directly.
+The parse integration test loads the whole version tree and selects parse cases.
+The scalar progress test discovers both the conformance tree and `formats`,
+then excludes the exact cases in `iris-cli/tests/pending-cases.txt` before
+invoking any driver. Every pending case names its later owner (rust-004 through
+rust-010); newly discovered cases run by default. Catalog and dzn remain
+unsupported (exit 2), as do reached execution features owned by later tasks.
+
+Read scalar input and run the current progress selection:
+
+```sh
+cargo run --locked -p iris-cli -- read path/to/spec.iris path/to/input.txt --json
+cargo test --locked -p iris-cli --test read_conformance -- --nocapture
+```
+
+The interim user command requires exactly one input file and `--json`.
+Later tasks add summary/dzn output, repeated files, and caller parameters.
+The driver already transports ordered string parameters and rejects unknown
+names; parameter declaration execution remains deferred.
 
 Format reader specs in place, preview changes, or format standard input:
 

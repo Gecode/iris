@@ -3,15 +3,17 @@
 The `iris` command and Rust conformance driver, part of milestone M3 in
 [PLAN.md §8.1](../../PLAN.md#81-rust-rust) and the
 [§4.2 layers](../../PLAN.md#42-the-rust-reference-implementation-is-layered).
-The user command checks and formats reader specs; the driver implements
-parse-and-resolve. Neither command reads instance input or executes
-reader-spec expressions, including parameter defaults.
+The user command checks and formats reader specs, reads scalar inputs through
+[iris-core](../iris-core/README.md), and starts the language server. The driver
+implements parse-and-resolve and scalar reading. Parse-only requests never
+execute expressions or parameter defaults.
 
 From `rust/`:
 
 ```sh
 cargo run --locked -p iris-cli -- lsp
 cargo run --locked -p iris-cli -- check path/to/spec.iris
+cargo run --locked -p iris-cli -- read path/to/spec.iris path/to/input.txt --json
 cargo run --locked -p iris-cli -- fmt path/to/spec.iris
 cargo run --locked -p iris-cli -- fmt --check --diff path/to/directory
 cargo run --locked -p iris-cli --bin iris-driver -- parse path/to/spec.iris --version 0.1
@@ -27,6 +29,15 @@ virtual capture lines remain in the header; the excerpt uses the raw source.
 The renderer escapes control characters in diagnostic text and excerpts.
 Usage errors exit 2; file acquisition and resource failures exit 1.
 `iris --version` reports package 0.1.0 and language 0.1.
+
+## Reading scalar input
+
+`iris read SPEC FILE --json` prints the canonical data document. It currently
+requires one input file and `--json`. Runtime language errors exit 1 with an
+input location, bounded excerpt, byte-position caret, and active reader-spec
+line. No partial data is printed. File/serialization failures exit 1; usage
+errors exit 2. Summary output, multiple files, dzn, and repeated `--param`
+options belong to later tasks.
 
 ## Language server
 
@@ -96,7 +107,15 @@ only the parse-success document (exit 0) or a canonical error (exit 1).
 Misuse exits 2 and host failures exit 3, with empty stdout. Parse parameters
 must be an empty JSON object; duplicate members, non-string values, malformed
 Unicode, extra documents, unknown/repeated options, and unsupported versions
-are rejected. The other protocol operations currently exit 2 as unsupported.
+are rejected.
+
+`iris-driver read SPEC INPUT [--params JSON] [--version 0.1]` returns canonical
+data (exit 0) or a canonical language error (exit 1). It buffers output before
+writing stdout. Host failures exit 3; unsupported reached features and misuse
+exit 2, both with empty stdout. Parameters are decoded as ordered string pairs,
+with exact values and duplicate rejection. Unknown names fail before input
+UTF-8 validation. Parameter statements/defaults await rust-008.
+Catalog and dzn operations remain unsupported (exit 2).
 
 The integration test discovers and loads the entire `conformance/cases/0.1`
 tree through the runner library, selects exactly `Operation::Parse`, and gives
@@ -108,3 +127,25 @@ Messages match the pinned reference for ASCII failures. A valid non-ASCII
 character rejected by the lexer is rendered as its Unicode scalar; Gecode's
 single-byte message can be invalid Unicode and cannot always be reproduced
 byte for byte in canonical JSON. Codes and locations follow the Specification.
+
+The `read_conformance` progress test discovers both case roots, validates the
+exact pending list and its rust-004 through rust-010 owners, and excludes those
+paths before driver invocation. Newly discovered cases run automatically.
+The initial selection is 320 cases (155 parse, 165 read), with 612 pending;
+counts follow inventory changes. No known-failure driver ID is used.
+
+```sh
+cargo test --locked -p iris-cli --test read_conformance -- --nocapture
+```
+
+The ignored scalar differential test runs 256 bounded probes with fixed seed
+73003, decoding both drivers through the independent canonical validator.
+It covers scalar input spellings, arithmetic boundaries, frozen types, settings,
+control flow, functions, comparisons, and error order. It preserves a temporary
+reproducer and prints commands on the first mismatch. Build the pinned adapter
+from the repository root, then run from `rust/`:
+
+```sh
+adapter=$(../conformance/adapters/gecode/build.sh)
+GECODE_ADAPTER="$adapter" cargo test --locked -p iris-cli --test scalar_differential -- --ignored --nocapture
+```

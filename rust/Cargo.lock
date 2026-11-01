@@ -220,6 +220,7 @@ dependencies = [
  "clap",
  "ec4rs",
  "iris-conformance",
+ "iris-core",
  "iris-lsp",
  "iris-sema",
  "iris-syntax",
@@ -241,6 +242,17 @@ dependencies = [
  "shell-words",
  "tempfile",
  "toml",
+]
+
+[[package]]
+name = "iris-core"
+version = "0.1.0"
+dependencies = [
+ "iris-sema",
+ "iris-syntax",
+ "ryu",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

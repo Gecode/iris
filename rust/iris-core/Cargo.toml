@@ -1,0 +1,16 @@
+[package]
+name = "iris-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+iris-syntax = { path = "../iris-syntax" }
+iris-sema = { path = "../iris-sema" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+ryu = "1.0"

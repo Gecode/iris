@@ -94,7 +94,7 @@ fn driver_misuse_and_host_failures() {
         assert!(output.stdout.is_empty());
         assert!(!output.stderr.is_empty());
     }
-    for operation in ["read", "catalog", "dzn"] {
+    for operation in ["catalog", "dzn"] {
         let output = driver(&[operation, &path, &path]);
         assert_eq!(output.status.code(), Some(2));
         assert!(output.stdout.is_empty());
@@ -125,4 +125,96 @@ fn excerpt_escapes_controls_and_uses_physical_pattern_line() {
         _ => unreachable!(),
     };
     assert!(!iris_cli::render_error(&error, b"\0").contains('\0'));
+}
+
+#[test]
+fn read_json_and_instance_caret() {
+    let (dir, path) = fixture(b"x:int let y=x^2");
+    let input = dir.path().join("input.bin");
+    let input = input.to_str().unwrap();
+    std::fs::write(input, b"7\n").unwrap();
+    for output in [
+        driver(&["read", &path, input, "--params", "{}", "--version", "0.1"]),
+        check(&["read", &path, input, "--json"]),
+    ] {
+        assert_eq!(output.status.code(), Some(0));
+        assert!(output.stderr.is_empty());
+        Outcome::decode(OutcomeKind::Data, &output.stdout, "0.1").unwrap();
+        let document: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(document["entries"][0]["value"], 7);
+        assert_eq!(document["entries"][1]["value"], 49);
+    }
+    std::fs::write(input, b"oops\n").unwrap();
+    let output = check(&["read", &path, input, "--json"]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    assert_eq!(
+        String::from_utf8(output.stderr).unwrap(),
+        format!(
+            "{input}:1:1: expected int, found 'oops'\n     1 | oops\n       | ^\nwhile reading: x\nspec: {path}:1\n"
+        )
+    );
+    let output = driver(&["read", &path, input]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stderr.is_empty());
+    Outcome::decode(OutcomeKind::Error, &output.stdout, "0.1").unwrap();
+    for args in [
+        vec!["read", &path],
+        vec!["read", &path, input],
+        vec!["read", &path, input, "--dzn"],
+        vec!["read", &path, input, input, "--json"],
+    ] {
+        assert_eq!(check(&args).status.code(), Some(2));
+    }
+    assert_eq!(
+        driver(&["read", &path, &format!("{input}.missing")])
+            .status
+            .code(),
+        Some(3)
+    );
+    for options in [
+        vec!["--params", "{\"x\":1}"],
+        vec!["--params", "{\"x\":\"a\",\"x\":\"b\"}"],
+        vec!["--params", "{} {}"],
+        vec!["--version", "1.0"],
+        vec!["--params", "{}", "--params", "{}"],
+    ] {
+        let mut args = vec!["read", &path, input];
+        args.extend(options);
+        let output = driver(&args);
+        assert_eq!(output.status.code(), Some(2));
+        assert!(output.stdout.is_empty());
+    }
+}
+#[test]
+fn ordered_parameter_admission_precedes_input_validation() {
+    let params = iris_cli::protocol::parse_params("{\"z\":\"  a=b\\n\",\"a\":\"2\"}").unwrap();
+    assert_eq!(
+        params.pairs(),
+        &[("z".into(), "  a=b\n".into()), ("a".into(), "2".into())]
+    );
+    let (dir, path) = fixture(b"param n=1/0 x:int");
+    let input = dir.path().join("input.bin");
+    std::fs::write(&input, b"\xff").unwrap();
+    let output = driver(&[
+        "read",
+        &path,
+        input.to_str().unwrap(),
+        "--params",
+        "{\"z\":\"first\",\"a\":\"second\"}",
+    ]);
+    assert_eq!(output.status.code(), Some(1));
+    let error: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(error["code"], "E-PARAM-UNKNOWN");
+    assert!(error["message"].as_str().unwrap().contains("'z'"));
+    assert_eq!(error["input_location"], serde_json::Value::Null);
+    let output = driver(&[
+        "read",
+        &path,
+        input.to_str().unwrap(),
+        "--params",
+        "{\"n\":\"value\"}",
+    ]);
+    let error: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(error["code"], "E-UTF8");
 }
