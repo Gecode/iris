@@ -1,4 +1,6 @@
 //! Language server for Iris reader specs, shared by stdio and in-process clients.
+mod assist;
+mod builtins;
 mod diagnostic;
 mod document;
 mod navigation;

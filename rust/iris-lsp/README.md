@@ -59,8 +59,40 @@ site can supply its final routes later.
 
 Analysis runs on the server thread using complete reparses; the document cache
 retains each tree and semantic model together and invalidates both on accepted
-changes. Completion, formatting, and live sample reading
-belong to later LSP tasks.
+changes. Formatting and live sample reading belong to later LSP tasks.
+
+## Hover, completion, and inlay hints
+
+Hover documents built-in keywords, reading types, and functions with links to
+the Specification sections summarized in `src/builtins.rs`. Names show the
+semantic model's value type and depth at that definition or reference. Record
+names and named types are described separately from data entries. Contextual
+keywords used as names retain their name information.
+
+Completion offers statement keywords, visible named types in type positions,
+and available name candidates, functions, and host constants in expressions.
+Names from completed repeats are offered as columns; comprehension bindings
+are offered only in their bodies. Suggestions describe possible names, without
+claiming that a conditional definition will execute. Layout expressions offer
+the nine matrix layout strings, inserting quotes when needed. Completion edits
+replace the current identifier or layout string, and filter by its typed prefix.
+
+Hover and completion documentation use the client's first supported markup
+format, defaulting to plaintext. Function snippets are used only when the client
+advertises `snippetSupport`; other clients receive plain names.
+
+Inlay hints annotate value definitions in the requested range, including reads,
+captures, `let`, and `param`. Both hover and hints preserve uncertainty: unknown
+facts say `unknown`, and multiple possibilities are separated by `or` and marked
+`ambiguous`. A definition inside a repeat shows its local depth; references use
+the semantic model's selected view, including collected column depths.
+
+These requests use the latest open buffer and negotiated position encoding.
+They reuse the bulk position table and request helpers used by structure
+requests. Completion computes scope visibility once and scans definitions once;
+hints scan definitions once and render only those in the requested range.
+Syntax traversal and ancestor walks are iterative. Feature work takes linear
+time in source and model size, in addition to cached analysis.
 
 ## Navigation and rename
 
@@ -141,6 +173,8 @@ entry point. Tests cover synchronization, diagnostic links and ranges,
 Unicode encodings, atomic edits, document isolation, debounce decisions,
 lifecycle errors, navigation, ambiguous definitions, transitive rename groups,
 capture names and bounds, rename refusals, nested outlines, block and comment
-folding, semantic token roles and deltas, and representative repository reader
+folding, semantic token roles and deltas, hover documentation and shapes,
+completion contexts and visibility, optional snippets, uncertain inlay hints,
+and representative repository reader
 specs. The CLI test starts the real binary and checks framing, diagnostics,
 and orderly exit.

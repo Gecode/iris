@@ -1,5 +1,5 @@
 use crate::{
-    Result, diagnostic,
+    Result, assist, diagnostic,
     document::{Document, PositionEncoding},
     navigation, semantic_tokens, structure,
 };
@@ -7,10 +7,11 @@ use crossbeam_channel::RecvTimeoutError;
 use iris_syntax::ParseError;
 use lsp_server::{Connection, ErrorCode, Message, Notification, Request, Response};
 use lsp_types::{
-    FoldingRangeProviderCapability, InitializeParams, InitializeResult, OneOf,
-    PositionEncodingKind, PublishDiagnosticsParams, RenameOptions, SemanticTokensFullOptions,
-    SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo,
-    SymbolKind, TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions, Uri,
+    CompletionOptions, FoldingRangeProviderCapability, HoverProviderCapability, InitializeParams,
+    InitializeResult, MarkupKind, OneOf, PositionEncodingKind, PublishDiagnosticsParams,
+    RenameOptions, SemanticTokensFullOptions, SemanticTokensOptions,
+    SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo, SymbolKind,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions, Uri,
     WorkDoneProgressOptions,
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, PublishDiagnostics,
@@ -19,18 +20,21 @@ use lsp_types::{
 use std::{collections::HashMap, time::Instant};
 
 pub(crate) fn run(connection: Connection) -> Result<()> {
-    let (encoding, structure_options) = initialize(&connection)?;
+    let (encoding, structure_options, assist_options) = initialize(&connection)?;
     Server {
         connection,
         encoding,
         structure_options,
+        assist_options,
         documents: HashMap::new(),
         shutdown_requested: false,
     }
     .run()
 }
 
-fn initialize(connection: &Connection) -> Result<(PositionEncoding, structure::Options)> {
+fn initialize(
+    connection: &Connection,
+) -> Result<(PositionEncoding, structure::Options, assist::Options)> {
     let (id, params) = connection.initialize_start()?;
     let params: InitializeParams = match serde_json::from_value(params) {
         Ok(params) => params,
@@ -68,9 +72,30 @@ fn initialize(connection: &Connection) -> Result<(PositionEncoding, structure::O
             .and_then(|c| c.value_set.as_ref())
             .is_some_and(|kinds| kinds.contains(&SymbolKind::KEY)),
     };
+    let assist_options = assist::Options {
+        hover_markdown: prefers_markdown(
+            text_document
+                .and_then(|c| c.hover.as_ref())
+                .and_then(|c| c.content_format.as_deref()),
+        ),
+        completion_markdown: prefers_markdown(
+            text_document
+                .and_then(|c| c.completion.as_ref())
+                .and_then(|c| c.completion_item.as_ref())
+                .and_then(|c| c.documentation_format.as_deref()),
+        ),
+        snippets: text_document
+            .and_then(|c| c.completion.as_ref())
+            .and_then(|c| c.completion_item.as_ref())
+            .and_then(|c| c.snippet_support)
+            .unwrap_or(false),
+    };
     let result = InitializeResult {
         capabilities: ServerCapabilities {
             position_encoding: Some(encoding.protocol_kind()),
+            hover_provider: Some(HoverProviderCapability::Simple(true)),
+            completion_provider: Some(CompletionOptions::default()),
+            inlay_hint_provider: Some(OneOf::Left(true)),
             definition_provider: Some(OneOf::Left(true)),
             references_provider: Some(OneOf::Left(true)),
             document_symbol_provider: Some(OneOf::Left(true)),
@@ -101,13 +126,22 @@ fn initialize(connection: &Connection) -> Result<(PositionEncoding, structure::O
         }),
     };
     connection.initialize_finish(id, serde_json::to_value(result)?)?;
-    Ok((encoding, structure_options))
+    Ok((encoding, structure_options, assist_options))
+}
+
+fn prefers_markdown(formats: Option<&[MarkupKind]>) -> bool {
+    formats.and_then(|formats| {
+        formats
+            .iter()
+            .find(|format| **format == MarkupKind::Markdown || **format == MarkupKind::PlainText)
+    }) == Some(&MarkupKind::Markdown)
 }
 
 struct Server {
     connection: Connection,
     encoding: PositionEncoding,
     structure_options: structure::Options,
+    assist_options: assist::Options,
     documents: HashMap<Uri, Document>,
     shutdown_requested: bool,
 }
@@ -193,6 +227,16 @@ impl Server {
                 &mut self.documents,
                 self.encoding,
                 &self.structure_options,
+            )
+        } else if matches!(
+            request.method.as_str(),
+            "textDocument/hover" | "textDocument/completion" | "textDocument/inlayHint"
+        ) {
+            assist::handle_request(
+                request,
+                &mut self.documents,
+                self.encoding,
+                &self.assist_options,
             )
         } else {
             Response::new_err(

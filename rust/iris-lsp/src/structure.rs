@@ -81,7 +81,7 @@ pub(crate) fn handle_request(
     }
 }
 
-fn respond<R: LspRequest>(
+pub(crate) fn respond<R: LspRequest>(
     request: Request,
     handler: impl FnOnce(R::Params) -> Result<R::Result>,
 ) -> Response {
@@ -99,7 +99,7 @@ fn respond<R: LspRequest>(
 }
 
 #[allow(clippy::mutable_key_type)]
-fn analyzed_document<'a>(
+pub(crate) fn analyzed_document<'a>(
     documents: &'a mut HashMap<Uri, Document>,
     uri: &Uri,
 ) -> Result<&'a Document> {
@@ -112,7 +112,7 @@ fn analyzed_document<'a>(
     Ok(document)
 }
 
-fn response_error(code: ErrorCode, message: impl Into<String>) -> ResponseError {
+pub(crate) fn response_error(code: ErrorCode, message: impl Into<String>) -> ResponseError {
     ResponseError {
         code: code as i32,
         message: message.into(),
