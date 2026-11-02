@@ -283,6 +283,32 @@ m = [1, 2]
 w = [[[5], [6]], [[7, 8]]]
 ```
 
+Test cases that each end with a terminator, followed by one more
+terminator after the last case, nest two repeats on the same token. The
+inner repeat consumes each case's terminator; the outer one stops at the
+extra one:
+
+```iris
+repeat until "-" {
+  repeat until "-" {
+    list v: int until eol
+  }
+}
+```
+
+```input
+1 2
+3
+-
+4
+-
+-
+```
+
+```data
+v = [[[1, 2], [3]], [[4]]]
+```
+
 If the first token of the terminator can also start a record (pairs ending
 with `0 0`, where `0 5` is a valid pair), the repeat cannot stop on it.
 When the terminator is the last thing in the file, read to the end and
