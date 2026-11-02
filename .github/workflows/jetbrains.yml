@@ -31,6 +31,11 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
+      # verifyPlugin downloads three IDE builds, which fill the runner's default free space.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h /
       - uses: dtolnay/rust-toolchain@stable
       - name: Cache Rust build
         uses: actions/cache@v6
