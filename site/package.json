@@ -1,0 +1,32 @@
+{
+  "name": "iris-site",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "prepare:assets": "node scripts/prepare-assets.mjs",
+    "dev": "npm run prepare:assets && astro dev",
+    "build": "npm run prepare:assets && astro build",
+    "preview": "astro preview",
+    "check:astro": "astro check",
+    "check:links": "node scripts/check-links.mjs",
+    "check:html": "node scripts/check-html.mjs",
+    "check:contrast": "node scripts/check-contrast.mjs",
+    "check": "npm run check:astro && npm run check:links && npm run check:html && npm run check:contrast"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "0.42.6",
+    "@astrojs/starlight-tailwind": "5.0.0",
+    "@tailwindcss/vite": "4.3.3",
+    "astro": "7.3.8",
+    "tailwindcss": "4.3.3"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.10",
+    "html-validate": "10.17.0",
+    "parse5": "7.3.0",
+    "typescript": "6.0.3"
+  }
+}

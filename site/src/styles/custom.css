@@ -1,0 +1,257 @@
+@layer base, starlight, theme, components, utilities;
+@import '@astrojs/starlight-tailwind';
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+/* Actual font weights: Raleway 500; Open Sans and Roboto Mono 400. */
+@theme static {
+  --font-sans: 'Open Sans', sans-serif;
+  --font-display: 'Raleway', sans-serif;
+  --font-mono: 'Roboto Mono', ui-monospace, monospace;
+  --spacing-iris-rail: 17rem;
+  --spacing-iris-toolbar: 4rem;
+  --spacing-iris-page: 3rem;
+  --spacing-iris-mobile-page: 1.5rem;
+  --color-iris-rail: #092C43;
+  --color-iris-rail-active: #164661;
+  --color-iris-rail-text: #F1F6FA;
+  --color-iris-rail-muted: #BBD0DC;
+  --color-iris-rail-edge: #EB891B;
+  --color-iris-focus-dark: #FFBD66;
+  --color-iris-light-canvas: #FFFFFF;
+  --color-iris-light-surface: #F4F8FB;
+  --color-iris-light-hero: #EDF4FA;
+  --color-iris-light-ink: #172B38;
+  --color-iris-light-muted: #4A6170;
+  --color-iris-light-link: #005CA1;
+  --color-iris-light-orange: #9B5100;
+  --color-iris-light-red: #B71D18;
+  --color-iris-light-blue: #005CA1;
+  --color-iris-light-green: #0B7646;
+  --color-iris-light-border: #6D8493;
+  --color-iris-light-focus: #005CA1;
+  --color-iris-dark-canvas: #081E2D;
+  --color-iris-dark-surface: #102D40;
+  --color-iris-dark-hero: #12394F;
+  --color-iris-dark-ink: #EDF4FA;
+  --color-iris-dark-muted: #BBD0DC;
+  --color-iris-dark-link: #8ACBFF;
+  --color-iris-dark-orange: #EB891B;
+  --color-iris-dark-red: #FF8F86;
+  --color-iris-dark-blue: #8ACBFF;
+  --color-iris-dark-green: #8ED2AA;
+  --color-iris-dark-border: #628397;
+  --color-iris-dark-focus: #FFBD66;
+}
+
+@theme inline {
+  --color-iris-canvas: var(--iris-canvas);
+  --color-iris-surface: var(--iris-surface);
+  --color-iris-hero: var(--iris-hero);
+  --color-iris-ink: var(--iris-ink);
+  --color-iris-muted: var(--iris-muted);
+  --color-iris-link: var(--iris-link);
+  --color-iris-orange: var(--iris-orange);
+  --color-iris-red: var(--iris-red);
+  --color-iris-blue: var(--iris-blue);
+  --color-iris-green: var(--iris-green);
+  --color-iris-border: var(--iris-border);
+  --color-iris-focus: var(--iris-focus);
+}
+
+@layer theme {
+  :root {
+    --iris-rail: var(--color-iris-rail);
+    --iris-rail-active: var(--color-iris-rail-active);
+    --iris-rail-text: var(--color-iris-rail-text);
+    --iris-rail-muted: var(--color-iris-rail-muted);
+    --iris-rail-edge: var(--color-iris-rail-edge);
+    --iris-focus-dark: var(--color-iris-focus-dark);
+    --iris-display: var(--font-display);
+    --sl-font: var(--font-sans);
+    --sl-font-mono: var(--font-mono);
+    --sl-sidebar-width: var(--spacing-iris-rail);
+    --sl-nav-height: var(--spacing-iris-toolbar);
+    --sl-menu-button-size: 4.75rem;
+    --sl-content-pad-x: var(--spacing-iris-mobile-page);
+    --sl-line-height: 1.75;
+  }
+  :root,
+  :root[data-theme='dark'],
+  /* Pages without the rail, such as 404, keep dark chrome in both themes. */
+  :root:not([data-has-sidebar]) .page > header.header {
+    --iris-canvas: var(--color-iris-dark-canvas);
+    --iris-surface: var(--color-iris-dark-surface);
+    --iris-hero: var(--color-iris-dark-hero);
+    --iris-ink: var(--color-iris-dark-ink);
+    --iris-muted: var(--color-iris-dark-muted);
+    --iris-link: var(--color-iris-dark-link);
+    --iris-orange: var(--color-iris-dark-orange);
+    --iris-red: var(--color-iris-dark-red);
+    --iris-blue: var(--color-iris-dark-blue);
+    --iris-green: var(--color-iris-dark-green);
+    --iris-border: var(--color-iris-dark-border);
+    --iris-focus: var(--color-iris-dark-focus);
+  }
+  :root[data-theme='light'] {
+    --iris-canvas: var(--color-iris-light-canvas);
+    --iris-surface: var(--color-iris-light-surface);
+    --iris-hero: var(--color-iris-light-hero);
+    --iris-ink: var(--color-iris-light-ink);
+    --iris-muted: var(--color-iris-light-muted);
+    --iris-link: var(--color-iris-light-link);
+    --iris-orange: var(--color-iris-light-orange);
+    --iris-red: var(--color-iris-light-red);
+    --iris-blue: var(--color-iris-light-blue);
+    --iris-green: var(--color-iris-light-green);
+    --iris-border: var(--color-iris-light-border);
+    --iris-focus: var(--color-iris-light-focus);
+  }
+}
+
+/* The compatibility package maps these in utilities; Iris must follow it. */
+@layer utilities {
+  :root,
+  :root[data-theme],
+  :root:not([data-has-sidebar]) .page > header.header {
+    color-scheme: dark;
+    --sl-color-bg: var(--iris-canvas);
+    --sl-color-text: var(--iris-ink);
+    --sl-color-text-accent: var(--iris-link);
+    --sl-color-bg-nav: var(--iris-canvas);
+    --sl-color-bg-sidebar: var(--iris-rail);
+    --sl-color-bg-inline-code: var(--iris-surface);
+    --sl-color-hairline: var(--iris-border);
+    --sl-color-hairline-light: var(--iris-border);
+    --sl-color-hairline-shade: var(--iris-border);
+    --sl-color-text-invert: var(--iris-canvas);
+    --sl-color-white: var(--iris-ink);
+    --sl-color-gray-1: var(--iris-ink);
+    --sl-color-gray-2: var(--iris-ink);
+    --sl-color-gray-3: var(--iris-muted);
+    --sl-color-gray-4: var(--iris-muted);
+    --sl-color-gray-5: var(--iris-border);
+    --sl-color-gray-6: var(--iris-surface);
+    --sl-color-gray-7: var(--iris-canvas);
+    --sl-color-black: var(--iris-canvas);
+    --sl-color-accent-low: var(--iris-hero);
+    --sl-color-accent: var(--iris-link);
+    --sl-color-accent-high: var(--iris-link);
+  }
+  :root[data-theme='light'] { color-scheme: light; }
+
+}
+
+@layer components {
+  html, body, .sidebar-pane, .right-sidebar { overscroll-behavior-y: none; }
+  :focus-visible { outline: 3px solid var(--iris-focus); outline-offset: 3px; }
+  select option { background: var(--iris-canvas); color: var(--iris-ink); }
+  h1, h2, h3, h4, h5, h6 { @apply font-display font-medium; }
+  h1 { @apply text-[2.75rem] tracking-[-0.04em]; }
+  .sl-markdown-content h2 { @apply text-[1.75rem] tracking-[-0.025em]; }
+  .main-frame, main, .main-pane, .content-panel, .sl-container { @apply min-w-0; }
+  .content-panel > .sl-container { @apply max-w-none mx-0; }
+  .sl-markdown-content :is(p, ul, ol) { @apply max-w-[68ch]; }
+  .sl-markdown-content table { @apply block max-w-full overflow-x-auto; }
+  .expressive-code pre:focus-visible { outline-offset: -4px; }
+
+  /* The stock page frame still owns offsets, the popover, and focus trapping. */
+  .iris-toolbar { @apply flex items-center justify-between gap-4 h-full; }
+  .iris-toolbar-controls { @apply hidden items-center gap-4; }
+  .iris-mobile-brand, .iris-search { @apply min-w-0; }
+  .site-title img { @apply w-40 h-auto; }
+  .iris-rail-brand { @apply hidden pt-5 px-2 pb-6; }
+  .sidebar-pane { @apply bg-iris-rail text-iris-rail-text; }
+  .sidebar-content { @apply gap-2 pb-6; }
+  .iris-rail-navigation { @apply p-1; }
+  .iris-rail-navigation :is(a, summary) {
+    @apply font-display font-medium text-iris-rail-text lowercase;
+  }
+  .iris-rail-navigation summary { @apply text-base; }
+  .iris-rail-navigation .large { @apply font-medium text-base text-iris-rail-text; }
+  .iris-rail-navigation a {
+    @apply text-[0.9375rem] border-s-[3px] border-transparent py-[0.4rem] px-[0.65rem] rounded-xs;
+  }
+  .iris-rail-navigation a:hover { @apply bg-iris-rail-active text-iris-rail-text; }
+  .iris-rail-navigation [aria-current='page'] {
+    @apply border-s-iris-rail-edge bg-iris-rail-active text-iris-rail-text;
+  }
+  .iris-rail-navigation ul ul li { @apply border-s-iris-rail-muted; }
+  .iris-rail-navigation :is(select, label), .iris-rail-navigation .social-icons a { @apply text-iris-rail-muted; }
+  .sidebar-pane :focus-visible { outline-color: var(--iris-focus-dark); }
+
+  /* Count only direct h2 wrappers so code, paragraphs, and h3s cannot shift petals. */
+  .sl-markdown-content > :nth-child(4n + 1 of .sl-heading-wrapper.level-h2) { --iris-petal: var(--iris-orange); }
+  .sl-markdown-content > :nth-child(4n + 2 of .sl-heading-wrapper.level-h2) { --iris-petal: var(--iris-red); }
+  .sl-markdown-content > :nth-child(4n + 3 of .sl-heading-wrapper.level-h2) { --iris-petal: var(--iris-blue); }
+  .sl-markdown-content > :nth-child(4n + 4 of .sl-heading-wrapper.level-h2) { --iris-petal: var(--iris-green); }
+  .sl-markdown-content > .sl-heading-wrapper.level-h2 > h2::before {
+    content: '';
+    @apply inline-block size-[0.7rem] me-[0.65rem] align-[0.1em];
+    border-radius: 0.25rem 0.05rem 0.25rem 0.05rem;
+    background: var(--iris-petal);
+  }
+  starlight-tabs [role='presentation']:nth-child(4n + 1) { --iris-tab-colour: var(--iris-orange); }
+  starlight-tabs [role='presentation']:nth-child(4n + 2) { --iris-tab-colour: var(--iris-red); }
+  starlight-tabs [role='presentation']:nth-child(4n + 3) { --iris-tab-colour: var(--iris-blue); }
+  starlight-tabs [role='presentation']:nth-child(4n + 4) { --iris-tab-colour: var(--iris-green); }
+  starlight-tabs > .tablist-wrapper { @apply p-1.5 -m-1.5; }
+  starlight-tabs [role='tab'] { @apply border-b-[3px] border-transparent text-iris-muted shadow-none; }
+  starlight-tabs [role='tab'][aria-selected='true'] { @apply text-iris-ink font-bold; border-bottom-color: var(--iris-tab-colour); }
+  starlight-tabs [role='tab']:hover { @apply underline; }
+
+  /* Search uses page colours even when its trigger is inside dark mobile chrome. */
+  site-search dialog {
+    @apply text-iris-ink bg-iris-canvas;
+  }
+  #starlight__search {
+    --pagefind-ui-background: var(--iris-canvas);
+    --pagefind-ui-text: var(--iris-ink);
+    --pagefind-ui-primary: var(--iris-link);
+    --pagefind-ui-border: var(--iris-border);
+    --pagefind-ui-tag: var(--iris-surface);
+  }
+
+  [data-has-hero] .content-panel:has(.hero) { @apply bg-iris-hero; }
+  [data-has-hero] .hero { @apply block py-[clamp(2.5rem,7vw,7rem)]; }
+  [data-has-hero] .hero .stack { @apply text-start; }
+  [data-has-hero] .hero .copy { @apply items-start; }
+  [data-has-hero] .hero h1 { @apply max-w-[17ch] text-[clamp(2.5rem,5vw,4.75rem)] leading-[1.06]; }
+  [data-has-hero] .hero .tagline { @apply max-w-[42ch] text-iris-ink text-[1.2rem]; }
+  [data-has-hero] .hero .actions { @apply justify-start; }
+  .hero .sl-link-button { @apply rounded-sm min-h-11; }
+  .hero .sl-link-button.primary { @apply bg-iris-link text-iris-canvas border-iris-link; }
+  .hero .sl-link-button.secondary { @apply text-iris-link border-iris-link; }
+
+  @media (min-width: 50rem) {
+    :root { --sl-content-pad-x: var(--spacing-iris-page); }
+    [data-has-sidebar] .page > header.header { inset-inline-start: var(--sl-sidebar-width); width: calc(100% - var(--sl-sidebar-width)); }
+    .sidebar-pane { inset-block-start: 0; }
+    .iris-rail-brand { @apply block; }
+    [data-has-sidebar] .iris-mobile-brand { @apply hidden; }
+    /* Without the rail, the header carries the white lockup on rail blue. */
+    :root:not([data-has-sidebar]) .page > header.header { @apply bg-iris-rail; }
+    :root:not([data-has-sidebar]) .iris-mobile-brand .site-title img { @apply w-26; }
+    .iris-toolbar-controls { @apply flex; }
+    .iris-search { @apply flex-1; }
+  }
+  @media (max-width: 49.99rem) {
+    h1 { @apply text-[2.2rem]; }
+    .page > header.header { @apply bg-iris-rail text-iris-rail-text; }
+    .iris-mobile-brand :focus-visible, site-search > button:focus-visible,
+    .sl-menu-button:focus-visible { outline-color: var(--iris-focus-dark); }
+    .iris-mobile-brand .site-title img { @apply w-26; }
+    site-search > button { @apply text-iris-rail-text; }
+    .sl-menu-button {
+      @apply h-11 rounded-sm bg-iris-rail-active text-iris-rail-text shadow-none gap-[0.35rem] text-sm;
+      top: calc((var(--sl-nav-height) - 2.75rem) / 2);
+    }
+    .sl-menu-button .sr-only { @apply not-sr-only; }
+  }
+  @media (max-width: 360px) { :root { --sl-content-pad-x: 1rem; --sl-nav-pad-x: 1rem; } }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
+  }
+  @media (forced-colors: active) { :focus-visible { outline-color: Highlight !important; } }
+
+}

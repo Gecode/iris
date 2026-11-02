@@ -1,0 +1,55 @@
+---
+title: Introduction
+description: Reader specs, text input, and the data Iris reads.
+editUrl: false
+prev: false
+next: false
+---
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+Iris is a declarative language for reading text instance files.
+A **reader spec** describes a format: the values to read, their structure,
+and the checks the data must satisfy.
+
+## Reader specs
+
+A reader spec names the entries to read. This small example reads an integer
+from a line of input, then checks its value.
+
+<Tabs>
+<TabItem label="Reader spec">
+
+```iris title="example.iris"
+# Read the size from one line.
+line "size {n:int}"
+check n > 0 "size must be positive"
+```
+
+</TabItem>
+<TabItem label="Input">
+
+```text title="example.txt"
+size 3
+```
+
+</TabItem>
+</Tabs>
+
+## Input
+
+The input is the text being read. Reader specs can describe lines, lists,
+sections, and repeated records. The [format library](/formats/) will collect
+examples of complete formats.
+
+## Data
+
+Reading produces named, typed entries: scalars and arrays, including arrays
+whose rows have different lengths. The [tutorial](/tutorial/) will walk through
+reading an instance and using its data.
+
+## Gecode
+
+Iris grew out of Gecode’s instance reader. Iris 0.1 follows the language of
+Gecode 6.5.0, with the deliberate differences listed in the Iris Language
+Specification. Rust is the reference implementation; the
+[language documentation](/using/rust/) will cover using it from a host program.

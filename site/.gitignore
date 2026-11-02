@@ -1,0 +1,13 @@
+.astro/
+public/brand/
+public/favicon.svg
+public/favicon.ico
+public/favicon-16.png
+public/favicon-32.png
+public/favicon-48.png
+public/app-icon.svg
+public/apple-touch-icon.png
+public/icon-192.png
+public/icon-512.png
+public/site.webmanifest
+public/og-image.png
