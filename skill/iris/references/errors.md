@@ -88,6 +88,7 @@ not names used in expressions: a misspelled name such as `a: 1..nn` passes
 | `'n' is defined in several repeats, or inside and outside a repeat, so a check here cannot range over its records` | Use distinct names for top-level values and repeat fields. |
 | `'rows' is a list of records, not a value` | Use `size(rows)`, `rows[i].field`, or a field. |
 | `only records have fields such as '.a'` | Field access needs a record name from `as`/`each`. |
+| `'edges' cannot name both the list and each record` | `as` names the list and `each` names one record, so they need different names: `repeat m as edges { each edge ... }`. |
 | `'items' is a list in each record of the repeat around it; use 'row.items'` | Reach nested lists through the outer record. |
 
 ## Read errors

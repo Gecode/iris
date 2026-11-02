@@ -106,7 +106,7 @@ title = "Small graph"
 | `list x: T until S` | Values up to the sentinel token `S` (a number or a string such as `"END"`). |
 | `list x: T until eol` | The values on the rest of the line. |
 | `repeat e { }`, `repeat until "END" { }`, `repeat until eof { }` | Loops. Each value read inside becomes an array with one element per iteration (a *column*). |
-| `repeat e as recs { each rec ... }` | Names the records (`recs[0].u`, `size(recs)`) and the current record (`rec.u`). |
+| `repeat e as recs { each rec ... }` | Names the records (`recs[0].u`, `size(recs)`) and the current record (`rec.u`); the two names must differ. |
 | `index 1` | Inside a repeat: read the 1-based row number and verify it. |
 | `line "p cnf {vars:int} {clauses:0..}"` | Match a whole line, capturing values. `{x}` is a word, `{_}` discards, `...` at the end accepts any remaining text. |
 | `find "pattern"`, `skip line`, `skip e lines`, `expect "tok"` | Seek a line, discard lines, require literal tokens. |
