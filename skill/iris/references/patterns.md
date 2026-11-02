@@ -779,6 +779,29 @@ d0 = [1, 4, 6]
 code = [1, 4, 16]
 ```
 
+A number too big for 64 bits, or a long string of digits, reads the same
+way as an exact digit array, one row per line:
+
+```iris
+t: 1..
+tokens "0123456789"
+repeat t {
+  list digit: 0..9 until eol
+  check digit[0] != 0 || size(digit) == 1 "no leading zeros"
+}
+```
+
+```input
+2
+123456789012345678901234567890
+7
+```
+
+```data
+t = 2
+digit = [[1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0], [7]]
+```
+
 A separator byte is gone from the input: with `separators "-"`, `-5`
 reads as `5` with no error, so this does not suit input with negative
 numbers. Empty fields vanish the same way: `separators ","` reads `1,,,5`
@@ -942,7 +965,7 @@ The left column names the need; § numbers point into the Specification.
 | Ordering or measuring strings | Strings support only `==` and `!=` (§8.6). | Check in the host. |
 | Position-dependent checks: sorted arrays, `a[i] < a[i+1]` | No index ranges or loop counters in expressions (§8.10). | Check in the host. |
 | A previous record's values inside a repeat | Each iteration starts with a fresh frame (§7.1). | Check after the repeat when the condition does not need positions. |
-| Integers beyond 64 bits, hexadecimal, or decimal commas | Numeric tokens are decimal 64-bit integers and `.`-decimals (§4.4, §4.5). | Read as `word`. For one big integer per line, `tokens "0123456789"` and `list digit: 0..9 until eol` give an exact digit array that checks can bound. Place the setting after the count, which it would otherwise split. |
+| Integers beyond 64 bits, hexadecimal, or decimal commas | Numeric tokens are decimal 64-bit integers and `.`-decimals (§4.4, §4.5). | For one big integer per line, `tokens "0123456789"` and `list digit: 0..9 until eol` give an exact digit array that checks can bound. Place the setting after the count, which it would otherwise split. Read as `word` only when several share a line. |
 | Case-insensitive keywords | Matching is byte-exact (§7.2). | List each spelling: `repeat until "END" "end"`, or one optional sections arm per spelling. |
 | Alternative names for one header key (`width N` or `columns N`) | Each sections arm has its own occurrence rule (§7.8). | One optional arm per spelling, then `let` and checks to merge them. |
 | Every instance of a multi-instance file at once | `instances` keeps one instance (§9.4). | Use `repeat` over the instances. |
