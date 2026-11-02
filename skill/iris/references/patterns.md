@@ -709,21 +709,27 @@ before reaching for `rest`. A setting applies from where it appears to the
 end of the input, so check that no later value contains the byte, and
 place the setting after any header it must not split.
 
-`separators` makes punctuation act like a space:
+`separators` makes punctuation act like a space. Pairs such as set scores
+`6:2` become two integers each, so a line of pairs reads as one list:
 
 ```iris
-separators "-"
-repeat until eof {
-  part: word
+n: 1..
+separators ":"
+repeat n {
+  list games: 0.. until eol
+  check size(games) % 2 == 0 "scores come in pairs"
 }
 ```
 
 ```input
-Knuth-Morris-Pratt
+2
+6:2 6:4
+3:6 7:5 2:6
 ```
 
 ```data
-part = ["Knuth", "Morris", "Pratt"]
+n = 2
+games = [[6, 2, 6, 4], [3, 6, 7, 5, 2, 6]]
 ```
 
 `tokens` makes each listed byte a token of its own, which separates
