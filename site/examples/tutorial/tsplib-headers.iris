@@ -1,0 +1,6 @@
+comment "COMMENT"
+sections until "EOF" {
+  "NAME : {name:rest}" optional
+  "DIMENSION : {n:2..46340}"
+  "EDGE_WEIGHT_TYPE : {edge_weight_type:word}"
+}

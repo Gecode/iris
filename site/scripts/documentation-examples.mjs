@@ -3,8 +3,10 @@ import { tmpdir } from 'node:os';
 import { resolve, dirname } from 'node:path';
 import { strictEqual, ok } from 'node:assert';
 import { repository } from './markdown-sources.mjs';
+import { collectLearningExamples, learningPages } from './learning-examples.mjs';
 
 export const documentationPages = {
+  ...learningPages,
   'tools/cli/index.html': ['build-cli', 'check', 'read-default', 'read-summary', 'read-json', 'read-dzn', 'read-param', 'list', 'list-dzn', 'fmt', 'fmt-check', 'fmt-diff', 'build-driver', 'conformance'],
   'tools/formatter/index.html': ['format-before', 'format-after', 'format-stdin'],
   'tools/lsp/index.html': ['sample-directive'],
@@ -65,6 +67,7 @@ export async function collectDocumentationExamples({ tools, formats, execute, co
   const manifest = await readSource('rust/gecode-iris/Cargo.toml');
   ok(manifest.includes('publish = false'));
   add('rust-dependency', '[dependencies]\ngecode-iris = { path = "../iris/rust/gecode-iris" }', 'toml');
+  Object.assign(examples, await collectLearningExamples({ tools, execute, command }));
   return examples;
 
   async function addReadmeCommand(id, path, code) {

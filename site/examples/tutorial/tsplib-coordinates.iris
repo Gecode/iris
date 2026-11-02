@@ -1,0 +1,15 @@
+comment "COMMENT"
+sections until "EOF" {
+  "NAME : {name:rest}" optional
+  "DIMENSION : {n:2..46340}"
+  "EDGE_WEIGHT_TYPE : {edge_weight_type:word}"
+  "NODE_COORD_SECTION" {
+    repeat n {
+      node: int
+      x: float
+      y: float
+    }
+  }
+}
+check edge_weight_type == "EUC_2D" "this reader requires EUC_2D coordinates"
+check x >= -1e9 && x <= 1e9 && y >= -1e9 && y <= 1e9 "coordinates must be between -1e9 and 1e9"

@@ -1,0 +1,5 @@
+COMMENT A small coordinate instance
+EDGE_WEIGHT_TYPE:EUC_2D
+NAME : triangle
+DIMENSION : 3
+EOF

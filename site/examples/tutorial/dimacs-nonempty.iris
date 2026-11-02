@@ -1,0 +1,6 @@
+comment "c"
+line "p cnf {vars:0..gecode.int_max} {clauses:0..}"
+repeat clauses {
+  list clause: -vars..vars until 0
+}
+check count(clause) > 0 "this application requires nonempty clauses"

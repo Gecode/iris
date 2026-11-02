@@ -1,0 +1,58 @@
+---
+title: Patterns
+description: Match line patterns with typed captures, literal punctuation and current-value references.
+editUrl: false
+prev: false
+next: false
+---
+import CheckedExample from '../../../components/docs/CheckedExample.astro';
+
+Use a line pattern for a header or record whose punctuation matters. A pattern
+contains literal text, captures and references to current values. Matching is
+case-sensitive and deterministic. A line pattern is not a regular expression.
+
+## Capture fields and match a reference
+
+This reader captures a count and a label, reads that many point lines, then
+requires a matching end label:
+
+<CheckedExample id="patterns-spec" title="site/examples/guides/patterns.iris" />
+<CheckedExample id="patterns-input" title="site/examples/guides/patterns.txt" />
+<CheckedExample id="patterns" />
+
+`{n:1..}` captures and bounds an integer. `{label:rest}` captures the remaining
+text, so the label can contain spaces. `{x:int}` and `{y:int}` capture signed
+integers. `{$label}` matches an existing value without defining another entry.
+Use `{name}` for a word capture and `{_:int}` to validate and discard an integer.
+
+Pattern blanks can match zero blanks beside punctuation. That is why both
+`points=2` and `(3,4)` match these patterns. Between word-like items, a blank
+is required. A `rest` capture takes all remaining matching text; put it last.
+Captures must be nonempty.
+
+See [line patterns and captures](/specification/0.1/07-structure/#72-line-patterns-and-captures)
+and [reading types](/specification/0.1/06-types-and-values/#61-reading-types-and-resulting-entries)
+in the Specification.
+
+## Read a mismatch
+
+The third line below omits the literal parentheses:
+
+<CheckedExample id="patterns-invalid-input" title="site/examples/guides/patterns-invalid.txt" />
+<CheckedExample id="patterns-invalid" />
+
+This is [E-LINE-MATCH](/specification/0.1/errors/#e-line-match). The active
+repeat tells you which point failed. Compare that line's punctuation and case
+with the pattern before changing the reading types.
+
+## Choose how to find the line
+
+`line` requires the next remaining data line to match. `find` discards lines
+until it finds a match; use it when preceding text is irrelevant. `sections`
+tries several patterns at the same position. End a pattern with `...` only
+when any remaining suffix is allowed. A selected capture's range failure is
+a hard error: `find` will not search for a later in-range line.
+
+These operations are defined under
+[line, find, skip and expect](/specification/0.1/07-structure/#73-line-find-skip-and-expect).
+For a set of keyword headers, continue with [sections](/guides/sections/).

@@ -76,7 +76,7 @@ for (const [path, required] of requiredPages) {
 for (const [path, ids] of Object.entries(documentationPages)) {
   for (const id of ids) {
     const example = documentation[id];
-    const parts = ['code', ...(example.output === undefined ? [] : [example.output ? 'output' : 'empty-output'])];
+    const parts = [example.code ? 'code' : 'empty-source', ...(example.output === undefined ? [] : [example.output ? 'output' : 'empty-output'])];
     for (const part of parts) ok(documentationSeen.has(`${path}:${id}/${part}`), `${path}: missing documentation example ${id}/${part}`);
   }
 }
@@ -93,6 +93,9 @@ function checkDocumentation(path, document) {
     const part = attributes['data-doc-part'];
     if (part === 'code') {
       strictEqual(highlightedText(node), example.code, `${path}: stale documentation command/source ${id}`);
+    } else if (part === 'empty-source') {
+      strictEqual(example.code, '', `${path}: unexpected empty source ${id}`);
+      strictEqual(text(node), 'Empty file.');
     } else if (part === 'output') {
       strictEqual(node.tagName, 'code');
       strictEqual(text(node), example.output, `${path}: stale documentation output ${id}`);

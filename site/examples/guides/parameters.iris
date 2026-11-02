@@ -1,0 +1,5 @@
+param capacity = 10
+n: 0..
+weight[n]: 0..
+let total = sum(weight)
+check total <= capacity "the weights exceed capacity"

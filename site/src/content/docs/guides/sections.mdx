@@ -1,0 +1,57 @@
+---
+title: Sections
+description: Read keyword headers and payload sections, with explicit handling of optional and repeated arms.
+editUrl: false
+prev: false
+next: false
+---
+import CheckedExample from '../../../components/docs/CheckedExample.astro';
+
+Use `sections` for lines identified by keywords. Arms can match in input order;
+their bodies execute as soon as the arm matches. Sections are useful for
+headers whose order varies, as in [TSPLIB](/formats/tsplib/).
+
+## Read headers and a body
+
+This coordinate reader requires a dimension, an edge-weight type and a
+coordinate section. Only the name is optional.
+
+<CheckedExample id="tsplib-coordinates-spec" title="site/examples/tutorial/tsplib-coordinates.iris" />
+<CheckedExample id="tsplib-coordinates-input" title="site/examples/tutorial/tsplib-coordinates.txt" />
+<CheckedExample id="tsplib-coordinates" />
+
+The coordinate body uses `n`, so `DIMENSION` must occur before
+`NODE_COORD_SECTION`. Other header arms may occur in either order. Names are
+defined when their arms run; sections do not rearrange input or defer bodies.
+
+## Required, optional and last arms
+
+An ordinary arm must match exactly once. `optional` changes that to zero or
+one, so guard an optional capture with `defined` before using it. `last` ends
+sections after the selected arm's body runs. It still checks for missing
+required arms. The [job shop tutorial](/tutorial/job-shop/#finish-with-the-library-reader)
+uses a last arm to leave the next instance header for the next pass.
+
+A terminator is tested before arms. Actual end of input also ends sections,
+even with `until "EOF"`. On completion, a missing required arm reports
+[E-LINE-MATCH](/specification/0.1/errors/#e-line-match).
+
+## Repeated and unknown lines
+
+A repeated dimension is an error even when its value is unchanged:
+
+<CheckedExample id="sections-repeated-input" title="site/examples/guides/sections-repeated.txt" />
+<CheckedExample id="sections-repeated" />
+
+This is [E-SECTIONS-REPEATED](/specification/0.1/errors/#e-sections-repeated).
+Optional arms also reject a second match. Use a repeat for repeated records;
+a sections arm does not collect repeated headers into an array.
+
+Unknown lines report
+[E-SECTIONS-UNEXPECTED](/specification/0.1/errors/#e-sections-unexpected).
+`skip other` discards unmatched lines when the format permits irrelevant text.
+Keep sections strict when an unknown keyword is likely to be a spelling error.
+If two patterns could match, the first complete match wins.
+
+The Specification defines the full [sections execution order](/specification/0.1/07-structure/#78-sections).
+The [TSPLIB tutorial](/tutorial/tsplib/) grows this example into the library reader.

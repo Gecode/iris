@@ -1,0 +1,5 @@
+line "points = {n:1..} {label:rest}"
+repeat n {
+  line "({x:int}, {y:int})"
+}
+line "end {$label}"

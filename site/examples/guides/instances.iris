@@ -1,0 +1,6 @@
+instances {
+  line "instance {name:word}"
+  n: 1..
+  values[n]: int
+  check min(values) >= 0 "values must be nonnegative"
+}

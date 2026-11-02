@@ -1,0 +1,81 @@
+---
+title: 3. Read job shop records and checks
+description: Read nested job and operation records and check machine use and total duration.
+editUrl: false
+prev: false
+next: false
+---
+import CheckedExample from '../../../components/docs/CheckedExample.astro';
+
+A job shop input gives a job count and a machine count. Each job then has one
+operation per machine. An operation is a pair: machine number and duration.
+Machine numbers start at 0.
+
+Build on [repeats](/tutorial/dimacs/) and [sections](/tutorial/tsplib/).
+All commands run from the repository root.
+
+## Read nested records
+
+Use an outer repeat for jobs and an inner repeat for operations. `as jobs`
+names the list of job records; `each job` names an individual job for later
+checks. The inner names play the same roles for operations.
+
+<CheckedExample id="jobshop-records-spec" title="site/examples/tutorial/jobshop-records.iris" />
+<CheckedExample id="jobshop-records-input" title="site/examples/tutorial/jobshop.txt" />
+<CheckedExample id="jobshop-records" />
+
+Each repeat adds one array level. `machine` and `duration` therefore have
+depth 2. Row 0 holds job 0's operations; row 1 holds job 1's. The names `jobs`,
+`job`, `steps` and `step` describe records and create no data entries.
+
+`0..<n_machines` excludes its upper bound; `0..` admits nonnegative durations.
+Ordinary numeric reads cross line breaks, so the pairs need not be laid out
+on physical job lines. See
+[logical records](/specification/0.1/07-structure/#76-logical-records-and-names).
+
+## Check each job and the whole instance
+
+Range checks admit each machine number separately. To ensure a job uses every
+machine exactly once, also check that its machine numbers are distinct. Since
+there are exactly `n_machines` operations and every number is in range,
+distinctness gives the required coverage.
+
+<CheckedExample id="jobshop-checks-spec" title="site/examples/tutorial/jobshop-checks.iris" />
+<CheckedExample id="jobshop-checks-input" title="site/examples/tutorial/jobshop.txt" />
+<CheckedExample id="jobshop-checks" />
+
+`check distinct(job.machine)` ranges over jobs. Within one job, `job.machine`
+is the array of its machine numbers. The final check uses a comprehension to
+sum durations across all jobs, then compares the total with Gecode's integer
+limit. The early count check is the library's bound on the job/machine product.
+
+A duplicate machine is in range but fails the record check:
+
+<CheckedExample id="jobshop-invalid-input" title="site/examples/guides/jobshop-invalid.txt" />
+<CheckedExample id="jobshop-invalid" />
+
+The diagnostic identifies the first job and points at its saved start.
+This is [E-CHECK-FAILED](/specification/0.1/errors/#e-check-failed). See the
+[records and checks guide](/guides/records-and-checks/) and the Specification's
+[record access](/specification/0.1/08-expressions-and-checks/#812-record-names-and-field-access)
+and [failure witnesses](/specification/0.1/08-expressions-and-checks/#813-checks-and-failure-witnesses).
+
+## Finish with the library reader
+
+Real OR-Library and JSPLIB files include descriptions, separators and sometimes
+several named instances. The library wraps the reader in `instances`, skips
+`#` and `+++` comments, and uses `sections skip other` to find the counts.
+The count arm is `last`: its body reads the jobs, then sections end before
+the next instance's header.
+
+<CheckedExample id="jobshop-library-spec" title="formats/jobshop/jobshop.iris" />
+<CheckedExample id="jobshop-library-input" title="formats/jobshop/cases/or-library/input.txt" />
+<CheckedExample id="jobshop-library" />
+
+The `instance` parameter selects `handmade-or` by name. An `instances` block
+must be the final statement, so the checks stay inside it. Use the
+[several instances guide](/guides/instances/) for catalogs and selection rules.
+
+You now have the complete [job shop library reader](/formats/job-shop/).
+Use the [guides](/guides/) to adapt these structures to another format, and
+[check and read samples](/tools/cli/) as you make changes.

@@ -1,0 +1,66 @@
+---
+title: Parameters
+description: Use caller-supplied string parameters with typed defaults and explicit checks.
+editUrl: false
+prev: false
+next: false
+---
+import CheckedExample from '../../../components/docs/CheckedExample.astro';
+
+A `param` introduces a value supplied by the caller. It consumes no input.
+The CLI accepts repeated `--param NAME=VALUE` options; the reader spec converts
+the supplied strings when their declarations execute.
+
+## Choose a default and check the result
+
+This reader sums a weight array once and compares the total with a capacity:
+
+<CheckedExample id="parameters-spec" title="site/examples/guides/parameters.iris" />
+<CheckedExample id="parameters-input" title="site/examples/guides/parameters.txt" />
+
+Supply a capacity of 12:
+
+<CheckedExample id="parameters" />
+
+`capacity` is an ordinary entry in the returned data. Its integer default
+requires caller values to convert to integers. The parameter does not get a
+range from the default; add a `check` if your application also requires a
+nonnegative capacity.
+
+See [caller parameters](/specification/0.1/09-params-and-instances/#91-caller-parameters)
+and [parameter evaluation and conversion](/specification/0.1/09-params-and-instances/#92-parameter-evaluation-and-conversion).
+
+## Use or override the default
+
+With no caller value, capacity is 10, so these weights fail:
+
+<CheckedExample id="parameters-default" />
+
+This is [E-CHECK-FAILED](/specification/0.1/errors/#e-check-failed). The `let`
+calculation uses the whole array, and this check has no repeated record witness.
+The input location is therefore the cursor after the array.
+
+Defaults execute even when the caller overrides them. A default with a bad
+index or an undefined name still fails before the supplied string is converted.
+Keep default expressions valid for every reached execution.
+
+## Match the supplied type
+
+A decimal value does not convert to an integer parameter:
+
+<CheckedExample id="parameters-type" />
+
+This is [E-PARAM-TYPE](/specification/0.1/errors/#e-param-type).
+A float default converts numeric strings to floats, including integer
+spellings. A string default keeps the supplied text as a string. Without a default, a supplied value tries integer conversion, then
+float conversion, then remains a string. With neither a default nor a supplied
+value, the parameter reports
+[E-PARAM-MISSING](/specification/0.1/errors/#e-param-missing).
+
+Names are case-sensitive. An undeclared caller key reports
+[E-PARAM-UNKNOWN](/specification/0.1/errors/#e-param-unknown) before reading input.
+The CLI splits an assignment at its first `=` and later assignments replace
+earlier ones. Parameter strings are not Iris expressions.
+
+The special `instance` selector is admitted by an `instances` block. See
+[several instances](/guides/instances/) for its ordinal and name rules.

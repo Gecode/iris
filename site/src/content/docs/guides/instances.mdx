@@ -1,0 +1,76 @@
+---
+title: Several instances
+description: List a catalog and select an instance by ordinal or name, including rejected instances.
+editUrl: false
+prev: false
+next: false
+---
+import CheckedExample from '../../../components/docs/CheckedExample.astro';
+
+Use an `instances` block when one input file contains separately selectable
+instances. Each pass reads one instance into a fresh local frame. A read
+returns one instance's data. A catalog reports the file's instance count,
+usable names and first rejections.
+
+## Describe one instance per pass
+
+The block must be the last statement of the reader spec. Put checks inside it
+so they apply to each instance:
+
+<CheckedExample id="instances-spec" title="site/examples/guides/instances.iris" />
+<CheckedExample id="instances-input" title="site/examples/guides/instances.txt" />
+
+The second instance has a negative value. Its check rejects it; the other two
+remain usable. See
+[instance blocks and frames](/specification/0.1/09-params-and-instances/#93-instance-blocks-and-frames).
+
+## Inspect the catalog
+
+The plain listing shows names and a rejection message:
+
+<CheckedExample id="instances-list" />
+
+Use `--dzn` to get the catalog as data:
+
+<CheckedExample id="instances-catalog" />
+
+A catalog traverses every instance, even when given an `instance` parameter.
+It can retain a failed check as a rejection summary. A malformed numeric token,
+invalid UTF-8 or exhausted work budget still aborts the operation. See
+[catalog results](/specification/0.1/09-params-and-instances/#96-catalog-results)
+and [deferred failures](/specification/0.1/09-params-and-instances/#95-deferred-failures-in-skipped-instances).
+
+## Select by number or name
+
+Ordinals start at 1. Select the third instance:
+
+<CheckedExample id="instances-number" />
+
+Or select its exact, case-sensitive name:
+
+<CheckedExample id="instances-name" />
+
+The reader traverses earlier instances, defers eligible rejections in skipped
+ones, and stops after the selected body. It does not visit later instances.
+Integer-looking selectors choose ordinals before names; avoid numeric names
+when name selection matters. Duplicate names select the first match.
+
+## Read without a selector
+
+A file with several instances needs an explicit selection. With no selector,
+the reader retains the first instance and traverses the rest to count them.
+The later rejected check is deferred:
+
+<CheckedExample id="instances-unselected" />
+
+This is [E-INSTANCE-SELECTION](/specification/0.1/errors/#e-instance-selection).
+Selecting the rejected instance instead reports its check failure:
+
+<CheckedExample id="instances-rejected" />
+
+That is [E-CHECK-FAILED](/specification/0.1/errors/#e-check-failed).
+A rejected first instance would fail immediately even without a selector.
+No read returns partial data.
+
+See the exact [selection rules](/specification/0.1/09-params-and-instances/#94-instance-selection).
+The [job shop reader](/formats/job-shop/) applies this structure to a real format.

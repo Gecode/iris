@@ -1,0 +1,9 @@
+instance small
+2
+4 7
+instance broken
+1
+-1
+instance large
+3
+2 5 8

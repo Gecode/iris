@@ -1,0 +1,73 @@
+---
+title: Performance
+description: Understand input progress, expression effort and idle work budgets with a real exhaustion example.
+editUrl: false
+prev: false
+next: false
+---
+import CheckedExample from '../../../components/docs/CheckedExample.astro';
+
+Iris limits work that can grow without corresponding input. The two work budgets
+count specified operations, independently of elapsed time or an implementation's
+allocation strategy. They apply to a whole read or catalog operation.
+
+## Know the two allowances
+
+Let `N` be the entire original input's byte length, including comments and bytes
+after a stop or selected instance. Each operation starts with these limits:
+
+| Work | Limit | Examples of charged work |
+| --- | ---: | --- |
+| Idle | 1048576 | Counted repeat iterations that read no input; empty array rows |
+| Expression | 1048576 + 16 × N | Aggregate leaves, array and record selections, comprehension visits, lifted-check rows |
+
+Equality is allowed. Exceeding either allowance reports
+[E-BUDGET](/specification/0.1/errors/#e-budget). The counters do not reset when
+a repeat ends, input advances or an instance is skipped. A catalog shares them
+across all its instances. Reader-spec bytes and parameter strings do not add to
+`N`. `iris check` executes neither budget.
+
+The Specification defines [counters and input length](/specification/0.1/10-work-budgets/#101-counters-and-input-byte-length)
+and [expression charges](/specification/0.1/10-work-budgets/#103-expression-effort).
+
+## See empty rows consume idle work
+
+A zero-width array can still require many outer rows. This reader uses a
+parameter to choose how many empty rows to construct:
+
+<CheckedExample id="empty-rows-spec" title="site/examples/guides/empty-rows.iris" />
+
+Its input file is empty; no tokens are needed:
+
+<CheckedExample id="empty-rows-input" title="site/examples/guides/empty.txt (empty file)" />
+<CheckedExample id="empty-rows" />
+
+`empty[rows][0]` adds `rows` idle units before constructing the empty structure.
+Increasing only the parameter exceeds the allowance, even with zero input:
+
+<CheckedExample id="empty-rows-budget" />
+
+This failure happens at the array declaration. It is a work limit, not a memory
+allocation failure or a wall-clock timeout. The exact empty-array charges are
+in [idle work](/specification/0.1/10-work-budgets/#102-idle-work), and diagnostic
+locations are in [exhaustion](/specification/0.1/10-work-budgets/#106-exhaustion-and-error-locations).
+
+## Keep work proportional to input
+
+Use counted repeats when the input supplies a count, and token or EOF repeats
+when the input supplies a terminator. An indefinite repeat or instance body
+that consumes no input reports
+[E-NO-PROGRESS](/specification/0.1/errors/#e-no-progress), separately from the
+idle budget.
+
+Use `distinct` to test uniqueness rather than comparing every pair in nested
+comprehensions. Sum a collection once with `let` when several later checks need
+the same total. Keep record checks local when their condition concerns one
+record. [The job shop reader](/tutorial/job-shop/#check-each-job-and-the-whole-instance)
+shows both a per-job `distinct` and a single total-duration calculation.
+
+Short circuit can avoid evaluating later expressions. It does not remove the
+row-selection charges that a lifted check incurs before evaluating its
+condition. See [lifted-check traversal](/specification/0.1/10-work-budgets/#104-lifted-check-traversal).
+If a read exhausts a budget, reduce repeated traversal or idle structure
+creation; making the input artificially longer leaves the underlying work.

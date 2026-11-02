@@ -1,0 +1,4 @@
+points=2 morning route
+(1, 2)
+3,4
+end morning route

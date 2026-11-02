@@ -6,9 +6,9 @@ const { id, title } = Astro.props;
 const example = documentation[id];
 if (!example) throw new Error(`Unknown documentation example: ${id}`);
 ---
-<div class="my-5 min-w-0 max-w-full" data-doc-example={id} data-doc-part="code">
+{example.code ? <div class="my-5 min-w-0 max-w-full" data-doc-example={id} data-doc-part="code">
   <Code code={example.code} lang={example.language} title={title} />
-</div>
+</div> : <p class="text-sm text-iris-muted" data-doc-example={id} data-doc-part="empty-source">Empty file.</p>}
 {example.output !== undefined && (example.output ?
   <div class="iris-terminal min-w-0 border border-iris-dark-border bg-iris-dark-canvas text-iris-dark-ink">
     <pre class="m-0 max-h-[28rem] overflow-auto border-0 bg-transparent p-4 text-sm" tabindex="0" role="group" aria-label="Command output"><code class="bg-transparent p-0 text-iris-dark-ink" data-doc-example={id} data-doc-part="output">{example.output}</code></pre>

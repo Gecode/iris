@@ -8,8 +8,8 @@ then shows executable format examples. The format library renders every
 format’s README, highlighted reader spec, and cases with their real output.
 The Language Specification is rendered directly from `spec/`, with versioned
 chapter pages and error-code links shared with the language server.
-The introduction, tools and Rust API pages use the same shell. Other language
-guides identify planned implementations.
+The introduction, tutorial, guides, tools and Rust API pages use the same shell.
+Other language guides identify planned implementations.
 
 ## Build and check
 
@@ -168,3 +168,16 @@ repository-relative path. In-place formatting runs on a disposable copy.
 `CheckedExample.astro` marks commands, source snippets and outputs for the
 existing freshness checker, which requires each page's examples and rejects
 unmarked code blocks on these pages. The introduction reuses the format markers.
+
+
+The tutorial and guides extend that collector through
+`scripts/learning-examples.mjs`. Intermediate reader specs and inputs live in
+`examples/tutorial/` and `examples/guides/`; final tutorial readers come directly
+from the format library. Every collection checks each reader spec with the real
+CLI and checks formatting under `examples/`. It runs every displayed read,
+selection and catalog command, including expected failures. For each failure,
+the conformance driver also checks the expected error code, and the user CLI
+must emit no partial data. The same rendered-text markers cover all these
+pages, including diagnostics and the canonical error document in the errors
+guide. To add an example, register its required markers in `learningPages`,
+collect its sources and command result, then render them with `CheckedExample`.

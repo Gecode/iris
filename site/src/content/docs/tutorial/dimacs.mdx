@@ -1,0 +1,94 @@
+---
+title: 1. Read DIMACS CNF
+description: Read a DIMACS header, comments, and sentinel-terminated clauses, then check a policy.
+editUrl: false
+prev: false
+next: false
+---
+import CheckedExample from '../../../components/docs/CheckedExample.astro';
+
+A DIMACS CNF file starts with a `p cnf` header. It declares the number of
+Boolean variables and clauses. Each clause is a sequence of signed variable
+numbers followed by `0`. A negative number denotes a negated variable.
+
+Start with the header, then add the clause body. All commands below run from
+the repository root; see the [tutorial setup](/tutorial/#before-you-start).
+
+## Capture the header
+
+A `line` pattern matches a whole remaining line. Literal text checks `p cnf`;
+the two captures read integers and store them as `vars` and `clauses`.
+The ranges reject negative counts. `gecode.int_max` is 2147483646, the fixed
+Iris 0.1 host constant used by the library reader.
+
+<CheckedExample id="dimacs-header-spec" title="site/examples/tutorial/dimacs-header.iris" />
+
+For now the input contains only a header. The reader spec must consume the
+whole input, so save the clauses for the next stage.
+
+<CheckedExample id="dimacs-header-input" title="site/examples/tutorial/dimacs-header.txt" />
+<CheckedExample id="dimacs-header" />
+
+`--dzn` prints named MiniZinc data assignments. The two captures produce two
+scalar integer entries. See the Specification's
+[line patterns](/specification/0.1/07-structure/#72-line-patterns-and-captures)
+and [ranges](/specification/0.1/06-types-and-values/#64-integer-ranges).
+
+## Add comments and clauses
+
+Declare `comment "c"` at the top level to skip input comments. `#` introduces
+a comment in the reader spec itself. These are separate conventions.
+
+`repeat clauses` runs its body exactly that many times. A `list` reads until
+its sentinel, consuming the terminating `0` without storing it. The range
+`-vars..vars` checks each stored literal against the declared variable count.
+
+<CheckedExample id="dimacs-clauses-spec" title="site/examples/tutorial/dimacs-clauses.iris" />
+<CheckedExample id="dimacs-clauses-input" title="site/examples/tutorial/dimacs-clauses.txt" />
+<CheckedExample id="dimacs-clauses" />
+
+Each list is one row of `clause`. Repetition adds another array level, so
+`clause` has depth 2 and its rows can have different lengths. A clause can
+span physical lines: zero ends it. Too few clauses or a missing zero fails
+while reading; extra data after the declared clauses also fails.
+
+The Specification defines [comment and stop prefixes](/specification/0.1/04-input/#47-comment-and-stop-prefixes),
+[repeats](/specification/0.1/07-structure/#74-repeat-forms-and-termination),
+and [lists](/specification/0.1/06-types-and-values/#69-sentinel-and-end-of-line-lists).
+
+## Check an application policy
+
+Suppose your application accepts only nonempty clauses. Add a `check` after
+the repeat. In `count(clause)`, `clause` denotes one record's list, so the condition
+runs once per clause. A direct `size(clause)` would instead inspect the outer
+column and count clauses; `size` has a whole-array exception.
+
+<CheckedExample id="dimacs-nonempty-spec" title="site/examples/tutorial/dimacs-nonempty.iris" />
+<CheckedExample id="dimacs-nonempty-input" title="site/examples/tutorial/dimacs-clauses.txt" />
+<CheckedExample id="dimacs-nonempty" />
+
+An empty clause violates that policy:
+
+<CheckedExample id="dimacs-empty-input" title="site/examples/tutorial/dimacs-empty.txt" />
+<CheckedExample id="dimacs-empty" />
+
+This is [E-CHECK-FAILED](/specification/0.1/errors/#e-check-failed).
+The caret points at the failing record's start. A failed read prints no partial
+data. See [records and checks](/guides/records-and-checks/) for the rules that
+make a check range over records.
+
+## Finish with the library reader
+
+DIMACS itself permits an empty clause: it makes the formula unsatisfiable.
+The library therefore leaves out our application policy. It adds a format name
+and `stop "%"` for the SATLIB trailer. The stop prefix makes the rest of the
+input unavailable to reading, including the trailer's final zero.
+
+This is the complete [DIMACS CNF library reader](/formats/dimacs-cnf/):
+
+<CheckedExample id="dimacs-library-spec" title="formats/dimacs-cnf/dimacs-cnf.iris" />
+<CheckedExample id="dimacs-library-input" title="formats/dimacs-cnf/cases/three-variables/input.txt" />
+<CheckedExample id="dimacs-library" />
+
+The library page includes a failing literal-range example and source downloads.
+Continue with [TSPLIB sections](/tutorial/tsplib/).

@@ -1,0 +1,79 @@
+---
+title: 2. Read TSPLIB sections
+description: Read keyword/value headers and a coordinate section, then use the TSPLIB library reader.
+editUrl: false
+prev: false
+next: false
+---
+import CheckedExample from '../../../components/docs/CheckedExample.astro';
+
+TSPLIB uses keyword/value headers followed by a coordinate or edge-weight
+section. Use `sections` when header lines can occur in different orders.
+This step builds a reader for `EUC_2D` coordinates, then moves to the full
+[TSPLIB library reader](/formats/tsplib/).
+
+All commands run from the repository root. Start with
+[DIMACS CNF](/tutorial/dimacs/) if captures and repeats are new to you.
+
+## Read keyword/value headers
+
+Each sections arm has a line pattern. An ordinary arm must match once;
+`optional` allows it to be absent. Each arm still permits at most one match.
+The patterns below accept both `DIMENSION:3` and `DIMENSION : 3` because
+pattern spacing beside punctuation can be empty.
+
+<CheckedExample id="tsplib-headers-spec" title="site/examples/tutorial/tsplib-headers.iris" />
+<CheckedExample id="tsplib-headers-input" title="site/examples/tutorial/tsplib-headers.txt" />
+<CheckedExample id="tsplib-headers" />
+
+`rest` captures the remaining matching text, including spaces within a name.
+`word` captures one word. Entry order follows the order in which the arms
+execute, so `edge_weight_type` appears before `name` in this output.
+
+The `EOF` token ends sections and is consumed. Sections also end at actual end
+of input; `until "EOF"` does not require the token to appear. Required arms
+are checked when sections end. See
+[sections in the Specification](/specification/0.1/07-structure/#78-sections).
+
+## Add the coordinates
+
+An arm's body can read subsequent input. The `NODE_COORD_SECTION` body reads
+`n` triples: a node ID, an x coordinate and a y coordinate. The dimension
+must have been read before this body runs. Sections allow flexible arm order;
+they do not postpone a body until its dependencies are available.
+
+<CheckedExample id="tsplib-coordinates-spec" title="site/examples/tutorial/tsplib-coordinates.iris" />
+<CheckedExample id="tsplib-coordinates-input" title="site/examples/tutorial/tsplib-coordinates.txt" />
+<CheckedExample id="tsplib-coordinates" />
+
+The repeat produces three parallel arrays. Coordinates are floats even when
+the input spells them as integers. The checks require the supported distance
+type and bound both coordinate columns. In the coordinate check, `x` and `y`
+denote fields of the same record, so they are checked together for every node.
+
+This reader stores node IDs without requiring consecutive numbering. Use
+`index 1` instead of `node: int` when a format requires exactly 1, 2, 3, … and
+you do not need to retain the IDs. See
+[index statements](/specification/0.1/07-structure/#77-index-statements) and
+[checks](/specification/0.1/08-expressions-and-checks/#813-checks-and-failure-witnesses).
+
+## Finish with the library reader
+
+The library supports coordinate and explicit matrix instances. It makes the
+payload arms optional, then checks which payload the declared edge-weight
+type requires. `defined` guards names whose arms may not have run. An omitted
+edge-weight type defaults to `EXPLICIT`; an omitted matrix layout defaults to
+`FULL_MATRIX` when the weight section runs.
+
+<CheckedExample id="tsplib-library-spec" title="formats/tsplib/tsplib.iris" />
+<CheckedExample id="tsplib-library-input" title="formats/tsplib/cases/euc-2d-five/input.txt" />
+<CheckedExample id="tsplib-library" />
+
+The data contains coordinates. The host computes distances for `EUC_2D`,
+`CEIL_2D`, `ATT` or `GEO`; the reader spec does not perform that conversion.
+The [library page](/formats/tsplib/) also shows explicit weights and a missing
+weight-section failure. The Specification defines
+[matrix layouts](/specification/0.1/06-types-and-values/#68-matrix-layouts).
+
+Continue with [job shop records and checks](/tutorial/job-shop/), or read the
+[sections guide](/guides/sections/) for repeated and missing headers.

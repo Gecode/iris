@@ -1,0 +1,64 @@
+---
+title: Records and checks
+description: Use nested repeats, column data and record checks with useful failure locations.
+editUrl: false
+prev: false
+next: false
+---
+import CheckedExample from '../../../components/docs/CheckedExample.astro';
+
+Each repeat iteration forms a record. Its fields become columns in the data;
+nested repeats add array levels. Record names let a check refer to one record's
+fields together.
+
+## Read jobs and check machine use
+
+Each job below has one operation per machine. The inner repeat reads a machine
+number and duration for each operation:
+
+<CheckedExample id="jobshop-checks-spec" title="site/examples/tutorial/jobshop-checks.iris" />
+<CheckedExample id="jobshop-checks-input" title="site/examples/tutorial/jobshop.txt" />
+<CheckedExample id="jobshop-checks" />
+
+The data has `machine` and `duration` columns of depth 2. It has no record
+objects or extra entries named `job` or `jobs`. `as jobs` names the record list;
+`each job` names its individual records. Place `each` first in its repeat.
+
+See [column construction](/specification/0.1/07-structure/#75-column-construction-and-missing-rows)
+and [logical records](/specification/0.1/07-structure/#76-logical-records-and-names).
+
+## Check a record or a collection
+
+`check distinct(job.machine)` runs for each job. `job.machine` is that job's
+machine array. A plain repeated field in a check can also denote one record's
+field, rather than the whole stored column. This is why checks can identify
+a failing record without an explicit loop.
+
+The final comprehension explicitly ranges over `jobs`, sums each duration
+array, and compares the instance total with `gecode.int_max`. For a whole-column
+calculation that should happen once, compute it with `let` before checking the
+result. Avoid relying on a repeated field's ordinary expression meaning inside
+a check: the check's record resolution can change it.
+
+See [record names and field access](/specification/0.1/08-expressions-and-checks/#812-record-names-and-field-access),
+[comprehensions](/specification/0.1/08-expressions-and-checks/#810-comprehensions-and-bindings),
+and [checks and failure witnesses](/specification/0.1/08-expressions-and-checks/#813-checks-and-failure-witnesses).
+
+## Locate a failed record
+
+The first job in this input uses machine 0 twice:
+
+<CheckedExample id="jobshop-invalid-input" title="site/examples/guides/jobshop-invalid.txt" />
+<CheckedExample id="jobshop-invalid" />
+
+[E-CHECK-FAILED](/specification/0.1/errors/#e-check-failed) points at the saved
+start of the failing job. The record number in the message starts at 1;
+the canonical error's `record_path` starts at 0, so this job has path `[0]`.
+A check without a record witness uses the current input cursor instead.
+
+Checks stop at the first false condition. A hard evaluation error, such as an
+out-of-range array index, retains its own error kind. Guard optional data with `defined` and short circuit operators before
+accessing it.
+
+For the complete reader, including descriptions and named instances, see the
+[job shop tutorial](/tutorial/job-shop/) and [library page](/formats/job-shop/).

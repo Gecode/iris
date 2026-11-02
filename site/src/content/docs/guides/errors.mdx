@@ -1,0 +1,77 @@
+---
+title: Errors
+description: Read CLI diagnostic locations and carets, then inspect canonical error codes and record paths.
+editUrl: false
+prev: false
+next: false
+---
+import CheckedExample from '../../../components/docs/CheckedExample.astro';
+
+A diagnostic names where reading failed and the reader-spec statement that
+was active. Start with the message, then compare the marked input with that
+statement. The first visible mismatch may come from an earlier wrong count
+or an extra token consumed in a previous record.
+
+## Follow a real check failure
+
+This reader checks that each job uses every machine once:
+
+<CheckedExample id="jobshop-checks-spec" title="site/examples/tutorial/jobshop-checks.iris" />
+
+The first job below uses machine 0 twice:
+
+<CheckedExample id="jobshop-invalid-input" title="site/examples/guides/jobshop-invalid.txt" />
+<CheckedExample id="jobshop-invalid" />
+
+Read the diagnostic in three parts:
+
+- The first line gives the input path, line and byte column, then the message.
+- The excerpt and caret mark the input position. A record check uses the saved
+  record start, so the caret can precede the duplicate token itself.
+- `spec:` gives the reader-spec path and active statement's line. An active
+  `while reading:` context, when present, identifies repeats, sections or fields.
+
+Columns count UTF-8 bytes. The renderer escapes control characters and bounds
+long excerpts. A caret is a location marker; it does not always cover the full
+bad token. The numbered records in diagnostic messages start at 1.
+
+## Find the stable error code
+
+The user CLI prints a human-readable diagnostic, without an error code.
+`--json` selects data output on success; it does not change errors into JSON.
+Build the [conformance driver](/tools/cli/#run-conformance-cases) to get
+a canonical error document for the same failing read. Put `iris-driver` on
+your `PATH` alongside `iris`:
+
+<CheckedExample id="jobshop-error-json" />
+
+The `code` is [E-CHECK-FAILED](/specification/0.1/errors/#e-check-failed).
+`record_path: [0]` identifies the first job using indices from 0. The input and
+reader-spec locations have separate fields. Canonical documents are defined in
+[the data model](/specification/0.1/03-data-model/); location profiles and error
+ordering are in [the errors chapter](/specification/0.1/errors/).
+
+## Separate source errors from reading errors
+
+`iris check` parses and resolves a reader spec without reading input. Syntax,
+reading-type and placement errors point into that source. Expressions still
+execute at read time: a misspelled value name can pass `check` and later report
+[E-NAME-UNDEFINED](/specification/0.1/errors/#e-name-undefined).
+
+For reading errors, check the input shape first:
+
+- [E-EXPECTED-VALUE](/specification/0.1/errors/#e-expected-value): the token
+  cannot be read using the required type. Check earlier counts if the token
+  belongs to a later section.
+- A range rejection also uses E-EXPECTED-VALUE. Check the input's numbering
+  base and the reader's bounds.
+- [E-LINE-MATCH](/specification/0.1/errors/#e-line-match): compare literal text,
+  punctuation and captures, or look for a missing required sections arm.
+- [E-TRAILING-INPUT](/specification/0.1/errors/#e-trailing-input): data remains
+  after the reader ends. Check counts and trailers before ignoring it.
+- [E-BUDGET](/specification/0.1/errors/#e-budget): inspect repeated work; see
+  [performance](/guides/performance/).
+
+A failed read exits with status 1 and prints no partial data. CLI usage errors
+exit with status 2. Error codes identify language failures and are separate from
+those process exit statuses. See the [CLI guide](/tools/cli/) for command modes.
