@@ -33,8 +33,10 @@ npm run preview -- --host 127.0.0.1
 
 Search uses Pagefind and works in the built preview. The development server
 shows Starlight’s search warning. Build and checks also run in the
-[site workflow](../.github/workflows/site.yml). This task adds no deployment;
-hosting is separate work.
+[site workflow](../.github/workflows/site.yml). Pushes to `main` deploy the
+checked build to the Cloudflare Worker `iris-site` once its repository secrets
+are configured. See [publishing](PUBLISHING.md) for the one-time Gecode account
+and custom-domain setup, deployment, verification and rollback.
 
 ## Content and styling
 

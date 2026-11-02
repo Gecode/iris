@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "iris-site",
+  "compatibility_date": "2026-11-02",
+  "workers_dev": false,
+  "preview_urls": false,
+  // Attach iris.gecode.dev once in the Gecode account (see PUBLISHING.md).
+  // Omit routes so ordinary deployments leave that connection unchanged.
+  "assets": {
+    "directory": "./dist",
+    "html_handling": "force-trailing-slash",
+    "not_found_handling": "404-page"
+  }
+}
