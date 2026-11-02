@@ -58,6 +58,10 @@ impl Control {
             self.work.set(self.work.get() + _count);
         }
     }
+    #[cfg(test)]
+    pub(crate) fn test_work(&self) -> usize {
+        self.work.get()
+    }
     pub fn is_active(&self) -> bool {
         self.token.is_some()
     }
@@ -328,7 +332,7 @@ pub(crate) mod tests {
         reader.execute(declaration.parent().unwrap()).unwrap();
         cancel_at(4, |control| {
             reader.input.control = control;
-            let value = reader.lookup("x").unwrap();
+            let value = reader.lookup(spec.index.test_name("x").id).unwrap();
             value
                 .root()
                 .copy_with(&reader.input.control, |_| {})
@@ -366,9 +370,37 @@ pub(crate) mod tests {
             reader.execute_check(&check)
         });
         let zeros = vec![b'0'; 4 * SCAN_CHUNK + 1];
-        cancel_at(9, |control| {
+        cancel_at(3, |control| {
             crate::numeric::parse_integer_controlled(&zeros, &control).map_err(Into::into)
         });
+    }
+
+    #[test]
+    fn cancellation_long_names_use_interned_keys() {
+        let long = "a".repeat(512 * SCAN_CHUNK);
+        let source = format!("repeat 8 {{{long}:int let y={long}}}");
+        let spec = Spec::parse(source.as_bytes(), "spec").unwrap();
+        let name = spec.index.test_name(&long);
+        // A frame stores only an identity plus shared text. No name bytes are
+        // scanned or copied by set/lookup/take, regardless of identifier size.
+        let control = Control::new(&ReadOptions {
+            cancellation: Some(CancellationToken::default()),
+        });
+        let mut frame = crate::value::Frame::default();
+        frame
+            .set_controlled(name.clone(), Value::int(7), &control)
+            .unwrap();
+        assert_eq!(frame.lookup(name.id).unwrap().root().as_int().unwrap(), 7);
+        assert!(frame.take(name.id).is_some());
+        assert_eq!(control.test_work(), 0);
+        // Gate execution after construction, including publication and generic
+        // expression lookup. The other thread cancels at the next checkpoint.
+        let mut reader = Interpreter::new(&spec, Input::new(b"1 2 3 4 5 6 7 8", "input")).unwrap();
+        cancel_at(20, |control| {
+            reader.input.control = control;
+            reader.read()
+        });
+        println!("32 MiB identifier: frame name-byte work=0; cancelled at checkpoint 20");
     }
 
     /// Counts the checkpoints of an uncancelled read of `source` on empty input.

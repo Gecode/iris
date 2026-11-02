@@ -4,7 +4,7 @@ use super::*;
 pub(super) struct Sections {
     node: SyntaxNode,
     alternatives: Vec<String>,
-    store: Option<String>,
+    store: Option<Name>,
     skip_other: bool,
     arms: Vec<Arm>,
 }
@@ -16,7 +16,11 @@ struct Arm {
     body: Option<SyntaxNode>,
 }
 impl Sections {
-    pub fn new(node: SyntaxNode, strings: &HashMap<TextRange, String>) -> Self {
+    pub fn new(
+        node: SyntaxNode,
+        strings: &HashMap<TextRange, String>,
+        names: &HashMap<TextRange, Name>,
+    ) -> Self {
         let mut alternatives = vec![];
         let mut store = None;
         for option in node.children().filter(|n| n.kind() == K::Terminators) {
@@ -28,7 +32,7 @@ impl Sections {
                     .map(|t| strings[&t.text_range()].clone()),
             );
             if let Some(index) = tokens.iter().position(|t| t.text() == "store") {
-                store = Some(tokens[index + 1].text().to_owned());
+                store = Some(names[&tokens[index + 1].text_range()].clone());
             }
         }
         let skip_other = tokens(&node).iter().any(|t| t.text() == "skip");
@@ -161,7 +165,7 @@ impl Interpreter<'_, '_> {
                 .last_mut()
                 .expect("active frame")
                 .set_controlled(
-                    self.input.control.copy_text(name)?,
+                    name.clone(),
                     Value::string(
                         self.input
                             .control

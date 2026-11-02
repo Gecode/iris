@@ -44,10 +44,9 @@ their ordinary path. This is a bound on cooperative work, not elapsed time:
 parser analysis, OS acquisition/scheduling, allocation/deallocation and a single
 standard-library conversion are indivisible. Cancellation cannot interrupt a
 blocked syscall or instantly release a large allocation. Parsing remains outside
-the cancellable reading API. Known gap: storing or looking up a value by a spec
-name hashes the whole name without a checkpoint, so an extremely long
-identifier exceeds the 64 KiB bound. Interning names when the spec loads
-(rust-013) removes it.
+the cancellable reading API. Spec names are interned when the spec loads; reading
+keys frame, record and evaluator maps by small identifiers. Host parameter keys are admitted
+once with checked comparisons, then statements use those same identifiers.
 
 `summary::write_summary` writes the CLI's unlimited summary, preserving its
 bytes. `summary::preview` uses the same shape renderer with editor limits:

@@ -32,15 +32,44 @@ pub struct Entry {
 pub struct Data {
     pub(crate) entries: Vec<Entry>,
 }
+/// Spec-local identity. Text is shared for output and checked diagnostics only.
+#[derive(Debug, Clone)]
+pub(crate) struct Name {
+    pub id: NameId,
+    text: std::sync::Arc<str>,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct NameId(pub usize);
+impl NameId {
+    pub const NAME: Self = Self(0);
+    pub const INSTANCES: Self = Self(1);
+    pub const FAILED: Self = Self(2);
+    pub const INSTANCE: Self = Self(3);
+}
+impl Name {
+    pub fn new(id: usize, text: &str) -> Self {
+        Self {
+            id: NameId(id),
+            text: text.into(),
+        }
+    }
+}
+impl std::ops::Deref for Name {
+    type Target = str;
+    fn deref(&self) -> &str {
+        &self.text
+    }
+}
 #[derive(Debug, Default)]
 pub(crate) struct Frame {
     entries: Vec<FrameEntry>,
-    names: HashMap<String, usize>,
+    names: HashMap<NameId, usize>,
 }
 #[derive(Debug)]
 struct FrameEntry {
-    name: String,
+    name: Name,
     value: Option<Value>,
+    buffer: Option<Value>,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AccessError {
@@ -209,6 +238,21 @@ impl Value {
         }
         Ok(())
     }
+    pub(crate) fn set_list_dimension(&mut self, control: &Control) -> Result<(), Cancelled> {
+        control.check()?;
+        control.check()?;
+        control.worked(2);
+        let size = self.leaf_count();
+        if self.levels.len() == 1 {
+            self.levels[0].offsets.clear();
+            self.levels[0].offsets.extend([0, size]);
+        } else {
+            self.levels = vec![ArrayLevel {
+                offsets: vec![0, size],
+            }];
+        }
+        Ok(())
+    }
     pub fn depth(&self) -> usize {
         self.levels.len()
     }
@@ -364,47 +408,77 @@ impl<'a> ValueRef<'a> {
     }
 }
 impl Frame {
-    pub fn set(&mut self, name: String, value: Value) {
+    pub fn set(&mut self, name: Name, value: Value) {
         self.set_controlled(name, value, &Control::default())
             .expect("uncancelled frame");
     }
     pub fn set_controlled(
         &mut self,
-        name: String,
+        name: Name,
         value: Value,
         control: &Control,
     ) -> Result<(), Cancelled> {
-        if let Some(&index) = self.names.get(&name) {
+        control.check()?;
+        if let Some(&index) = self.names.get(&name.id) {
             self.entries[index].value = Some(value);
         } else {
-            self.names
-                .insert(control.copy_text(&name)?, self.entries.len());
+            self.names.insert(name.id, self.entries.len());
             self.entries.push(FrameEntry {
                 name,
                 value: Some(value),
+                buffer: None,
             });
         }
         Ok(())
     }
-    pub fn lookup(&self, name: &str) -> Option<&Value> {
-        self.entries.get(*self.names.get(name)?)?.value.as_ref()
+    pub fn lookup(&self, name: NameId) -> Option<&Value> {
+        self.entries.get(*self.names.get(&name)?)?.value.as_ref()
     }
-    pub fn take(&mut self, name: &str) -> Option<Value> {
-        self.entries.get_mut(*self.names.get(name)?)?.value.take()
+    pub fn take(&mut self, name: NameId) -> Option<Value> {
+        self.entries.get_mut(*self.names.get(&name)?)?.value.take()
     }
-    pub fn into_data(self) -> Data {
-        Data {
+    pub fn into_data(self, control: &Control) -> Result<Data, Cancelled> {
+        Ok(Data {
             entries: self
                 .entries
                 .into_iter()
-                .map(|entry| Entry {
-                    name: entry.name,
-                    value: entry
-                        .value
-                        .expect("published frame values have not been collected"),
+                .map(|entry| {
+                    Ok(Entry {
+                        name: control.copy_text(&entry.name)?,
+                        value: entry
+                            .value
+                            .expect("published frame values have not been collected"),
+                    })
                 })
-                .collect(),
+                .collect::<Result<_, Cancelled>>()?,
+        })
+    }
+    pub fn extend(&mut self, other: Frame, control: &Control) -> Result<(), Cancelled> {
+        for entry in other.entries {
+            control.check()?;
+            self.set_controlled(entry.name, entry.value.expect("published value"), control)?;
         }
+        Ok(())
+    }
+    #[cfg(test)]
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+    pub fn clear(&mut self, control: &Control) -> Result<(), Cancelled> {
+        for (index, entry) in self.entries.iter_mut().enumerate() {
+            if index.is_multiple_of(VALUE_CHUNK) {
+                control.check()?;
+            }
+            control.worked(1);
+            entry.value = None;
+        }
+        Ok(())
+    }
+    pub fn take_buffer(&mut self, name: NameId) -> Option<Value> {
+        self.entries.get_mut(*self.names.get(&name)?)?.buffer.take()
+    }
+    pub fn recycle(&mut self, name: NameId, buffer: Option<Value>) {
+        self.entries[*self.names.get(&name).expect("collected field")].buffer = buffer;
     }
 }
 
@@ -432,13 +506,21 @@ impl Column {
                 _ => unreachable!(),
             })
     }
+    #[cfg(test)]
     pub fn add_row_controlled(
         &mut self,
         row: Option<Value>,
         control: &Control,
     ) -> Result<(), BuildError> {
+        self.add_row_reusing(row, control).map(|_| ())
+    }
+    pub fn add_row_reusing(
+        &mut self,
+        row: Option<Value>,
+        control: &Control,
+    ) -> Result<Option<Value>, BuildError> {
         use crate::ErrorCode;
-        let Some(row) = row else {
+        let Some(mut row) = row else {
             if let Some(value) = &mut self.value {
                 if value.depth() == 1 {
                     return Err(ErrorCode::RepeatMissing.into());
@@ -447,7 +529,7 @@ impl Column {
                 offsets.push(*offsets.last().expect("initial offset"));
             }
             self.rows += 1;
-            return Ok(());
+            return Ok(None);
         };
         if let Some(value) = &self.value {
             if value.depth() != row.depth() + 1 {
@@ -481,13 +563,30 @@ impl Column {
         // replaces it; subsequent nonempty rows use ordinary numeric promotion.
         if row.leaf_count() > 0 {
             if value.leaf_count() == 0 {
-                value.leaves = row.leaves;
+                value.leaves = std::mem::replace(&mut row.leaves, LeafStorage::Int(Vec::new()));
             } else {
-                value.append_controlled(row, control)?;
+                if let (LeafStorage::Int(destination), LeafStorage::Int(source)) =
+                    (&mut value.leaves, &mut row.leaves)
+                {
+                    for chunk in source.chunks(if control.is_active() {
+                        VALUE_CHUNK
+                    } else {
+                        usize::MAX
+                    }) {
+                        control.check()?;
+                        control.worked(chunk.len());
+                        destination.extend_from_slice(chunk);
+                    }
+                    source.clear();
+                } else {
+                    value.append_controlled(row, control)?;
+                    self.rows += 1;
+                    return Ok(None);
+                }
             }
         }
         self.rows += 1;
-        Ok(())
+        Ok(Some(row))
     }
     #[cfg(test)]
     pub fn finish(self) -> Result<Value, crate::ErrorCode> {

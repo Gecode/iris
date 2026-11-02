@@ -2,7 +2,7 @@ use super::*;
 
 impl Interpreter<'_, '_> {
     pub(super) fn execute_param(&mut self, node: &SyntaxNode) -> Result<(), Failure> {
-        let name = self.input.control.copy_text(tokens(node)[1].text())?;
+        let name = self.spec.index.names[&tokens(node)[1].text_range()].clone();
         // Defaults execute even when overridden, and may themselves fail.
         let default = node
             .children()
@@ -10,7 +10,7 @@ impl Interpreter<'_, '_> {
             .map(|n| self.eval(&n))
             .transpose()?;
         self.work(WorkKind::Probe, 1);
-        let value = if let Some(text) = self.params.get(&name) {
+        let value = if let Some(text) = self.params.get(&name.id) {
             self.work(WorkKind::Leaf, text.len());
             let kind = default.as_ref().map(Value::value_type);
             let converted = match kind {

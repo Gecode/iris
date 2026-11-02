@@ -27,6 +27,8 @@ fn parse_integer_with<const CANCEL: bool>(
     if digits.is_empty() {
         return Ok(None);
     }
+    let negative = bytes.first() == Some(&b'-');
+    let mut value = 0i64;
     for chunk in digits.chunks(if CANCEL {
         crate::cancellation::SCAN_CHUNK
     } else {
@@ -35,44 +37,28 @@ fn parse_integer_with<const CANCEL: bool>(
         if CANCEL {
             control.check()?;
         }
-        if !chunk.iter().all(u8::is_ascii_digit) {
-            return Ok(None);
-        }
-    }
-    if CANCEL {
-        control.check()?;
-    }
-    if CANCEL {
-        // Integer conversion itself can scan arbitrarily many leading zeroes.
-        // Keep the std parser on the ordinary path, and use the same checked
-        // decimal arithmetic in bounded chunks on the cancellable path.
-        let negative = bytes.first() == Some(&b'-');
-        let mut value = 0i64;
-        for chunk in digits.chunks(crate::cancellation::SCAN_CHUNK) {
-            control.check()?;
-            for &digit in chunk {
-                let Some(shifted) = value.checked_mul(10) else {
-                    return Ok(None);
-                };
-                let next = if negative {
-                    shifted.checked_sub(i64::from(digit - b'0'))
-                } else {
-                    shifted.checked_add(i64::from(digit - b'0'))
-                };
-                let Some(next) = next else {
-                    return Ok(None);
-                };
-                value = next;
+        for &digit in chunk {
+            if !digit.is_ascii_digit() {
+                return Ok(None);
             }
+            let Some(shifted) = value.checked_mul(10) else {
+                return Ok(None);
+            };
+            let next = if negative {
+                shifted.checked_sub(i64::from(digit - b'0'))
+            } else {
+                shifted.checked_add(i64::from(digit - b'0'))
+            };
+            let Some(next) = next else {
+                return Ok(None);
+            };
+            value = next;
         }
-        control.check()?;
-        return Ok(Some(value));
     }
-    let value = std::str::from_utf8(bytes).ok().and_then(|s| s.parse().ok());
     if CANCEL {
         control.check()?;
     }
-    Ok(value)
+    Ok(Some(value))
 }
 #[inline]
 pub(crate) fn parse_float_controlled(

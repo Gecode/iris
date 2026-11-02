@@ -123,12 +123,12 @@ pub(crate) struct Witness {
 
 pub(crate) struct Evaluator<'a, 's, 'i> {
     pub reader: &'a Interpreter<'s, 'i>,
-    names: HashMap<String, Option<View<'a>>>,
+    names: HashMap<crate::value::NameId, Option<View<'a>>>,
     bindings: HashMap<DefinitionId, Kind<'a>>,
     fields: HashMap<(usize, RecordId), View<'a>>,
     spans: HashMap<(usize, usize, usize), usize>,
     pub selected: HashMap<RepeatId, RecordId>,
-    pub dependency_slots: HashMap<String, usize>,
+    pub dependency_slots: HashMap<crate::value::NameId, usize>,
     pub dependencies: Vec<Option<Kind<'a>>>,
     pub witnesses: Vec<Witness>,
     #[cfg(test)]

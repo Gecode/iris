@@ -16,15 +16,19 @@ enum Item {
         required: bool,
     },
     Ellipsis,
-    Reference(String),
+    Reference(Name),
     Capture {
-        name: Option<String>,
+        name: Option<Name>,
         kind: ReadingKind,
         domain: Option<SyntaxNode>,
     },
 }
 impl Pattern {
-    pub fn new(node: &SyntaxNode, kinds: &HashMap<TextRange, ReadingKind>) -> Self {
+    pub fn new(
+        node: &SyntaxNode,
+        kinds: &HashMap<TextRange, ReadingKind>,
+        names: &HashMap<TextRange, Name>,
+    ) -> Self {
         let raw = node.text().to_string();
         let decoded = DecodedString::new(&raw);
         let base = usize::from(node.text_range().start());
@@ -45,14 +49,14 @@ impl Pattern {
                 K::PatternBlank => Item::Blank { required: false },
                 K::Ellipsis => Item::Ellipsis,
                 K::CurrentValue => Item::Reference(
-                    tokens(&item)
+                    names[&tokens(&item)
                         .into_iter()
                         .find(|t| t.kind() == K::Ident)
                         .expect("reference name")
-                        .text()
-                        .to_owned(),
+                        .text_range()]
+                        .clone(),
                 ),
-                K::Capture => Item::capture(&item, kinds),
+                K::Capture => Item::capture(&item, kinds, names),
                 _ => unreachable!("pattern item"),
             });
         }
@@ -72,11 +76,15 @@ impl Pattern {
     }
 }
 impl Item {
-    fn capture(item: &SyntaxNode, kinds: &HashMap<TextRange, ReadingKind>) -> Self {
+    fn capture(
+        item: &SyntaxNode,
+        kinds: &HashMap<TextRange, ReadingKind>,
+        names: &HashMap<TextRange, Name>,
+    ) -> Self {
         let name = tokens(item)
             .into_iter()
             .find(|t| t.kind() == K::Ident)
-            .map(|t| t.text().to_owned());
+            .map(|t| names[&t.text_range()].clone());
         let domain = item.children().find(|n| n.kind() == K::Type);
         let kind = domain.as_ref().map_or(ReadingKind::Word, |domain| {
             let contents = domain.first_child().expect("type contents");
@@ -211,7 +219,7 @@ impl<'i> Interpreter<'_, 'i> {
                 }
                 Item::Ellipsis => offset = line.bytes.len(),
                 Item::Reference(name) => {
-                    let value = self.lookup(name).ok_or_else(|| {
+                    let value = self.lookup(name.id).ok_or_else(|| {
                         match self
                             .input
                             .control
@@ -326,13 +334,13 @@ impl<'i> Interpreter<'_, 'i> {
             if let Item::Capture {
                 name: Some(name), ..
             } = &pattern.items[capture.item]
-                && name != "_"
+                && &**name != "_"
             {
                 self.frames
                     .last_mut()
                     .expect("active frame")
                     .set_controlled(
-                        self.input.control.copy_text(name)?,
+                        name.clone(),
                         capture.value(&self.input.control)?,
                         &self.input.control,
                     )?;
@@ -479,7 +487,7 @@ mod tests {
             assert_eq!(error.code, ErrorCode::Utf8);
             assert_eq!(error.input_span().unwrap().bytes, 1..1);
             assert_eq!(error.input_location().unwrap().column, Some(2));
-            assert!(reader.frames[0].lookup("x").is_none());
+            assert!(reader.frames[0].is_empty());
             assert_eq!(reader.input.position().offset, 1);
         }
         let spec = Spec::parse(b"line \"{$missing}\"", "spec").unwrap();

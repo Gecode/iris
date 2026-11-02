@@ -155,7 +155,7 @@ impl Spec {
     ) -> Result<(), Failure> {
         for (name, _) in &params.pairs {
             control.check()?;
-            if !self.index.params.contains(name) {
+            if self.index.param_name(name, control)?.is_none() {
                 return Err(Error::unknown_param(name, self.parsed.origin()).into());
             }
         }

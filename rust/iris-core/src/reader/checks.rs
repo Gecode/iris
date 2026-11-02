@@ -58,13 +58,11 @@ fn run_check(evaluator: &mut Evaluator<'_, '_, '_>, info: &CheckInfo) -> Result<
     let mut cursors = Vec::new();
     let mut deepest = None;
     for (slot, dependency) in info.dependencies.iter().enumerate() {
+        evaluator.reader.input.control.check()?;
+        let name = &evaluator.reader.spec.index.dependency_names
+            [evaluator.reader.spec.index.checks[&info.node.text_range()]][slot];
         let cursor = if matches!(
-            evaluator
-                .reader
-                .spec
-                .index
-                .structural
-                .get(&dependency.label),
+            evaluator.reader.spec.index.structural.get(&name.id),
             Some(Denotation::Record(_))
         ) {
             let parent = evaluator.parent_for(dependency.repeats[0]);
@@ -72,7 +70,7 @@ fn run_check(evaluator: &mut Evaluator<'_, '_, '_>, info: &CheckInfo) -> Result<
                 .list(dependency.repeats[0], parent)
                 .map(|_| Cursor::Marker(parent))
         } else {
-            evaluator.lookup_name(&dependency.label)?.map(Cursor::Value)
+            evaluator.lookup_name(name)?.map(Cursor::Value)
         };
         if cursor.is_some()
             && deepest.is_none_or(|i: usize| {
@@ -81,14 +79,7 @@ fn run_check(evaluator: &mut Evaluator<'_, '_, '_>, info: &CheckInfo) -> Result<
         {
             deepest = Some(slot);
         }
-        evaluator.dependency_slots.insert(
-            evaluator
-                .reader
-                .input
-                .control
-                .copy_text(&dependency.label)?,
-            slot,
-        );
+        evaluator.dependency_slots.insert(name.id, slot);
         evaluator.dependencies.push(match &cursor {
             Some(Cursor::Value(v)) => Some(Kind::Value(v.clone())),
             _ => None,
@@ -372,7 +363,7 @@ mod tests {
     use super::*;
     use crate::value::{ArrayLevel, LeafStorage};
     #[test]
-    fn cancellation_inside_check_labels_and_frame_keys() {
+    fn cancellation_inside_check_labels() {
         use crate::cancellation::{SCAN_CHUNK, tests::cancel_at};
         let name = "a".repeat(16 * SCAN_CHUNK);
         let source = format!("{name}[1]:int check all(i in {name}:0)");
@@ -380,11 +371,6 @@ mod tests {
         let domain = &spec.analysis.model.comprehensions()[0].domain;
         cancel_at(3, |control| {
             array_name(domain, &control).map_err(Into::into)
-        });
-        cancel_at(3, |control| {
-            Frame::default()
-                .set_controlled(name, Value::int(1), &control)
-                .map_err(Into::into)
         });
     }
     #[test]
@@ -401,7 +387,7 @@ mod tests {
             let spec = Spec::parse(b"repeat 2 {x:int let y=x} if 0 {check x==y}", "spec").unwrap();
             let mut reader = Interpreter::new(&spec, Input::new(b"1 2", "input")).unwrap();
             reader.execute(spec.parsed.syntax()).unwrap();
-            reader.frames[0].set("x".into(), replacement);
+            reader.frames[0].set(spec.index.test_name("x"), replacement);
             let node = &spec.analysis.model.checks()[0].node;
             reader.select_statement(node);
             let Failure::Language(error) = reader.execute_check(node).unwrap_err() else {
@@ -414,7 +400,7 @@ mod tests {
         let mut reader = Interpreter::new(&spec, Input::new(b"1 2", "input")).unwrap();
         reader.execute(spec.parsed.syntax()).unwrap();
         reader.frames[0].set(
-            "x".into(),
+            spec.index.test_name("x"),
             Value {
                 leaves: LeafStorage::Int(vec![1]),
                 levels: vec![ArrayLevel {

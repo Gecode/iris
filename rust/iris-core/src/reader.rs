@@ -2,27 +2,27 @@ use crate::{
     Error, ErrorCode, Failure, Spec, Value,
     input::{Input, Position, Token},
     numeric,
-    value::{Frame, LeafStorage},
+    value::{Frame, LeafStorage, Name, NameId},
 };
 use iris_sema::{DefinitionId, DefinitionKind, ReferenceId, RepeatId, Resolution, SemanticModel};
 use iris_syntax::{DecodedString, SyntaxKind as K, SyntaxNode, SyntaxToken, TextRange};
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
 const BASE_BUDGET: u128 = 1 << 20;
 
 #[derive(Debug)]
 pub(crate) struct ModelIndex {
-    pub params: HashSet<String>,
+    pub params: Vec<Name>,
+    pub names: HashMap<TextRange, Name>,
+    pub repeat_names: Vec<Vec<Name>>,
+    pub dependency_names: Vec<Vec<Name>>,
     definitions: HashMap<TextRange, DefinitionId>,
     pub references: HashMap<TextRange, ReferenceId>,
     pub repeats: HashMap<TextRange, RepeatId>,
     pub checks: HashMap<TextRange, usize>,
     pub expressions: HashMap<TextRange, usize>,
     pub comprehensions: HashMap<TextRange, usize>,
-    pub structural: HashMap<String, iris_sema::Denotation>,
+    pub structural: HashMap<NameId, iris_sema::Denotation>,
     patterns: HashMap<TextRange, pattern::Pattern>,
     pub pattern_literals: HashMap<TextRange, String>,
     /// Every ordinary string token is decoded at load time. Read-time users
@@ -30,9 +30,88 @@ pub(crate) struct ModelIndex {
     pub string_literals: HashMap<TextRange, String>,
     sections: HashMap<TextRange, sections::Sections>,
     alphabets: HashMap<TextRange, Arc<Alphabet>>,
+    lists: HashMap<TextRange, prepared::List>,
+    domains: HashMap<TextRange, prepared::Domain>,
 }
 impl ModelIndex {
+    /// Host keys are compared in checked chunks once at operation admission.
+    /// All statement-time parameter access uses the interned identity.
+    pub fn param_name(
+        &self,
+        text: &str,
+        control: &crate::cancellation::Control,
+    ) -> Result<Option<NameId>, crate::cancellation::Cancelled> {
+        let mut range = 0..self.params.len();
+        while range.start < range.end {
+            control.check()?;
+            let middle = range.start + range.len() / 2;
+            let name = &self.params[middle];
+            let mut ordering = std::cmp::Ordering::Equal;
+            for (left, right) in name
+                .as_bytes()
+                .chunks(control.chunk_size())
+                .zip(text.as_bytes().chunks(control.chunk_size()))
+            {
+                control.check()?;
+                control.worked(left.len().min(right.len()));
+                ordering = left.cmp(right);
+                if !ordering.is_eq() {
+                    break;
+                }
+            }
+            if ordering.is_eq() {
+                ordering = name.len().cmp(&text.len());
+            }
+            match ordering {
+                std::cmp::Ordering::Less => range.start = middle + 1,
+                std::cmp::Ordering::Greater => range.end = middle,
+                std::cmp::Ordering::Equal => return Ok(Some(name.id)),
+            }
+        }
+        Ok(None)
+    }
+    #[cfg(test)]
+    pub(crate) fn test_name(&self, text: &str) -> Name {
+        self.names
+            .values()
+            .find(|name| &***name == text)
+            .expect("test name exists")
+            .clone()
+    }
     pub fn new(model: &SemanticModel, root: SyntaxNode) -> Self {
+        let prepared::Names {
+            tokens: names,
+            definitions: definition_names,
+            repeats: repeat_names,
+            dependencies: dependency_names,
+            params,
+        } = prepared::Names::new(&root, model);
+        let references: HashMap<_, _> = model
+            .references()
+            .iter()
+            .enumerate()
+            .map(|(id, reference)| (reference.name_range, ReferenceId(id)))
+            .collect();
+        let lists = root
+            .descendants()
+            .filter(|n| n.kind() == K::List)
+            .map(|node| {
+                (
+                    node.text_range(),
+                    prepared::List::new(&node, &names, &references, model),
+                )
+            })
+            .collect();
+        let domains = root
+            .descendants()
+            .filter(|n| n.kind() == K::Type)
+            .map(|node| {
+                (
+                    node.text_range(),
+                    prepared::Domain::new(&node, &names, &references, model),
+                )
+            })
+            .collect();
         let named: HashMap<_, _> = model
             .named_types()
             .iter()
@@ -49,7 +128,7 @@ impl ModelIndex {
         let patterns = root
             .descendants()
             .filter(|n| n.kind() == K::Pattern)
-            .map(|n| (n.text_range(), pattern::Pattern::new(&n, &kinds)))
+            .map(|n| (n.text_range(), pattern::Pattern::new(&n, &kinds, &names)))
             .collect();
         let pattern_literals: HashMap<_, _> = root
             .descendants()
@@ -75,7 +154,12 @@ impl ModelIndex {
         let sections = root
             .descendants()
             .filter(|n| n.kind() == K::Sections)
-            .map(|n| (n.text_range(), sections::Sections::new(n, &string_literals)))
+            .map(|n| {
+                (
+                    n.text_range(),
+                    sections::Sections::new(n, &string_literals, &names),
+                )
+            })
             .collect();
         let alphabets = root
             .descendants()
@@ -87,17 +171,13 @@ impl ModelIndex {
                 )
             })
             .collect();
-        let mut params: HashSet<_> = model
-            .definitions()
-            .iter()
-            .filter(|d| d.kind == DefinitionKind::Param)
-            .map(|d| d.name.clone())
-            .collect();
-        if root.children().any(|n| n.kind() == K::Instances) {
-            params.insert("instance".into());
-        }
         Self {
             params,
+            lists,
+            domains,
+            names,
+            repeat_names,
+            dependency_names,
             checks: model
                 .checks()
                 .iter()
@@ -133,7 +213,7 @@ impl ModelIndex {
                     ]
                     .into_iter()
                     .filter_map(|(id, denotation)| {
-                        id.map(|id| (model.definition(id).name.clone(), denotation))
+                        id.map(|id| (definition_names[id.0].id, denotation))
                     })
                 })
                 .collect(),
@@ -155,12 +235,7 @@ impl ModelIndex {
                 .filter(|(_, d)| d.kind == DefinitionKind::NamedType)
                 .map(|(id, d)| (d.node.text_range(), DefinitionId(id)))
                 .collect(),
-            references: model
-                .references()
-                .iter()
-                .enumerate()
-                .map(|(id, reference)| (reference.name_range, ReferenceId(id)))
-                .collect(),
+            references,
         }
     }
 }
@@ -170,6 +245,9 @@ pub(crate) mod checks;
 mod instances;
 mod params;
 mod pattern;
+#[cfg(test)]
+mod performance_tests;
+mod prepared;
 mod reads;
 pub(crate) mod repeat;
 mod sections;
@@ -190,7 +268,7 @@ enum ExecutionContext {
     Section(TextRange),
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 enum EvaluatedType {
     Int,
     Float,
@@ -253,13 +331,13 @@ pub(crate) struct Interpreter<'s, 'i> {
     pub frames: Vec<Frame>,
     types: HashMap<DefinitionId, EvaluatedType>,
     pub(crate) statement: Option<(usize, TextRange)>,
-    pub(crate) context: Option<String>,
+    pub(crate) context: Option<Name>,
     pub repeats: Vec<RepeatState>,
     pub records: RecordLists,
     sections: Vec<SectionsState>,
     contexts: Vec<ExecutionContext>,
     source_lines: Vec<usize>,
-    params: crate::Params,
+    params: HashMap<NameId, String>,
     instance: Option<instances::Instance>,
     catalog: Option<instances::Catalog>,
     selected: bool,
@@ -310,7 +388,7 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             capture_charges: true,
             #[cfg(test)]
             work: std::cell::Cell::new([0; 6]),
-            params: crate::Params::new(),
+            params: HashMap::new(),
             instance: None,
             catalog: None,
             selected: false,
@@ -320,16 +398,14 @@ impl<'s, 'i> Interpreter<'s, 'i> {
         })
     }
     pub fn with_params(mut self, params: &crate::Params) -> Result<Self, Failure> {
-        if !self.input.control.is_active() {
-            self.params = params.clone();
-        } else {
-            for (name, value) in params.pairs() {
-                self.input.control.check()?;
-                self.params.set(
-                    self.input.control.copy_text(name)?,
-                    self.input.control.copy_text(value)?,
-                );
-            }
+        for (name, value) in params.pairs() {
+            self.input.control.check()?;
+            let id = self
+                .spec
+                .index
+                .param_name(name, &self.input.control)?
+                .expect("parameters admitted before execution");
+            self.params.insert(id, self.input.control.copy_text(value)?);
         }
         Ok(self)
     }
@@ -341,7 +417,7 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             .frames
             .pop()
             .expect("root frame exists throughout a read")
-            .into_data())
+            .into_data(&self.input.control)?)
     }
     pub(crate) fn execute(&mut self, root: SyntaxNode) -> Result<(), Failure> {
         let mut work = vec![Work::Sequence(root.first_child())];
@@ -429,7 +505,7 @@ impl<'s, 'i> Interpreter<'s, 'i> {
                     .filter(|t| t.kind() == K::Ident)
                     .nth(1)
                     .expect("valid let has a name");
-                let name = self.input.control.copy_text(token.text())?;
+                let name = self.spec.index.names[&token.text_range()].clone();
                 let value = self.eval(&expression(node))?;
                 self.frames
                     .last_mut()
@@ -474,8 +550,8 @@ impl<'s, 'i> Interpreter<'s, 'i> {
         Ok(())
     }
     fn execute_declaration(&mut self, node: &SyntaxNode) -> Result<(), Failure> {
-        let name = self.input.control.copy_text(tokens(node)[0].text())?;
-        self.context = Some(self.input.control.copy_text(&name)?);
+        let name = self.spec.index.names[&tokens(node)[0].text_range()].clone();
+        self.context = Some(name.clone());
         let offset = self.evaluate_offset(node)?;
         let domain = self.evaluate_domain(&child(node, K::Type))?;
         let dimensions = self.evaluate_dimensions(node)?;
@@ -492,8 +568,8 @@ impl<'s, 'i> Interpreter<'s, 'i> {
         self.publish(name, value)?;
         Ok(())
     }
-    fn publish(&mut self, name: String, value: Value) -> Result<(), Failure> {
-        if name != "_" {
+    fn publish(&mut self, name: Name, value: Value) -> Result<(), Failure> {
+        if &*name != "_" {
             self.frames
                 .last_mut()
                 .expect("active frame")
@@ -503,76 +579,57 @@ impl<'s, 'i> Interpreter<'s, 'i> {
         Ok(())
     }
     fn evaluate_domain(&mut self, node: &SyntaxNode) -> Result<EvaluatedType, Failure> {
-        let contents = node.children().next().expect("valid type has contents");
-        Ok(match contents.kind() {
-            K::BaseType => match tokens(&contents)[0].text() {
-                "int" => EvaluatedType::Int,
-                "float" => EvaluatedType::Float,
-                "num" => EvaluatedType::Num,
-                "word" => EvaluatedType::Word,
-                "rest" => EvaluatedType::Rest,
-                _ => unreachable!("base type"),
-            },
-            K::TypeName => {
-                let name = tokens(&contents)
-                    .into_iter()
-                    .find(|t| t.kind() == K::Ident)
-                    .expect("named type has identifier");
-                let reference = self.spec.index.references[&name.text_range()];
-                let Resolution::NamedType(id) =
-                    self.spec.analysis.model.reference(reference).resolution
-                else {
-                    unreachable!("valid type use resolves to a named type");
-                };
-                self.types.get(&id).cloned().ok_or_else(|| {
+        self.evaluate_prepared_domain(&self.spec.index.domains[&node.text_range()])
+    }
+    fn evaluate_prepared_domain(
+        &mut self,
+        domain: &prepared::Domain,
+    ) -> Result<EvaluatedType, Failure> {
+        use prepared::Domain;
+        self.input.control.check()?;
+        self.work(WorkKind::Dispatch, 1);
+        Ok(match domain {
+            Domain::Base(kind) => kind.clone(),
+            Domain::Named { definition, name } => {
+                self.types.get(definition).cloned().ok_or_else(|| {
                     self.error_text(
                         ErrorCode::TypeUndefined,
-                        &["the type '", name.text(), "' is not defined yet"],
+                        &["the type '", name, "' is not defined yet"],
                     )
                 })?
             }
-            K::Range => self.evaluate_range(&contents)?,
-            K::Alphabet => {
-                EvaluatedType::Alphabet(self.spec.index.alphabets[&contents.text_range()].clone())
+            Domain::Range {
+                lower,
+                upper,
+                exclusive,
+            } => {
+                let lower = lower
+                    .as_ref()
+                    .map(|bound| self.eval_range_bound(bound))
+                    .transpose()?;
+                let mut upper = upper
+                    .as_ref()
+                    .map(|bound| self.eval_range_bound(bound))
+                    .transpose()?;
+                if *exclusive {
+                    upper = Some(
+                        upper
+                            .expect("exclusive upper bound")
+                            .checked_sub(1)
+                            .ok_or_else(|| {
+                                self.error(
+                                    ErrorCode::IntegerOverflow,
+                                    "integer overflow in the upper bound of a range",
+                                )
+                            })?,
+                    );
+                }
+                EvaluatedType::Range { lower, upper }
             }
-            _ => unreachable!("valid reading type"),
+            Domain::Alphabet(range) => {
+                EvaluatedType::Alphabet(self.spec.index.alphabets[range].clone())
+            }
         })
-    }
-    fn evaluate_range(&mut self, contents: &SyntaxNode) -> Result<EvaluatedType, Failure> {
-        let mut lower = None;
-        let mut upper = None;
-        let operator = tokens(contents)
-            .into_iter()
-            .find(|t| matches!(t.text(), ".." | "..<"))
-            .expect("range operator");
-        for bound in contents.children().filter(|n| is_expression(n.kind())) {
-            let value = self.eval(&bound)?;
-            let integer = value.root().as_int().map_err(|_| {
-                self.error(
-                    ErrorCode::RangeBounds,
-                    "the bounds of a range must be integers",
-                )
-            })?;
-            if bound.text_range().start() < operator.text_range().start() {
-                lower = Some(integer);
-            } else {
-                upper = Some(integer);
-            }
-        }
-        if operator.text() == "..<" {
-            upper = Some(
-                upper
-                    .expect("exclusive upper bound exists")
-                    .checked_sub(1)
-                    .ok_or_else(|| {
-                        self.error(
-                            ErrorCode::IntegerOverflow,
-                            "integer overflow in the upper bound of a range",
-                        )
-                    })?,
-            );
-        }
-        Ok(EvaluatedType::Range { lower, upper })
     }
     fn convert_scalar(&self, domain: &EvaluatedType, token: &Token<'_>) -> Result<Value, Failure> {
         let value = match domain {
@@ -695,7 +752,7 @@ impl<'s, 'i> Interpreter<'s, 'i> {
         }
         Ok(false)
     }
-    pub fn lookup(&self, name: &str) -> Option<&Value> {
+    pub fn lookup(&self, name: NameId) -> Option<&Value> {
         self.frames
             .iter()
             .rev()

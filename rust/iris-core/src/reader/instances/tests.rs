@@ -202,6 +202,6 @@ fn rejections_compare_names_without_copying() {
     // copying a long name there makes many checks quadratic.
     let mut frame = Frame::default();
     assert_eq!(name(&frame), Cow::Borrowed(""));
-    frame.set("name".into(), Value::string("x".repeat(4096)));
+    frame.set(Name::new(0, "name"), Value::string("x".repeat(4096)));
     assert!(matches!(name(&frame), Cow::Borrowed(text) if text.len() == 4096));
 }

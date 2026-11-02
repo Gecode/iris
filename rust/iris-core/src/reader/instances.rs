@@ -35,14 +35,22 @@ pub(super) struct Catalog {
 impl Catalog {
     fn into_data(self) -> Data {
         let mut frame = Frame::default();
-        frame.set("instances".into(), Value::int(self.count as i64));
+        frame.set(
+            Name::new(NameId::INSTANCES.0, "instances"),
+            Value::int(self.count as i64),
+        );
         if !self.names.is_empty() && self.names.iter().all(|n| !n.is_empty()) {
-            frame.set("name".into(), strings(self.names));
+            frame.set(Name::new(NameId::NAME.0, "name"), strings(self.names));
         }
         if self.failures.iter().any(|m| !m.is_empty()) {
-            frame.set("failed".into(), strings(self.failures));
+            frame.set(
+                Name::new(NameId::FAILED.0, "failed"),
+                strings(self.failures),
+            );
         }
-        frame.into_data()
+        frame
+            .into_data(&crate::cancellation::Control::default())
+            .expect("uncancelled catalog")
     }
 }
 fn strings(values: Vec<String>) -> Value {
@@ -58,7 +66,7 @@ fn strings(values: Vec<String>) -> Value {
 }
 /// Borrows a string name, so comparisons at every rejection do not copy it.
 fn name(frame: &Frame) -> Cow<'_, str> {
-    let Some(value) = frame.lookup("name").filter(|v| v.depth() == 0) else {
+    let Some(value) = frame.lookup(NameId::NAME).filter(|v| v.depth() == 0) else {
         return Cow::Borrowed("");
     };
     match value.value_type() {
@@ -100,7 +108,7 @@ impl Interpreter<'_, '_> {
         Ok(())
     }
     pub(super) fn execute_instances(&mut self, node: &SyntaxNode) -> Result<(), Failure> {
-        let selection = Rc::new(match self.params.get("instance") {
+        let selection = Rc::new(match self.params.get(&NameId::INSTANCE) {
             None => Selection::Single,
             Some(text) => {
                 match numeric::parse_integer_controlled(text.as_bytes(), &self.input.control)? {
@@ -144,9 +152,7 @@ impl Interpreter<'_, '_> {
                     return Err(rejection.error.into());
                 }
                 let outer = self.frames.last_mut().expect("outer frame");
-                for entry in frame.into_data().entries {
-                    outer.set_controlled(entry.name, entry.value, &self.input.control)?;
-                }
+                outer.extend(frame, &self.input.control)?;
                 if !matches!(selection.as_ref(), Selection::Single) {
                     self.selected = true;
                     return Ok(());
@@ -162,7 +168,7 @@ impl Interpreter<'_, '_> {
                 ErrorCode::InstanceEmpty,
                 "the file contains no instance".into(),
             )
-        } else if let Some(wanted) = self.params.get("instance") {
+        } else if let Some(wanted) = self.params.get(&NameId::INSTANCE) {
             (
                 ErrorCode::InstanceNotFound,
                 self.input.control.text_message(&[

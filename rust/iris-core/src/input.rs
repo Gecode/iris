@@ -158,11 +158,7 @@ impl<'a> Input<'a> {
     #[inline]
     fn skip_to_data_with<const CANCEL: bool>(&mut self) -> Result<(), Cancelled> {
         loop {
-            let mut end = self.cursor.offset;
-            end = self.scan_with::<CANCEL>(end, |b| {
-                self.settings.classes[b as usize] == Class::Separator
-            })?;
-            self.advance_to_with::<CANCEL>(end)?;
+            let end = self.scan_advance_with::<CANCEL>(|class| class == Class::Separator)?;
             if end == self.bytes.len() || !self.cursor.line_blank {
                 return Ok(());
             }
@@ -210,17 +206,52 @@ impl<'a> Input<'a> {
             return Ok(None);
         }
         let start = self.position();
-        let mut end = self.cursor.offset + 1;
-        if self.settings.classes[self.bytes[self.cursor.offset] as usize] == Class::Plain {
-            end = self
-                .scan_with::<CANCEL>(end, |b| self.settings.classes[b as usize] == Class::Plain)?;
+        let plain = self.settings.classes[self.bytes[self.cursor.offset] as usize] == Class::Plain;
+        self.advance_to_with::<CANCEL>(self.cursor.offset + 1)?;
+        if plain {
+            self.scan_advance_with::<CANCEL>(|class| class == Class::Plain)?;
         }
-        self.advance_to_with::<CANCEL>(end)?;
+        let end = self.cursor.offset;
         Ok(Some(Token {
             bytes: &self.bytes[start.offset..end],
             start,
             end: self.position(),
         }))
+    }
+    /// Advance positions while recognizing bytes, rather than rescanning a token
+    /// or separator run. Cancellation still bounds each scan to 64 KiB.
+    #[inline]
+    fn scan_advance_with<const CANCEL: bool>(
+        &mut self,
+        keep: impl Fn(Class) -> bool,
+    ) -> Result<usize, Cancelled> {
+        let start = self.cursor.offset;
+        if CANCEL {
+            self.control.check()?;
+        }
+        while let Some(&byte) = self.bytes.get(self.cursor.offset) {
+            if !keep(self.settings.classes[byte as usize]) {
+                break;
+            }
+            if byte == b'\n' {
+                self.cursor.line += 1;
+                self.cursor.line_start = self.cursor.offset + 1;
+                self.cursor.line_blank = true;
+            } else if !is_line_blank(byte) {
+                self.cursor.line_blank = false;
+            }
+            self.cursor.offset += 1;
+            self.control.worked(1);
+            if CANCEL
+                && (self.cursor.offset - start).is_multiple_of(crate::cancellation::SCAN_CHUNK)
+            {
+                self.control.check()?;
+            }
+        }
+        if self.cursor.offset != start {
+            self.next_data = None;
+        }
+        Ok(self.cursor.offset)
     }
     #[inline]
     fn scan(&self, start: usize, keep: impl Fn(u8) -> bool) -> Result<usize, Cancelled> {

@@ -55,7 +55,9 @@ impl<'a> Evaluator<'a, '_, '_> {
                     denotation: Denotation::RecordList(repeat),
                     ..
                 } => self.list(*repeat, self.parent_for(*repeat)).is_some(),
-                _ => self.lookup_name(token.text())?.is_some(),
+                _ => self
+                    .lookup_name(&self.reader.spec.index.names[&token.text_range()])?
+                    .is_some(),
             },
         )
     }
@@ -86,35 +88,43 @@ impl<'a> Evaluator<'a, '_, '_> {
                 Denotation::Value => unreachable!("structural denotation"),
             },
             Resolution::Value { projection, .. } if !projection.is_empty() => {
-                if let Some(&slot) = self.dependency_slots.get(token.text()) {
+                if let Some(&slot) = self
+                    .dependency_slots
+                    .get(&self.reader.spec.index.names[&token.text_range()].id)
+                {
                     return self.dependencies[slot]
                         .clone()
                         .ok_or_else(|| self.undefined(token.text()));
                 }
-                self.value_name(token.text()).map(Kind::Value)
+                self.value_name(&self.reader.spec.index.names[&token.text_range()])
+                    .map(Kind::Value)
             }
-            _ => self.value_name(token.text()).map(Kind::Value),
+            _ => self
+                .value_name(&self.reader.spec.index.names[&token.text_range()])
+                .map(Kind::Value),
         }
     }
-    pub(crate) fn value_name(&mut self, name: &str) -> Result<View<'a>, Failure> {
+    pub(crate) fn value_name(&mut self, name: &crate::value::Name) -> Result<View<'a>, Failure> {
         self.lookup_name(name)?.ok_or_else(|| self.undefined(name))
     }
-    pub(crate) fn lookup_name(&mut self, name: &str) -> Result<Option<View<'a>>, Failure> {
+    pub(crate) fn lookup_name(
+        &mut self,
+        name: &crate::value::Name,
+    ) -> Result<Option<View<'a>>, Failure> {
         self.reader.work(WorkKind::Probe, 1);
-        if let Some(value) = self.names.get(name) {
+        if let Some(value) = self.names.get(&name.id) {
             return Ok(value.clone());
         }
         let mut value = None;
         for frame in self.reader.frames.iter().rev() {
             self.reader.input.control.check()?;
             self.reader.work(WorkKind::Probe, 1);
-            if let Some(root) = frame.lookup(name) {
+            if let Some(root) = frame.lookup(name.id) {
                 value = Some(View::borrowed(root));
                 break;
             }
         }
-        self.names
-            .insert(self.reader.input.control.copy_text(name)?, value.clone());
+        self.names.insert(name.id, value.clone());
         Ok(value)
     }
     pub(crate) fn undefined(&self, name: &str) -> Failure {
@@ -136,11 +146,7 @@ impl<'a> Evaluator<'a, '_, '_> {
                 .map(Kind::Records)
                 .ok_or_else(|| self.undefined(field_name(node).text()));
         }
-        let name = self
-            .reader
-            .input
-            .control
-            .copy_text(field_name(node).text())?;
+        let name = self.reader.spec.index.names[&field_name(node).text_range()].clone();
         let root = self.value_name(&name)?;
         let mut view = self.record_field(root, record)?.ok_or_else(|| {
             self.reader.error_text(

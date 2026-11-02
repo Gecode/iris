@@ -278,19 +278,33 @@ impl Interpreter<'_, '_> {
     }
 
     pub(super) fn execute_list(&mut self, node: &SyntaxNode) -> Result<(), Failure> {
-        let name = self.input.control.copy_text(tokens(node)[1].text())?;
-        self.context = Some(self.input.control.copy_text(&name)?);
-        let domain = self.evaluate_domain(&child(node, K::Type))?;
-        let mut value = if let Some(sentinel) = node.children().find(|n| is_expression(n.kind())) {
-            let sentinel = self.eval(&sentinel)?;
+        let list = &self.spec.index.lists[&node.text_range()];
+        let name = list.name.clone();
+        self.context = Some(name.clone());
+        let domain = self.evaluate_prepared_domain(&list.domain)?;
+        let mut value = if let Some(sentinel) = &list.sentinel {
+            let sentinel = match self.eval_integer(sentinel)? {
+                Some(integer) => Value::int(integer),
+                None => self.eval(&sentinel.node)?,
+            };
             let sentinel = self.list_sentinel(&domain, sentinel)?;
-            self.read_sentinel_list(&domain, &sentinel)?
+            self.read_sentinel_list(&domain, &sentinel, name.id)?
         } else {
             self.read_eol_list(&domain)?
         };
-        let offset = self.evaluate_offset(node)?;
+        let offset =
+            if let Some(offset) = &list.offset {
+                match self.eval_integer(offset)? {
+                    Some(integer) => integer,
+                    None => self.eval(&offset.node)?.root().as_int().map_err(|_| {
+                        self.error(ErrorCode::OffsetType, "offset must be an integer")
+                    })?,
+                }
+            } else {
+                0
+            };
         self.apply_offset(&mut value, offset)?;
-        value.set_dimensions_controlled(&[value.leaf_count()], &self.input.control)?;
+        value.set_list_dimension(&self.input.control)?;
         self.publish(name, value)?;
         Ok(())
     }
@@ -320,7 +334,11 @@ impl Interpreter<'_, '_> {
         &mut self,
         domain: &EvaluatedType,
         sentinel: &Value,
+        name: NameId,
     ) -> Result<Value, Failure> {
+        if matches!(domain, EvaluatedType::Int | EvaluatedType::Range { .. }) {
+            return self.read_integer_list(domain, sentinel, name);
+        }
         let mut value = domain.empty_value();
         loop {
             let string = sentinel.root().as_str().ok();
@@ -348,6 +366,63 @@ impl Interpreter<'_, '_> {
             }
             self.validate_range(domain, &scalar, &token)?;
             self.append_scalar(&mut value, scalar)?;
+        }
+        Ok(value)
+    }
+
+    fn read_integer_list(
+        &mut self,
+        domain: &EvaluatedType,
+        sentinel: &Value,
+        name: NameId,
+    ) -> Result<Value, Failure> {
+        let string = sentinel.root().as_str().ok();
+        let integer = sentinel.root().as_int().ok();
+        let float = sentinel.root().as_float().ok();
+        let mut value = self
+            .frames
+            .last_mut()
+            .expect("active frame")
+            .take_buffer(name)
+            .filter(|value| value.value_type() == "int")
+            .unwrap_or_else(|| Value::empty("int"));
+        let LeafStorage::Int(leaves) = &mut value.leaves else {
+            unreachable!("integer buffer")
+        };
+        leaves.clear();
+        loop {
+            let token = self.input.next_token()?.ok_or_else(|| {
+                self.error(
+                    if string.is_some() {
+                        ErrorCode::ExpectedToken
+                    } else {
+                        ErrorCode::ExpectedValue
+                    },
+                    "expected list terminator, found end of input",
+                )
+            })?;
+            self.work(WorkKind::Leaf, token.bytes.len() + 1);
+            if let Some(string) = string
+                && self
+                    .input
+                    .control
+                    .equal_bytes(string.as_bytes(), token.bytes)?
+            {
+                break;
+            }
+            let Some(value) = numeric::parse_integer_controlled(token.bytes, &self.input.control)?
+            else {
+                return Err(self.expected_value(domain, &token)?.into());
+            };
+            if integer == Some(value) || float.is_some_and(|sentinel| value as f64 == sentinel) {
+                break;
+            }
+            if let EvaluatedType::Range { lower, upper } = domain
+                && (lower.is_some_and(|lo| value < lo) || upper.is_some_and(|hi| value > hi))
+            {
+                return Err(self.expected_value(domain, &token)?.into());
+            }
+            leaves.push(value);
         }
         Ok(value)
     }

@@ -180,3 +180,88 @@ a separate 50-value check of the documented Gecode float precision gap. Dzn
 tests check linear work at 4× input size, I/O failures, and 65,536 dimensions
 without recursion. See the [core README](iris-core/README.md) for the
 complexity regressions and separate read/evaluator doubling measurements.
+
+## Performance
+
+Run `cargo bench` to benchmark every `formats/*/cases/*/input.txt`, including
+rejected inputs and case parameters. The Criterion suite parses reader specs and
+loads inputs before timing; each iteration reads and drops its result. Input-byte
+throughput tracks small-input regressions. Criterion is a dev-dependency only.
+
+The end-to-end acceptance comparison uses the [fixed-seed DIMACS
+generator](benches/generate-dimacs.py), ordinary release binaries, buffered input,
+and Hyperfine medians after two warm-ups and ten measured runs. Compare canonical
+JSON before timing. From the repository root (with Hyperfine on `PATH`):
+
+```sh
+bench_dir=/tmp/iris-rust-013-acceptance
+mkdir -p "$bench_dir"
+export CARGO_TARGET_DIR="$bench_dir/target"
+cargo build --manifest-path rust/Cargo.toml --release --locked -p iris-cli --bins
+scripts/gecode-reference.sh
+eval "$(scripts/gecode-reference.sh --print-env)"
+adapter=$(conformance/adapters/gecode/build.sh)
+python3 -I rust/benches/generate-dimacs.py "$bench_dir/dimacs-100mb.cnf" \
+  --bytes 100000000 --variables 100000 --seed 73013
+spec_file="$PWD/formats/dimacs-cnf/dimacs-cnf.iris"
+input_file="$bench_dir/dimacs-100mb.cnf"
+"$CARGO_TARGET_DIR/release/iris-driver" read "$spec_file" "$input_file" \
+  > "$bench_dir/rust.json"
+"$adapter" read "$spec_file" "$input_file" > "$bench_dir/gecode.json"
+cmp "$bench_dir/rust.json" "$bench_dir/gecode.json" && \
+hyperfine --warmup 2 --runs 10 --output null --style basic \
+  --export-json "$bench_dir/hyperfine.json" \
+  "\"$CARGO_TARGET_DIR/release/iris\" read --summary \"$spec_file\" \"$input_file\"" \
+  "\"$GECODE_REFERENCE_INSTANCE_TOOL\" -spec \"$spec_file\" -summary \"$input_file\""
+```
+
+Read medians from the exported wall-clock samples; Hyperfine's terminal table
+reports means. The acceptance gate is Rust median ≤ Gecode median on the same
+machine and input. [Gecode/gecode#270](https://github.com/Gecode/gecode/pull/270)
+records the historical 1.40 s result; it is not a portable absolute threshold.
+
+Measured 2026-11-02 on a MacBook Pro (MacBookPro18,4), Apple M1 Max,
+10 cores (8 performance, 2 efficiency), 64 GiB RAM, arm64 macOS 27.0.1
+(26A434). Rust 1.98.1 / LLVM 22.1.8, Apple Clang 21.0.0,
+Python 3.15.1, Hyperfine 2.0.0. Gecode reference pin:
+`5e7bbd5c26b0702c6fd652356b2289da0710ac3c`. Rust starting revision:
+`7f44ec62f870b9e6b6dba357f4eae885214e6bf6`, with local rust-013 changes.
+The generator produced 4,724,402 clauses, 100,000,054 bytes including the
+header, SHA-256
+`e2d416ac60ce4d1096a48b21e7d04da3026569d269a91b69404f17a229f822bc`.
+Python's random-library sequence is recorded for this interpreter version.
+
+| Run | Rust median | Gecode median | Rust/Gecode |
+|---|---:|---:|---:|
+| Fresh baseline, cancellation present | 13.975366 s | 1.504075 s | 9.292 |
+| Final local changes | 3.518777 s | 2.000679 s | 1.759 |
+
+**The performance target remains unmet.** Rust improved by
+3.97× from the fresh baseline and remains 75.9% slower
+than the measured reference. Optimization stopped at the plan's boundary;
+there is no evaluator rewrite or relaxed budget/cancellation contract.
+Canonical JSON was byte-identical before both comparisons. All measured
+commands exited successfully. Hyperfine's final mean-based output was:
+
+```text
+Benchmark 1: Rust (10 runs)
+                mean     ±       σ          min     …     max
+  Wall Time    3.497 s   ±   0.197 s      3.200 s   …   3.726 s
+  Memory       217.8 MiB ±     0.0 MiB    217.8 MiB …   217.9 MiB
+
+Benchmark 2: Gecode (10 runs)
+                mean     ±       σ          min     …     max
+  Wall Time    2.019 s   ±   0.077 s      1.927 s   …   2.185 s            -42.3%  (1.7x faster)
+  Memory       403.3 MiB ±     1.7 MiB    401.6 MiB …   406.7 MiB          +85.1%  (1.9x more)
+```
+
+No task-owned build or test ran during the final timing. Background Gecode
+test/compiler jobs and desktop applications remained active; these are
+loaded-machine measurements, not a dedicated benchmark host.
+The baseline also overlapped unrelated Gecode tests and compiler activity.
+Separate macOS `/usr/bin/time -l` runs recorded peak RSS of 228,442,112 B
+(217.86 MiB) for Rust and 421,150,720 B
+(401.64 MiB) for Gecode. See the task
+handoff at `/tmp/iris-zdev/rust-013-handoff.md` for values, complete logs,
+linear-work evidence and the pre-existing ignored timing-harness failure.
+The generated workload, JSON, samples and profiles remain outside Git.

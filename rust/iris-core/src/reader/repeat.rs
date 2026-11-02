@@ -6,8 +6,9 @@ pub(crate) struct RepeatState {
     node: SyntaxNode,
     pub body: SyntaxNode,
     mode: Mode,
-    columns: Vec<(String, Column)>,
+    columns: Vec<(Name, Column)>,
     pub row: usize,
+    frame: Frame,
     before: Option<usize>,
     pub occurrence: usize,
 }
@@ -16,7 +17,7 @@ enum Mode {
     Eof,
     Tokens {
         alternatives: Vec<String>,
-        store: Option<String>,
+        store: Option<Name>,
     },
 }
 impl RepeatState {
@@ -92,6 +93,7 @@ impl Interpreter<'_, '_> {
             mode,
             columns,
             row: 0,
+            frame: Frame::default(),
             before: None,
             occurrence,
         });
@@ -117,12 +119,7 @@ impl Interpreter<'_, '_> {
                 let store = terminator_tokens
                     .iter()
                     .position(|t| t.text() == "store")
-                    .map(|i| {
-                        self.input
-                            .control
-                            .copy_text(terminator_tokens[i + 1].text())
-                    })
-                    .transpose()?;
+                    .map(|i| self.spec.index.names[&terminator_tokens[i + 1].text_range()].clone());
                 Mode::Tokens {
                     alternatives,
                     store,
@@ -132,11 +129,14 @@ impl Interpreter<'_, '_> {
             Mode::Count(self.admit_count(&expression(node), "repeat count")?)
         })
     }
-    fn repeat_columns(&self, id: RepeatId) -> Result<Vec<(String, Column)>, Failure> {
+    fn repeat_columns(&self, id: RepeatId) -> Result<Vec<(Name, Column)>, Failure> {
         let info = &self.spec.analysis.model.repeats()[id.0];
         info.fields
             .iter()
-            .map(|field| {
+            .zip(&self.spec.index.repeat_names[id.0])
+            .map(|(field, name)| {
+                self.input.control.check()?;
+                self.work(WorkKind::Metadata, 1);
                 let Possibilities::Known(depths) = &field.fallback.depths else {
                     unreachable!("valid repeat field has a syntactic fallback depth")
                 };
@@ -148,10 +148,7 @@ impl Interpreter<'_, '_> {
                     ValueType::Float => "float",
                     ValueType::String => "string",
                 };
-                Ok((
-                    self.input.control.copy_text(&field.name)?,
-                    Column::new(kind, depths[0]),
-                ))
+                Ok((name.clone(), Column::new(kind, depths[0])))
             })
             .collect()
     }
@@ -189,7 +186,7 @@ impl Interpreter<'_, '_> {
                             .last_mut()
                             .expect("enclosing frame")
                             .set_controlled(
-                                self.input.control.copy_text(name)?,
+                                name.clone(),
                                 Value::string(
                                     self.input
                                         .control
@@ -214,7 +211,7 @@ impl Interpreter<'_, '_> {
             },
         );
         repeat.before = Some(self.input.position().offset);
-        self.frames.push(Frame::default());
+        self.frames.push(std::mem::take(&mut repeat.frame));
         self.contexts
             .push(ExecutionContext::Repeat(self.repeats.len() - 1));
         Ok(true)
@@ -234,15 +231,30 @@ impl Interpreter<'_, '_> {
         let mut columns =
             std::mem::take(&mut self.repeats.last_mut().expect("active repeat").columns);
         for (name, column) in &mut columns {
-            let value = self.frames.last_mut().expect("local frame").take(name);
-            column
-                .add_row_controlled(value, &self.input.control)
+            let value = self.frames.last_mut().expect("local frame").take(name.id);
+            #[cfg(test)]
+            if let Some(value) = &value {
+                self.work(WorkKind::Copy, value.leaf_count());
+                for level in &value.levels {
+                    self.work(WorkKind::Metadata, level.offsets.len().saturating_sub(1));
+                }
+            }
+            let buffer = column
+                .add_row_reusing(value, &self.input.control)
                 .map_err(|e| self.column_failure(e, name, false))?;
+            if buffer.is_some() {
+                self.frames
+                    .last_mut()
+                    .expect("local frame")
+                    .recycle(name.id, buffer);
+            }
         }
-        self.frames.pop();
+        let mut frame = self.frames.pop().expect("local frame");
+        frame.clear(&self.input.control)?;
         self.contexts.pop();
         let repeat = self.repeats.last_mut().expect("active repeat");
         repeat.columns = columns;
+        repeat.frame = frame;
         self.records
             .active
             .remove(&self.records.lists[repeat.occurrence].repeat);
@@ -367,8 +379,16 @@ mod tests {
             ]
         );
         assert!(list.complete);
-        assert!(reader.frames[0].lookup("rows").is_none());
-        assert!(reader.frames[0].lookup("row").is_none());
+        assert!(
+            reader.frames[0]
+                .lookup(spec.index.test_name("rows").id)
+                .is_none()
+        );
+        assert!(
+            reader.frames[0]
+                .lookup(spec.index.test_name("row").id)
+                .is_none()
+        );
 
         let spec = Spec::parse(b"comment \"#\" repeat 2 as rows {each row repeat 2 as ticks {each tick} k:int if k {repeat 0 as children {each child}}}", "spec").unwrap();
         let mut reader = Interpreter::new(&spec, Input::new(b"# skip\n0\n1", "input")).unwrap();
