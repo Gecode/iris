@@ -9,6 +9,8 @@ coding agent. `CLAUDE.md` imports it.
   repository layout (§5), deliverables, milestones, and decisions. Read it
   before starting work on a component.
 - `CONTEXT.md` is the glossary. Use its terms in every document.
+- [`RELEASING.md`](RELEASING.md) is the entry point for component releases and
+  site deployment.
 - `docs/adr/` holds the architecture decision records.
 - `docs/1.0-ideas.md` collects candidate changes for Iris 1.0. Add an entry
   there when Iris 0.1 cannot express something, or expresses it awkwardly.

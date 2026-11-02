@@ -65,6 +65,8 @@ clause.
 [`docs/1.0-ideas.md`](docs/1.0-ideas.md) collects candidate changes for Iris
 1.0. [`AGENTS.md`](AGENTS.md) has the conventions for contributors and coding
 agents.
+[`RELEASING.md`](RELEASING.md) is the entry point for component releases and
+site deployment.
 
 ## License
 
