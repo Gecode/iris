@@ -1,24 +1,23 @@
 use crate::document::{LineIndex, Positions};
-use iris_sema::{Error, ErrorCode};
-use iris_syntax::DiagnosticCode;
+use iris_sema::Error;
 use lsp_types::{CodeDescription, Diagnostic, DiagnosticSeverity, NumberOrString};
 
-const DIAGNOSTIC_DOCS_BASE_URL: &str = "https://github.com/Gecode/iris/blob/main/spec/0.1/";
+const DIAGNOSTIC_DOCS_BASE_URL: &str = "https://iris.gecode.dev/specification/0.1/errors/";
+
+fn code_description(code: &str) -> CodeDescription {
+    CodeDescription {
+        href: format!("{DIAGNOSTIC_DOCS_BASE_URL}#{}", code.to_ascii_lowercase())
+            .parse()
+            .expect("the documentation URL and error code form a valid URI"),
+    }
+}
 
 pub(crate) fn to_lsp(error: &Error, positions: &Positions) -> Diagnostic {
-    let section = match error.code {
-        ErrorCode::Syntax(DiagnosticCode::Utf8) => "116-iris-only-errors",
-        _ => "114-parse-time-codes",
-    };
     Diagnostic {
         range: positions.range(error.range),
         severity: Some(DiagnosticSeverity::ERROR),
         code: Some(NumberOrString::String(error.code.as_str().into())),
-        code_description: Some(CodeDescription {
-            href: format!("{DIAGNOSTIC_DOCS_BASE_URL}errors.md#{section}")
-                .parse()
-                .expect("the documentation URL constant and section form a valid URI"),
-        }),
+        code_description: Some(code_description(error.code.as_str())),
         source: Some("iris".into()),
         message: error.message.clone(),
         ..Diagnostic::default()
@@ -51,7 +50,7 @@ pub(crate) fn sample_failure(
     lines: &LineIndex,
     positions: &crate::document::Positions,
 ) -> Diagnostic {
-    use iris_core::{ErrorCode as CoreCode, Failure};
+    use iris_core::Failure;
     let Failure::Language(error) = error else {
         return sample_file(
             &crate::sample::bounded(&error.to_string(), 3500),
@@ -111,22 +110,33 @@ pub(crate) fn sample_failure(
             message.push_str(" …");
         }
     }
-    let section = if error.code == CoreCode::Utf8 {
-        "116-iris-only-errors"
-    } else {
-        "115-read-time-codes"
-    };
     Diagnostic {
         range,
         severity: Some(DiagnosticSeverity::ERROR),
         code: Some(NumberOrString::String(error.code.as_str().into())),
-        code_description: Some(CodeDescription {
-            href: format!("{DIAGNOSTIC_DOCS_BASE_URL}errors.md#{section}")
-                .parse()
-                .expect("documentation URI"),
-        }),
+        code_description: Some(code_description(error.code.as_str())),
         source: Some("iris".into()),
         message: crate::sample::bounded(&message, 4096),
         ..Diagnostic::default()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::code_description;
+
+    #[test]
+    fn documentation_links_use_stable_error_code_anchors() {
+        for (code, anchor) in [
+            ("E-SPEC-UTF8", "e-spec-utf8"),
+            ("E-SPEC-SYNTAX", "e-spec-syntax"),
+            ("E-CHECK-FAILED", "e-check-failed"),
+            ("E-UTF8", "e-utf8"),
+        ] {
+            assert_eq!(
+                code_description(code).href.as_str(),
+                format!("https://iris.gecode.dev/specification/0.1/errors/#{anchor}")
+            );
+        }
     }
 }

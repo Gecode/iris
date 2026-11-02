@@ -44,12 +44,18 @@ fn only_error(params: &PublishDiagnosticsParams, code: &str) -> Diagnostic {
     assert!(!diagnostic.message.is_empty());
     assert_eq!(
         diagnostic.code_description.as_ref().unwrap().href.as_str(),
-        "https://github.com/Gecode/iris/blob/main/spec/0.1/errors.md#114-parse-time-codes"
+        format!(
+            "https://iris.gecode.dev/specification/0.1/errors/#{}",
+            code.to_ascii_lowercase()
+        )
     );
     // Check the wire spelling as well as the typed value.
     assert_eq!(
         serde_json::to_value(diagnostic).unwrap()["codeDescription"]["href"],
-        "https://github.com/Gecode/iris/blob/main/spec/0.1/errors.md#114-parse-time-codes"
+        format!(
+            "https://iris.gecode.dev/specification/0.1/errors/#{}",
+            code.to_ascii_lowercase()
+        )
     );
     diagnostic.clone()
 }

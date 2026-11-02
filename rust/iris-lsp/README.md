@@ -52,12 +52,12 @@ range, and a `codeDescription` link. Unavailable ordinary values remain a
 read-time concern. LSP document text is Unicode, so invalid file bytes cannot
 produce `E-SPEC-UTF8` through document notifications.
 
-Diagnostic links currently target the error registry's section anchors at
-`https://github.com/Gecode/iris/blob/main/spec/0.1/errors.md#114-parse-time-codes`.
-This is an interim source-document target, without per-code anchors. Public
-reachability and editor hyperlink rendering are not established by server
-tests. The documentation base is one constant in `src/diagnostic.rs` so the
-site can supply its final routes later.
+Diagnostic links target each code in the rendered Specification, for example
+`https://iris.gecode.dev/specification/0.1/errors/#e-spec-syntax`.
+The documentation base is one constant in `src/diagnostic.rs`; the anchor is
+the error code in lowercase. The site's checks verify every linkable code's
+anchor. Server tests check the emitted URLs; they do not establish public
+reachability or editor hyperlink rendering.
 
 Analysis runs on the server thread using complete reparses; the document cache
 retains each tree and semantic model together and invalidates both on accepted

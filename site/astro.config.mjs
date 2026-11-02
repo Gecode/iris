@@ -3,16 +3,23 @@ import starlight from '@astrojs/starlight';
 import tailwindcss from '@tailwindcss/vite';
 import irisGrammar from '../editors/textmate/iris.tmLanguage.json' with { type: 'json' };
 import { irisDark, irisLight } from './src/code-themes.mjs';
+import { ebnfGrammar } from './src/ebnf-grammar.mjs';
 import { discoverFormatSources } from './scripts/format-sources.mjs';
+import { discoverSpecificationSources } from './scripts/specification-sources.mjs';
+import { repository } from './scripts/markdown-sources.mjs';
 
 const formats = await discoverFormatSources();
+const specifications = await discoverSpecificationSources();
 
 export default defineConfig({
   site: 'https://iris.gecode.dev',
   base: '/',
   output: 'static',
   trailingSlash: 'always',
-  vite: { plugins: [tailwindcss()] },
+  vite: {
+    plugins: [tailwindcss()],
+    define: { 'import.meta.env.IRIS_REPOSITORY_ROOT': JSON.stringify(repository) },
+  },
   integrations: [starlight({
     title: 'Iris',
     description: 'A declarative language for reading text instance files.',
@@ -33,7 +40,8 @@ export default defineConfig({
       { tag: 'meta', attrs: { name: 'twitter:image', content: 'https://iris.gecode.dev/og-image.png' } },
     ],
     expressiveCode: {
-      shiki: { langs: [{ ...irisGrammar, name: 'iris', aliases: ['Iris'] }] },
+      tabWidth: 0,
+      shiki: { langs: [{ ...irisGrammar, name: 'iris', aliases: ['Iris'] }, ebnfGrammar] },
       themes: [irisDark, irisLight],
       useStarlightDarkModeSwitch: true,
       useStarlightUiThemeColors: false,
@@ -49,7 +57,10 @@ export default defineConfig({
       { label: 'Introduction', slug: 'introduction' },
       { label: 'Tutorial', collapsed: true, items: ['tutorial', 'tutorial/dimacs', 'tutorial/tsplib', 'tutorial/job-shop'] },
       { label: 'Guides', collapsed: true, items: ['guides', 'guides/patterns', 'guides/sections', 'guides/records-and-checks', 'guides/instances', 'guides/parameters', 'guides/errors', 'guides/performance'] },
-      { label: 'Language Specification', collapsed: true, items: [{ label: 'Language version 0.1', slug: 'specification/0.1' }] },
+      { label: 'Language Specification', collapsed: true, items: specifications.map(({ version, pages }) => ({
+        label: `Language version ${version}`, collapsed: true,
+        items: pages.map(page => ({ label: page.file === 'README.md' ? 'Chapter index' : page.title, link: page.url })),
+      })) },
       { label: 'Formats', collapsed: true, items: [{ label: 'Format library', link: '/formats/' }, ...formats.map(format => ({ label: format.title, link: `/formats/${format.slug}/` }))] },
       { label: 'Using Iris from', collapsed: true, items: ['using/rust', 'using/python', 'using/java', 'using/kotlin', 'using/cpp', 'using/gecode'] },
       { label: 'Tools', collapsed: true, items: ['tools', 'tools/cli', 'tools/formatter', 'tools/lsp', 'tools/editors', 'tools/agent-skill'] },

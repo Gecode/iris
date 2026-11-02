@@ -62,6 +62,24 @@
   --color-iris-focus: var(--iris-focus);
 }
 
+/* One labelled record per table row: the key and its prose span the row, and
+   the remaining fields follow as labelled pairs. */
+@utility iris-records {
+  overflow: visible;
+  & :is(table, tbody, tr, td) { display: block; }
+  & table { @apply min-w-0 border-b border-iris-border; }
+  & thead { @apply sr-only; }
+  & tr { @apply grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-x-6 gap-y-2 border-t border-iris-border py-4; }
+  & td { @apply m-0 min-w-0 border-0 p-0 text-start; }
+  & td:is(:first-child, :nth-child(2)) { @apply col-span-full; }
+  & td:first-child { @apply font-semibold; }
+  & td:nth-child(n + 3) { @apply wrap-anywhere text-iris-muted; }
+  & td:nth-child(n + 3)::before {
+    @apply block text-xs font-semibold tracking-wide text-iris-muted uppercase;
+    content: attr(data-label);
+  }
+}
+
 @layer theme {
   :root {
     --iris-rail: var(--color-iris-rail);
@@ -156,6 +174,23 @@
   .content-panel > .sl-container { @apply max-w-none mx-0; }
   .sl-markdown-content :is(p, ul, ol) { @apply max-w-[68ch]; }
   .sl-markdown-content table { @apply block max-w-full overflow-x-auto; }
+  .iris-specification { @apply leading-7 wrap-anywhere; }
+  .iris-specification :is(h2, h3, h4, [id]) { @apply scroll-mt-24; }
+  .iris-specification :is(h2, h3, h4) { @apply leading-tight text-balance; }
+  .iris-specification h2 { @apply border-t border-iris-border pt-6; }
+  .iris-specification :is(th, td) { @apply align-top text-sm leading-6; }
+  .iris-specification-table { @apply max-w-full overflow-x-auto; }
+  .iris-specification-table table { @apply table w-full; overflow-wrap: normal; }
+  .iris-specification-table :is(th, td) { @apply min-w-24; }
+  .iris-specification-table[data-columns='3'] table { @apply min-w-[36rem]; }
+  .iris-specification-table[data-layout='wide'] table { @apply min-w-[40rem]; }
+  .iris-specification-table[data-layout='records'] { @apply iris-records; }
+  .iris-specification-table[data-layout='wide'] { @apply max-[50rem]:iris-records; }
+  .iris-specification a[id]:target { @apply bg-iris-hero outline-2 outline-iris-orange; }
+  .iris-specification [data-specification-code] { @apply min-w-0 max-w-full; }
+  .iris-specification .expressive-code { @apply text-sm; }
+  .iris-specification .expressive-code pre { @apply [contain:inline-size]; }
+  .iris-specification .expressive-code code { overflow-wrap: normal; }
   .expressive-code pre:focus-visible { outline-offset: -4px; }
 
   /* The stock page frame still owns offsets, the popover, and focus trapping. */

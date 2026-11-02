@@ -14,7 +14,8 @@
     "check:links": "node scripts/check-links.mjs",
     "check:html": "node scripts/check-html.mjs",
     "check:contrast": "node scripts/check-contrast.mjs",
-    "check": "npm run check:examples && npm run check:hero && npm run check:astro && npm run check:links && npm run check:html && npm run check:contrast",
+    "check": "npm run check:examples && npm run check:hero && npm run check:specification && npm run check:astro && npm run check:links && npm run check:html && npm run check:contrast",
+    "check:specification": "node scripts/check-specification.mjs",
     "prepare:examples": "node scripts/prepare-examples.mjs",
     "check:examples": "node scripts/check-examples.mjs",
     "check:hero": "node --experimental-strip-types scripts/check-hero.mjs"

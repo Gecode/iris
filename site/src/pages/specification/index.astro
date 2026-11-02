@@ -1,0 +1,5 @@
+---
+import { discoverSpecificationSources } from '../../../scripts/specification-sources.mjs';
+const [latest] = await discoverSpecificationSources();
+return Astro.redirect(`/specification/${latest.version}/`);
+---

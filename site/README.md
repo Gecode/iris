@@ -6,6 +6,8 @@ milestone M5. The home page connects a DIMACS input to its reader spec and
 typed data,
 then shows executable format examples. The format library renders every
 format’s README, highlighted reader spec, and cases with their real output.
+The Language Specification is rendered directly from `spec/`, with versioned
+chapter pages and error-code links shared with the language server.
 The introduction and planned documentation pages use the same shell.
 
 ## Build and check
@@ -27,6 +29,9 @@ npx astro check
 CLI, then checks the hero’s UTF-8 ranges and data relationships. It also runs
 Astro diagnostics, checks internal links and anchors against
 `dist/`, validates all built HTML, and checks text/control colour contrast.
+The Specification check compares prose, examples and grammar with their sources,
+requires every chapter link and heading anchor, and checks every registered
+error anchor and every error code the language server can link to.
 Build first: checks do not silently rebuild. They do not crawl external sites.
 The contrast table includes both themes, the rail, terminal, and syntax
 highlighting;
@@ -48,11 +53,32 @@ and custom-domain setup, deployment, verification and rollback.
 ## Content and styling
 
 The sidebar in `astro.config.mjs` references pages under `src/content/docs/`
-and discovers the Formats section from `formats/`. The splash lives in
+and discovers the Formats section from `formats/` and the Language Specification
+section from `spec/`. The splash lives in
 `src/pages/index.astro`; `src/pages/formats/` generates the format index and
-individual pages. Keep stubs
-honest until their owning task supplies content; the Specification placeholder
-is not normative text. Its explicit slug preserves the `0.1` route.
+individual pages. Keep stubs honest until their owning task supplies content.
+
+`scripts/specification-sources.mjs` discovers numeric version directories under
+`spec/` and follows each README's chapter index for page and sidebar order.
+`src/pages/specification/` renders each Markdown file and `grammar.ebnf` at
+`/specification/VERSION/FILE/`; the README is the version's chapter index.
+`/specification/` redirects to the highest numeric version. Adding `spec/1.0/`
+with its chapter index needs no site code change. The native version links
+retain the current file when available, otherwise lead to the chapter index.
+
+The Markdown loader and repository-link resolver are shared with the format
+library. Links within the Specification lead to its pages; other repository
+links retain their GitHub destinations. GitHub-style heading IDs preserve the
+source's existing fragments. Error table codes gain lowercase self-links such
+as `/specification/0.1/errors/#e-check-failed`. The source text is unchanged;
+smart punctuation is disabled. Complete fences use the site's Expressive Code
+component and Iris TextMate grammar; EBNF has its own highlighting. Prose has a
+comfortable width and tables and code scroll within that width on phones.
+Astro's Vite configuration supplies the repository source root to bundled
+prerender modules, so they can load files without copying them into `site/`.
+
+`npm run check:specification` checks the existing build without rewriting it.
+The ordinary link, HTML and contrast checks include all Specification pages.
 
 Tailwind 4 runs through `@tailwindcss/vite`, with `@astrojs/starlight-tailwind`
 compatibility and the documented `base, starlight, theme, components, utilities`

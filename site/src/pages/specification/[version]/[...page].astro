@@ -1,0 +1,39 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import { Code } from '@astrojs/starlight/components';
+import { discoverSpecificationSources, renderSpecificationPage } from '../../../../scripts/specification-sources.mjs';
+
+export async function getStaticPaths() {
+  const versions = await discoverSpecificationSources();
+  return versions.flatMap(({ version, pages }) => pages.map((page, index) => ({
+    params: { version, page: page.slug || undefined },
+    props: { page, versions, previous: pages[index - 1], next: pages[index + 1] },
+  })));
+}
+type Versions = Awaited<ReturnType<typeof discoverSpecificationSources>>;
+type Page = Versions[number]['pages'][number];
+interface Props { page: Page; versions: Versions; previous?: Page; next?: Page }
+const { page, versions, previous, next } = Astro.props;
+const rendered = await renderSpecificationPage(page, versions);
+const version = Astro.params.version;
+const pagination = (target: Page | undefined) => target ? { label: target.title, link: target.url } : false;
+---
+<StarlightPage hasSidebar={true} headings={rendered.headings} frontmatter={{
+  title: page.title, description: `${page.title} — Iris ${version} Language Specification.`,
+  prev: pagination(previous), next: pagination(next),
+}}>
+  <div class="iris-specification min-w-0 max-w-[76ch]">
+    <nav class="iris-specification-versions mb-8 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-iris-border pb-4 text-sm" aria-label="Specification language version">
+      <span class="text-iris-muted">Language version</span>
+      {versions.map(item => <a class="inline-flex min-h-11 items-center px-2 aria-current:border-b-2 aria-current:border-iris-orange" href={item.pages.find(target => target.file === page.file)?.url ?? item.pages[0].url} aria-current={item.version === version ? 'true' : undefined}>{item.version}</a>)}
+      <a class="ms-auto" href={`/specification/${version}/`}>Chapter index</a>
+    </nav>
+    <p class="mb-8 text-sm text-iris-muted"><a href={`https://github.com/Gecode/iris/blob/main/${page.path}`}>Specification source</a></p>
+    <div data-specification-source={page.path}>
+      {rendered.titleAnchor && <span id={rendered.titleAnchor} />}
+      {rendered.blocks.map(block => 'html' in block
+        ? <Fragment set:html={block.html} />
+        : <div data-specification-code={block.lang}><Code code={block.code} lang={block.lang} /></div>)}
+    </div>
+  </div>
+</StarlightPage>

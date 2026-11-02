@@ -126,6 +126,10 @@ fn failures_use_exact_spec_ranges_in_both_encodings_and_physical_lines() {
             assert!(diagnostic.message.contains("sample bad"));
             assert!(diagnostic.message.contains("line 1, column 1"));
             assert!(diagnostic.message.contains("oops"));
+            assert_eq!(
+                diagnostic.code_description.as_ref().unwrap().href.as_str(),
+                "https://iris.gecode.dev/specification/0.1/errors/#e-expected-value"
+            );
             client.shutdown();
         }
     }

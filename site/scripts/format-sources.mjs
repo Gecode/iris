@@ -1,12 +1,10 @@
 import { readFile, readdir } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { parseFragment, serialize } from 'parse5';
 import { createSatteriMarkdownProcessor } from '@astrojs/markdown-satteri';
 
-export const repository = fileURLToPath(new URL('../../', import.meta.url));
-export const siteDirectory = fileURLToPath(new URL('../', import.meta.url));
-const github = 'https://github.com/Gecode/iris/blob/main/';
+import { repository, descendants, nodeText, repositoryLink } from './markdown-sources.mjs';
+export { repository, siteDirectory } from './markdown-sources.mjs';
 // Preserve the home page's editorial choices; new formats need no entry here.
 const showcase = [
   { id: 'dimacs-cnf', homeCase: 'three-variables', description: 'Zero terminators end each clause and are discarded from the data.' },
@@ -56,24 +54,19 @@ function renderReadme(document, format, formats) {
 }
 
 function readmeLink(href, format, formats) {
-  if (/^(?:[a-z][a-z\d+.-]*:|\/\/|#)/i.test(href)) return href;
-  const url = new URL(href, `${github}${format.readme.path}`);
-  const path = decodeURIComponent(url.pathname).replace(/^\/(?:Gecode\/iris\/blob\/main\/)?/, '').replace(/\/$/, '');
-  if (path === 'formats') return '/formats/';
-  for (const target of formats) {
-    const root = `formats/${target.id}`;
-    const page = `/formats/${target.slug}/`;
-    if (path === root || path === `${root}/README.md`) return `${page}${url.hash}`;
-    if (path === `${root}/${target.id}.iris`) return `${page}#reader-spec`;
-    const caseId = path.startsWith(`${root}/cases/`) ? path.slice(`${root}/cases/`.length) : null;
-    if (caseId && !caseId.includes('/')) return `${page}#case-${caseId}`;
-    if (caseId?.endsWith('/spec.iris')) return `${page}#reader-spec`;
-    if (caseId && /\/(?:input\.txt|case\.toml|params\.json)$/.test(caseId)) return `/examples/${path}${url.hash}`;
-  }
-  if (path === 'formats/GECODE-LICENSE.md') return '/examples/GECODE-LICENSE.md';
-  if (path === 'LICENSE') return '/examples/LICENSE';
-  return `${github}${path}${url.search}${url.hash}`;
+  return repositoryLink(href, format.readme.path, (path, url) => {
+    if (path === 'formats') return '/formats/';
+    for (const target of formats) {
+      const root = `formats/${target.id}`;
+      const page = `/formats/${target.slug}/`;
+      if (path === root || path === `${root}/README.md`) return `${page}${url.hash}`;
+      if (path === `${root}/${target.id}.iris`) return `${page}#reader-spec`;
+      const caseId = path.startsWith(`${root}/cases/`) ? path.slice(`${root}/cases/`.length) : null;
+      if (caseId && !caseId.includes('/')) return `${page}#case-${caseId}`;
+      if (caseId?.endsWith('/spec.iris')) return `${page}#reader-spec`;
+      if (caseId && /\/(?:input\.txt|case\.toml|params\.json)$/.test(caseId)) return `/examples/${path}${url.hash}`;
+    }
+    if (path === 'formats/GECODE-LICENSE.md') return '/examples/GECODE-LICENSE.md';
+    if (path === 'LICENSE') return '/examples/LICENSE';
+  });
 }
-
-function descendants(node) { return (node.childNodes ?? []).flatMap(child => [child, ...descendants(child)]); }
-function nodeText(node) { return node.nodeName === '#text' ? node.value : (node.childNodes ?? []).map(nodeText).join(''); }
