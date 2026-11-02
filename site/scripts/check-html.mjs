@@ -9,6 +9,8 @@ const validator = new HtmlValidate({
   elements: ['html5', {
     // Expressive Code uses divs for code lines and the copy button icon.
     // Permit these generated nodes only; ordinary div nesting stays checked.
+    // Browsers support wrap=off for horizontally scrolling source editors.
+    textarea: { attributes: { wrap: { enum: ['soft', 'hard', 'off'] } } },
     div: { phrasing: node => Boolean(node.closest('.expressive-code .ec-line, .expressive-code .copy button > div')) },
   }],
 });

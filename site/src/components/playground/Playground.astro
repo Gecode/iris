@@ -1,0 +1,60 @@
+---
+import { formats, caseById } from '../../data/formats';
+const format = formats.find(format => format.id === 'dimacs-cnf');
+if (!format) throw new Error('Playground requires the DIMACS example');
+const example = caseById(format, 'three-variables');
+const initial = { language: '0.1', spec: format.spec.text, input: example.input.text, specOrigin: format.spec.path, inputOrigin: example.input.path, params: example.params, view: 'table' };
+---
+<div class="iris-playground min-w-0" data-playground data-initial={JSON.stringify(initial)}>
+  <p class="mb-5 max-w-[68ch]">Edit a reader spec and an input to see the data as you type. Reading happens in your browser; your edits stay on this device until you share a link.</p>
+  <noscript><p class="border-s-4 border-iris-orange bg-iris-surface p-4">The playground requires JavaScript and WebAssembly. Use the <a href="/tools/cli/">command-line tool</a> or browse the <a href="/formats/">format library</a>.</p></noscript>
+  <div class="mb-4 flex flex-wrap items-center gap-3">
+    <button type="button" data-run disabled class="iris-play-button border-iris-blue bg-iris-blue text-iris-canvas">Run</button>
+    <button type="button" data-stop disabled class="iris-play-button">Stop</button>
+    <button type="button" data-format disabled class="iris-play-button">Format reader spec</button>
+    <button type="button" data-share disabled class="iris-play-button">Copy link</button>
+    <p class="m-0 text-sm text-iris-muted" role="status" aria-live="polite" data-status>Loading reader…</p>
+  </div>
+  <p data-notice hidden class="my-4 border-s-4 border-iris-orange bg-iris-surface p-3 text-sm wrap-anywhere"></p>
+  <div data-share-field hidden class="mb-4"><label for="play-share-url">Shared link</label><input id="play-share-url" type="text" readonly class="iris-play-input w-full" /></div>
+  <div class="iris-play-editors grid min-w-0 gap-4">
+    <div class="min-w-0 border border-iris-border bg-iris-surface">
+      <div class="iris-play-heading border-t-3 border-t-iris-blue"><label for="play-spec">Reader spec</label><span class="text-xs text-iris-muted">Iris 0.1</span></div>
+      <div class="iris-editor relative min-w-0">
+        <pre aria-hidden="true" class="iris-editor-overlay"><code></code></pre>
+        <textarea id="play-spec" class="iris-source" wrap="off" spellcheck="false" autocorrect="off" autocapitalize="off" aria-describedby="play-spec-origin">{initial.spec}</textarea>
+      </div>
+      <p id="play-spec-origin" data-spec-origin class="m-0 border-t border-iris-border px-3 py-2 text-xs text-iris-muted wrap-anywhere">{initial.specOrigin}</p>
+    </div>
+    <div class="min-w-0 border border-iris-border bg-iris-surface">
+      <div class="iris-play-heading border-t-3 border-t-iris-orange"><label for="play-input">Input</label><span class="text-xs text-iris-muted">Text</span></div>
+      <textarea id="play-input" class="iris-source" wrap="off" spellcheck="false" autocorrect="off" autocapitalize="off" aria-describedby="play-input-origin">{initial.input}</textarea>
+      <p id="play-input-origin" data-input-origin class="m-0 border-t border-iris-border px-3 py-2 text-xs text-iris-muted wrap-anywhere">{initial.inputOrigin}</p>
+    </div>
+  </div>
+  <details class="iris-play-parameters mt-4 border border-iris-border p-4" open>
+    <summary class="cursor-pointer">Parameters and instance</summary>
+    <div class="mt-3 max-w-md min-w-0"><label class="block text-sm" for="play-instance">Instance (number or name)</label><input id="play-instance" type="text" class="iris-play-input w-full" spellcheck="false" /></div>
+    <div data-parameters class="mt-4 grid min-w-0 gap-3"></div>
+    <button type="button" data-add-param class="iris-play-button mt-3">Add parameter</button>
+  </details>
+  <section class="mt-5 min-w-0 border border-iris-border" aria-label="Output" aria-busy="false" data-output>
+    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-iris-border bg-iris-surface px-3 py-2">
+      <div role="tablist" aria-label="Output view" class="flex min-w-0 flex-wrap gap-1">
+        {['table', 'json', 'dzn', 'summary'].map((view, index) => <button type="button" role="tab" id={`play-tab-${view}`} aria-controls="play-result" aria-selected={index === 0 ? 'true' : 'false'} tabindex={index === 0 ? 0 : -1} data-view={view} class="iris-play-tab">{view === 'json' ? 'JSON' : view === 'table' ? 'Table' : view === 'summary' ? 'Summary' : 'dzn'}</button>)}
+      </div>
+      <span data-stale hidden class="text-sm text-iris-muted">Previous output · stale</span>
+    </div>
+    <div id="play-result" role="tabpanel" aria-labelledby="play-tab-table" tabindex="0" class="min-w-0 p-4" data-result><p class="m-0 text-sm text-iris-muted">Run the reader to see its data.</p></div>
+    <div data-text-actions hidden class="flex flex-wrap gap-4 border-t border-iris-border px-4 py-3 text-sm"><button type="button" data-copy-output class="iris-play-button">Copy output</button><a data-download>Download complete output</a><span data-excerpt hidden>Showing a 32 KiB excerpt; the download contains the complete output.</span></div>
+  </section>
+  <section data-diagnostic hidden class="mt-4 min-w-0 border-s-4 border-iris-red bg-iris-surface p-4" aria-labelledby="play-diagnostic-title">
+    <h2 id="play-diagnostic-title" class="m-0 text-lg"></h2><p class="my-2"><a data-error-code></a></p><pre class="iris-play-code" tabindex="0"><code data-diagnostic-text></code></pre><button type="button" data-focus-error hidden class="iris-play-button mt-3">Focus reader spec error</button>
+  </section>
+  <p class="mt-5 text-sm text-iris-muted">Check diagnostics come from the Rust implementation. Formatting uses a line width of 100. <a href="/tools/cli/">Use the CLI</a> for larger files, or choose another example from the <a href="/formats/">format library</a>.</p>
+</div>
+<script>
+  import { mountPlayground } from '../../playground/controller';
+  const root = document.querySelector<HTMLElement>('[data-playground]');
+  if (root) mountPlayground(root);
+</script>

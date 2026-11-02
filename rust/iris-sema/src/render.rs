@@ -1,4 +1,5 @@
-use iris_sema::Error;
+use crate::Error;
+use iris_syntax::{FormatError, ParseError};
 
 /// Keep reported coordinates in the header; locate the excerpt by raw span.
 pub fn render_error(error: &Error, bytes: &[u8]) -> String {
@@ -51,4 +52,19 @@ pub fn render_error(error: &Error, bytes: &[u8]) -> String {
         " ".repeat(width),
         " ".repeat(column)
     )
+}
+
+/// Render syntax-only formatter failures with the same source excerpts as checking.
+pub fn render_format_error(error: FormatError, bytes: &[u8], origin: &str) -> String {
+    match error {
+        FormatError::Source(ParseError::InvalidUtf8(diagnostic)) => {
+            render_error(&crate::Error::from(&diagnostic), bytes)
+        }
+        FormatError::Syntax(diagnostics) => diagnostics
+            .iter()
+            .map(|diagnostic| render_error(&crate::Error::from(diagnostic), bytes))
+            .collect::<Vec<_>>()
+            .join("\n"),
+        other => format!("{origin}: {other}"),
+    }
 }

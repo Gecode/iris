@@ -4,6 +4,12 @@
 
 ### Library
 
+- Add the unpublished `iris-wasm` browser boundary for reading, checking and
+  formatting, with exact integer table values and bounded output previews.
+- Add streaming `Data::write_json`; preserve `to_json` and its canonical bytes.
+- Share source diagnostic and formatter rendering through `iris-sema`, keeping
+  `iris_cli::render_error` available as a re-export.
+
 - Implement Iris 0.1 parsing, name resolution, type and shape analysis, reading,
   and expression evaluation, including arrays, repeats, line patterns,
   sections, checks over records, parameters, instances, and catalogs.

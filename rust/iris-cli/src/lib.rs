@@ -1,8 +1,7 @@
 //! Shared byte-oriented parse/check boundary for the user CLI and test driver.
-mod diagnostic;
 pub mod protocol;
-pub use diagnostic::render_error;
 use iris_sema::Analysis;
+pub use iris_sema::render_error;
 use iris_syntax::{LanguageVersion, Parse, ParseError};
 
 #[derive(Debug)]

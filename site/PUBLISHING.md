@@ -150,3 +150,18 @@ support, use the current pinned Wrangler and config with that earlier build's
 assets. Restore the corresponding source on `main` through the normal review
 process before re-enabling automatic deployment. Recheck pages, 404 handling,
 headers, sitemap and TLS after either rollback path.
+
+## Playground assets
+
+Build prerequisites include the wasm32 target and pinned wasm-bindgen CLI;
+see [the site guide](README.md#playground). The browser worker is a static
+module asset, separate from Cloudflare's assets-only serving Worker. There is
+no runtime WASM binding or server API. Keep the fingerprinted `.wasm` extension
+and verify `Content-Type: application/wasm` and the existing immutable cache
+rule on its actual `/_astro/` URL, locally and after an authorized deployment.
+The site check enforces 1 MiB raw / 384 KiB gzip, below static asset limits.
+
+If a CSP is introduced later, account for same-origin worker/script/asset
+loads, `worker-src 'self'`, `connect-src 'self'`, and WASM compilation via
+`script-src 'wasm-unsafe-eval'`, including the worker response's policy. This
+playground needs no blob worker, eval, shared memory, COOP or COEP.

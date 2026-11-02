@@ -1,5 +1,5 @@
-use iris_cli::render_error;
-use iris_syntax::{FormatError, FormatOptions, LanguageVersion, ParseError};
+use iris_sema::render_format_error;
+use iris_syntax::{FormatOptions, LanguageVersion};
 use std::{
     fs,
     io::{self, Read, Write},
@@ -190,18 +190,4 @@ fn replace_file(path: &Path, contents: &[u8]) -> io::Result<()> {
         let _ = fs::remove_file(&temporary);
     }
     result
-}
-
-fn render_format_error(error: FormatError, bytes: &[u8], origin: &str) -> String {
-    match error {
-        FormatError::Source(ParseError::InvalidUtf8(diagnostic)) => {
-            render_error(&iris_sema::Error::from(&diagnostic), bytes)
-        }
-        FormatError::Syntax(diagnostics) => diagnostics
-            .iter()
-            .map(|diagnostic| render_error(&iris_sema::Error::from(diagnostic), bytes))
-            .collect::<Vec<_>>()
-            .join("\n"),
-        other => format!("{origin}: {other}"),
-    }
 }

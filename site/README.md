@@ -181,3 +181,59 @@ must emit no partial data. The same rendered-text markers cover all these
 pages, including diagnostics and the canonical error document in the errors
 guide. To add an example, register its required markers in `learningPages`,
 collect its sources and command result, then render them with `CheckedExample`.
+
+## Playground
+
+`/playground/` runs the real Rust reader in a dedicated module Web Worker.
+Edit the reader spec and input, add string parameters, select an instance by
+number or name, and inspect Table, JSON, dzn or Summary. Format uses width 100.
+The page shows check diagnostics; no lint API exists yet. Every format case and
+home showcase has an ordinary Open in playground link, including error cases.
+
+Install the WASM tools explicitly before a normal dev/build:
+
+```sh
+rustup target add wasm32-unknown-unknown
+cargo install wasm-bindgen-cli --locked --version 0.2.129
+```
+
+`npm run prepare:wasm` reads the exact binding version from `iris-wasm`, rejects
+CLI mismatches, builds with `--locked` and the `wasm` profile, then optimizes with
+the locked Binaryen 132.0.0 dev dependency. It respects `CARGO_TARGET_DIR` and
+caller Rust flags. No global tools are installed by scripts. Generated glue,
+binary and adapter stay under ignored `src/generated/`; Vite fingerprints the
+worker and WASM in `dist/_astro/`. No backend or deployment binding is needed.
+
+`npm run dev:docs` explicitly disables the runtime for documentation-only work
+without these tools. Sources remain editable and the page explains the missing
+runtime. A normal build restores it; checks reject the disabled adapter.
+
+`npm run check:wasm`, also part of `npm run check`, runs the optimized emitted
+binary against every freshly collected format case and compares complete CLI
+bytes. It also checks integer/float/Unicode/check/format probes and the share
+codec. It never rebuilds or repairs WASM. The hard WASM budget is 1 MiB raw and
+384 KiB gzip at level 9; emitted and generated optimized bytes must match.
+Binaryen is build-only and is absent from browser code.
+
+`npm run check:browser` uses the test-only Playwright dependency and serves the
+existing build on loopback. CI installs managed Chromium; locally use installed
+Chrome without a browser download:
+
+```sh
+PLAYWRIGHT_MODULE=/Users/zayenz/projects/web/zayenz.se/node_modules/playwright/index.mjs BROWSER_CHANNEL=chrome npm run check:browser
+```
+
+Reading is debounced 200 ms. Stop and obsolete work terminate the worker;
+operations have a five-second host deadline and startup has fifteen seconds.
+Sources are capped at 1 MiB each, origin labels at 256 bytes, parameters at
+64 KiB and each complete output at 1 MiB. WASM memory is capped at 256 MiB.
+These host limits do not alter Iris work budgets. Table previews mark omissions;
+text views keep the exact Rust documents for copy/download. Integer text never
+passes through JavaScript numbers.
+
+Copy link stores language, sources, origin labels, exact string parameters and
+the selected view in a self-contained `#v1=` gzip/base64url fragment. It does not
+include results. Links are limited to 16,384 characters and inflated state to
+256 KiB; invalid links leave editors intact. Compression Streams support is
+required for sharing, independently of reading. User edits are never fetched
+or posted; preset links fetch only the same-origin existing example bundles.

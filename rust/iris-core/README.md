@@ -212,3 +212,7 @@ Counters include output bytes, inspected offsets, stack steps, leaves, and
 precision attempts. The deep writer test renders 65,536 dimensions on a 128 KiB
 thread stack. Output-failure tests exercise every byte boundary of a nested
 document.
+
+`Data::write_json` streams the same canonical bytes as `to_json`, including the
+final newline, into a caller-supplied writer. Writer errors propagate; hosts
+that need atomic output must buffer until rendering succeeds.

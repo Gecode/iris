@@ -17,6 +17,7 @@ export default defineConfig({
   output: 'static',
   trailingSlash: 'always',
   vite: {
+    worker: { format: 'es' },
     plugins: [tailwindcss()],
     define: { 'import.meta.env.IRIS_REPOSITORY_ROOT': JSON.stringify(repository) },
   },
@@ -64,7 +65,7 @@ export default defineConfig({
       { label: 'Formats', collapsed: true, items: [{ label: 'Format library', link: '/formats/' }, ...formats.map(format => ({ label: format.title, link: `/formats/${format.slug}/` }))] },
       { label: 'Using Iris from', collapsed: true, items: ['using/rust', 'using/python', 'using/java', 'using/kotlin', 'using/cpp', 'using/gecode'] },
       { label: 'Tools', collapsed: true, items: ['tools', 'tools/cli', 'tools/formatter', 'tools/lsp', 'tools/editors', 'tools/agent-skill'] },
-      { label: 'Playground', slug: 'playground' },
+      { label: 'Playground', link: '/playground/' },
     ],
   })],
 });

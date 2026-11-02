@@ -96,8 +96,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ steps.msrv.outputs.version }}
+          targets: wasm32-unknown-unknown
       # rust/rust-toolchain.toml selects stable, so name the toolchain explicitly.
       - name: Build Rust workspace
         run: cargo "+${{ steps.msrv.outputs.version }}" build --workspace --locked
       - name: Test Rust workspace
         run: cargo "+${{ steps.msrv.outputs.version }}" test --workspace --locked
+      - name: Check browser crate on wasm32
+        run: cargo "+${{ steps.msrv.outputs.version }}" check -p iris-wasm --target wasm32-unknown-unknown --locked

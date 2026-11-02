@@ -397,3 +397,55 @@
   }
   @keyframes iris-reading-cursor { from { left: 0; } to { left: 100%; } }
 }
+
+@layer components {
+  .iris-playground { container-type: inline-size; }
+  .iris-playground :where(*) { margin-block-start: 0; }
+  .iris-playground [hidden] { display: none !important; }
+  .iris-playground :is(button, input, textarea) { font: inherit; }
+  .iris-playground .iris-play-button { @apply min-h-11 cursor-pointer rounded-sm border border-iris-border bg-iris-surface px-3 py-2 text-sm text-iris-ink; }
+  .iris-playground .iris-play-button:disabled { @apply cursor-default text-iris-muted; }
+  .iris-playground [data-run]:enabled { @apply border-iris-blue bg-iris-blue text-iris-canvas; }
+  .iris-play-heading { @apply flex items-center justify-between gap-3 border-b border-iris-border px-3 py-2 text-sm; }
+  .iris-play-input { @apply min-h-11 min-w-0 rounded-sm border border-iris-border bg-iris-canvas px-3 py-2 text-sm text-iris-ink; }
+  .iris-playground .iris-source, .iris-playground .iris-editor-overlay {
+    @apply m-0 block h-56 w-full min-w-0 overflow-auto border-0 bg-transparent p-3 font-mono text-[0.8125rem] leading-6 whitespace-pre text-iris-ink;
+    tab-size: 4; letter-spacing: normal; font-variant-ligatures: none;
+  }
+  .iris-playground .iris-source { @apply relative resize-y rounded-none; min-height: 8rem; max-height: 40rem; caret-color: var(--iris-ink); }
+  .iris-playground .iris-source:focus-visible { outline-offset: -3px; }
+  .iris-playground .iris-editor-overlay { @apply pointer-events-none absolute inset-0 hidden h-full rounded-none; }
+  .iris-editor-overlay code { @apply bg-transparent p-0 text-inherit; font: inherit; }
+  .iris-editor[data-highlighted='true'] .iris-source { color: transparent; }
+  .iris-editor[data-highlighted='true'] .iris-editor-overlay { display: block; }
+  .iris-source::selection { background: var(--iris-blue); color: var(--iris-canvas); }
+  .iris-editor-overlay [data-color='comment'] { @apply text-iris-muted; }
+  .iris-editor-overlay :is([data-color='type'], [data-color='keyword']) { @apply text-iris-blue; }
+  .iris-editor-overlay [data-color='string'] { @apply text-iris-green; }
+  .iris-editor-overlay [data-color='number'] { @apply text-iris-orange; }
+  .iris-play-tab { @apply min-h-11 cursor-pointer border-0 border-b-3 border-transparent bg-transparent px-3 py-2 text-sm text-iris-muted; }
+  .iris-play-tab:nth-child(4n + 1) { --tab-colour: var(--iris-orange); }
+  .iris-play-tab:nth-child(4n + 2) { --tab-colour: var(--iris-red); }
+  .iris-play-tab:nth-child(4n + 3) { --tab-colour: var(--iris-blue); }
+  .iris-play-tab:nth-child(4n + 4) { --tab-colour: var(--iris-green); }
+  .iris-play-tab[aria-selected='true'] { @apply text-iris-ink; border-bottom-color: var(--tab-colour); }
+  .iris-playground .iris-play-code { @apply m-0 min-w-0 overflow-auto rounded-none border-0 bg-transparent p-0 font-mono text-xs leading-6 whitespace-pre; max-height: 32rem; }
+  .iris-playground .iris-play-code code { @apply bg-transparent p-0 text-inherit; font: inherit; }
+  .iris-playground table { @apply m-0 w-full text-sm; }
+  .iris-playground th, .iris-playground td { @apply border-iris-border px-3 py-2 text-start; }
+  .iris-playground td { @apply font-mono text-xs; }
+  .iris-playground .iris-table-scroll { @apply min-w-0 overflow-auto; }
+  .iris-playground .iris-param-row { @apply grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-end gap-2; }
+  .iris-param-row button { @apply col-span-2 justify-self-start; }
+  @container (min-width: 48rem) {
+    .iris-play-editors { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .iris-playground .iris-source { @apply h-80; }
+    .iris-playground .iris-param-row { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto; }
+    .iris-param-row button { grid-column: auto; }
+  }
+  @media (forced-colors: active) {
+    .iris-editor[data-highlighted='true'] .iris-source { color: CanvasText; }
+    .iris-editor[data-highlighted='true'] .iris-editor-overlay { display: none; }
+    .iris-play-tab[aria-selected='true'] { border-bottom-color: Highlight; }
+  }
+}

@@ -27,7 +27,11 @@ enabling publication. The planned crates.io order is `iris-syntax`, `iris-sema`,
 The standalone `iris-conformance` runner can be published at any point before
 `iris-cli`; it has no implementation dependencies. The separate nightly fuzz
 crate remains unpublished.
-Later work adds `iris-wasm` and, if built, `iris-lint`.
+[iris-wasm](iris-wasm/README.md) exposes the in-memory reader, checker and
+formatter to the browser playground (M5, PLAN.md §8.10). Its string-only API
+keeps canonical output and signed 64-bit integers exact. It stays unpublished;
+if enabled later, it follows `iris-syntax`, `iris-sema` and `iris-core` in
+publication order. Later work may add `iris-lint`.
 [PLAN.md §4.2](../PLAN.md#42-the-rust-reference-implementation-is-layered)
 describes the layers; §8.1, §8.7, §8.12 and §8.13 describe the crates. Milestones
 M3, M4b, M4e and M6b cover the core/CLI, language server, formatter and linter.
@@ -55,6 +59,23 @@ cargo test --locked -p iris-cli --test complete
 
 For the MSRV checks, run `cargo +1.88.0 build --workspace --locked` and
 `cargo +1.88.0 test --workspace --locked`.
+
+## Browser build
+
+From `site/`, `npm run prepare:wasm` builds only `iris-wasm` for wasm32 using
+the size-oriented `wasm` profile, pinned wasm-bindgen 0.2.129 and Binaryen
+132.0.0. See the [site guide](../site/README.md) for setup, parity and size
+checks. Native release/dist profiles and CLI archives are unchanged.
+
+From this directory:
+
+```sh
+cargo test --locked -p iris-wasm
+cargo +1.88.0 check -p iris-wasm --target wasm32-unknown-unknown --locked
+```
+
+The MSRV target must be installed for that compiler. Native tests exercise the
+same API; the site checks execute the optimized WASM binary.
 
 ## API stability
 

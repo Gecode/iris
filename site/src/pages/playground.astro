@@ -1,0 +1,7 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import Playground from '../components/playground/Playground.astro';
+---
+<StarlightPage hasSidebar={true} frontmatter={{ title: 'Playground', description: 'Edit an Iris reader spec and input, and read the data in your browser.', tableOfContents: false, prev: false, next: false }}>
+  <Playground />
+</StarlightPage>

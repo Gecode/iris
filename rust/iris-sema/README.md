@@ -33,3 +33,7 @@ execute without a runtime error.
 From `rust/`, `cargo test --locked -p iris-sema` checks model navigation,
 uncertainty and shapes, diagnostic messages, and phase/operand ordering.
 The driver conformance integration test lives in `iris-cli`.
+
+`render_error` and `render_format_error` provide the shared source excerpts for
+the CLI and browser. Checking keeps Specification error order; formatting stays
+syntax-only. The CLI retains its public `render_error` re-export.

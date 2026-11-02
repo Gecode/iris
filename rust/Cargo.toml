@@ -1,5 +1,5 @@
 [workspace]
-members = ["gecode-iris", "iris-core", "iris-conformance", "iris-syntax", "iris-sema", "iris-cli", "iris-lsp"]
+members = ["gecode-iris", "iris-core", "iris-conformance", "iris-syntax", "iris-sema", "iris-cli", "iris-lsp", "iris-wasm"]
 resolver = "3"
 
 [workspace.package]
@@ -22,3 +22,12 @@ all = "warn"
 [profile.dist]
 inherits = "release"
 lto = "thin"
+
+# Browser-only build; native release and distribution profiles stay independent.
+[profile.wasm]
+inherits = "release"
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = "debuginfo"

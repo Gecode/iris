@@ -32,6 +32,7 @@ let markedCount = 0;
 for (const path of paths) {
   const document = parse(await readFile(new URL(path, buildDirectory), 'utf8'));
   checkLibraryContent(path, document);
+  checkPlaygroundLinks(path, document);
   checkDocumentation(path, document);
   for (const node of descendants(document)) {
     const attributes = attrs(node);
@@ -180,4 +181,22 @@ function text(node) { return node.nodeName === '#text' ? node.value : (node.chil
 function closestPane(node) {
   for (let parent = node.parentNode; parent; parent = parent.parentNode) if ('data-example-pane' in attrs(parent)) return parent;
   return null;
+}
+
+function checkPlaygroundLinks(path, document) {
+  const nodes = descendants(document);
+  const format = formats.find(format => path === `formats/${format.slug}/index.html`);
+  const required = format ? format.cases.map(example => `${format.id}/${example.id}`) : path === 'index.html' ? formats.filter(format => format.homeCase !== null).map(format => `${format.id}/${format.homeCase}`) : [];
+  for (const key of required) ok(nodes.some(node => attrs(node)['data-playground-link'] === key && attrs(node).href === `/playground/?example=${key}`), `${path}: missing playground link ${key}`);
+  if (path === 'playground/index.html') {
+    const root = nodes.find(node => 'data-playground' in attrs(node));
+    ok(root, 'Missing playground');
+    const state = JSON.parse(attrs(root)['data-initial']);
+    const format = formats.find(format => format.id === 'dimacs-cnf');
+    const example = format.cases.find(example => example.id === 'three-variables');
+    strictEqual(state.spec, format.spec.text, 'Stale playground default spec');
+    strictEqual(state.input, example.input.text, 'Stale playground default input');
+    deepStrictEqual(state.params, example.params);
+    for (const [id, expected] of [['play-spec', state.spec], ['play-input', state.input]]) strictEqual(text(nodes.find(node => attrs(node).id === id)), expected, `Default textarea ${id}`);
+  }
 }

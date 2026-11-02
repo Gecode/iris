@@ -3,32 +3,44 @@ use crate::{
     value::{LeafStorage, ValueRef},
 };
 use serde::Serialize;
-use std::ops::Range;
+use std::{io::Write, ops::Range};
 
 impl Data {
     pub fn to_json(&self) -> Result<Vec<u8>, serde_json::Error> {
-        let mut out = b"{\"iris\":\"0.1\",\"entries\":[".to_vec();
+        let mut out = Vec::new();
+        self.write_json(&mut out)?;
+        Ok(out)
+    }
+
+    /// Write canonical JSON, including its final newline, without buffering it.
+    pub fn write_json(&self, out: &mut impl Write) -> Result<(), serde_json::Error> {
+        out.write_all(b"{\"iris\":\"0.1\",\"entries\":[")
+            .map_err(serde_json::Error::io)?;
         for (index, entry) in self.entries.iter().enumerate() {
             if index > 0 {
-                out.push(b',');
+                out.write_all(b",").map_err(serde_json::Error::io)?;
             }
-            out.extend_from_slice(b"{\"name\":");
-            serde_json::to_writer(&mut out, &entry.name)?;
-            out.extend_from_slice(b",\"type\":");
-            serde_json::to_writer(&mut out, entry.value.value_type())?;
-            out.extend_from_slice(b",\"depth\":");
-            serde_json::to_writer(&mut out, &entry.value.depth())?;
-            out.extend_from_slice(b",\"value\":");
-            write_value(&mut out, entry.value.root())?;
-            out.push(b'}');
+            out.write_all(b"{\"name\":")
+                .map_err(serde_json::Error::io)?;
+            serde_json::to_writer(&mut *out, &entry.name)?;
+            out.write_all(b",\"type\":")
+                .map_err(serde_json::Error::io)?;
+            serde_json::to_writer(&mut *out, entry.value.value_type())?;
+            out.write_all(b",\"depth\":")
+                .map_err(serde_json::Error::io)?;
+            serde_json::to_writer(&mut *out, &entry.value.depth())?;
+            out.write_all(b",\"value\":")
+                .map_err(serde_json::Error::io)?;
+            write_value(out, entry.value.root())?;
+            out.write_all(b"}").map_err(serde_json::Error::io)?;
         }
-        out.extend_from_slice(b"]}\n");
-        Ok(out)
+        out.write_all(b"]}\n").map_err(serde_json::Error::io)?;
+        Ok(())
     }
 }
 /// Writes `root` with an explicit stack: §5.12 allows any number of
 /// dimensions, so recursion could exhaust the call stack.
-fn write_value(out: &mut Vec<u8>, root: ValueRef<'_>) -> Result<(), serde_json::Error> {
+fn write_value(out: &mut impl Write, root: ValueRef<'_>) -> Result<(), serde_json::Error> {
     // For each open array: the level of its rows, the rows still to write, and
     // whether a row has been written.
     let mut open: Vec<(usize, Range<usize>, bool)> = Vec::new();
@@ -36,7 +48,7 @@ fn write_value(out: &mut Vec<u8>, root: ValueRef<'_>) -> Result<(), serde_json::
     loop {
         if let Some(selected) = next.take() {
             if selected.depth() > 0 {
-                out.push(b'[');
+                out.write_all(b"[").map_err(serde_json::Error::io)?;
                 let rows = selected.children().expect("array selection");
                 open.push((selected.level + 1, rows, false));
             } else {
@@ -49,7 +61,7 @@ fn write_value(out: &mut Vec<u8>, root: ValueRef<'_>) -> Result<(), serde_json::
         match rows.next() {
             Some(row) => {
                 if std::mem::replace(started, true) {
-                    out.push(b',');
+                    out.write_all(b",").map_err(serde_json::Error::io)?;
                 }
                 next = Some(ValueRef {
                     value: root.value,
@@ -58,20 +70,20 @@ fn write_value(out: &mut Vec<u8>, root: ValueRef<'_>) -> Result<(), serde_json::
                 });
             }
             None => {
-                out.push(b']');
+                out.write_all(b"]").map_err(serde_json::Error::io)?;
                 open.pop();
             }
         }
     }
 }
-fn write_leaf(out: &mut Vec<u8>, selected: ValueRef<'_>) -> Result<(), serde_json::Error> {
+fn write_leaf(out: &mut impl Write, selected: ValueRef<'_>) -> Result<(), serde_json::Error> {
     match &selected.value.leaves {
-        LeafStorage::Int(values) => {
-            out.extend_from_slice(values[selected.row].to_string().as_bytes())
-        }
-        LeafStorage::Float(values) => {
-            out.extend_from_slice(canonical_float(values[selected.row]).as_bytes())
-        }
+        LeafStorage::Int(values) => out
+            .write_all(values[selected.row].to_string().as_bytes())
+            .map_err(serde_json::Error::io)?,
+        LeafStorage::Float(values) => out
+            .write_all(canonical_float(values[selected.row]).as_bytes())
+            .map_err(serde_json::Error::io)?,
         LeafStorage::String(values) => serde_json::to_writer(out, &values[selected.row])?,
     }
     Ok(())

@@ -39,7 +39,9 @@ MSRV, and publication preparation. All workspace crates currently have
 M7 work. The dependency order is `iris-syntax`, `iris-sema`, `iris-core`,
 `gecode-iris`, `iris-conformance`, `iris-lsp`, then `iris-cli`.
 The independent `iris-conformance` runner can go anywhere before `iris-cli`.
-The nightly fuzz crate stays unpublished.
+The M5 browser crate `iris-wasm` stays unpublished and does not enter CLI
+archives. If enabled for publication later, it follows `iris-syntax`,
+`iris-sema` and `iris-core`. The nightly fuzz crate stays unpublished.
 
 The operational binary path is [Release binaries](rust/README.md#release-binaries):
 use its local cargo-dist checks before an authorized `rust-vVERSION` tag push.
