@@ -30,7 +30,9 @@ pub(crate) struct ModelIndex {
     pub string_literals: HashMap<TextRange, String>,
     sections: HashMap<TextRange, sections::Sections>,
     alphabets: HashMap<TextRange, Arc<Alphabet>>,
-    lists: HashMap<TextRange, prepared::List>,
+    lists: Vec<prepared::List>,
+    list_ids: HashMap<TextRange, plan::ListId>,
+    plan: plan::ExecutionPlan,
     domains: HashMap<TextRange, prepared::Domain>,
 }
 impl ModelIndex {
@@ -92,15 +94,15 @@ impl ModelIndex {
             .enumerate()
             .map(|(id, reference)| (reference.name_range, ReferenceId(id)))
             .collect();
-        let lists = root
-            .descendants()
-            .filter(|n| n.kind() == K::List)
-            .map(|node| {
-                (
-                    node.text_range(),
-                    prepared::List::new(&node, &names, &references, model),
-                )
-            })
+        let list_nodes: Vec<_> = root.descendants().filter(|n| n.kind() == K::List).collect();
+        let lists = list_nodes
+            .iter()
+            .map(|node| prepared::List::new(node, &names, &references, model))
+            .collect();
+        let list_ids = list_nodes
+            .iter()
+            .enumerate()
+            .map(|(i, node)| (node.text_range(), plan::ListId(i)))
             .collect();
         let domains = root
             .descendants()
@@ -171,7 +173,9 @@ impl ModelIndex {
                 )
             })
             .collect();
-        Self {
+        let mut index = Self {
+            plan: plan::ExecutionPlan::default(),
+            list_ids,
             params,
             lists,
             domains,
@@ -236,7 +240,9 @@ impl ModelIndex {
                 .map(|(id, d)| (d.node.text_range(), DefinitionId(id)))
                 .collect(),
             references,
-        }
+        };
+        index.plan = plan::ExecutionPlan::new(&root, &index, model);
+        index
     }
 }
 #[cfg(test)]
@@ -247,6 +253,7 @@ mod params;
 mod pattern;
 #[cfg(test)]
 mod performance_tests;
+mod plan;
 mod prepared;
 mod reads;
 pub(crate) mod repeat;
@@ -255,8 +262,8 @@ use repeat::{RecordLists, RepeatState};
 use sections::SectionsState;
 
 enum Work {
-    Statement(SyntaxNode),
-    Sequence(Option<SyntaxNode>),
+    Statement(plan::StatementId),
+    Sequence(plan::StatementId, usize),
     RepeatNext,
     AfterBody,
     SectionsNext,
@@ -336,7 +343,6 @@ pub(crate) struct Interpreter<'s, 'i> {
     pub records: RecordLists,
     sections: Vec<SectionsState>,
     contexts: Vec<ExecutionContext>,
-    source_lines: Vec<usize>,
     params: HashMap<NameId, String>,
     instance: Option<instances::Instance>,
     catalog: Option<instances::Catalog>,
@@ -355,22 +361,6 @@ impl<'s, 'i> Interpreter<'s, 'i> {
     pub fn new(spec: &'s Spec, input: Input<'i>) -> Result<Self, Failure> {
         // usize input lengths fit in u64 on supported Rust targets.
         let expression_limit = BASE_BUDGET + 16 * input.bytes.len() as u128;
-        let mut source_lines = vec![0];
-        for (chunk_index, chunk) in spec.source.chunks(input.control.chunk_size()).enumerate() {
-            input.control.check()?;
-            let start = if input.control.is_active() {
-                chunk_index * crate::cancellation::SCAN_CHUNK
-            } else {
-                0
-            };
-            source_lines.extend(
-                chunk
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, b)| **b == b'\n')
-                    .map(|(i, _)| start + i + 1),
-            );
-        }
         Ok(Self {
             spec,
             input,
@@ -394,7 +384,6 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             selected: false,
             idle_remaining: BASE_BUDGET,
             expression_remaining: std::cell::Cell::new(expression_limit),
-            source_lines,
         })
     }
     pub fn with_params(mut self, params: &crate::Params) -> Result<Self, Failure> {
@@ -420,70 +409,16 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             .into_data(&self.input.control)?)
     }
     pub(crate) fn execute(&mut self, root: SyntaxNode) -> Result<(), Failure> {
-        let mut work = vec![Work::Sequence(root.first_child())];
-        while let Some(next) = work.pop() {
-            self.input.control.check()?;
-            self.work(WorkKind::Dispatch, 1);
-            match next {
-                Work::Sequence(Some(node)) => {
-                    work.push(Work::Sequence(node.next_sibling()));
-                    work.push(Work::Statement(node));
-                }
-                Work::Sequence(None) => {}
-                Work::RepeatNext => {
-                    if self.begin_iteration()? {
-                        work.push(Work::AfterBody);
-                        work.push(Work::Statement(
-                            self.repeats.last().expect("active repeat").body.clone(),
-                        ));
-                    } else {
-                        self.finish_repeat()?;
-                    }
-                }
-                Work::AfterBody => {
-                    self.collect_iteration()?;
-                    work.push(Work::RepeatNext);
-                }
-                Work::SectionsNext => self.next_section(&mut work)?,
-                Work::AfterSectionBody => self.after_section_body(&mut work)?,
-                Work::Statement(node) => {
-                    // A block is not a statement of its own: diagnostics keep
-                    // the enclosing statement until a child statement runs.
-                    if node.kind() != K::Block {
-                        self.select_statement(&node);
-                    }
-                    match node.kind() {
-                        K::Block => work.push(Work::Sequence(node.first_child())),
-                        K::If => {
-                            let condition = self.eval(&expression(&node))?;
-                            let selected = if truth(&condition) { 0 } else { 1 };
-                            if let Some(body) = node
-                                .children()
-                                .filter(|n| !is_expression(n.kind()))
-                                .nth(selected)
-                            {
-                                work.push(Work::Statement(body));
-                            }
-                        }
-                        K::Sections => {
-                            self.begin_sections(&node);
-                            work.push(Work::SectionsNext);
-                        }
-                        K::Repeat => {
-                            self.begin_repeat(&node)?;
-                            work.push(Work::RepeatNext);
-                        }
-                        _ => self.execute_statement(&node)?,
-                    }
-                }
-            }
-        }
-        Ok(())
+        self.execute_plan(self.spec.index.plan.id(&root))
     }
     pub(crate) fn select_statement(&mut self, node: &SyntaxNode) {
-        let offset = usize::from(node.text_range().start());
-        let line = self.source_lines.partition_point(|&start| start <= offset);
-        self.statement = Some((line, node.text_range()));
+        self.select_site(
+            self.spec
+                .index
+                .plan
+                .statement(self.spec.index.plan.id(node))
+                .site,
+        );
     }
     fn execute_statement(&mut self, node: &SyntaxNode) -> Result<(), Failure> {
         match node.kind() {
@@ -565,25 +500,36 @@ impl<'s, 'i> Interpreter<'s, 'i> {
                 }
             }
         };
-        self.publish(name, value)?;
+        self.publish(name, value, None)?;
         Ok(())
     }
-    fn publish(&mut self, name: Name, value: Value) -> Result<(), Failure> {
+    fn publish(
+        &mut self,
+        name: Name,
+        value: Value,
+        entry: Option<&mut Option<crate::value::EntryId>>,
+    ) -> Result<(), Failure> {
         if &*name != "_" {
-            self.frames
-                .last_mut()
-                .expect("active frame")
-                .set_controlled(name, value, &self.input.control)?;
+            self.work(WorkKind::Probe, 1);
+            let frame = self.frames.last_mut().expect("active frame");
+            match entry {
+                Some(Some(entry)) => frame.set_at(*entry, value, &self.input.control)?,
+                Some(entry) => {
+                    *entry = Some(frame.set_indexed(name, value, &self.input.control)?)
+                }
+                None => frame.set_controlled(name, value, &self.input.control)?,
+            }
         }
         self.context = None;
         Ok(())
     }
     fn evaluate_domain(&mut self, node: &SyntaxNode) -> Result<EvaluatedType, Failure> {
-        self.evaluate_prepared_domain(&self.spec.index.domains[&node.text_range()])
+        self.evaluate_prepared_domain(&self.spec.index.domains[&node.text_range()], None)
     }
     fn evaluate_prepared_domain(
         &mut self,
         domain: &prepared::Domain,
+        mut bindings: Option<&mut prepared::ListBindings>,
     ) -> Result<EvaluatedType, Failure> {
         use prepared::Domain;
         self.input.control.check()?;
@@ -605,11 +551,13 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             } => {
                 let lower = lower
                     .as_ref()
-                    .map(|bound| self.eval_range_bound(bound))
+                    .map(|bound| {
+                        self.eval_range_bound(bound, bindings.as_deref_mut().map(|b| &mut b.lower))
+                    })
                     .transpose()?;
                 let mut upper = upper
                     .as_ref()
-                    .map(|bound| self.eval_range_bound(bound))
+                    .map(|bound| self.eval_range_bound(bound, bindings.map(|b| &mut b.upper)))
                     .transpose()?;
                 if *exclusive {
                     upper = Some(

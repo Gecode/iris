@@ -33,13 +33,16 @@ impl From<Cancelled> for crate::Failure {
     }
 }
 
+#[cfg(test)]
+type CheckpointObserver = Box<dyn FnMut(usize)>;
+
 #[derive(Default)]
 pub(crate) struct Control {
     token: Option<CancellationToken>,
     #[cfg(test)]
     work: std::cell::Cell<usize>,
     #[cfg(test)]
-    observer: std::cell::RefCell<Option<Box<dyn FnMut()>>>,
+    observer: std::cell::RefCell<Option<CheckpointObserver>>,
 }
 impl Control {
     pub fn new(options: &ReadOptions) -> Self {
@@ -69,7 +72,7 @@ impl Control {
     pub fn check(&self) -> Result<(), Cancelled> {
         #[cfg(test)]
         if let Some(observer) = self.observer.borrow_mut().as_mut() {
-            observer();
+            observer(self.work.get());
         }
         if self
             .token
@@ -244,7 +247,7 @@ pub(crate) mod tests {
         let (resume, wait_resume) = mpsc::sync_channel(1);
         let calls = Rc::new(Cell::new(0));
         let observed = calls.clone();
-        *control.observer.get_mut() = Some(Box::new(move || {
+        *control.observer.get_mut() = Some(Box::new(move |_| {
             observed.set(observed.get() + 1);
             if observed.get() == checkpoint {
                 entered.send(()).unwrap();
@@ -313,6 +316,27 @@ pub(crate) mod tests {
             input.control = control;
             Interpreter::new(&spec, input)?.with_params(&params)?.read()
         });
+    }
+    #[test]
+    fn cancellation_in_planned_list_after_deferred_rejection() {
+        let spec = Spec::parse(
+            b"instances {x:int check x>0 repeat 512 {list xs:int until 0} name:word}",
+            "spec",
+        )
+        .unwrap();
+        let input = format!(
+            "-1 {}rejected 1 {}selected",
+            "0 ".repeat(512),
+            "0 ".repeat(512)
+        );
+        let mut params = Params::new();
+        params.set("instance", "2");
+        cancel_at(100, |control| {
+            let mut input = Input::new(input.as_bytes(), "input");
+            input.control = control;
+            Interpreter::new(&spec, input)?.with_params(&params)?.read()
+        });
+        assert!(spec.read(input.as_bytes(), "input", &params).is_ok());
     }
     #[test]
     fn cancellation_empty_row_offsets_is_checked_inside_the_bulk_loop() {
@@ -411,7 +435,7 @@ pub(crate) mod tests {
         });
         let calls = Rc::new(Cell::new(0));
         let observed = calls.clone();
-        *control.observer.get_mut() = Some(Box::new(move || observed.set(observed.get() + 1)));
+        *control.observer.get_mut() = Some(Box::new(move |_| observed.set(observed.get() + 1)));
         let mut input = Input::new(b"", "input");
         input.control = control;
         Interpreter::new(&spec, input).unwrap().read().unwrap();
@@ -456,7 +480,7 @@ pub(crate) mod tests {
         });
         let calls = Rc::new(Cell::new(0));
         let observed = calls.clone();
-        *control.observer.get_mut() = Some(Box::new(move || observed.set(observed.get() + 1)));
+        *control.observer.get_mut() = Some(Box::new(move |_| observed.set(observed.get() + 1)));
         reader.input.control = control;
         let result = reader.read();
         assert!(matches!(result, Err(Failure::Language(_))));
@@ -589,5 +613,61 @@ mod scaling_tests {
         let large = measure(4 * SCAN_CHUNK);
         assert!(large <= 6 * small, "{small} -> {large}");
         assert!(large <= 9 * 4 * SCAN_CHUNK);
+    }
+}
+
+#[cfg(test)]
+mod checkpoint_tests {
+    use super::*;
+    use std::{cell::Cell, rc::Rc};
+
+    fn measure(limit: usize, operation: impl FnOnce(Control)) {
+        let mut control = Control::new(&ReadOptions {
+            cancellation: Some(CancellationToken::default()),
+        });
+        let maximum = Rc::new(Cell::new(0));
+        let observed = maximum.clone();
+        let mut previous = 0;
+        *control.observer.get_mut() = Some(Box::new(move |work| {
+            observed.set(observed.get().max(work - previous));
+            previous = work;
+        }));
+        operation(control);
+        println!("maximum checkpoint gap: {} (limit {limit})", maximum.get());
+        assert!(maximum.get() > 0 && maximum.get() <= limit);
+    }
+
+    #[test]
+    fn planned_list_checkpoint_gaps() {
+        use crate::{Spec, input::Input, reader::Interpreter};
+        for input in [
+            format!("{} 1 0", "0".repeat(5 * SCAN_CHUNK + 19)),
+            format!("{}0", "1 ".repeat(8 * VALUE_CHUNK + 7)),
+        ] {
+            let spec =
+                Spec::parse(b"repeat 1 {list xs:int until 0} ignore trailing", "spec").unwrap();
+            measure(SCAN_CHUNK, |control| {
+                let mut input = Input::new(input.as_bytes(), "input");
+                input.control = control;
+                Interpreter::new(&spec, input).unwrap().read().unwrap();
+            });
+        }
+        measure(VALUE_CHUNK, |control| {
+            use crate::value::{Column, Frame, LeafStorage, Name};
+            let mut frame = Frame::default();
+            for i in 0..(5 * VALUE_CHUNK + 7) {
+                frame.set(Name::new(i, &format!("n{i}")), crate::Value::int(1));
+            }
+            frame.clear(&control).unwrap();
+            let mut column = Column::new("int", 0);
+            for _ in 0..2 {
+                let row = crate::Value {
+                    leaves: LeafStorage::Int(vec![1; 5 * VALUE_CHUNK + 7]),
+                    levels: vec![],
+                };
+                assert!(column.add_row_reusing(Some(row), &control).is_ok());
+            }
+            control.check().unwrap();
+        });
     }
 }

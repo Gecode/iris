@@ -1,10 +1,9 @@
 use super::*;
 use crate::value::Column;
-use iris_sema::{Possibilities, ValueType};
 
 pub(crate) struct RepeatState {
-    node: SyntaxNode,
-    pub body: SyntaxNode,
+    site: plan::Site,
+    pub(super) body: plan::StatementId,
     mode: Mode,
     columns: Vec<(Name, Column)>,
     pub row: usize,
@@ -69,10 +68,34 @@ impl RecordLists {
 }
 
 impl Interpreter<'_, '_> {
+    #[cfg(test)]
     pub(super) fn begin_repeat(&mut self, node: &SyntaxNode) -> Result<(), Failure> {
-        let mode = self.repeat_mode(node)?;
-        let id = self.spec.index.repeats[&node.text_range()];
-        let columns = self.repeat_columns(id)?;
+        let statement = self
+            .spec
+            .index
+            .plan
+            .statement(self.spec.index.plan.id(node));
+        let plan::Operation::Repeat(repeat) = &statement.operation else {
+            unreachable!("repeat statement")
+        };
+        self.begin_prepared_repeat(repeat, statement.site)
+    }
+    pub(super) fn begin_prepared_repeat(
+        &mut self,
+        repeat: &plan::Repeat,
+        site: plan::Site,
+    ) -> Result<(), Failure> {
+        let mode = self.prepared_repeat_mode(&repeat.mode)?;
+        let id = repeat.id;
+        let columns = repeat
+            .fields
+            .iter()
+            .map(|field| {
+                self.input.control.check()?;
+                self.work(WorkKind::Metadata, 1);
+                Ok((field.name.clone(), Column::new(field.kind, field.depth)))
+            })
+            .collect::<Result<_, Failure>>()?;
         let parent = self.repeats.last().map(|repeat| RecordId {
             occurrence: repeat.occurrence,
             row: repeat.row,
@@ -88,8 +111,8 @@ impl Interpreter<'_, '_> {
             });
         }
         self.repeats.push(RepeatState {
-            node: node.clone(),
-            body: child(node, K::Block),
+            site,
+            body: repeat.body,
             mode,
             columns,
             row: 0,
@@ -99,58 +122,23 @@ impl Interpreter<'_, '_> {
         });
         Ok(())
     }
-    fn repeat_mode(&mut self, node: &SyntaxNode) -> Result<Mode, Failure> {
-        let own_tokens = tokens(node);
-        Ok(if own_tokens.get(1).is_some_and(|t| t.text() == "until") {
-            let terminators = node.children().find(|n| n.kind() == K::Terminators);
-            let terminator_tokens = terminators.as_ref().map(tokens).unwrap_or_default();
-            let alternatives: Vec<_> = terminator_tokens
-                .iter()
-                .filter(|t| t.kind() == K::String)
-                .map(|t| {
-                    self.input
-                        .control
-                        .copy_text(&self.spec.index.string_literals[&t.text_range()])
-                })
-                .collect::<Result<_, _>>()?;
-            if alternatives.is_empty() {
-                Mode::Eof
-            } else {
-                let store = terminator_tokens
+    fn prepared_repeat_mode(&mut self, mode: &plan::RepeatMode) -> Result<Mode, Failure> {
+        Ok(match mode {
+            plan::RepeatMode::Until {
+                alternatives,
+                store,
+            } if !alternatives.is_empty() => Mode::Tokens {
+                alternatives: alternatives
                     .iter()
-                    .position(|t| t.text() == "store")
-                    .map(|i| self.spec.index.names[&terminator_tokens[i + 1].text_range()].clone());
-                Mode::Tokens {
-                    alternatives,
-                    store,
-                }
+                    .map(|s| self.input.control.copy_text(s))
+                    .collect::<Result<_, _>>()?,
+                store: store.clone(),
+            },
+            plan::RepeatMode::Until { .. } => Mode::Eof,
+            plan::RepeatMode::Count(bound) => {
+                Mode::Count(self.admit_count(&bound.node, "repeat count")?)
             }
-        } else {
-            Mode::Count(self.admit_count(&expression(node), "repeat count")?)
         })
-    }
-    fn repeat_columns(&self, id: RepeatId) -> Result<Vec<(Name, Column)>, Failure> {
-        let info = &self.spec.analysis.model.repeats()[id.0];
-        info.fields
-            .iter()
-            .zip(&self.spec.index.repeat_names[id.0])
-            .map(|(field, name)| {
-                self.input.control.check()?;
-                self.work(WorkKind::Metadata, 1);
-                let Possibilities::Known(depths) = &field.fallback.depths else {
-                    unreachable!("valid repeat field has a syntactic fallback depth")
-                };
-                let Possibilities::Known(types) = &field.fallback.value_types else {
-                    unreachable!("valid repeat field has a syntactic fallback type")
-                };
-                let kind = match types[0] {
-                    ValueType::Int => "int",
-                    ValueType::Float => "float",
-                    ValueType::String => "string",
-                };
-                Ok((name.clone(), Column::new(kind, depths[0])))
-            })
-            .collect()
     }
     pub(super) fn begin_iteration(&mut self) -> Result<bool, Failure> {
         let repeat = self.repeats.last().expect("active repeat");
@@ -216,7 +204,10 @@ impl Interpreter<'_, '_> {
             .push(ExecutionContext::Repeat(self.repeats.len() - 1));
         Ok(true)
     }
-    pub(super) fn collect_iteration(&mut self) -> Result<(), Failure> {
+    pub(super) fn collect_iteration(
+        &mut self,
+        output: Option<crate::value::EntryId>,
+    ) -> Result<(), Failure> {
         let repeat = self.repeats.last().expect("active iteration");
         if repeat.before == Some(self.input.position().offset) {
             if !matches!(repeat.mode, Mode::Count(_)) {
@@ -231,7 +222,12 @@ impl Interpreter<'_, '_> {
         let mut columns =
             std::mem::take(&mut self.repeats.last_mut().expect("active repeat").columns);
         for (name, column) in &mut columns {
-            let value = self.frames.last_mut().expect("local frame").take(name.id);
+            self.work(WorkKind::Probe, 1);
+            let frame = self.frames.last_mut().expect("local frame");
+            let value = match output {
+                Some(entry) => frame.take_at(entry),
+                None => frame.take(name.id),
+            };
             #[cfg(test)]
             if let Some(value) = &value {
                 self.work(WorkKind::Copy, value.leaf_count());
@@ -243,10 +239,12 @@ impl Interpreter<'_, '_> {
                 .add_row_reusing(value, &self.input.control)
                 .map_err(|e| self.column_failure(e, name, false))?;
             if buffer.is_some() {
-                self.frames
-                    .last_mut()
-                    .expect("local frame")
-                    .recycle(name.id, buffer);
+                self.work(WorkKind::Probe, 1);
+                let frame = self.frames.last_mut().expect("local frame");
+                match output {
+                    Some(entry) => frame.recycle_at(entry, buffer),
+                    None => frame.recycle(name.id, buffer),
+                }
             }
         }
         let mut frame = self.frames.pop().expect("local frame");
@@ -260,8 +258,8 @@ impl Interpreter<'_, '_> {
             .remove(&self.records.lists[repeat.occurrence].repeat);
         repeat.row += 1;
         repeat.before = None;
-        let node = repeat.node.clone();
-        self.select_statement(&node);
+        let site = repeat.site;
+        self.select_site(site);
         Ok(())
     }
     pub(super) fn finish_repeat(&mut self) -> Result<(), Failure> {

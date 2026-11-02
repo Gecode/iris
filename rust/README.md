@@ -188,13 +188,20 @@ rejected inputs and case parameters. The Criterion suite parses reader specs and
 loads inputs before timing; each iteration reads and drops its result. Input-byte
 throughput tracks small-input regressions. Criterion is a dev-dependency only.
 
+The reader prepares a flat execution plan when a reader spec loads. A repeat
+containing one list dispatches directly to its descriptor and reuses frame-entry
+handles for that active repeat. General expressions retain the ordinary
+evaluator; the [core README](iris-core/README.md) describes the boundary. The CLI
+comparison below includes preparation, input reading, validation, data
+construction, summary rendering and process teardown.
+
 The end-to-end acceptance comparison uses the [fixed-seed DIMACS
 generator](benches/generate-dimacs.py), ordinary release binaries, buffered input,
 and Hyperfine medians after two warm-ups and ten measured runs. Compare canonical
 JSON before timing. From the repository root (with Hyperfine on `PATH`):
 
 ```sh
-bench_dir=/tmp/iris-rust-013-acceptance
+bench_dir=/tmp/iris-performance
 mkdir -p "$bench_dir"
 export CARGO_TARGET_DIR="$bench_dir/target"
 cargo build --manifest-path rust/Cargo.toml --release --locked -p iris-cli --bins
@@ -224,47 +231,42 @@ Measured 2026-11-02 on a MacBook Pro (MacBookPro18,4), Apple M1 Max,
 10 cores (8 performance, 2 efficiency), 64 GiB RAM, arm64 macOS 27.0.1
 (26A434). Rust 1.98.1 / LLVM 22.1.8, Apple Clang 21.0.0,
 Python 3.15.1, Hyperfine 2.0.0. Gecode reference pin:
-`5e7bbd5c26b0702c6fd652356b2289da0710ac3c`. Rust starting revision:
-`7f44ec62f870b9e6b6dba357f4eae885214e6bf6`, with local rust-013 changes.
-The generator produced 4,724,402 clauses, 100,000,054 bytes including the
+`5e7bbd5c26b0702c6fd652356b2289da0710ac3c`. Rust baseline:
+`f540ed2a3942747c141c7634074570fb218a00b9`; final runs include the local
+rust-018 changes. Both use ordinary release builds.
+The generator produced 4,724,402 clauses and 100,000,054 bytes including the
 header, SHA-256
 `e2d416ac60ce4d1096a48b21e7d04da3026569d269a91b69404f17a229f822bc`.
 Python's random-library sequence is recorded for this interpreter version.
 
 | Run | Rust median | Gecode median | Rust/Gecode |
 |---|---:|---:|---:|
-| Fresh baseline, cancellation present | 13.975366 s | 1.504075 s | 9.292 |
-| Final local changes | 3.518777 s | 2.000679 s | 1.759 |
+| Baseline, 10 samples each | 2.438004 s | 1.502599 s | 1.622525 |
+| Final, 20 samples each | 1.500373 s | 1.515234 s | 0.990192 |
+| Complete repeat, 20 samples each | 1.497005 s | 1.505805 s | 0.994156 |
 
-**The performance target remains unmet.** Rust improved by
-3.97× from the fresh baseline and remains 75.9% slower
-than the measured reference. Optimization stopped at the plan's boundary;
-there is no evaluator rewrite or relaxed budget/cancellation contract.
-Canonical JSON was byte-identical before both comparisons. All measured
-commands exited successfully. Hyperfine's final mean-based output was:
+The parity gate passes in both final comparisons. Hyperfine 2 executes commands
+in blocks; each final invocation alternates Rust/Gecode/Rust/Gecode blocks,
+with two warm-ups and ten measured runs per block. Each implementation's median
+uses all 20 wall-clock samples. The first comparison retains a 2.135 s Rust
+outlier; the complete repeat confirms the result. Canonical JSON matches both
+the pinned adapter and the baseline before timing, and every measured command
+exits successfully.
 
-```text
-Benchmark 1: Rust (10 runs)
-                mean     ±       σ          min     …     max
-  Wall Time    3.497 s   ±   0.197 s      3.200 s   …   3.726 s
-  Memory       217.8 MiB ±     0.0 MiB    217.8 MiB …   217.9 MiB
+No task-owned build, test, profile or Criterion run overlaps these timings.
+The first final run's endpoint snapshots contain no compiler or Gecode test
+jobs. The repeat starts with an unrelated single-core Gecode test and finishes
+after it exits. Earlier compiler bursts disrupted Criterion measurements;
+the performance procedure waited for a usable window, with a 30-minute cap.
+The 14 format-library inputs show no reproducible regression. An external
+Criterion probe also alternates predecessor and candidate reads within each
+sample to control for changing load. Reader specs, inputs and parameters stay
+outside timing; both reads and result destruction are timed.
 
-Benchmark 2: Gecode (10 runs)
-                mean     ±       σ          min     …     max
-  Wall Time    2.019 s   ±   0.077 s      1.927 s   …   2.185 s            -42.3%  (1.7x faster)
-  Memory       403.3 MiB ±     1.7 MiB    401.6 MiB …   406.7 MiB          +85.1%  (1.9x more)
-```
-
-No task-owned build or test ran during the final timing. Background Gecode
-test/compiler jobs and desktop applications remained active; these are
-loaded-machine measurements, not a dedicated benchmark host.
-The baseline also overlapped unrelated Gecode tests and compiler activity.
-Separate macOS `/usr/bin/time -l` runs recorded peak RSS of 228,442,112 B
-(217.86 MiB) for Rust and 421,150,720 B
-(401.64 MiB) for Gecode. See the task
-handoff at `/tmp/iris-zdev/rust-013-handoff.md` for values, complete logs,
-linear-work evidence and the pre-existing ignored timing-harness failure.
-The generated workload, JSON, samples and profiles remain outside Git.
+The task handoff at `/tmp/iris-zdev/rust-018-handoff.md` records every stage,
+raw Hyperfine output and samples, load snapshots, paired Criterion results,
+conformance and cancellation/budget/linear-work evidence. The generated input,
+JSON, profiles and temporary probes remain outside Git.
 
 ## Fuzzing
 

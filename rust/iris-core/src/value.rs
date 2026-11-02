@@ -407,6 +407,10 @@ impl<'a> ValueRef<'a> {
         }
     }
 }
+/// Stable while a frame retains its entries, including across clear/reuse.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct EntryId(usize);
+
 impl Frame {
     pub fn set(&mut self, name: Name, value: Value) {
         self.set_controlled(name, value, &Control::default())
@@ -418,18 +422,60 @@ impl Frame {
         value: Value,
         control: &Control,
     ) -> Result<(), Cancelled> {
+        self.set_indexed(name, value, control).map(|_| ())
+    }
+    pub fn set_indexed(
+        &mut self,
+        name: Name,
+        value: Value,
+        control: &Control,
+    ) -> Result<EntryId, Cancelled> {
         control.check()?;
-        if let Some(&index) = self.names.get(&name.id) {
+        let index = if let Some(&index) = self.names.get(&name.id) {
             self.entries[index].value = Some(value);
+            index
         } else {
-            self.names.insert(name.id, self.entries.len());
+            let index = self.entries.len();
+            self.names.insert(name.id, index);
             self.entries.push(FrameEntry {
                 name,
                 value: Some(value),
                 buffer: None,
             });
-        }
+            index
+        };
+        Ok(EntryId(index))
+    }
+    pub fn entry(&self, name: NameId) -> Option<EntryId> {
+        self.names.get(&name).copied().map(EntryId)
+    }
+    pub fn value_at(&self, entry: EntryId) -> Option<&Value> {
+        self.entries.get(entry.0)?.value.as_ref()
+    }
+    pub fn set_at(
+        &mut self,
+        entry: EntryId,
+        value: Value,
+        control: &Control,
+    ) -> Result<(), Cancelled> {
+        control.check()?;
+        self.entries
+            .get_mut(entry.0)
+            .expect("entry belongs to reused frame")
+            .value = Some(value);
         Ok(())
+    }
+    pub fn take_at(&mut self, entry: EntryId) -> Option<Value> {
+        self.entries.get_mut(entry.0)?.value.take()
+    }
+    pub fn take_buffer_at(&mut self, entry: EntryId) -> Option<Value> {
+        self.entries.get_mut(entry.0)?.buffer.take()
+    }
+    pub fn recycle_at(&mut self, entry: EntryId, buffer: Option<Value>) {
+        self.entries
+            .get_mut(entry.0)
+            .expect("collected entry belongs to frame")
+            .buffer = buffer;
     }
     pub fn lookup(&self, name: NameId) -> Option<&Value> {
         self.entries.get(*self.names.get(&name)?)?.value.as_ref()

@@ -22,7 +22,6 @@ pub use value::{AccessError, Data, Entry, Value, ValueRef};
 pub struct Spec {
     parsed: Parse,
     analysis: Analysis,
-    source: Vec<u8>,
     index: reader::ModelIndex,
 }
 impl Spec {
@@ -49,7 +48,6 @@ impl Spec {
         Ok(Self {
             parsed,
             analysis,
-            source: source.to_vec(),
             index,
         })
     }

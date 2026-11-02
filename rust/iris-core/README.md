@@ -96,9 +96,20 @@ Its display renders runtime excerpts and byte-position carets; `to_json`
 renders the canonical error envelope. Data JSON uses shortest round-tripping
 float digits with the Specification's notation choice and signed-zero rule.
 
-Repeat and sections execution use an explicit work stack for blocks,
-conditionals and nested bodies. Expressions use a continuation stack; check
-traversal, record selection, marker summaries, and witness links are iterative.
+Each `Spec` owns a flat execution plan for blocks, lists, repeats and
+conditionals, with statement ranges and source lines prepared at load time.
+Other statements retain their existing helpers; their bodies enter the same
+planned blocks. Repeat and sections continuations use an explicit work stack.
+A repeat whose body contains one list calls its prepared descriptor directly,
+while sharing ordinary iteration admission, record metadata and column
+collection. Its bound and output-entry handles live only for that active repeat
+and resolve on first use. Bounds still read current frame values at each
+statement; unsupported expressions use the ordinary evaluator. The first actual
+publication establishes an entry's position, and clearing a local frame retains
+only its entries and reusable buffers. Other bodies keep ordinary frame lookup.
+
+Expressions use a continuation stack; check traversal, record selection, marker
+summaries, and witness links are iterative.
 Model ranges are indexed once per `Spec`. Row selections retain parent cursors
 and lazy leaf boundaries instead of reconstructing values or paths. Spec
 strings and alphabet options are prepared once per `Spec`; read-time copies

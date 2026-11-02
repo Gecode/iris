@@ -1,5 +1,12 @@
 use super::*;
 
+// Only integer lists need a scalar sentinel fast path. Other domains retain
+// their ordinary Value conversions and numeric/string equality rules.
+enum IntegerSentinel<'a> {
+    Integer(i64),
+    Generic(&'a Value),
+}
+
 impl Interpreter<'_, '_> {
     pub(super) fn evaluate_offset(&mut self, node: &SyntaxNode) -> Result<i64, Failure> {
         let Some(offset) = node.children().find(|n| n.kind() == K::Offset) else {
@@ -73,6 +80,7 @@ impl Interpreter<'_, '_> {
             usize::MAX
         };
         match &mut value.leaves {
+            LeafStorage::Int(_) if offset == 0 => {}
             LeafStorage::Int(values) => {
                 for values in values.chunks_mut(chunk) {
                     self.input.control.check()?;
@@ -278,23 +286,50 @@ impl Interpreter<'_, '_> {
     }
 
     pub(super) fn execute_list(&mut self, node: &SyntaxNode) -> Result<(), Failure> {
-        let list = &self.spec.index.lists[&node.text_range()];
+        let list = &self.spec.index.lists[self.spec.index.list_ids[&node.text_range()].0];
+        self.execute_list_descriptor(list, None)
+    }
+
+    pub(super) fn execute_list_descriptor(
+        &mut self,
+        list: &prepared::List,
+        mut bindings: Option<&mut prepared::ListBindings>,
+    ) -> Result<(), Failure> {
         let name = list.name.clone();
         self.context = Some(name.clone());
-        let domain = self.evaluate_prepared_domain(&list.domain)?;
+        let domain = self.evaluate_prepared_domain(&list.domain, bindings.as_deref_mut())?;
         let mut value = if let Some(sentinel) = &list.sentinel {
-            let sentinel = match self.eval_integer(sentinel)? {
-                Some(integer) => Value::int(integer),
-                None => self.eval(&sentinel.node)?,
-            };
-            let sentinel = self.list_sentinel(&domain, sentinel)?;
-            self.read_sentinel_list(&domain, &sentinel, name.id)?
+            match self.eval_integer(sentinel, bindings.as_deref_mut().map(|b| &mut b.sentinel))? {
+                Some(integer)
+                    if matches!(domain, EvaluatedType::Int | EvaluatedType::Range { .. }) =>
+                {
+                    self.read_integer_list(
+                        &domain,
+                        IntegerSentinel::Integer(integer),
+                        name.id,
+                        bindings.as_deref().and_then(|b| b.output),
+                    )?
+                }
+                integer => {
+                    let sentinel = match integer {
+                        Some(integer) => Value::int(integer),
+                        None => self.eval(&sentinel.node)?,
+                    };
+                    let sentinel = self.list_sentinel(&domain, sentinel)?;
+                    self.read_sentinel_list(
+                        &domain,
+                        &sentinel,
+                        name.id,
+                        bindings.as_deref().and_then(|b| b.output),
+                    )?
+                }
+            }
         } else {
             self.read_eol_list(&domain)?
         };
         let offset =
             if let Some(offset) = &list.offset {
-                match self.eval_integer(offset)? {
+                match self.eval_integer(offset, bindings.as_deref_mut().map(|b| &mut b.offset))? {
                     Some(integer) => integer,
                     None => self.eval(&offset.node)?.root().as_int().map_err(|_| {
                         self.error(ErrorCode::OffsetType, "offset must be an integer")
@@ -305,7 +340,7 @@ impl Interpreter<'_, '_> {
             };
         self.apply_offset(&mut value, offset)?;
         value.set_list_dimension(&self.input.control)?;
-        self.publish(name, value)?;
+        self.publish(name, value, bindings.map(|bindings| &mut bindings.output))?;
         Ok(())
     }
 
@@ -335,9 +370,15 @@ impl Interpreter<'_, '_> {
         domain: &EvaluatedType,
         sentinel: &Value,
         name: NameId,
+        output: Option<crate::value::EntryId>,
     ) -> Result<Value, Failure> {
         if matches!(domain, EvaluatedType::Int | EvaluatedType::Range { .. }) {
-            return self.read_integer_list(domain, sentinel, name);
+            return self.read_integer_list(
+                domain,
+                IntegerSentinel::Generic(sentinel),
+                name,
+                output,
+            );
         }
         let mut value = domain.empty_value();
         loop {
@@ -373,19 +414,26 @@ impl Interpreter<'_, '_> {
     fn read_integer_list(
         &mut self,
         domain: &EvaluatedType,
-        sentinel: &Value,
+        sentinel: IntegerSentinel<'_>,
         name: NameId,
+        output: Option<crate::value::EntryId>,
     ) -> Result<Value, Failure> {
-        let string = sentinel.root().as_str().ok();
-        let integer = sentinel.root().as_int().ok();
-        let float = sentinel.root().as_float().ok();
-        let mut value = self
-            .frames
-            .last_mut()
-            .expect("active frame")
-            .take_buffer(name)
-            .filter(|value| value.value_type() == "int")
-            .unwrap_or_else(|| Value::empty("int"));
+        let (string, integer, float) = match sentinel {
+            IntegerSentinel::Integer(integer) => (None, Some(integer), None),
+            IntegerSentinel::Generic(sentinel) => (
+                sentinel.root().as_str().ok(),
+                sentinel.root().as_int().ok(),
+                sentinel.root().as_float().ok(),
+            ),
+        };
+        self.work(WorkKind::Probe, 1);
+        let frame = self.frames.last_mut().expect("active frame");
+        let mut value = match output {
+            Some(entry) => frame.take_buffer_at(entry),
+            None => frame.take_buffer(name),
+        }
+        .filter(|value| value.value_type() == "int")
+        .unwrap_or_else(|| Value::empty("int"));
         let LeafStorage::Int(leaves) = &mut value.leaves else {
             unreachable!("integer buffer")
         };

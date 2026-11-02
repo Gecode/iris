@@ -121,7 +121,7 @@ pub(super) struct Bound {
     integer: Option<Integer>,
 }
 impl Bound {
-    fn new(
+    pub fn new(
         node: SyntaxNode,
         names: &HashMap<TextRange, Name>,
         references: &HashMap<TextRange, ReferenceId>,
@@ -254,8 +254,28 @@ impl Integer {
         Some(Self { base, steps })
     }
 }
+/// Handles live only for one active single-list repeat. Its local frame is
+/// empty at each bound evaluation and no parent frame can change in its body.
+#[derive(Default)]
+pub(super) struct ListBindings {
+    pub lower: Option<Binding>,
+    pub upper: Option<Binding>,
+    pub sentinel: Option<Binding>,
+    pub offset: Option<Binding>,
+    pub output: Option<crate::value::EntryId>,
+}
+#[derive(Clone, Copy)]
+pub(super) struct Binding {
+    frame: usize,
+    entry: crate::value::EntryId,
+}
+
 impl Interpreter<'_, '_> {
-    pub(super) fn eval_integer(&self, bound: &Bound) -> Result<Option<i64>, Failure> {
+    pub(super) fn eval_integer(
+        &self,
+        bound: &Bound,
+        binding: Option<&mut Option<Binding>>,
+    ) -> Result<Option<i64>, Failure> {
         let Some(integer) = &bound.integer else {
             return Ok(None);
         };
@@ -268,21 +288,7 @@ impl Interpreter<'_, '_> {
         let mut value = match &integer.base {
             IntegerBase::Literal(value) => *value,
             IntegerBase::Name(name) => {
-                let mut found = None;
-                for frame in self.frames.iter().rev() {
-                    self.input.control.check()?;
-                    self.work(WorkKind::Probe, 1);
-                    if let Some(value) = frame.lookup(name.id) {
-                        found = Some(value);
-                        break;
-                    }
-                }
-                let value = found.ok_or_else(|| {
-                    self.error_text(
-                        ErrorCode::NameUndefined,
-                        &["'", name, "' is not defined yet"],
-                    )
-                })?;
+                let value = self.bound_value(name, binding)?;
                 let Ok(value) = value.root().as_int() else {
                     return Ok(None);
                 };
@@ -300,8 +306,46 @@ impl Interpreter<'_, '_> {
         }
         Ok(Some(value))
     }
-    pub(super) fn eval_range_bound(&mut self, bound: &Bound) -> Result<i64, Failure> {
-        if let Some(integer) = self.eval_integer(bound)? {
+    fn bound_value(
+        &self,
+        name: &Name,
+        binding: Option<&mut Option<Binding>>,
+    ) -> Result<&Value, Failure> {
+        if let Some(cached) = binding.as_ref().and_then(|slot| **slot) {
+            self.input.control.check()?;
+            self.work(WorkKind::Probe, 2);
+            return Ok(self
+                .frames
+                .get(cached.frame)
+                .and_then(|frame| frame.value_at(cached.entry))
+                .expect("bound handle belongs to unchanged parent frame"));
+        }
+        for (index, frame) in self.frames.iter().enumerate().rev() {
+            self.input.control.check()?;
+            self.work(WorkKind::Probe, 1);
+            if let Some(entry) = frame.entry(name.id)
+                && let Some(value) = frame.value_at(entry)
+            {
+                if let Some(binding) = binding {
+                    *binding = Some(Binding {
+                        frame: index,
+                        entry,
+                    });
+                }
+                return Ok(value);
+            }
+        }
+        Err(self.error_text(
+            ErrorCode::NameUndefined,
+            &["'", name, "' is not defined yet"],
+        ))
+    }
+    pub(super) fn eval_range_bound(
+        &mut self,
+        bound: &Bound,
+        binding: Option<&mut Option<Binding>>,
+    ) -> Result<i64, Failure> {
+        if let Some(integer) = self.eval_integer(bound, binding)? {
             return Ok(integer);
         }
         self.eval(&bound.node)?.root().as_int().map_err(|_| {

@@ -119,7 +119,7 @@ impl Interpreter<'_, '_> {
                 self.contexts.push(ExecutionContext::Section(arm.pattern));
                 work.push(Work::AfterSectionBody);
                 if let Some(body) = &arm.body {
-                    work.push(Work::Statement(body.clone()));
+                    work.push(Work::Statement(self.spec.index.plan.id(body)));
                 }
                 return Ok(());
             }
