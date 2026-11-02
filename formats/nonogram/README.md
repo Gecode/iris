@@ -9,7 +9,7 @@ column and remains `[0]` in the data. Other keyword lines are skipped.
 The format source is Steven Simpson's
 [puzzle-file format](https://stevocity.me.uk/nonogram/fmt2), also available
 through [webpbn's export tool](https://webpbn.com/export.cgi). The reader
-spec is copied verbatim from
+spec is copied from
 [Gecode's nonogram.cpp](https://github.com/Gecode/gecode/blob/5e7bbd5c26b0702c6fd652356b2289da0710ac3c/examples/nonogram.cpp#L61).
 It requires explicit `width` and `height` lines rather than the full
 format's dimension aliases `columns N` and `rows N`.

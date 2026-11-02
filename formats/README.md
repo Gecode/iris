@@ -13,12 +13,13 @@ part of milestone M2; its layout follows [§5](../PLAN.md#5-repository-layout).
 | [Sudoku](sudoku/) | A 4×4 grid with 2×2 boxes; incompatible box dimensions. |
 | [Nonogram](nonogram/) | A 5×5 X; a clue wider than the board. |
 
-Each `<format>/<format>.iris` is the verbatim value of `instance_spec` in
-the corresponding Gecode example at commit
-`5e7bbd5c26b0702c6fd652356b2289da0710ac3c`. All six are C++ raw string
-literals: their contents, including the final LF, need no escape decoding.
-Extraction was checked against bytes emitted by compiling the original
-literal. The [Gecode notices](GECODE-LICENSE.md) accompany these specs.
+Each `<format>/<format>.iris` contains `instance_spec` from the corresponding
+Gecode example at commit `5e7bbd5c26b0702c6fd652356b2289da0710ac3c`, formatted
+with `iris fmt` according to the [formatting guide](../docs/formatting.md).
+Formatting changes only whitespace and line breaks. All six were extracted
+from C++ raw string literals without escape decoding; extraction was checked
+against bytes emitted by compiling the original literal. The
+[Gecode notices](GECODE-LICENSE.md) accompany these specs.
 
 ## Samples and cases
 
@@ -60,5 +61,5 @@ For a direct read with the reference tool:
   formats/tsplib/cases/euc-2d-five/input.txt
 ```
 
-Changes to the copied specs belong in a later language version. Format
+Changes to the meaning of these specs belong in a later language version. Format
 limitations and awkward constructions feed into [Iris 1.0 ideas](../docs/1.0-ideas.md).

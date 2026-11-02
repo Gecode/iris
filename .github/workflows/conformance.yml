@@ -47,6 +47,8 @@ jobs:
       - name: Build Rust workspace, runner and driver
         working-directory: rust
         run: cargo build --workspace --locked
+      - name: Check format library formatting
+        run: rust/target/debug/iris fmt --check formats/
       - name: Check Specification examples
         run: (cd rust && cargo run --locked -p iris-conformance -- extract-examples ../spec/0.1 ../conformance/cases/0.1/spec-examples --check)
       - name: Check formal grammar

@@ -1,8 +1,8 @@
 format dimacs-cnf
 
 comment "c"
-stop "%"                    # SATLIB files end with "%" and "0"
+stop "%" # SATLIB files end with "%" and "0"
 line "p cnf {vars:0..gecode.int_max} {clauses:0..}"
 repeat clauses {
-  list clause: -vars..vars until 0   # the terminating 0 is not stored
+  list clause: -vars..vars until 0 # the terminating 0 is not stored
 }
