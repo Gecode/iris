@@ -351,7 +351,8 @@ reported upstream. Gecode itself needs no changes.
 ### 8.1 Rust (`rust/`)
 
 - Crates: `iris-syntax`, `iris-sema`, `iris-core`, `iris-cli`,
-  `iris-lsp`, `iris-wasm`, and `iris-lint` if built (§8.13), published
+  `iris-lsp`, `iris-wasm`, `iris-macros` (after 0.1), and `iris-lint` if
+  built (§8.13), published
   under the umbrella crate `gecode-iris`.
 - API sketch:
   ```rust
@@ -365,8 +366,13 @@ reported upstream. Gecode itself needs no changes.
   implementation that renders Gecode's caret format.
 - Optional `serde` feature: deserialize `Data` into user structs (after
   0.1).
-- Optional `spec!` macro that checks an embedded spec at compile time
-  (after 0.1).
+- An `iris!` macro for inline specs (after 0.1), in a proc-macro crate
+  `iris-macros` that `gecode-iris` re-exports. It parses and checks an
+  embedded spec at compile time with `iris-syntax` and `iris-sema`, turns
+  their diagnostics into compile errors pointing into the spec text, and
+  expands to a ready `Spec`. It depends on `proc-macro2`, `quote` and
+  `syn`; small dependencies like these are acceptable throughout the Rust
+  crates.
 - Performance target: at least as fast as Gecode on the 100 MB DIMACS
   benchmark from #270 (1.40 s), with ordinary buffered input (§12). A
   `criterion` benchmark suite tracks the format library inputs.
