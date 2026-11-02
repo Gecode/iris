@@ -265,3 +265,23 @@ Separate macOS `/usr/bin/time -l` runs recorded peak RSS of 228,442,112 B
 handoff at `/tmp/iris-zdev/rust-013-handoff.md` for values, complete logs,
 linear-work evidence and the pre-existing ignored timing-harness failure.
 The generated workload, JSON, samples and profiles remain outside Git.
+
+## Fuzzing
+
+The separate [fuzz crate](fuzz/README.md) fuzzes the parser and the reader with
+cargo-fuzz. It needs nightly Rust and keeps its own workspace and lockfile, so
+the stable commands above never build it. From this directory:
+
+```sh
+python3 -I fuzz/seed-corpus.py
+cargo +nightly fuzz run --sanitizer none parse -- -max_total_time=300 -max_len=8192 -timeout=60
+cargo +nightly fuzz run --sanitizer none read -- -max_total_time=300 -max_len=8192 -timeout=60
+cargo +nightly fmt --manifest-path fuzz/Cargo.toml -- --check
+cargo +nightly clippy --manifest-path fuzz/Cargo.toml --all-targets --locked -- -D warnings
+```
+
+The script writes seed corpora from the conformance cases and formats. The
+`parse` target checks byte-for-byte reconstruction; the `read` target splits
+its input at the first NUL byte into a reader spec and data, then reads,
+catalogs and renders. The [fuzz workflow](../.github/workflows/fuzz.yml) runs
+each target for two minutes when `rust/`, the cases, or the formats change.

@@ -1,0 +1,72 @@
+name: Fuzz
+
+on:
+  push:
+    paths:
+      - 'rust/**'
+      - 'conformance/cases/**'
+      - 'formats/**'
+      - '.github/workflows/fuzz.yml'
+  pull_request:
+    paths:
+      - 'rust/**'
+      - 'conformance/cases/**'
+      - 'formats/**'
+      - '.github/workflows/fuzz.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fuzz-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fuzz:
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [parse, read]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+        working-directory: rust
+    env:
+      CARGO_FUZZ_VERSION: 0.13.2
+    steps:
+      - uses: actions/checkout@v7
+      # cargo-fuzz needs nightly; rust/rust-toolchain.toml keeps stable for
+      # everything else, so each command here selects +nightly.
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt, clippy
+      # Nightly changes daily, so caching the fuzz build would rarely help.
+      - name: Cache cargo-fuzz and crate sources
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/bin/cargo-fuzz
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-${{ runner.arch }}-fuzz-${{ env.CARGO_FUZZ_VERSION }}-${{ hashFiles('rust/fuzz/Cargo.lock', 'rust/**/Cargo.toml') }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-fuzz-${{ env.CARGO_FUZZ_VERSION }}-
+      - name: Install cargo-fuzz
+        run: command -v cargo-fuzz || cargo +nightly install cargo-fuzz --locked --version "$CARGO_FUZZ_VERSION"
+      - name: Check fuzz lockfile
+        run: cargo +nightly fetch --locked --manifest-path fuzz/Cargo.toml
+      - name: Check fuzz crate formatting
+        run: cargo +nightly fmt --manifest-path fuzz/Cargo.toml -- --check
+      - name: Lint fuzz crate
+        run: cargo +nightly clippy --manifest-path fuzz/Cargo.toml --all-targets --locked -- -D warnings
+      - name: Write seed corpora
+        run: python3 -I fuzz/seed-corpus.py
+      - name: Fuzz ${{ matrix.target }} for two minutes
+        run: cargo +nightly fuzz run --sanitizer none ${{ matrix.target }} -- -max_total_time=120 -max_len=8192 -timeout=60
+      - name: Upload failing inputs
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: fuzz-${{ matrix.target }}-artifacts
+          path: rust/fuzz/artifacts/
