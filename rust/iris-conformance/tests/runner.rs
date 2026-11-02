@@ -33,6 +33,7 @@ fn options(root: PathBuf) -> RunOptions {
         driver_id: None,
         roots: vec![root],
         filter: None,
+        skip: Vec::new(),
         version: "0.1".into(),
         timeout: Duration::from_secs(3),
     }
@@ -580,6 +581,31 @@ fn canned_driver_observes_all_commands_original_bytes_and_parameters() {
         report
             .render()
             .ends_with("Summary: total=6 pass=6 xfail=0 fail=0 xpass=0 unrepresentable=0\n")
+    );
+}
+
+#[test]
+fn skipped_cases_are_reported_without_running() {
+    let mut opts = options(fixtures("failing"));
+    let all = run(&opts).unwrap();
+    assert_eq!(all.exit_code(), 1);
+    opts.skip = all
+        .cases
+        .iter()
+        .filter(|case| case.status == CaseStatus::Fail)
+        .map(|case| case.path.clone())
+        .collect();
+    let report = run(&opts).unwrap();
+    assert_eq!(report.exit_code(), 0, "{}", report.render());
+    assert_eq!(report.skipped.len(), opts.skip.len());
+    let text = report.render();
+    assert!(text.contains(&format!("SKIP {}\n", opts.skip[0])));
+    assert!(text.ends_with(&format!(" skipped={}\n", opts.skip.len())));
+    opts.skip.push("no-such-case".into());
+    let error = run(&opts).unwrap_err().to_string();
+    assert!(
+        error.contains("\"no-such-case\" matches no selected case"),
+        "{error}"
     );
 }
 

@@ -22,6 +22,8 @@ pub struct CaseResult {
 #[derive(Debug, Default)]
 pub struct RunReport {
     pub cases: Vec<CaseResult>,
+    /// Display paths of cases selected by `--skip`; they were not run.
+    pub skipped: Vec<String>,
 }
 
 impl RunReport {
@@ -50,7 +52,10 @@ impl RunReport {
                 writeln!(text, "  {detail}").expect("writing to String cannot fail");
             }
         }
-        writeln!(
+        for path in &self.skipped {
+            writeln!(text, "SKIP {path}").expect("writing to String cannot fail");
+        }
+        write!(
             text,
             "Summary: total={} pass={} xfail={} fail={} xpass={} unrepresentable={}",
             self.cases.len(),
@@ -61,6 +66,10 @@ impl RunReport {
             counts[4]
         )
         .expect("writing to String cannot fail");
+        if !self.skipped.is_empty() {
+            write!(text, " skipped={}", self.skipped.len()).expect("writing to String cannot fail");
+        }
+        text.push('\n');
         text
     }
 }

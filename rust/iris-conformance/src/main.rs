@@ -33,6 +33,9 @@ enum Commands {
         driver_id: Option<String>,
         #[arg(long)]
         filter: Option<String>,
+        /// Report cases whose paths contain this text as skipped; repeatable.
+        #[arg(long)]
+        skip: Vec<String>,
         #[arg(long, default_value = "0.1")]
         version: String,
         #[arg(long, default_value = "30", value_parser = parse_timeout)]
@@ -74,6 +77,7 @@ fn main() -> ExitCode {
             driver,
             driver_id,
             filter,
+            skip,
             version,
             timeout,
             cases_dir,
@@ -83,6 +87,7 @@ fn main() -> ExitCode {
                 driver_id,
                 roots: cases_dir,
                 filter,
+                skip,
                 version,
                 timeout,
             };

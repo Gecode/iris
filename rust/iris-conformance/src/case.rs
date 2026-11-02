@@ -418,7 +418,7 @@ fn discover_directory(path: &Path, cases: &mut BTreeSet<PathBuf>) -> Result<(), 
     Ok(())
 }
 
-fn display_path(path: &Path) -> Result<String, String> {
+pub(crate) fn display_path(path: &Path) -> Result<String, String> {
     let cwd = std::env::current_dir()
         .map_err(|error| error.to_string())?
         .canonicalize()

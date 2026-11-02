@@ -18,6 +18,7 @@ fn parse_only_conformance() {
         driver_id: None,
         roots,
         filter: None,
+        skip: Vec::new(),
         version: "0.1".into(),
         timeout: Duration::from_secs(30),
     })

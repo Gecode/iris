@@ -1,0 +1,11 @@
+# Cases the pinned Gecode reference fails only when built against libstdc++.
+# Gecode reads and prints floats through iostreams. libstdc++ accepts
+# subnormal and underflowing values without failbit, and print_real's
+# round-trip check ignores failbit, so DBL_MAX prints as 2e+308. libc++
+# (macOS) follows the Specification. CI passes each line to --skip on Linux.
+pinned/float-below-normal
+pinned/float-underflow-to-zero
+smoke/dzn
+spec-examples/04-input--input-float-underflow
+spec-examples/09-params-and-instances--params-conversion-fallbacks
+spec-examples/appendix-b-dzn--dzn-float-spellings

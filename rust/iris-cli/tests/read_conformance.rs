@@ -31,6 +31,7 @@ fn full_conformance() {
         driver_id: None,
         roots: paths,
         filter: None,
+        skip: Vec::new(),
         version: "0.1".into(),
         timeout: Duration::from_secs(30),
     })

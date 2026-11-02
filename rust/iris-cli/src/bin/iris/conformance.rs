@@ -15,6 +15,9 @@ pub struct Arguments {
     /// Select cases whose paths contain this text.
     #[arg(long)]
     filter: Option<String>,
+    /// Report cases whose paths contain this text as skipped instead of running them; repeatable.
+    #[arg(long)]
+    skip: Vec<String>,
     /// Language version used by the cases and driver.
     #[arg(long, default_value = "0.1")]
     version: String,
@@ -29,6 +32,7 @@ pub fn run(arguments: Arguments) -> ExitCode {
         driver_id: arguments.driver_id,
         roots: arguments.roots,
         filter: arguments.filter,
+        skip: arguments.skip,
         version: arguments.version,
         timeout: arguments.timeout,
     };

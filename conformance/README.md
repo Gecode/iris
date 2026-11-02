@@ -407,7 +407,7 @@ From `rust/`:
 
 ```sh
 cargo run --locked -p iris-conformance -- run --driver '<command>' \
-  [--driver-id ID] [--filter PATTERN] [--version 0.1] [--timeout SECONDS] <cases-dir>...
+  [--driver-id ID] [--filter PATTERN] [--skip PATTERN]... [--version 0.1] [--timeout SECONDS] <cases-dir>...
 ```
 
 The version defaults to `0.1`, the only supported selection. The timeout is
@@ -433,7 +433,14 @@ field or byte differences and bounded diagnostic/output excerpts. The final line
 Summary: total=N pass=P xfail=K fail=F xpass=U unrepresentable=R
 ```
 
-Counts partition total. Runner exits: **0** when fail and xpass are both zero;
+Counts partition total. `--skip PATTERN`, repeatable, takes a literal substring like
+`--filter`. Selected cases whose paths contain it are not run. Each one prints `SKIP`
+and its path, is left out of the counts, and the summary gains ` skipped=S`. A pattern
+that matches no selected case is a configuration error, so stale skips must be removed.
+CI uses it only for the Gecode adapter on Linux, with the list in
+[`adapters/gecode/libstdcxx-skips.txt`](adapters/gecode/libstdcxx-skips.txt): the
+pinned reference reads and prints out-of-range floats wrongly when built against
+libstdc++, and that platform bug is not an appendix C difference. Runner exits: **0** when fail and xpass are both zero;
 **1** when either is nonzero; **2** for CLI, configuration, loading or zero-selection
 errors. Help and version exit 0. A driver exit 2 is a case failure, hence runner
 exit 1. XFAIL and UNREPRESENTABLE lines include the driver ID, reason and any difference

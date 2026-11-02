@@ -20,6 +20,8 @@ pub struct RunOptions {
     pub driver_id: Option<String>,
     pub roots: Vec<PathBuf>,
     pub filter: Option<String>,
+    /// Literal path substrings of selected cases to report as skipped instead of running.
+    pub skip: Vec<String>,
     pub version: String,
     pub timeout: Duration,
 }
@@ -37,13 +39,36 @@ impl std::error::Error for RunError {}
 pub fn run(options: &RunOptions) -> Result<RunReport, RunError> {
     validate_options(options).map_err(RunError)?;
     let command = DriverCommand::parse(&options.driver).map_err(RunError)?;
-    let paths = case::discover(&options.roots, options.filter.as_deref()).map_err(RunError)?;
+    let mut paths = case::discover(&options.roots, options.filter.as_deref()).map_err(RunError)?;
+    let mut report = RunReport::default();
+    if !options.skip.is_empty() {
+        let mut unused: Vec<&String> = options.skip.iter().collect();
+        let mut kept = Vec::new();
+        for path in paths {
+            let text = case::display_path(&path).map_err(RunError)?;
+            if options
+                .skip
+                .iter()
+                .any(|pattern| text.contains(pattern.as_str()))
+            {
+                unused.retain(|pattern| !text.contains(pattern.as_str()));
+                report.skipped.push(text);
+            } else {
+                kept.push(path);
+            }
+        }
+        if let Some(pattern) = unused.first() {
+            return Err(RunError(format!(
+                "skip pattern {pattern:?} matches no selected case"
+            )));
+        }
+        paths = kept;
+    }
     let cases: Vec<Case> = paths
         .iter()
         .map(|path| Case::load(path, &options.version))
         .collect::<Result<_, _>>()
         .map_err(RunError)?;
-    let mut report = RunReport::default();
     for case in cases {
         report.cases.push(run_case(&command, &case, options));
     }
