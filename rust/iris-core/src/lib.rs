@@ -191,13 +191,17 @@ impl Params {
     }
 }
 
+/// A language diagnostic, a host failure, or an unsupported implementation feature.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Failure {
     Language(Error),
     Host(HostError),
     Unsupported(UnsupportedFeature),
 }
+/// A host-side failure, separate from Iris language diagnostics and work budgets.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum HostError {
     Cancelled,
     Io(std::io::Error),

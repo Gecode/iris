@@ -70,3 +70,34 @@ jobs:
       - name: Test Rust workspace
         working-directory: rust
         run: cargo test --workspace --locked
+      - name: Test EditorConfig support
+        working-directory: rust
+        run: cargo test --locked -p iris-syntax --features editorconfig
+      - name: Build Rust documentation
+        working-directory: rust
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --workspace --no-deps --locked
+
+  msrv:
+    name: Minimum supported Rust version
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v7
+      - name: Read minimum supported Rust version
+        id: msrv
+        run: |
+          version=$(sed -n 's/^rust-version = "\([^"]*\)"$/\1/p' Cargo.toml)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
+      # rust/rust-toolchain.toml selects stable, so name the toolchain explicitly.
+      - name: Build Rust workspace
+        run: cargo "+${{ steps.msrv.outputs.version }}" build --workspace --locked
+      - name: Test Rust workspace
+        run: cargo "+${{ steps.msrv.outputs.version }}" test --workspace --locked

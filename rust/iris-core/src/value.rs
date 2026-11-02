@@ -71,7 +71,9 @@ struct FrameEntry {
     value: Option<Value>,
     buffer: Option<Value>,
 }
+/// An invalid entry lookup, path, or requested value type in successfully read data.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum AccessError {
     UnknownEntry(String),
     IndexOutOfBounds,

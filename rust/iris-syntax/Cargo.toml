@@ -2,8 +2,19 @@
 name = "iris-syntax"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
+description = "Lossless parsing and formatting for the Iris reader language"
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+documentation = "https://docs.rs/iris-syntax"
+keywords.workspace = true
+categories = ["parsing"]
 publish = false
+
+[package.metadata.docs.rs]
+all-features = true
 
 [features]
 editorconfig = ["dep:ec4rs"]

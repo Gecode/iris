@@ -21,23 +21,58 @@ with parse and resolution diagnostics (milestone M4b).
 [gecode-iris](gecode-iris/README.md) re-exports the public `iris-core` API. Its
 package name is `gecode-iris`; Rust imports it as `gecode_iris`. All workspace
 crates currently set `publish = false`; publication belongs to milestone M7.
+Package metadata and versioned internal dependencies are prepared without
+enabling publication. The planned crates.io order is `iris-syntax`, `iris-sema`,
+`iris-core`, `gecode-iris`, `iris-conformance`, `iris-lsp`, then `iris-cli`.
+The standalone `iris-conformance` runner can be published at any point before
+`iris-cli`; it has no implementation dependencies. The separate nightly fuzz
+crate remains unpublished.
 Later work adds `iris-wasm` and, if built, `iris-lint`.
 [PLAN.md §4.2](../PLAN.md#42-the-rust-reference-implementation-is-layered)
 describes the layers; §8.1, §8.7, §8.12 and §8.13 describe the crates. Milestones
 M3, M4b, M4e and M6b cover the core/CLI, language server, formatter and linter.
 
-Use the installed stable Rust toolchain with rustfmt and Clippy. The workspace
-selects channel `stable`, not a numeric compiler pin. Python 3 is required only
-for the canned driver in process tests. From this directory:
+The minimum supported Rust version (MSRV) is **1.88**. The existing source uses
+let chains, which require Rust 1.88; the workspace builds and tests with 1.88.0.
+CI reads `rust-version` from the workspace manifest for its MSRV build and test
+job, alongside stable checks. MSRV increases accompany minor package releases.
+The separate nightly fuzz crate is outside this guarantee.
+
+Use the installed stable Rust toolchain with rustfmt and Clippy for development.
+The workspace selects channel `stable`, not a numeric compiler pin. Python 3 is
+required only for the canned driver in process tests. From this directory:
 
 ```sh
 cargo build --workspace --locked
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
+RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
+cargo test --locked -p iris-syntax --features editorconfig
 cargo test --locked -p gecode-iris --doc
 cargo test --locked -p iris-cli --test complete
 ```
+
+For the MSRV checks, run `cargo +1.88.0 build --workspace --locked` and
+`cargo +1.88.0 test --workspace --locked`.
+
+## API stability
+
+Package versions and language versions are separate. The Rust packages use
+0.x versions while implementing the frozen Iris 0.1 language contract in the
+[Specification](../spec/0.1/README.md). Rust API changes do not change that
+language contract. Breaking API changes may accompany minor package releases
+(for example, 0.1 to 0.2); patch releases preserve the public API. Formatter
+output changes only in minor package releases and must be noted in the changelog.
+
+The reader API distinguishes language diagnostics (`Failure::Language`), host
+failures (`Failure::Host`), unsupported implementation features
+(`Failure::Unsupported`), and invalid access to successfully read data
+(`AccessError`). The [umbrella API documentation](https://docs.rs/gecode-iris)
+explains these types. Its public error enums `Failure`, `HostError`, and
+`AccessError` are non-exhaustive so callers can handle future variants.
+
+## Development checks
 
 Check reconstruction of every valid-UTF-8 reader spec in the repository:
 

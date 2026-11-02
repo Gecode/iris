@@ -127,6 +127,7 @@ fn read_document(request: &Request, bytes: &[u8]) -> Result<(u8, Vec<u8>), (u8, 
         Err(Failure::Language(error)) => Ok((1, error.to_json().map_err(|e| (3, e.to_string()))?)),
         Err(Failure::Host(error)) => Err((3, error.to_string())),
         Err(Failure::Unsupported(error)) => Err((2, error.to_string())),
+        Err(error) => Err((3, error.to_string())),
     }
 }
 fn run() -> Result<u8, (u8, String)> {
