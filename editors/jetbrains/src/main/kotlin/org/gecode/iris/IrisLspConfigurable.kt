@@ -19,7 +19,7 @@ class IrisLspConfigurable(private val project: Project) : Configurable {
         executableField = field
         return FormBuilder.createFormBuilder()
             .addLabeledComponent("Executable path:", field)
-            .addComponent(JBLabel("Leave empty to find iris on PATH. The plugin adds lsp; enter a path without quotes or arguments."))
+            .addComponent(JBLabel("Leave empty to use PATH, then a downloaded release. Otherwise enter a path without quotes or arguments."))
             .addComponent(JBLabel("Applying changes restarts the server for open reader specs."))
             .panel
     }

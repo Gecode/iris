@@ -47,6 +47,7 @@ intellijPlatform {
 }
 
 tasks.processResources {
+    filesMatching("iris-version.txt") { expand("version" to project.version.toString()) }
     // Preserve the tuned brand artwork; only set its display dimensions.
     from("../../brand/favicon/favicon.svg") {
         into("icons")

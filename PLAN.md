@@ -766,9 +766,11 @@ RustRover, and the other JetBrains IDEs.
     checksums published with the Iris release; match the server host
     rather than the frontend in remote development. Keep configured
     commands and `PATH` usable for offline/manual installation.
-  - An explicit offer naming the version, source, target, and size, with
-    download, configure-existing, and decline actions. Do not download
-    or execute a command taken from a reader spec.
+  - An explicit offer naming the version, source, and target, with
+    download, configure-existing, and decline actions. The size is not
+    known before the plugin contacts the source, so the IDE reports it
+    during the download. Do not download or execute a command taken from
+    a reader spec.
   - HTTPS using the IDE's proxy settings, a trusted expected SHA-256,
     safe extraction, executable permissions, and a versioned user-writable
     cache outside the plugin directory. Verify before atomic installation

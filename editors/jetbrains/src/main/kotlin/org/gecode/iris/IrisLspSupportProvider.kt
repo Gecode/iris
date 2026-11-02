@@ -9,15 +9,21 @@ import com.intellij.util.EnvironmentUtil
 import java.io.File
 
 // The server-named API also works on 2025.3, before the 2026.1.4 client API rename.
-class IrisLspSupportProvider internal constructor(private val searchPath: () -> String?) : LspServerSupportProvider {
-    constructor() : this({ EnvironmentUtil.getValue("PATH") })
+class IrisLspSupportProvider internal constructor(
+    private val release: IrisBinaryDownload,
+    private val searchPath: () -> String?,
+) : LspServerSupportProvider {
+    constructor() : this(IrisBinaryDownload(), { EnvironmentUtil.getValue("PATH") })
+    internal constructor(searchPath: () -> String?) : this(IrisBinaryDownload(), searchPath)
 
     override fun fileOpened(project: Project, file: VirtualFile, serverStarter: LspServerSupportProvider.LspServerStarter) {
         if (file.fileType != IrisFileType) return
-        val executable = findIrisExecutable(project.getService(IrisLspSettings::class.java).executablePath, searchPath())
+        val configuredPath = project.getService(IrisLspSettings::class.java).executablePath
+        val executable = findIrisExecutable(configuredPath, searchPath())
+            ?: if (configuredPath.isBlank()) release.cachedExecutable() else null
         val notifications = project.getService(IrisLspNotifications::class.java)
         if (executable == null) {
-            notifications.showMissingExecutable()
+            notifications.showMissingExecutable(if (configuredPath.isBlank()) release else null)
             return
         }
         notifications.clear()

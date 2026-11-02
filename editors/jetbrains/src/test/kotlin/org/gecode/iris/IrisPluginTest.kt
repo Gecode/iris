@@ -125,7 +125,7 @@ class IrisPluginTest : BasePlatformTestCase() {
             assertTrue(notification.content.contains("cargo build --locked -p iris-cli --bin iris"))
             assertTrue(notification.content.contains("Executable path"))
             assertTrue(notification.content.contains("PATH"))
-            assertEquals("Configure Iris", notification.actions.single().templatePresentation.text)
+            assertTrue(notification.actions.any { it.templatePresentation.text == "Configure Iris" })
             provider.fileOpened(project, file, starter)
             UIUtil.dispatchAllInvocationEvents()
             assertEquals("One notification per unresolved attempt", 1, received.size)
