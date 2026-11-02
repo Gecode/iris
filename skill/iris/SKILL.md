@@ -171,7 +171,8 @@ Before reading a packed token as one string, try splitting it:
 numbers, an alphabet for tokens of fixed length, and a line pattern for
 fixed punctuation ([patterns.md](references/patterns.md#compact-tokens)).
 A number too big for 64 bits splits too: `tokens "0123456789"` and
-`list digit: 0..9 until eol` read it as an exact digit array.
+`list digit: 0..9 until eol` read it as an exact digit array, and
+`tokens "01"` with `list bit: 0..1 until eol` does the same in binary.
 
 Several common needs have no direct form. The full table, with
 workarounds and Specification sections, is at the end of
