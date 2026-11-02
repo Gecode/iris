@@ -1,11 +1,20 @@
 ---
 title: Tools
-description: Documentation for the Iris tools is planned.
+description: Check, read, format, and edit Iris reader specs.
 editUrl: false
 prev: false
 next: false
 ---
 
-Documentation for the Iris tools is planned.
+The Rust implementation supplies the `iris` CLI and language server.
+Build them from source; registry publication, release distribution, and editor
+marketplace publication are planned.
 
-[Introduction](/introduction/)
+- [CLI](/tools/cli/): validate a reader spec, read input as JSON, dzn or a summary, list instances, and run conformance cases.
+- [Formatter](/tools/formatter/): use one style, with the line width from EditorConfig.
+- [Language server](/tools/lsp/): diagnostics, completion, navigation, formatting, and live sample reading.
+- [Editors](/tools/editors/): the shared TextMate grammar and the JetBrains plugin.
+- [Agent skill](/tools/agent-skill/): guidance for an agent writing or debugging Iris 0.1 reader specs.
+
+The [Specification](/specification/0.1/) defines what reader specs mean.
+Tool diagnostics link to its [error codes](/specification/0.1/errors/).

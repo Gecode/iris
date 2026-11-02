@@ -1,0 +1,64 @@
+---
+title: Language server
+description: Diagnostics, navigation, completion, formatting, and live sample reading over LSP.
+editUrl: false
+prev: false
+next: false
+---
+import CheckedExample from '../../../components/docs/CheckedExample.astro';
+
+The Iris language server uses the Rust parser, semantic model and reader.
+An editor starts the `iris` executable with one argument, `lsp`, and communicates
+through framed LSP messages on standard input and output. Errors go to standard
+error. The editor owns executable discovery and installation.
+
+## Connect an editor
+
+[Build the CLI](/tools/cli/#build-from-source). Configure your editor's
+language-server executable as `iris`, with arguments `["lsp"]`, or supply the
+absolute path to the built executable. The editor can use the project directory
+as its working directory; document identity comes from URIs.
+The [JetBrains plugin](/tools/editors/#jetbrains) starts the server for you.
+A VS Code extension that combines the grammar and an LSP client is planned.
+
+The server analyzes open buffers, including unsaved edits. It supports incremental
+synchronization, UTF-16 positions by default, and UTF-8 when the client offers it.
+Edits trigger analysis after a 150 ms debounce. Closing a document clears its
+diagnostics.
+
+## Features
+
+- Parse and resolution diagnostics with stable [error-code links](/specification/0.1/errors/), including [syntax errors](/specification/0.1/errors/#e-spec-syntax).
+- Hover for keywords, types, functions and names, with inferred value types and depths.
+- Completion for statement keywords, visible names, named types, layouts, functions and host constants.
+- Go to definition, find references, and rename within the current document. Rename checks for collisions and preserves reference targets.
+- Inlay hints for definitions, an outline of repeats, sections and instances, folding, and semantic tokens.
+- Document and range [formatting](/tools/formatter/) using the same style as the CLI.
+
+Unknown facts remain unknown; ambiguous definitions are marked as such.
+Rename requires a reader spec without parse or resolution errors. Navigation
+uses the available semantic model even when the source has an error. Features
+available in an editor also depend on its LSP client.
+
+## Read a sample while editing
+
+A directive comment asks the server to read a sample with the whole reader spec:
+
+<CheckedExample id="sample-directive" />
+
+Save a file at `samples/small.txt` relative to the reader spec's directory.
+On open and accepted reader-spec edits, the server reads it and merges any
+runtime errors with the document diagnostics. A successful sample gets a hover
+summary and inlay hint with entry names, types, scalar values and shapes.
+These previews are bounded; the read itself is complete.
+
+A directive can add `instance=2` or `param NAME=VALUE`. Double quotes delimit
+components containing spaces; backslashes are literal. Paths must be relative
+and resolve from a local file URI. Untitled buffers cannot resolve sample paths.
+Directives are ordinary comments to the Iris language and to Gecode.
+
+The server rereads samples on reader-spec edits, without watching sample files.
+After changing only an input file, edit the reader spec or close and reopen it.
+Obsolete reads are cancelled and their results are discarded.
+See the [server README](https://github.com/Gecode/iris/blob/main/rust/iris-lsp/README.md)
+for directive syntax, preview limits, and protocol details.

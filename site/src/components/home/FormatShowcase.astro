@@ -30,7 +30,7 @@ const representations = [{ id: 'input', label: 'input' }, { id: 'spec', label: '
           <a class="text-iris-link underline underline-offset-4" href={example.downloads.case} download>Download full case</a>
           <a class="text-iris-link underline underline-offset-4" href={`/formats/${format.slug}/`}>About {format.title}</a>
         </div>
-        <ExampleTerminal example={example} formatId={format.id} />
+        <ExampleTerminal fixedHeight example={example} formatId={format.id} />
       </div>;
     })}
   </div>

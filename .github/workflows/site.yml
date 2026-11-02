@@ -11,6 +11,8 @@ on:
       - '.editorconfig'
       - 'LICENSE'
       - 'editors/textmate/**'
+      - 'editors/jetbrains/README.md'
+      - 'docs/formatting.md'
       - '.github/workflows/site.yml'
   pull_request:
     paths:
@@ -22,6 +24,8 @@ on:
       - '.editorconfig'
       - 'LICENSE'
       - 'editors/textmate/**'
+      - 'editors/jetbrains/README.md'
+      - 'docs/formatting.md'
       - '.github/workflows/site.yml'
   workflow_dispatch:
 

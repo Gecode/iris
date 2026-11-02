@@ -1,0 +1,68 @@
+---
+title: Formatter
+description: One style for Iris reader specs, with line width from EditorConfig.
+editUrl: false
+prev: false
+next: false
+---
+import CheckedExample from '../../../components/docs/CheckedExample.astro';
+
+The formatter changes whitespace and line breaks in an Iris 0.1 reader spec.
+It preserves tokens, comments, strings, names, numbers, and statement order.
+Text inside a line pattern stays byte for byte, including captures and spaces.
+
+## Before and after
+
+This pair comes from the repository's
+[formatting guide](https://github.com/Gecode/iris/blob/main/docs/formatting.md).
+The site checks the result against the real formatter.
+
+<CheckedExample id="format-before" title="Before" />
+
+<CheckedExample id="format-after" title="After" />
+
+## The style
+
+- Put each statement on its own line and indent brace bodies by two spaces.
+- Expand nonempty blocks; write empty blocks as `{}`. Keep `} else` together unless a comment or blank line separates it.
+- Use `name: type`, tight array brackets and ranges, spaces around binary operators, and a space after commas. Do not align columns.
+- Keep comments attached to the same tokens. Do not reword, wrap or move them to another line.
+- Keep interior single blank lines, collapse longer runs, and trim blank lines at file edges and directly inside braces.
+- Use LF outside protected string and comment text, with one final LF in a nonempty file. Empty files stay empty.
+
+When a line needs wrapping, move a check's message first, then option groups
+and string lists, before breaking expressions. Expression breaks follow the
+loosest operator precedence and keep operators on the preceding line. Calls put
+one argument per line when broken. Continuations add two spaces, without column
+alignment. Indivisible tokens and comments may exceed the target width.
+The full guide defines the remaining details and exceptions.
+
+## Line width
+
+The only setting is `max_line_length` in `.editorconfig`, looked up for the
+reader spec's path. The default is 100 when the property is absent, `unset`, or
+`off`. Other properties do not affect formatting: indentation remains two spaces.
+Widths count Unicode scalar values, rather than bytes or terminal display cells.
+
+The [language server](/tools/lsp/) uses the same formatter and lookup for file
+URIs. Untitled documents use width 100. Formatter output changes only in minor
+package releases, with style changes recorded in the Rust changelog.
+
+## Use the formatter
+
+[Build the CLI](/tools/cli/#build-from-source) and use its
+[in-place, check, and diff modes](/tools/cli/#format-reader-specs).
+For standard input, run this from the repository root with `iris` on `PATH`.
+Pipe the unformatted reader spec into it, or paste it and close standard input:
+
+<CheckedExample id="format-stdin" />
+
+The command prints formatted source and uses width 100. Add `--stdin-filepath`
+with a reader-spec path to use its EditorConfig hierarchy; that path need not
+exist and is never written. `-` must be the only operand.
+
+Whole-document formatting refuses syntax errors. Range formatting in the language
+server can format a clean statement sequence when other parts have syntax errors.
+Neither mode requires successful semantic analysis. See
+[source syntax](/specification/0.1/05-reader-specs/) and
+[syntax errors](/specification/0.1/errors/#e-spec-syntax) in the Specification.

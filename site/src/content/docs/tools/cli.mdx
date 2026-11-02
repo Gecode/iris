@@ -1,0 +1,138 @@
+---
+title: CLI
+description: Build iris, check reader specs, read data, list instances, format, and run conformance cases.
+editUrl: false
+prev: false
+next: false
+---
+import CheckedExample from '../../../components/docs/CheckedExample.astro';
+
+The `iris` command checks reader specs and reads text input using Iris 0.1.
+It also formats reader specs, starts the [language server](/tools/lsp/), and
+runs the shared conformance suite.
+
+## Build from source
+
+Use Rust 1.88 or newer with Cargo. In the repository's `rust/` directory, run:
+
+<CheckedExample id="build-cli" />
+
+The executable is `rust/target/debug/iris` relative to the repository root
+(`iris.exe` on Windows). If you set `CARGO_TARGET_DIR`, use that directory's
+`debug` subdirectory instead. Add the executable's directory to `PATH` for the
+commands below. **All following examples run from the repository root.**
+
+The Rust packages are at version 0.1.0 and have publication disabled.
+The repository has a release workflow, but its changelog remains Unreleased;
+building from source is the installation path described here. Crates.io
+publication and packaged releases are planned.
+
+## Check a reader spec
+
+<CheckedExample id="check" />
+
+A successful check validates parsing and resolution without reading input.
+It does not execute expressions or parameter defaults. Read a sample as well:
+a name used in an expression can still fail at read time.
+
+## Read input
+
+The default output is a summary: entry names, types, scalar values, and array
+shapes. This example reads the [DIMACS formula](/introduction/):
+
+<CheckedExample id="read-default" />
+
+You can request that summary explicitly:
+
+<CheckedExample id="read-summary" />
+
+Use `--json` for [canonical JSON](/specification/0.1/03-data-model/).
+It retains entry names, types, depths, and values:
+
+<CheckedExample id="read-json" />
+
+Use `--dzn` for [MiniZinc data](/specification/0.1/appendix-b-dzn/):
+
+<CheckedExample id="read-dzn" />
+
+Choose one output option. A read accepts several input files; parameters apply
+to each. JSON and dzn documents concatenate without extra separators. Output is
+buffered until all files have been read successfully.
+
+## Supply parameters
+
+Repeat `--param NAME=VALUE` for caller parameters. Values remain strings until
+the reader spec converts them. The first `=` separates name and value; later
+assignments to the same name replace earlier ones.
+
+The `instance` parameter selects one instance by its number (starting at 1)
+or exact name. This [job shop](/formats/job-shop/) example selects a named instance:
+
+<CheckedExample id="read-param" />
+
+See [parameters and instances in the Specification](/specification/0.1/09-params-and-instances/).
+
+## List instances
+
+A catalog traverses every instance, even if you supply a selector. The plain
+listing gives the count, names when all are usable, and first rejection messages:
+
+<CheckedExample id="list" />
+
+Add `--dzn` for the catalog as data:
+
+<CheckedExample id="list-dzn" />
+
+## Format reader specs
+
+Format a file in place:
+
+<CheckedExample id="fmt" />
+
+Directory operands recurse through `.iris` files, including hidden files and
+files matched by `.gitignore`. Symlinks are skipped. In CI, check without writing:
+
+<CheckedExample id="fmt-check" />
+
+Preview unified diffs and fail if changes are needed:
+
+<CheckedExample id="fmt-diff" />
+
+`--diff` alone prints diffs without changing files and exits successfully when
+the only difference is formatting. `--check` exits 1 if a file would change.
+Syntax errors leave that file unchanged; processing continues with other files.
+See the [formatter](/tools/formatter/) for style, standard input, and EditorConfig.
+
+## Run conformance cases
+
+The conformance runner compares an implementation's driver with the language-neutral
+cases. Build the Rust driver in `rust/`:
+
+<CheckedExample id="build-driver" />
+
+Then run from the repository root, with `iris` on `PATH` and the default Cargo
+target directory. If you changed `CARGO_TARGET_DIR`, adjust the driver path:
+
+<CheckedExample id="conformance" />
+
+Explicit roots are relative to the current directory. With no root, the default
+is `conformance/cases/0.1`. `--filter` selects a path substring; `--version` defaults
+to `0.1`; `--timeout` defaults to 30 seconds per case. `--driver-id` selects precise
+known-failure annotations for that driver. Rust needs no exemptions.
+The driver argument is a command string parsed with shell quoting, without shell
+execution or expansion.
+
+See the [conformance suite](https://github.com/Gecode/iris/blob/main/conformance/README.md)
+for its driver protocol and case format.
+
+## Errors and exit status
+
+Checks and reads exit 0 on success, 1 for language, file or resource errors, and
+2 for incorrect usage. Diagnostics show a location, source excerpt and caret;
+read errors also identify the active reader-spec line. No partial read data is
+printed. The [format library](/formats/dimacs-cnf/#case-literal-out-of-range)
+shows a real failed read; the [Specification](/specification/0.1/errors/)
+defines the error codes and their order.
+
+For conformance, exit 1 means a failure or unexpected pass; exit 2 also covers
+configuration, case-loading and zero-selection errors.

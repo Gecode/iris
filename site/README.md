@@ -8,7 +8,8 @@ then shows executable format examples. The format library renders every
 format’s README, highlighted reader spec, and cases with their real output.
 The Language Specification is rendered directly from `spec/`, with versioned
 chapter pages and error-code links shared with the language server.
-The introduction and planned documentation pages use the same shell.
+The introduction, tools and Rust API pages use the same shell. Other language
+guides identify planned implementations.
 
 ## Build and check
 
@@ -156,3 +157,14 @@ Markdown and TOML use the same pinned parsers already present in the dependency
 tree, declared directly for these imports. Use the example marker
 attributes from `ExamplePane.astro` and `ExampleTerminal.astro` when rendering
 these records on another page, so their output enters the freshness check.
+
+The same collector also prepares `src/generated/documentation.ts` for the tools
+and Rust pages. `scripts/documentation-examples.mjs` runs the CLI commands,
+formats a before/after pair extracted from `docs/formatting.md`, and extracts the
+umbrella crate's example from its doc-tested source. Each collection executes
+that Rust doctest. Setup commands are checked against their owning READMEs;
+conformance uses the driver path reported by Cargo while showing the default
+repository-relative path. In-place formatting runs on a disposable copy.
+`CheckedExample.astro` marks commands, source snippets and outputs for the
+existing freshness checker, which requires each page's examples and rejects
+unmarked code blocks on these pages. The introduction reuses the format markers.

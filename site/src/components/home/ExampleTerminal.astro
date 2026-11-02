@@ -1,7 +1,8 @@
 ---
 import type { FormatCase } from '../../data/formats';
-interface Props { example: FormatCase; formatId: string; error?: boolean }
-const { example, formatId, error = false } = Astro.props;
+// The showcase keeps one height across tabs; elsewhere the output sets it.
+interface Props { example: FormatCase; formatId: string; error?: boolean; fixedHeight?: boolean }
+const { example, formatId, error = false, fixedHeight = false } = Astro.props;
 const key = `${formatId}/${example.id}`;
 const output = example.result.kind === 'success' ? example.result.dzn : example.result.diagnostic;
 ---
@@ -13,6 +14,6 @@ const output = example.result.kind === 'success' ? example.result.dzn : example.
   <div class="px-4 pt-4 pb-3 font-mono text-[0.8125rem] leading-6">
     <span aria-hidden="true" class="text-iris-dark-green">$ </span><code class="whitespace-pre-wrap wrap-break-word" data-example={key} data-representation="command" data-final-lf="kept">{example.commands.readDzn}</code>
   </div>
-  <pre class="m-0 h-iris-terminal overflow-auto px-4 pb-4 text-[0.8125rem] leading-6" tabindex="0" role="group" aria-label={error ? 'CLI error diagnostic' : 'dzn output'}><code data-example={key} data-representation={error ? 'diagnostic' : 'dzn'} data-final-lf="kept">{error ? output.split(/( +\^\n)/).map(part => /^ +\^\n$/.test(part) ? <span class="text-iris-dark-red">{part}</span> : part) : output}</code></pre>
+  <pre class:list={['m-0 overflow-auto px-4 pb-4 text-[0.8125rem] leading-6', fixedHeight ? 'h-iris-terminal' : 'max-h-iris-terminal']} tabindex="0" role="group" aria-label={error ? 'CLI error diagnostic' : 'dzn output'}><code data-example={key} data-representation={error ? 'diagnostic' : 'dzn'} data-final-lf="kept">{error ? output.split(/( +\^\n)/).map(part => /^ +\^\n$/.test(part) ? <span class="text-iris-dark-red">{part}</span> : part) : output}</code></pre>
   <p class:list={['m-0 border-t border-iris-dark-border px-4 py-2 text-sm', error ? 'text-iris-dark-red' : 'text-iris-dark-green']}>{error ? 'Input rejected' : 'Read succeeded'}</p>
 </div>

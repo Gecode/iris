@@ -1,0 +1,74 @@
+---
+title: Editors
+description: TextMate highlighting and the source-built JetBrains plugin for Iris.
+editUrl: false
+prev: false
+next: false
+---
+import CheckedExample from '../../../components/docs/CheckedExample.astro';
+
+Iris has a shared TextMate grammar and a JetBrains plugin. The
+[language server](/tools/lsp/) supplies diagnostics and editing features beyond
+highlighting. Marketplace publication and a packaged VS Code extension are planned.
+
+## TextMate and VS Code
+
+The grammar is the JSON file
+[`editors/textmate/iris.tmLanguage.json`](https://github.com/Gecode/iris/blob/main/editors/textmate/iris.tmLanguage.json),
+with scope `source.iris`. It needs no generation or build step. An editor
+extension or highlighter can load it directly and associate it with `.iris` files;
+this site uses the same grammar.
+
+It highlights comments, strings, numbers, types, keywords, names, operators,
+line-pattern captures and current-value references. TextMate examines one physical
+line at a time, so contextual names can retain keyword highlighting. Semantic
+tokens from the language server can correct these classifications.
+
+The repository supplies the grammar, rather than an installable VS Code package.
+A VS Code extension combining it with an LSP client is planned. For now, integrating
+it into an editor requires that editor's grammar and LSP configuration. Highlighting
+alone does not validate a reader spec; use the [CLI](/tools/cli/) to check it and
+read a sample. The [grammar README](https://github.com/Gecode/iris/blob/main/editors/textmate/README.md)
+describes its scope and tests.
+
+## JetBrains
+
+The plugin registers the `.iris` file type and icon, loads the shared TextMate
+grammar, and starts `iris lsp` through the IntelliJ Platform LSP API.
+It targets IDE release lines 2025.3, 2026.1 and 2026.2 with the LSP module and
+bundled TextMate plugin: IntelliJ IDEA, CLion, PyCharm, RustRover and other
+compatible JetBrains IDEs. Android Studio and open-source IDEA builds lack the
+required LSP module. Rename needs 2026.1.1; range formatting needs 2026.1.
+
+### Build and install
+
+In `editors/jetbrains/`, run:
+
+<CheckedExample id="build-jetbrains" />
+
+The Gradle wrapper can run on Java 27 and resolves Java 21 for compilation and
+tests. Tests need a Unix shell and Python 3.10 or newer. The first build needs
+network access and several GiB for IDEs and caches.
+
+Install `build/distributions/iris-0.1.0-SNAPSHOT.zip` through the IDE's
+**Settings → Plugins → Install Plugin from Disk** action. Marketplace publication
+is planned. The [plugin README](https://github.com/Gecode/iris/blob/main/editors/jetbrains/README.md)
+describes compatibility checks and the sandbox IDE.
+
+### Select the server
+
+[Build `iris`](/tools/cli/#build-from-source). In
+**Settings → Languages & Frameworks → Iris**, set **Executable path** to the
+absolute path of that binary. Enter only the path, without quotes or arguments;
+the plugin adds `lsp`. An empty setting searches the IDE's console `PATH`, then a
+previously downloaded release matching the plugin version and server host.
+
+Applying a changed setting restarts the server. Use
+**Find Action → Restart Iris Language Server** to retry discovery. If no usable
+binary is found, **Configure Iris** opens the setting and the warning explains
+how to build the server.
+
+The plugin implements an optional, explicit server download with checksum and
+version verification. This requires matching GitHub release assets; release
+preparation does not establish that those assets are published. Building and
+configuring a local binary works independently of release availability.

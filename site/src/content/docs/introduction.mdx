@@ -1,55 +1,72 @@
 ---
 title: Introduction
-description: Reader specs, text input, and the data Iris reads.
+description: Read text instance files into named, typed data with Iris.
 editUrl: false
 prev: false
 next: false
 ---
-import { Tabs, TabItem } from '@astrojs/starlight/components';
+import ExamplePane from '../../components/home/ExamplePane.astro';
+import ExampleTerminal from '../../components/home/ExampleTerminal.astro';
+import { formatBySlug, caseById } from '../../data/formats';
 
-Iris is a declarative language for reading text instance files.
-A **reader spec** describes a format: the values to read, their structure,
-and the checks the data must satisfy.
+export const format = formatBySlug('dimacs-cnf');
+export const example = caseById(format, 'three-variables');
+export const key = `${format.id}/${example.id}`;
 
-## Reader specs
+Iris is a declarative language for reading text instance files into named,
+typed data. A **reader spec** describes the input format: which values to read,
+how to collect them into arrays, and which conditions they must satisfy.
+The same reader spec can serve a command-line tool or a host program.
 
-A reader spec names the entries to read. This small example reads an integer
-from a line of input, then checks its value.
+## Read a formula in two minutes
 
-<Tabs>
-<TabItem label="Reader spec">
+This small [DIMACS CNF](/formats/dimacs-cnf/) file describes a Boolean formula
+with three variables and three clauses. A positive number names a variable;
+a negative number negates it. Each clause ends with `0`.
 
-```iris title="example.iris"
-# Read the size from one line.
-line "size {n:int}"
-check n > 0 "size must be positive"
-```
+<div class="iris-format-library min-w-0">
+  <ExamplePane source={example.input.text} href={example.downloads.input} label="Input" exampleKey={key} representation="input" compact />
+</div>
 
-</TabItem>
-<TabItem label="Input">
+The library's reader spec skips comment lines beginning with `c`, captures the
+counts from the `p cnf` header, then reads one list per clause. The range checks
+that every literal refers to an existing variable. The sentinel `0` ends each
+list and is consumed without being stored. `stop "%"` handles the end marker
+used by SATLIB files.
 
-```text title="example.txt"
-size 3
-```
+<div class="iris-format-library min-w-0">
+  <ExamplePane source={format.spec.text} href={example.downloads.spec} label="Reader spec" exampleKey={key} representation="spec" highlighted compact />
+</div>
 
-</TabItem>
-</Tabs>
+[Build the CLI](/tools/cli/#build-from-source), then run this command from the
+repository root. The paths refer to the library's actual files. Choose `--dzn`
+to print MiniZinc data:
 
-## Input
+<div class="iris-format-library min-w-0">
+  <ExampleTerminal example={example} formatId={format.id} />
+</div>
 
-The input is the text being read. Reader specs can describe lines, lists,
-sections, and repeated records. The [format library](/formats/) will collect
-examples of complete formats.
+The result contains the two integer counts and `clause`, a ragged array of integers:
+one row of literals per clause, and rows can have different lengths.
+The CLI can also print [JSON or a summary](/tools/cli/#read-input).
+A [Rust program](/using/rust/) can access the same data through typed accessors.
 
-## Data
+## Iris and Gecode
 
-Reading produces named, typed entries: scalars and arrays, including arrays
-whose rows have different lengths. The [tutorial](/tutorial/) will walk through
-reading an instance and using its data.
+Iris grew out of Gecode's instance reader. **Iris 0.1 is the Gecode 6.5.0
+language**, with the deliberate differences listed in
+[appendix C of the Specification](/specification/0.1/appendix-c-differences/).
+Until Gecode's `release-6.5.0` tag exists, the reference is commit
+`5e7bbd5c26b0702c6fd652356b2289da0710ac3c`.
 
-## Gecode
+Rust is the reference implementation in this repository. Iris 1.0 develops the
+language further for Gecode 7; that work is planned. Language versions and
+package versions are separate: a Rust package version does not define an Iris
+language version.
 
-Iris grew out of Gecode’s instance reader. Iris 0.1 follows the language of
-Gecode 6.5.0, with the deliberate differences listed in the Iris Language
-Specification. Rust is the reference implementation; the
-[language documentation](/using/rust/) will cover using it from a host program.
+## Where to go next
+
+- The [tutorial](/tutorial/) is the planned step-by-step introduction to writing reader specs.
+- The [format library](/formats/) has complete reader specs, sample inputs, data, and failure examples.
+- The [Iris Language Specification](/specification/0.1/) defines the language, including its [data model](/specification/0.1/03-data-model/) and [errors](/specification/0.1/errors/).
+- The [tools](/tools/) check, read, format, and edit reader specs.

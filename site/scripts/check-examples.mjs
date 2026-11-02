@@ -2,12 +2,14 @@ import { readFile, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { strictEqual, deepStrictEqual, ok } from 'node:assert';
 import { parse, serialize } from 'parse5';
-import { buildExampleTools, collectFormatExamples, generatedModule, siteDirectory } from './format-examples.mjs';
+import { buildExampleTools, collectFormatExamples, generatedModule, documentationModule, siteDirectory } from './format-examples.mjs';
+import { documentationPages } from './documentation-examples.mjs';
 import { builtHtmlFiles, buildDirectory } from './built-pages.mjs';
 import { examplePreview } from '../src/data/example-preview.mjs';
 
-const { formats, files } = await collectFormatExamples(buildExampleTools());
+const { formats, files, documentation } = await collectFormatExamples(buildExampleTools());
 strictEqual(await readFile(resolve(siteDirectory, 'src/generated/formats.ts'), 'utf8'), generatedModule(formats), 'Stale src/generated/formats.ts; run npm run build');
+strictEqual(await readFile(resolve(siteDirectory, 'src/generated/documentation.ts'), 'utf8'), documentationModule(documentation), 'Stale src/generated/documentation.ts; run npm run build');
 for (const directory of ['public/examples', 'dist/examples']) await checkDownloads(directory, files);
 const examples = new Map(formats.flatMap(format => format.cases.map(example => [`${format.id}/${example.id}`, { format, example }])));
 const homeRequired = new Set(formats.filter(format => format.homeCase !== null).flatMap(format => ['input', 'spec', 'json', 'dzn', 'command'].map(representation => `${format.id}/${format.homeCase}/${representation}`)));
@@ -21,13 +23,16 @@ for (const format of formats) {
   }
   requiredPages.set(`formats/${format.slug}/index.html`, markers);
 }
+requiredPages.set('introduction/index.html', new Set(['input', 'spec', 'command', 'dzn'].map(part => `dimacs-cnf/three-variables/${part}`)));
 const seen = new Set();
+const documentationSeen = new Set();
 const paths = await builtHtmlFiles();
 deepStrictEqual(paths.filter(path => path.startsWith('formats/')).sort(), ['formats/index.html', ...formats.map(format => `formats/${format.slug}/index.html`)].sort(), 'Missing or extra format pages');
 let markedCount = 0;
 for (const path of paths) {
   const document = parse(await readFile(new URL(path, buildDirectory), 'utf8'));
   checkLibraryContent(path, document);
+  checkDocumentation(path, document);
   for (const node of descendants(document)) {
     const attributes = attrs(node);
     const key = attributes['data-example'] ?? attributes['data-example-highlighted'];
@@ -68,7 +73,53 @@ for (const path of paths) {
 for (const [path, required] of requiredPages) {
   for (const marker of required) ok(seen.has(`${path}:${marker}`), `${path}: missing ${marker}`);
 }
+for (const [path, ids] of Object.entries(documentationPages)) {
+  for (const id of ids) {
+    const example = documentation[id];
+    const parts = ['code', ...(example.output === undefined ? [] : [example.output ? 'output' : 'empty-output'])];
+    for (const part of parts) ok(documentationSeen.has(`${path}:${id}/${part}`), `${path}: missing documentation example ${id}/${part}`);
+  }
+}
+console.log(`Documentation freshness: ${Object.keys(documentation).length} source/CLI examples, including the executed Rust doctest.`);
 console.log(`Example freshness: ${formats.length} formats, ${examples.size} cases, ${files.size} downloads in public and dist, ${markedCount} rendered texts agree with the current CLI.`);
+
+function checkDocumentation(path, document) {
+  for (const node of descendants(document)) {
+    const attributes = attrs(node);
+    const id = attributes['data-doc-example'];
+    if (!id) continue;
+    const example = documentation[id];
+    ok(example, `${path}: unknown documentation example ${id}`);
+    const part = attributes['data-doc-part'];
+    if (part === 'code') {
+      strictEqual(highlightedText(node), example.code, `${path}: stale documentation command/source ${id}`);
+    } else if (part === 'output') {
+      strictEqual(node.tagName, 'code');
+      strictEqual(text(node), example.output, `${path}: stale documentation output ${id}`);
+    } else {
+      strictEqual(part, 'empty-output');
+      strictEqual(example.output, '', `${path}: unexpected empty output ${id}`);
+      strictEqual(text(node), 'Successful exit; no output.');
+    }
+    documentationSeen.add(`${path}:${id}/${part}`);
+  }
+  // New documentation pages must not bypass freshness checks with an unmarked fence.
+  if (path === 'introduction/index.html' || path in documentationPages) {
+    const main = descendants(document).find(node => node.tagName === 'main');
+    for (const pre of descendants(main).filter(node => node.tagName === 'pre')) {
+      const marked = descendants(pre).some(node => 'data-example' in attrs(node) || 'data-doc-example' in attrs(node));
+      let parent = pre;
+      while (parent && !('data-doc-example' in attrs(parent)) && !('data-example-highlighted' in attrs(parent))) parent = parent.parentNode;
+      ok(marked || parent, `${path}: unmarked code block bypasses freshness checks`);
+    }
+  }
+}
+
+function highlightedText(node) {
+  const code = descendants(node).find(child => child.tagName === 'code');
+  ok(code, 'Missing highlighted code');
+  return descendants(code).filter(child => (attrs(child).class ?? '').split(' ').includes('ec-line')).map(line => text(line).replace(/\n$/, '')).join('\n');
+}
 
 function checkLibraryContent(path, document) {
   const nodes = descendants(document);

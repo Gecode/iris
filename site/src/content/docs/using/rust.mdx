@@ -1,0 +1,78 @@
+---
+title: Rust
+description: Parse a reader spec, read input, and borrow typed rows with gecode-iris.
+editUrl: false
+prev: false
+next: false
+---
+import CheckedExample from '../../../components/docs/CheckedExample.astro';
+
+Rust is the reference implementation of Iris 0.1. The `gecode-iris` crate
+re-exports the public reader API from `iris-core`; import it as `gecode_iris`.
+It reads named, typed entries, including arrays with rows of different lengths.
+
+## Add a local dependency
+
+Use Rust 1.88 or newer. Crates.io publication is planned; all workspace crates
+currently set `publish = false`. With your application directory beside an Iris
+checkout named `iris`, add this to your application's `Cargo.toml`:
+
+<CheckedExample id="rust-dependency" title="Cargo.toml" />
+
+Adjust the path for your checkout. Keep the full Rust workspace: the umbrella
+crate depends on the sibling implementation crates. Package versions and language
+versions are separate; the current Rust packages are 0.1.0 and implement Iris 0.1.
+
+## Parse once, read input, borrow a row
+
+Put this in your application's `src/main.rs`. It follows the umbrella
+crate's doc-tested example, wrapped in `main`.
+
+<CheckedExample id="rust-example" title="src/main.rs" />
+
+`Spec::parse` validates the reader spec. The declaration reads `n`, then a row
+of `n` integers. `Spec::read` reads input bytes using caller parameters; an empty
+`Params` supplies none. Origin names such as `example.iris` and `input.txt`
+appear in diagnostics.
+
+`Data::int` returns a scalar. `Data::ints` borrows an integer row without copying
+it. The empty index path selects the whole one-dimensional row here; for a column
+of rows, the path selects a row. The returned `Data` owns its entries and does
+not borrow the original input bytes, so the same `Spec` can read another input.
+
+To run the original example from the Iris checkout, use its `rust/` directory:
+
+<CheckedExample id="rust-doctest" />
+
+## Files, parameters, and output
+
+`Spec::read_path` reads a file with caller parameters. `Spec::catalog` and
+`catalog_path` traverse a multi-instance file and return catalog data.
+The `instance` parameter selects an instance during a read by ordinal or name;
+see [parameters and instances](/specification/0.1/09-params-and-instances/).
+
+`Data::entries` visits entries in definition order. `Data::value` selects a
+borrowed value by name and index path. `to_json` and `to_dzn` return buffered
+output; `write_dzn` writes to an `io::Write` destination. A stream error can leave
+partial bytes in that destination. The [data model](/specification/0.1/03-data-model/)
+and [dzn appendix](/specification/0.1/appendix-b-dzn/) define the representations.
+
+## Handle failures
+
+Parsing and reading return `Failure`. `Failure::Language` contains an error
+with a stable [language code](/specification/0.1/errors/), source locations and,
+when applicable, a record path. Work-budget exhaustion is a language failure
+([`E-BUDGET`](/specification/0.1/errors/#e-budget)). `Failure::Host` covers host
+failures such as file acquisition or cancellation. `Failure::Unsupported`
+identifies an implementation feature that has not been implemented.
+
+After a successful read, typed lookup returns `AccessError` for an unknown name,
+invalid index path or incompatible requested type. These are host API usage
+errors. `Failure`, `HostError` and `AccessError` are non-exhaustive; matching their
+variants requires a fallback arm.
+
+For more detail, read the
+[umbrella crate source](https://github.com/Gecode/iris/blob/main/rust/gecode-iris/src/lib.rs)
+and [core API guide](https://github.com/Gecode/iris/blob/main/rust/iris-core/README.md).
+Published API hosting is planned. Local Cargo documentation can be built from the
+workspace without waiting for publication.
