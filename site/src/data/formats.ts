@@ -6,6 +6,7 @@ export type ReadResult =
   | { kind: 'error'; json: string; diagnostic: string };
 export interface FormatCase {
   id: string;
+  title: string;
   input: { path: string; text: string };
   params: readonly { name: string; value: string }[];
   commands: { readJson: string; readDzn: string; readSummary: string; errorJson: string | null };
@@ -19,8 +20,9 @@ export interface Format {
   title: string;
   description: string;
   spec: { path: string; text: string };
-  readme: { path: string; text: string };
-  homeCase: string;
+  readme: { path: string; text: string; html: string };
+  provenance: { url: string; commit: string };
+  homeCase: string | null;
   cases: readonly FormatCase[];
 }
 export function formatBySlug(slug: string): Format {

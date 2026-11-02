@@ -1,0 +1,32 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import { formats, type Format } from '../../data/formats';
+import FormatCase from '../../components/formats/FormatCase.astro';
+import ExamplePane from '../../components/home/ExamplePane.astro';
+
+export function getStaticPaths() {
+  return formats.map(format => ({ params: { slug: format.slug }, props: { format } }));
+}
+interface Props { format: Format }
+const { format } = Astro.props;
+const firstCase = format.cases[0];
+if (!firstCase) throw new Error(`${format.id}: a format needs at least one case`);
+---
+<StarlightPage hasSidebar={true} frontmatter={{ title: format.title, description: format.description, tableOfContents: false, prev: false, next: false }}>
+  <div class="iris-format-library min-w-0">
+    <p class="mb-6 text-sm"><a href="/formats/">All formats</a> · <a href="#reader-spec">Reader spec</a> · <a href="#cases">Cases and output</a></p>
+    <div data-format-readme={format.id} set:html={format.readme.html} />
+    <section class="mt-10 min-w-0" aria-labelledby="reader-spec">
+      <h2 id="reader-spec" class="scroll-mt-20">Reader spec</h2>
+      <p class="text-sm text-iris-muted" data-format-provenance={format.id}>From Gecode commit <a class="wrap-anywhere" href={format.provenance.url}><code>{format.provenance.commit}</code></a>. <a href="/examples/GECODE-LICENSE.md">Source notices</a>.</p>
+      <div class="border border-iris-border bg-iris-surface">
+        <ExamplePane source={format.spec.text} href={`/examples/${format.spec.path}`} label={`${format.id}.iris`} exampleKey={`${format.id}/${firstCase.id}`} representation="spec" highlighted compact />
+      </div>
+    </section>
+    <section class="mt-10 min-w-0" aria-labelledby="cases">
+      <h2 id="cases" class="scroll-mt-20">Cases and output</h2>
+      <p>Run the commands from the repository root. Successful reads show JSON, dzn, and a summary. Rejected inputs show the CLI’s diagnostic and caret, with the stable error code alongside it.</p>
+      {format.cases.map(example => <FormatCase example={example} formatId={format.id} />)}
+    </section>
+  </div>
+</StarlightPage>

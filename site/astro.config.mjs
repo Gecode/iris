@@ -3,6 +3,9 @@ import starlight from '@astrojs/starlight';
 import tailwindcss from '@tailwindcss/vite';
 import irisGrammar from '../editors/textmate/iris.tmLanguage.json' with { type: 'json' };
 import { irisDark, irisLight } from './src/code-themes.mjs';
+import { discoverFormatSources } from './scripts/format-sources.mjs';
+
+const formats = await discoverFormatSources();
 
 export default defineConfig({
   site: 'https://iris.gecode.dev',
@@ -47,7 +50,7 @@ export default defineConfig({
       { label: 'Tutorial', collapsed: true, items: ['tutorial', 'tutorial/dimacs', 'tutorial/tsplib', 'tutorial/job-shop'] },
       { label: 'Guides', collapsed: true, items: ['guides', 'guides/patterns', 'guides/sections', 'guides/records-and-checks', 'guides/instances', 'guides/parameters', 'guides/errors', 'guides/performance'] },
       { label: 'Language Specification', collapsed: true, items: [{ label: 'Language version 0.1', slug: 'specification/0.1' }] },
-      { label: 'Format library', collapsed: true, items: ['formats', 'formats/dimacs-cnf', 'formats/tsplib', 'formats/nonogram', 'formats/job-shop', 'formats/sudoku', 'formats/tsptw'] },
+      { label: 'Formats', collapsed: true, items: [{ label: 'Format library', link: '/formats/' }, ...formats.map(format => ({ label: format.title, link: `/formats/${format.slug}/` }))] },
       { label: 'Using Iris from', collapsed: true, items: ['using/rust', 'using/python', 'using/java', 'using/kotlin', 'using/cpp', 'using/gecode'] },
       { label: 'Tools', collapsed: true, items: ['tools', 'tools/cli', 'tools/formatter', 'tools/lsp', 'tools/editors', 'tools/agent-skill'] },
       { label: 'Playground', slug: 'playground' },

@@ -331,6 +331,23 @@
   .iris-terminal { --iris-focus: var(--color-iris-focus-dark); }
   .iris-terminal code { @apply text-iris-dark-ink; }
   .iris-terminal pre { @apply bg-transparent; }
+  .iris-format-library { container-type: inline-size; }
+  .iris-case-panes { grid-template-columns: minmax(0, 1fr); }
+  .iris-format-library .iris-case-panes :where(*) { margin-block-start: 0; }
+  .iris-format-library .iris-example-pane :where(*) { margin-block-start: 0; }
+  .iris-format-library .iris-example-pane pre { @apply m-0 border-0 rounded-none bg-transparent p-0; }
+  .iris-format-library .iris-example-pane code,
+  .iris-format-library .iris-terminal code,
+  .iris-format-library .iris-case-command code { @apply bg-transparent p-0 text-inherit rounded-none; }
+  .iris-format-library .iris-terminal p { @apply max-w-none; }
+  .iris-format-library details { @apply m-0 border-0 rounded-none p-0; }
+  .iris-format-library details + details { @apply border-t border-iris-border; }
+  .iris-format-library summary { @apply min-h-11; }
+  .iris-format-library summary:hover { @apply underline underline-offset-4; }
+  .iris-format-library .iris-case-command { @apply bg-transparent rounded-none; }
+  @container (min-width: 56rem) {
+    .iris-case-panes { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); }
+  }
   @container (min-width: 60rem) {
     .iris-read-panes { grid-template-columns: minmax(0, .9fr) minmax(0, 1.3fr) minmax(0, .8fr); }
     .iris-read-pane { min-height: 18rem; }

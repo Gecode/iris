@@ -2,6 +2,7 @@
 import { formatBySlug, caseById } from '../../data/formats';
 import { heroRelations, headerCaptures, heroEntries, byteSlice, type HeroEntry, type ByteRange } from '../../data/hero';
 const format = formatBySlug('dimacs-cnf');
+if (format.homeCase === null) throw new Error('The DIMACS hero needs a successful case');
 const example = caseById(format, format.homeCase);
 const entries = heroEntries(example.result.json);
 interface SourcePart { text: string; relations: string; id: string; statement: string; label: string }

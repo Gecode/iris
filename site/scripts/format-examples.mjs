@@ -1,19 +1,12 @@
 import { spawnSync } from 'node:child_process';
 import { readFile, readdir, realpath } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { deepStrictEqual, strictEqual } from 'node:assert';
 
-export const repository = fileURLToPath(new URL('../../', import.meta.url));
-export const siteDirectory = fileURLToPath(new URL('../', import.meta.url));
-const metadata = [
-  { id: 'dimacs-cnf', slug: 'dimacs-cnf', title: 'DIMACS CNF', homeCase: 'three-variables', description: 'Zero terminators end each clause and are discarded from the data.' },
-  { id: 'tsplib', slug: 'tsplib', title: 'TSPLIB', homeCase: 'euc-2d-five', description: 'Coordinates remain coordinates; distance construction belongs to the host.' },
-  { id: 'nonogram', slug: 'nonogram', title: 'Nonogram', homeCase: 'five-by-five', description: 'Row and column clues become ragged arrays, with one array per line.' },
-  { id: 'jobshop', slug: 'job-shop', title: 'Job shop', homeCase: 'jsplib', description: 'Each job’s operations yield machine and duration arrays.' },
-  { id: 'sudoku', slug: 'sudoku', title: 'Sudoku', homeCase: 'four-by-four', description: 'Blank cells become zero. Solving the puzzle belongs to the host.' },
-  { id: 'tsptw', slug: 'tsptw', title: 'TSPTW', homeCase: 'three-nodes', description: 'Travel times form a matrix; checks require ordered time windows.' },
-];
+import { parse as parseToml } from 'smol-toml';
+import { discoverFormatSources, repository, siteDirectory } from './format-sources.mjs';
+
+export { repository, siteDirectory };
 
 export function buildExampleTools() {
   const build = run('cargo', ['build', '--locked', '--manifest-path', resolve(repository, 'rust/Cargo.toml'), '-p', 'iris-cli', '--bin', 'iris', '--bin', 'iris-driver', '--message-format=json'], resolve(repository, 'rust'));
@@ -28,8 +21,7 @@ export function buildExampleTools() {
 }
 
 export async function collectFormatExamples(tools) {
-  const directories = (await readdir(resolve(repository, 'formats'), { withFileTypes: true })).filter(entry => entry.isDirectory()).map(entry => entry.name).sort();
-  deepStrictEqual(directories, metadata.map(format => format.id).sort(), 'Add format metadata for new formats');
+  const sources = await discoverFormatSources();
   execute(tools.iris, ['fmt', '--check', 'formats/'], 0);
   const files = new Map();
   const formats = [];
@@ -38,17 +30,18 @@ export async function collectFormatExamples(tools) {
     files.set(destination, bytes);
     return { path: source, text: bytes.toString('utf8') };
   }
-  for (const format of metadata) {
+  for (const format of sources) {
     const source = `formats/${format.id}`;
     const spec = await copy(`${source}/${format.id}.iris`, `${source}/${format.id}.iris`);
-    const readme = await copy(`${source}/README.md`, `${source}/README.md`);
+    await copy(format.readme.path, format.readme.path);
     const cases = [];
     const caseIds = (await readdir(resolve(repository, source, 'cases'), { withFileTypes: true })).filter(entry => entry.isDirectory()).map(entry => entry.name).sort();
     for (const id of caseIds) {
       cases.push(await collectCase(format, spec, id, source));
     }
-    if (!cases.some(example => example.id === format.homeCase && example.result.kind === 'success')) throw new Error(`${source}: home case must succeed`);
-    formats.push({ ...format, spec, readme, cases });
+    const homeCase = format.homeCase ?? cases.find(example => example.result.kind === 'success')?.id ?? null;
+    if (homeCase && !cases.some(example => example.id === homeCase && example.result.kind === 'success')) throw new Error(`${source}: home case must succeed`);
+    formats.push({ ...format, homeCase, spec, cases });
   }
   await copy('formats/GECODE-LICENSE.md', 'GECODE-LICENSE.md');
   await copy('LICENSE', 'LICENSE');
@@ -61,7 +54,8 @@ export async function collectFormatExamples(tools) {
     strictEqual(await realpath(resolve(repository, path, 'spec.iris')), await realpath(resolve(repository, spec.path)), `${path}: reader spec must link to the format spec`);
     strictEqual(Number(names.includes('expected.json')) + Number(names.includes('error.json')), 1, `${path}: require one expectation`);
     const input = await copy(`${path}/input.txt`, `${path}/input.txt`);
-    await copy(`${path}/case.toml`, `${path}/case.toml`);
+    const manifest = parseToml((await copy(`${path}/case.toml`, `${path}/case.toml`)).text);
+    if (typeof manifest.title !== 'string' || !manifest.title.trim()) throw new Error(`${path}: require a case title`);
     const paramsText = names.includes('params.json') ? (await copy(`${path}/params.json`, `${path}/params.json`)).text : '{}';
     const parameters = JSON.parse(paramsText);
     if (!parameters || Array.isArray(parameters) || typeof parameters !== 'object' || Object.values(parameters).some(value => typeof value !== 'string')) throw new Error(`${path}: parameters must be strings`);
@@ -93,7 +87,7 @@ export async function collectFormatExamples(tools) {
     }
     if (catalog) { save('catalog.txt', catalog.text); save('catalog.dzn', catalog.dzn); }
     downloads.case = `/examples/${path}/case.json`;
-    const example = { id, input, params, commands, result, catalog, downloads };
+    const example = { id, title: manifest.title, input, params, commands, result, catalog, downloads };
     files.set(`${path}/case.json`, Buffer.from(`${JSON.stringify({ ...example, spec }, null, 2)}\n`));
     return example;
   }

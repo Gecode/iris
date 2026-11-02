@@ -4,8 +4,9 @@ The static Astro Starlight site for `iris.gecode.dev`, described in
 [PLAN.md §8.10](../PLAN.md#810-documentation-site-site) and delivered in
 milestone M5. The home page connects a DIMACS input to its reader spec and
 typed data,
-then shows executable examples of all six formats. The introduction and planned
-documentation pages use the same shell.
+then shows executable format examples. The format library renders every
+format’s README, highlighted reader spec, and cases with their real output.
+The introduction and planned documentation pages use the same shell.
 
 ## Build and check
 
@@ -46,8 +47,10 @@ and custom-domain setup, deployment, verification and rollback.
 
 ## Content and styling
 
-The explicit sidebar in `astro.config.mjs` references pages under
-`src/content/docs/`. The splash lives in `src/pages/index.astro`. Keep stubs
+The sidebar in `astro.config.mjs` references pages under `src/content/docs/`
+and discovers the Formats section from `formats/`. The splash lives in
+`src/pages/index.astro`; `src/pages/formats/` generates the format index and
+individual pages. Keep stubs
 honest until their owning task supplies content; the Specification placeholder
 is not normative text. Its explicit slug preserves the `0.1` route.
 
@@ -94,7 +97,7 @@ sets its canonical and open graph URL to the emitted `/404.html` explicitly.
 Every dev/build also runs `scripts/prepare-examples.mjs`. Cargo builds the local
 `iris` and `iris-driver` binaries; their executable paths come from Cargo’s
 artifact messages. `CARGO_TARGET_DIR` is respected. No installed Iris binary is
-used. The script collects every case under the six formats, including errors,
+used. The script discovers every format and case, including errors,
 parameters, summaries, and job shop/Sudoku catalogs. It checks canonical JSON
 against each successful fixture and error codes/locations against error fixtures.
 
@@ -106,12 +109,24 @@ labelled excerpt with a full-file link; JSON remains the CLI’s text.
 
 `npm run check:examples` collects current results without writing them and checks
 the generated module, public downloads, built downloads, and marked HTML code.
+It requires each format page and every case’s input and outputs, plus the
+rendered README, source commit, and format index.
 Missing, extra, or changed output fails. Build first after changing a source or
 the CLI. `npm run check:hero` checks the authored DIMACS mapping against the
 current CLI and the built entry view. Both checks are part of `npm run check`.
 CI installs Rust and caches Cargo artifacts before running these same commands.
 
-Add metadata in `scripts/format-examples.mjs` when adding a format. New cases
-within those formats are discovered automatically. Use the example marker
+Adding a format or case under `formats/` needs no site change. The library
+convention is `<directory>/<directory>.iris`, a README with a title, description
+paragraph and pinned Gecode source link, and cases following the conformance
+contract. `scripts/format-sources.mjs` derives titles, descriptions and Gecode
+commits from READMEs, renders their Markdown, and rewrites repository links to
+site pages/downloads or GitHub. The first successful case becomes a new format’s
+home example; the existing six retain their curated choices and URLs, including
+`jobshop` at `/formats/job-shop/`. A format containing only error cases still
+gets a library page. Case titles come from `case.toml`.
+
+Markdown and TOML use the same pinned parsers already present in the dependency
+tree, declared directly for these imports. Use the example marker
 attributes from `ExamplePane.astro` and `ExampleTerminal.astro` when rendering
 these records on another page, so their output enters the freshness check.

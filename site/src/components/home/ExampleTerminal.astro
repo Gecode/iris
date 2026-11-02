@@ -11,7 +11,7 @@ const output = example.result.kind === 'success' ? example.result.dzn : example.
     <span class="text-iris-dark-muted">Run from the repository root.</span>
   </div>
   <div class="px-4 pt-4 pb-3 font-mono text-[0.8125rem] leading-6">
-    <span aria-hidden="true" class="text-iris-dark-green">$ </span><code class="whitespace-pre-wrap wrap-anywhere" data-example={key} data-representation="command" data-final-lf="kept">{example.commands.readDzn}</code>
+    <span aria-hidden="true" class="text-iris-dark-green">$ </span><code class="whitespace-pre-wrap wrap-break-word" data-example={key} data-representation="command" data-final-lf="kept">{example.commands.readDzn}</code>
   </div>
   <pre class="m-0 h-iris-terminal overflow-auto px-4 pb-4 text-[0.8125rem] leading-6" tabindex="0" role="group" aria-label={error ? 'CLI error diagnostic' : 'dzn output'}><code data-example={key} data-representation={error ? 'diagnostic' : 'dzn'} data-final-lf="kept">{error ? output.split(/( +\^\n)/).map(part => /^ +\^\n$/.test(part) ? <span class="text-iris-dark-red">{part}</span> : part) : output}</code></pre>
   <p class:list={['m-0 border-t border-iris-dark-border px-4 py-2 text-sm', error ? 'text-iris-dark-red' : 'text-iris-dark-green']}>{error ? 'Input rejected' : 'Read succeeded'}</p>

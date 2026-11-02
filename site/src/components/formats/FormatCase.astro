@@ -1,0 +1,45 @@
+---
+import type { FormatCase } from '../../data/formats';
+import ExamplePane from '../home/ExamplePane.astro';
+import ExampleTerminal from '../home/ExampleTerminal.astro';
+
+interface Props { example: FormatCase; formatId: string }
+const { example, formatId } = Astro.props;
+const key = `${formatId}/${example.id}`;
+const failure = example.result.kind === 'error' ? JSON.parse(example.result.json) : null;
+const outputs = example.result.kind === 'success' ? [
+  { representation: 'dzn', label: 'dzn', text: example.result.dzn, href: example.downloads['data.dzn'], command: example.commands.readDzn, commandRepresentation: 'command' },
+  { representation: 'json', label: 'JSON', text: example.result.json, href: example.downloads['data.json'], command: example.commands.readJson, commandRepresentation: 'command-json' },
+  { representation: 'summary', label: 'Summary', text: example.result.summary, href: example.downloads['summary.txt'], command: example.commands.readSummary, commandRepresentation: 'command-summary' },
+] : [];
+---
+<section id={`case-${example.id}`} class="iris-format-case mt-10 min-w-0 scroll-mt-20 border-t border-iris-border pt-6" aria-labelledby={`case-title-${example.id}`} data-format-case={key}>
+  <h3 id={`case-title-${example.id}`} class="m-0 text-xl wrap-anywhere">{example.id}</h3>
+  <p class="mt-2 mb-4">{example.title}</p>
+  {example.params.length > 0 && <p class="mb-4 text-sm text-iris-muted">Parameters: {example.params.map(({ name, value }) => <code class="wrap-anywhere">{name}={value}</code>)}</p>}
+  <div class="iris-case-panes grid min-w-0 items-start gap-4">
+    <div class="min-w-0 border border-iris-border bg-iris-surface">
+      <ExamplePane source={example.input.text} href={example.downloads.input} label="Input" exampleKey={key} representation="input" compact />
+    </div>
+    <div class="min-w-0">
+      {example.result.kind === 'error' ? <div class="min-w-0 border-s-4 border-s-iris-red">
+        <div class="border border-iris-border bg-iris-surface px-4 py-3 text-sm">
+          <p class="m-0 max-w-none text-iris-red wrap-anywhere"><code data-example={key} data-representation="error-code" data-final-lf="kept">{failure.code}</code></p>
+          <p class="mt-2 mb-0 max-w-none wrap-anywhere"><code data-example={key} data-representation="error-message" data-final-lf="kept">{failure.message}</code></p>
+        </div>
+        <ExampleTerminal example={example} formatId={formatId} error />
+        <div class="flex flex-wrap gap-4 border border-t-0 border-iris-border px-4 py-3 text-sm">
+          <a href={example.downloads['error.txt']}>View full diagnostic</a>
+          <a href={example.downloads['error.json']} download>Download error JSON</a>
+        </div>
+      </div> : <div class="min-w-0 border border-iris-border bg-iris-surface">
+        {outputs.map((output, index) => <details class="min-w-0" open={index === 0}>
+          <summary class="cursor-pointer px-4 py-3 text-sm">{output.label}</summary>
+          <pre class="iris-case-command m-0 border-y border-iris-border px-4 py-3 text-xs leading-6 whitespace-pre-wrap wrap-anywhere"><code data-example={key} data-representation={output.commandRepresentation} data-final-lf="kept">{output.command}</code></pre>
+          <ExamplePane source={output.text} href={output.href} label={output.label} exampleKey={key} representation={output.representation} compact />
+        </details>)}
+      </div>}
+    </div>
+  </div>
+  <p class="mt-4 text-sm"><a href={example.downloads.case} download>Download full case</a></p>
+</section>
