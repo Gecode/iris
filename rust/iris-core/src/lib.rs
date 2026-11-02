@@ -1,4 +1,5 @@
 //! Input reading, expression evaluation, and owned column data for Iris 0.1.
+mod cancellation;
 mod dzn;
 mod error;
 mod eval;
@@ -6,8 +7,10 @@ mod input;
 mod json;
 mod numeric;
 mod reader;
+pub mod summary;
 mod value;
 
+pub use cancellation::{CancellationToken, ReadOptions};
 pub use error::{Error, ErrorCode, InputSpan, Location};
 use iris_sema::Analysis;
 pub use iris_syntax::LanguageVersion;
@@ -57,15 +60,44 @@ impl Spec {
     }
 
     pub fn read(&self, input: &[u8], origin: &str, params: &Params) -> Result<Data, Failure> {
-        reader::Interpreter::new(self, self.input(input, origin, params)?)
-            .with_params(params)
-            .read()
+        self.read_with_options(input, origin, params, &ReadOptions::default())
+    }
+
+    pub fn read_with_options(
+        &self,
+        input: &[u8],
+        origin: &str,
+        params: &Params,
+        options: &ReadOptions,
+    ) -> Result<Data, Failure> {
+        let result = (|| {
+            let control = cancellation::Control::new(options);
+            control.check()?;
+            self.admit_params(params, &control)?;
+            let input = self.controlled_input(input, origin, control)?;
+            reader::Interpreter::new(self, input)?
+                .with_params(params)?
+                .read()
+        })();
+        Self::finish_read(result, options)
+    }
+
+    fn finish_read(result: Result<Data, Failure>, options: &ReadOptions) -> Result<Data, Failure> {
+        if matches!(result, Err(Failure::Language(_)))
+            && options
+                .cancellation
+                .as_ref()
+                .is_some_and(CancellationToken::is_cancelled)
+        {
+            return Err(HostError::Cancelled.into());
+        }
+        result
     }
 
     /// Execute every instance and return its count, usable names, and rejections.
     pub fn catalog(&self, input: &[u8], origin: &str, params: &Params) -> Result<Data, Failure> {
-        reader::Interpreter::new(self, self.input(input, origin, params)?)
-            .with_params(params)
+        reader::Interpreter::new(self, self.input(input, origin, params)?)?
+            .with_params(params)?
             .catalog()
     }
 
@@ -81,14 +113,27 @@ impl Spec {
         origin: &'a str,
         params: &Params,
     ) -> Result<input::Input<'a>, Failure> {
-        self.admit_params(params)?;
-        let input = input::Input::new(bytes, origin);
-        if let Err(error) = std::str::from_utf8(bytes) {
+        let control = cancellation::Control::default();
+        self.admit_params(params, &control)?;
+        self.controlled_input(bytes, origin, control)
+    }
+
+    fn controlled_input<'a>(
+        &self,
+        bytes: &'a [u8],
+        origin: &'a str,
+        control: cancellation::Control,
+    ) -> Result<input::Input<'a>, Failure> {
+        let mut input = input::Input::new(bytes, origin);
+        input.control = control;
+        if let Err(offset) = input.control.utf8(bytes)? {
+            // Advance once rather than rescanning prefixes for a location.
+            input.advance_to(offset)?;
             return Err(Error::input(
                 ErrorCode::Utf8,
                 "input is not valid UTF-8",
                 &input,
-                input.position_at(error.valid_up_to()),
+                input.position(),
                 None,
                 None,
             )
@@ -103,10 +148,15 @@ impl Spec {
         self.read(&bytes, &path.to_string_lossy(), params)
     }
 
-    fn admit_params(&self, params: &Params) -> Result<(), Error> {
+    fn admit_params(
+        &self,
+        params: &Params,
+        control: &cancellation::Control,
+    ) -> Result<(), Failure> {
         for (name, _) in &params.pairs {
+            control.check()?;
             if !self.index.params.contains(name) {
-                return Err(Error::unknown_param(name, self.parsed.origin()));
+                return Err(Error::unknown_param(name, self.parsed.origin()).into());
             }
         }
         Ok(())
@@ -151,6 +201,7 @@ pub enum Failure {
 }
 #[derive(Debug)]
 pub enum HostError {
+    Cancelled,
     Io(std::io::Error),
     SourceTooLarge { len: usize },
 }
@@ -182,6 +233,7 @@ impl fmt::Display for Failure {
 impl fmt::Display for HostError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Cancelled => f.write_str("reading cancelled by host"),
             Self::Io(e) => e.fmt(f),
             Self::SourceTooLarge { len } => {
                 write!(f, "source has {len} bytes, exceeding rowan's u32 capacity")

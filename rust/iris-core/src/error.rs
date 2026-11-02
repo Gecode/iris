@@ -215,6 +215,9 @@ impl Error {
     pub fn input_span(&self) -> Option<&InputSpan> {
         self.details.input_span.as_ref()
     }
+    pub fn excerpt(&self) -> Option<&str> {
+        self.details.excerpt.as_deref()
+    }
     pub fn context(&self) -> Option<&str> {
         self.details.context.as_deref()
     }

@@ -27,6 +27,36 @@ return the count, usable names, and first rejection summaries as ordinary data.
 Returned data and errors own their retained content.
 The byte-slice interface also permits a future caller to use a memory map.
 
+Hosts can pass `ReadOptions { cancellation: Some(token) }` to
+`Spec::read_with_options`. `CancellationToken` is a monotonic, cloneable atomic
+flag; `cancel()` requests cancellation and `is_cancelled()` observes it.
+`Spec::read` supplies default options with no token. Catalog and path acquisition
+keep their existing interfaces. Cancellation returns the distinct
+`Failure::Host(HostError::Cancelled)`, including after a deferred instance
+rejection; it is neither a language error nor `E-BUDGET`, and has no canonical
+language-error JSON. Budgets and charge order are unchanged.
+
+The interpreter checks short dispatches and continuations, and chunks long
+scans, value copying, promotion, offsets, array metadata, aggregates and record
+walks. A supplied token is checked at least every 1,024 explicit row/leaf/metadata
+iterations or 64 KiB of scanning/copying. Without a token, bulk helpers retain
+their ordinary path. This is a bound on cooperative work, not elapsed time:
+parser analysis, OS acquisition/scheduling, allocation/deallocation and a single
+standard-library conversion are indivisible. Cancellation cannot interrupt a
+blocked syscall or instantly release a large allocation. Parsing remains outside
+the cancellable reading API. Known gap: storing or looking up a value by a spec
+name hashes the whole name without a checkpoint, so an extremely long
+identifier exceeds the 64 KiB bound. Interning names when the spec loads
+(rust-013) removes it.
+
+`summary::write_summary` writes the CLI's unlimited summary, preserving its
+bytes. `summary::preview` uses the same shape renderer with editor limits:
+64 entries, 1,024 second-level rows in total, 16 dimensions, 160 Unicode scalars
+per name/label/string before escaping, and 16 KiB UTF-8 output. Limits bound work
+and intermediate output as well as the final text; omissions are explicit, and
+incomplete row scans never claim a full shape. Rendering consumes no language
+work budget. `Error::excerpt()` borrows the runtime's existing bounded excerpt.
+
 Execution supports int, float, num, word, rest, and integer ranges;
 named types with frozen bounds, alphabet options, and aliases; fixed arrays,
 including empty rows; numeric offsets; every matrix layout; sentinel and
@@ -71,7 +101,10 @@ Repeat and sections execution use an explicit work stack for blocks,
 conditionals and nested bodies. Expressions use a continuation stack; check
 traversal, record selection, marker summaries, and witness links are iterative.
 Model ranges are indexed once per `Spec`. Row selections retain parent cursors
-and lazy leaf boundaries instead of reconstructing values or paths. Pattern metadata is decoded once per `Spec`;
+and lazy leaf boundaries instead of reconstructing values or paths. Spec
+strings and alphabet options are prepared once per `Spec`; read-time copies
+and diagnostic quotations use the same cancellation checkpoints. Pattern
+metadata is decoded once per `Spec`;
 matching borrows one prepared physical line for every candidate arm. Failed
 candidates publish nothing, and selected captures validate strings before
 publishing names and checking ranges. Positions use incremental cursor and

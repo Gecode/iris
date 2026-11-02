@@ -9,6 +9,7 @@ publish = false
 workspace = true
 
 [dependencies]
+iris-core = { path = "../iris-core" }
 iris-syntax = { path = "../iris-syntax", features = ["editorconfig"] }
 iris-sema = { path = "../iris-sema" }
 lsp-server = "0.10.0"

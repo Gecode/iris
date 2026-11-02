@@ -1,3 +1,4 @@
+use crate::cancellation::{Cancelled, Control};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Position {
     pub offset: usize,
@@ -31,20 +32,29 @@ impl Default for Settings {
     }
 }
 impl Settings {
-    pub fn add_tokens(&mut self, bytes: &[u8]) {
-        for &byte in bytes {
-            if self.classes[byte as usize] != Class::Separator {
-                self.classes[byte as usize] = Class::Token;
+    pub fn add_tokens(&mut self, bytes: &[u8], control: &Control) -> Result<(), Cancelled> {
+        for bytes in bytes.chunks(control.chunk_size()) {
+            control.check()?;
+            for &byte in bytes {
+                if self.classes[byte as usize] != Class::Separator {
+                    self.classes[byte as usize] = Class::Token;
+                }
             }
         }
+        Ok(())
     }
-    pub fn add_separators(&mut self, bytes: &[u8]) {
-        for &byte in bytes {
-            self.classes[byte as usize] = Class::Separator;
+    pub fn add_separators(&mut self, bytes: &[u8], control: &Control) -> Result<(), Cancelled> {
+        for bytes in bytes.chunks(control.chunk_size()) {
+            control.check()?;
+            for &byte in bytes {
+                self.classes[byte as usize] = Class::Separator;
+            }
         }
+        Ok(())
     }
 }
 pub(crate) struct Input<'a> {
+    pub control: Control,
     pub bytes: &'a [u8],
     pub origin: &'a str,
     cursor: Cursor,
@@ -82,6 +92,7 @@ impl<'a> Input<'a> {
         Self {
             bytes,
             origin,
+            control: Control::default(),
             cursor: Cursor {
                 offset: 0,
                 line: 1,
@@ -99,21 +110,32 @@ impl<'a> Input<'a> {
             column: self.cursor.offset - self.cursor.line_start + 1,
         }
     }
-    pub fn position_at(&self, offset: usize) -> Position {
-        let prefix = &self.bytes[..offset];
-        Position {
-            offset,
-            line: prefix.iter().filter(|&&b| b == b'\n').count() + 1,
-            column: prefix
-                .iter()
-                .rposition(|&b| b == b'\n')
-                .map_or(offset + 1, |lf| offset - lf),
+    #[inline]
+    pub fn advance_to(&mut self, end: usize) -> Result<(), Cancelled> {
+        if self.control.is_active() {
+            self.advance_to_with::<true>(end)
+        } else {
+            self.advance_to_with::<false>(end)
         }
     }
-    fn advance_to(&mut self, end: usize) {
+    #[inline]
+    fn advance_to_with<const CANCEL: bool>(&mut self, end: usize) -> Result<(), Cancelled> {
         if end != self.cursor.offset {
             self.next_data = None;
         }
+        if !CANCEL {
+            self.advance_cursor(end);
+        } else {
+            for chunk in chunk_ranges(self.cursor.offset..end, self.control.chunk_size()) {
+                self.control.check()?;
+                self.advance_cursor(chunk.end);
+            }
+        }
+        Ok(())
+    }
+    #[inline]
+    fn advance_cursor(&mut self, end: usize) {
+        self.control.worked(end - self.cursor.offset);
         for offset in self.cursor.offset..end {
             if self.bytes[offset] == b'\n' {
                 self.cursor.line += 1;
@@ -125,92 +147,128 @@ impl<'a> Input<'a> {
         }
         self.cursor.offset = end;
     }
-    pub fn skip_to_data(&mut self) {
+    #[inline]
+    pub fn skip_to_data(&mut self) -> Result<(), Cancelled> {
+        if self.control.is_active() {
+            self.skip_to_data_with::<true>()
+        } else {
+            self.skip_to_data_with::<false>()
+        }
+    }
+    #[inline]
+    fn skip_to_data_with<const CANCEL: bool>(&mut self) -> Result<(), Cancelled> {
         loop {
             let mut end = self.cursor.offset;
-            while end < self.bytes.len()
-                && self.settings.classes[self.bytes[end] as usize] == Class::Separator
-            {
-                end += 1;
-            }
-            self.advance_to(end);
+            end = self.scan_with::<CANCEL>(end, |b| {
+                self.settings.classes[b as usize] == Class::Separator
+            })?;
+            self.advance_to_with::<CANCEL>(end)?;
             if end == self.bytes.len() || !self.cursor.line_blank {
-                return;
+                return Ok(());
             }
             let tail = &self.bytes[end..];
-            if self
-                .settings
-                .comments
-                .iter()
-                .any(|p| prefix_matches(tail, p))
-            {
-                let end = tail
-                    .iter()
-                    .position(|&b| b == b'\n')
-                    .map_or(self.bytes.len(), |n| end + n);
-                self.advance_to(end);
-            } else if self.settings.stops.iter().any(|p| prefix_matches(tail, p)) {
-                self.advance_to(self.bytes.len());
-                return;
+            if matches_any_prefix(tail, &self.settings.comments, &self.control)? {
+                let end = self.scan_with::<CANCEL>(end, |b| b != b'\n')?;
+                self.advance_to_with::<CANCEL>(end)?;
+            } else if matches_any_prefix(tail, &self.settings.stops, &self.control)? {
+                self.advance_to_with::<CANCEL>(self.bytes.len())?;
+                return Ok(());
             } else {
-                return;
+                return Ok(());
             }
         }
     }
     /// Skip separators on this physical line, leaving its LF unconsumed.
-    pub fn skip_to_line_data(&mut self) -> bool {
+    #[inline]
+    pub fn skip_to_line_data(&mut self) -> Result<bool, Cancelled> {
         let mut end = self.cursor.offset;
-        while end < self.bytes.len()
-            && self.bytes[end] != b'\n'
-            && self.settings.classes[self.bytes[end] as usize] == Class::Separator
-        {
-            end += 1;
-        }
-        self.advance_to(end);
-        end < self.bytes.len() && self.bytes[end] != b'\n'
+        end = self.scan(end, |b| {
+            b != b'\n' && self.settings.classes[b as usize] == Class::Separator
+        })?;
+        self.advance_to(end)?;
+        Ok(end < self.bytes.len() && self.bytes[end] != b'\n')
     }
     pub fn peek_byte(&self) -> Option<u8> {
         self.bytes.get(self.cursor.offset).copied()
     }
-    pub fn consume_byte(&mut self) {
-        self.advance_to(self.cursor.offset + 1);
+    #[inline]
+    pub fn consume_byte(&mut self) -> Result<(), Cancelled> {
+        self.advance_to(self.cursor.offset + 1)
     }
-    pub fn next_token(&mut self) -> Option<Token<'a>> {
-        self.skip_to_data();
+    #[inline]
+    pub fn next_token(&mut self) -> Result<Option<Token<'a>>, Cancelled> {
+        if self.control.is_active() {
+            self.next_token_with::<true>()
+        } else {
+            self.next_token_with::<false>()
+        }
+    }
+    #[inline]
+    fn next_token_with<const CANCEL: bool>(&mut self) -> Result<Option<Token<'a>>, Cancelled> {
+        self.skip_to_data_with::<CANCEL>()?;
         if self.cursor.offset == self.bytes.len() {
-            return None;
+            return Ok(None);
         }
         let start = self.position();
         let mut end = self.cursor.offset + 1;
         if self.settings.classes[self.bytes[self.cursor.offset] as usize] == Class::Plain {
-            while end < self.bytes.len()
-                && self.settings.classes[self.bytes[end] as usize] == Class::Plain
-            {
-                end += 1;
-            }
+            end = self
+                .scan_with::<CANCEL>(end, |b| self.settings.classes[b as usize] == Class::Plain)?;
         }
-        self.advance_to(end);
-        Some(Token {
+        self.advance_to_with::<CANCEL>(end)?;
+        Ok(Some(Token {
             bytes: &self.bytes[start.offset..end],
             start,
             end: self.position(),
-        })
+        }))
+    }
+    #[inline]
+    fn scan(&self, start: usize, keep: impl Fn(u8) -> bool) -> Result<usize, Cancelled> {
+        if self.control.is_active() {
+            self.scan_with::<true>(start, keep)
+        } else {
+            self.scan_with::<false>(start, keep)
+        }
+    }
+    #[inline]
+    fn scan_with<const CANCEL: bool>(
+        &self,
+        start: usize,
+        keep: impl Fn(u8) -> bool,
+    ) -> Result<usize, Cancelled> {
+        if !CANCEL {
+            let mut end = start;
+            while end < self.bytes.len() && keep(self.bytes[end]) {
+                end += 1;
+            }
+            self.control.worked(end - start);
+            return Ok(end);
+        }
+        for range in chunk_ranges(start..self.bytes.len(), self.control.chunk_size()) {
+            self.control.check()?;
+            if let Some(n) = self.bytes[range.clone()].iter().position(|&b| !keep(b)) {
+                self.control.worked(n + 1);
+                return Ok(range.start + n);
+            }
+            self.control.worked(range.len());
+        }
+        Ok(self.bytes.len())
     }
     pub fn settings_changed(&mut self) {
         self.next_data = None;
     }
-    pub fn next_data_position(&mut self) -> Position {
+    pub fn next_data_position(&mut self) -> Result<Position, Cancelled> {
         if let Some(position) = self.next_data {
-            return position;
+            return Ok(position);
         }
         let cursor = self.cursor;
-        self.skip_to_data();
+        self.skip_to_data()?;
         let position = self.position();
         self.cursor = cursor;
         self.next_data = Some(position);
-        position
+        Ok(position)
     }
-    pub fn peek_token(&mut self) -> Option<Token<'a>> {
+    pub fn peek_token(&mut self) -> Result<Option<Token<'a>>, Cancelled> {
         let cursor = self.cursor;
         let next_data = self.next_data;
         let token = self.next_token();
@@ -218,45 +276,47 @@ impl<'a> Input<'a> {
         self.next_data = next_data;
         token
     }
-    pub fn remaining_line(&mut self) -> Option<Line<'a>> {
-        self.skip_to_data();
+    pub fn remaining_line(&mut self) -> Result<Option<Line<'a>>, Cancelled> {
+        self.skip_to_data()?;
         if self.cursor.offset == self.bytes.len() {
-            return None;
+            return Ok(None);
         }
         let start = self.position();
-        let physical_end = self.bytes[start.offset..]
-            .iter()
-            .position(|&b| b == b'\n')
-            .map_or(self.bytes.len(), |n| start.offset + n);
+        let physical_end = self.scan(start.offset, |b| b != b'\n')?;
         let mut trimmed = physical_end;
         while trimmed > start.offset && is_line_blank(self.bytes[trimmed - 1]) {
+            if (physical_end - trimmed).is_multiple_of(crate::cancellation::SCAN_CHUNK) {
+                self.control.check()?;
+            }
             trimmed -= 1;
         }
-        Some(Line {
+        Ok(Some(Line {
             bytes: &self.bytes[start.offset..trimmed],
             start,
             physical_end,
-        })
+        }))
     }
-    pub fn consume_line(&mut self, line: &Line<'_>) {
-        self.advance_to(line.physical_end);
+    pub fn consume_line(&mut self, line: &Line<'_>) -> Result<(), Cancelled> {
+        self.advance_to(line.physical_end)
     }
-    pub fn skip_line(&mut self) -> bool {
-        if let Some(line) = self.remaining_line() {
-            self.consume_line(&line);
-            true
+    pub fn skip_line(&mut self) -> Result<bool, Cancelled> {
+        if let Some(line) = self.remaining_line()? {
+            self.consume_line(&line)?;
+            Ok(true)
         } else {
-            false
+            Ok(false)
         }
     }
-    pub fn read_rest(&mut self) -> Option<Token<'a>> {
-        let line = self.remaining_line()?;
-        self.consume_line(&line);
-        Some(Token {
+    pub fn read_rest(&mut self) -> Result<Option<Token<'a>>, Cancelled> {
+        let Some(line) = self.remaining_line()? else {
+            return Ok(None);
+        };
+        self.consume_line(&line)?;
+        Ok(Some(Token {
             bytes: line.bytes,
             start: line.start,
             end: line.position(line.bytes.len()),
-        })
+        }))
     }
 }
 pub(super) fn is_line_blank(byte: u8) -> bool {
@@ -265,9 +325,34 @@ pub(super) fn is_line_blank(byte: u8) -> bool {
 pub(super) fn is_word_byte(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || byte == b'_'
 }
-fn prefix_matches(tail: &[u8], prefix: &[u8]) -> bool {
-    !prefix.is_empty()
-        && tail.starts_with(prefix)
-        && (!is_word_byte(prefix[prefix.len() - 1])
-            || tail.get(prefix.len()).is_none_or(|b| !is_word_byte(*b)))
+fn matches_any_prefix(
+    tail: &[u8],
+    prefixes: &[Vec<u8>],
+    control: &Control,
+) -> Result<bool, Cancelled> {
+    for prefix in prefixes {
+        control.check()?;
+        if !prefix.is_empty()
+            && control.starts_with(tail, prefix)?
+            && (!is_word_byte(prefix[prefix.len() - 1])
+                || tail.get(prefix.len()).is_none_or(|b| !is_word_byte(*b)))
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn chunk_ranges(
+    mut range: std::ops::Range<usize>,
+    size: usize,
+) -> impl Iterator<Item = std::ops::Range<usize>> {
+    std::iter::from_fn(move || {
+        if range.is_empty() {
+            return None;
+        }
+        let start = range.start;
+        range.start = start.saturating_add(size).min(range.end);
+        Some(start..range.start)
+    })
 }

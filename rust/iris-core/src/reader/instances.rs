@@ -51,7 +51,9 @@ fn strings(values: Vec<String>) -> Value {
         leaves: LeafStorage::String(values),
         levels: vec![],
     };
-    value.set_dimensions(&[count]);
+    value
+        .set_dimensions_controlled(&[count], &crate::cancellation::Control::default())
+        .expect("uncancelled catalog");
     value
 }
 /// Borrows a string name, so comparisons at every rejection do not copy it.
@@ -80,20 +82,19 @@ impl Interpreter<'_, '_> {
         // results outside that consuming boundary.
         self.execute(self.spec.parsed.syntax())?;
         self.finish_input()?;
+        self.input.control.check()?;
         Ok(self.catalog.take().expect("catalog execution").into_data())
     }
     pub(super) fn finish_input(&mut self) -> Result<(), Failure> {
         self.statement = None;
         self.context = None;
         if !self.selected && !self.input.settings.ignore_trailing {
-            self.input.skip_to_data();
+            self.input.skip_to_data()?;
             if self.input.position().offset < self.input.bytes.len() {
-                return Err(self
-                    .error(
-                        ErrorCode::TrailingInput,
-                        "unexpected input after the end of the spec",
-                    )
-                    .into());
+                return Err(self.error(
+                    ErrorCode::TrailingInput,
+                    "unexpected input after the end of the spec",
+                ));
             }
         }
         Ok(())
@@ -101,33 +102,38 @@ impl Interpreter<'_, '_> {
     pub(super) fn execute_instances(&mut self, node: &SyntaxNode) -> Result<(), Failure> {
         let selection = Rc::new(match self.params.get("instance") {
             None => Selection::Single,
-            Some(text) => match numeric::parse_integer(text.as_bytes()) {
-                Some(n) if n < 1 => {
-                    return Err(self
-                        .error(ErrorCode::InstanceNumber, "instance numbers start at 1")
-                        .into());
+            Some(text) => {
+                match numeric::parse_integer_controlled(text.as_bytes(), &self.input.control)? {
+                    Some(n) if n < 1 => {
+                        return Err(
+                            self.error(ErrorCode::InstanceNumber, "instance numbers start at 1")
+                        );
+                    }
+                    Some(n) => Selection::Ordinal(n),
+                    None => Selection::Name(self.input.control.copy_text(text)?),
                 }
-                Some(n) => Selection::Ordinal(n),
-                None => Selection::Name(text.into()),
-            },
+            }
         });
         let body = child(node, K::Block);
         let mut count = 0;
         loop {
-            self.input.skip_to_data();
+            self.input.skip_to_data()?;
             if self.input.peek_byte().is_none() {
                 break;
             }
             count += 1;
             let (instance, frame) = self.read_instance(node, &body, count, selection.clone())?;
-            let instance_name = name(&frame).into_owned();
+            let instance_name = self.input.control.copy_text(&name(&frame))?;
             let retain = self.catalog.is_none()
                 && match selection.as_ref() {
                     Selection::Single => count == 1,
                     Selection::Ordinal(n) => *n as u64 == count as u64,
-                    Selection::Name(wanted) => *wanted == instance_name,
+                    Selection::Name(wanted) => self
+                        .input
+                        .control
+                        .equal_bytes(wanted.as_bytes(), instance_name.as_bytes())?,
                 };
-            self.finish_instance_scope(&instance, retain);
+            self.finish_instance_scope(&instance, retain)?;
             if let Some(catalog) = &mut self.catalog {
                 catalog.names.push(instance_name);
                 catalog
@@ -139,7 +145,7 @@ impl Interpreter<'_, '_> {
                 }
                 let outer = self.frames.last_mut().expect("outer frame");
                 for entry in frame.into_data().entries {
-                    outer.set(entry.name, entry.value);
+                    outer.set_controlled(entry.name, entry.value, &self.input.control)?;
                 }
                 if !matches!(selection.as_ref(), Selection::Single) {
                     self.selected = true;
@@ -159,10 +165,14 @@ impl Interpreter<'_, '_> {
         } else if let Some(wanted) = self.params.get("instance") {
             (
                 ErrorCode::InstanceNotFound,
-                format!(
-                    "there is no instance '{wanted}' (the file has {count} instance{})",
-                    if count == 1 { "" } else { "s" }
-                ),
+                self.input.control.text_message(&[
+                    "there is no instance '",
+                    wanted,
+                    &format!(
+                        "' (the file has {count} instance{})",
+                        if count == 1 { "" } else { "s" }
+                    ),
+                ])?,
             )
         } else if count > 1 {
             (
@@ -174,7 +184,7 @@ impl Interpreter<'_, '_> {
         } else {
             return Ok(());
         };
-        Err(self.error(code, message).into())
+        Err(self.error(code, message))
     }
     fn read_instance(
         &mut self,
@@ -198,7 +208,8 @@ impl Interpreter<'_, '_> {
                 &mut failure,
                 self.instance.as_ref().and_then(|i| i.deferred.as_ref()),
             ) {
-                error.details.earlier_rejection = Some(rejection.summary.clone());
+                error.details.earlier_rejection =
+                    Some(self.input.control.copy_text(&rejection.summary)?);
             }
             return Err(failure);
         }
@@ -207,14 +218,13 @@ impl Interpreter<'_, '_> {
         self.context = None;
         self.select_statement(node);
         if self.input.position().offset == start {
-            return Err(self
-                .error(ErrorCode::NoProgress, "an instance must read some input")
-                .into());
+            return Err(self.error(ErrorCode::NoProgress, "an instance must read some input"));
         }
         Ok((instance, frame))
     }
-    fn finish_instance_scope(&mut self, instance: &Instance, retain: bool) {
+    fn finish_instance_scope(&mut self, instance: &Instance, retain: bool) -> Result<(), Failure> {
         for (id, previous) in instance.types.iter().rev() {
+            self.input.control.check()?;
             if let Some(previous) = previous {
                 self.types.insert(*id, previous.clone());
             } else {
@@ -223,6 +233,7 @@ impl Interpreter<'_, '_> {
         }
         if !retain {
             for binding in instance.records.iter().rev() {
+                self.input.control.check()?;
                 self.work(WorkKind::Metadata, 1);
                 let key = (binding.repeat, binding.parent);
                 if let Some(previous) = binding.previous {
@@ -232,16 +243,22 @@ impl Interpreter<'_, '_> {
                 }
             }
         }
+        Ok(())
     }
     pub(super) fn reject(&mut self, error: Error, summary: String) -> Result<(), Failure> {
-        let defer = self.instance.as_ref().is_some_and(|instance| {
+        let defer = if let Some(instance) = self.instance.as_ref() {
             self.catalog.is_some()
                 || match instance.selection.as_ref() {
                     Selection::Single => instance.ordinal != 1,
                     Selection::Ordinal(n) => *n as u64 != instance.ordinal as u64,
-                    Selection::Name(wanted) => *wanted != name(&self.frames[1]),
+                    Selection::Name(wanted) => !self
+                        .input
+                        .control
+                        .equal_bytes(wanted.as_bytes(), name(&self.frames[1]).as_bytes())?,
                 }
-        });
+        } else {
+            false
+        };
         if !defer {
             return Err(error.into());
         }

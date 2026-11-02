@@ -2,7 +2,7 @@ use super::*;
 
 impl Interpreter<'_, '_> {
     pub(super) fn execute_param(&mut self, node: &SyntaxNode) -> Result<(), Failure> {
-        let name = tokens(node)[1].text().to_owned();
+        let name = self.input.control.copy_text(tokens(node)[1].text())?;
         // Defaults execute even when overridden, and may themselves fail.
         let default = node
             .children()
@@ -14,42 +14,59 @@ impl Interpreter<'_, '_> {
             self.work(WorkKind::Leaf, text.len());
             let kind = default.as_ref().map(Value::value_type);
             let converted = match kind {
-                Some("string") => Some(Value::string(text.into())),
-                Some("int") => numeric::parse_integer(text.as_bytes()).map(Value::int),
-                Some("float") => numeric::parse_float(text.as_bytes()).map(Value::float),
-                None => Some(
-                    numeric::parse_integer(text.as_bytes())
+                Some("string") => Some(Value::string(self.input.control.copy_text(text)?)),
+                Some("int") => {
+                    numeric::parse_integer_controlled(text.as_bytes(), &self.input.control)?
                         .map(Value::int)
-                        .or_else(|| numeric::parse_float(text.as_bytes()).map(Value::float))
-                        .unwrap_or_else(|| Value::string(text.into())),
+                }
+                Some("float") => {
+                    numeric::parse_float_controlled(text.as_bytes(), &self.input.control)?
+                        .map(Value::float)
+                }
+                None => Some(
+                    match numeric::parse_integer_controlled(text.as_bytes(), &self.input.control)? {
+                        Some(n) => Value::int(n),
+                        None => match numeric::parse_float_controlled(
+                            text.as_bytes(),
+                            &self.input.control,
+                        )? {
+                            Some(n) => Value::float(n),
+                            None => Value::string(self.input.control.copy_text(text)?),
+                        },
+                    },
                 ),
                 _ => unreachable!("three value types"),
             };
             converted.ok_or_else(|| {
-                self.error(
+                self.error_text(
                     ErrorCode::ParamType,
-                    format!(
-                        "parameter '{name}' must be {}, not '{text}'",
+                    &[
+                        "parameter '",
+                        &name,
+                        "' must be ",
                         if kind == Some("int") {
                             "an integer"
                         } else {
                             "a number"
-                        }
-                    ),
+                        },
+                        ", not '",
+                        text,
+                        "'",
+                    ],
                 )
             })?
         } else {
             default.ok_or_else(|| {
-                self.error(
+                self.error_text(
                     ErrorCode::ParamMissing,
-                    format!("parameter '{name}' must be given"),
+                    &["parameter '", &name, "' must be given"],
                 )
             })?
         };
         self.frames
             .last_mut()
             .expect("active frame")
-            .set(name, value);
+            .set_controlled(name, value, &self.input.control)?;
         Ok(())
     }
 }

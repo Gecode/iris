@@ -38,8 +38,10 @@ impl Interpreter<'_, '_> {
                 let summary = tokens(node)
                     .iter()
                     .find(|t| t.kind() == K::String)
-                    .map(|t| DecodedString::new(t.text()).text)
-                    .filter(|s| !s.is_empty())
+                    .map(|t| &self.spec.index.string_literals[&t.text_range()])
+                    .filter(|text| !text.is_empty())
+                    .map(|text| self.input.control.copy_text(text))
+                    .transpose()?
                     .unwrap_or_else(|| {
                         format!(
                             "check on line {} of the spec",
@@ -70,7 +72,7 @@ fn run_check(evaluator: &mut Evaluator<'_, '_, '_>, info: &CheckInfo) -> Result<
                 .list(dependency.repeats[0], parent)
                 .map(|_| Cursor::Marker(parent))
         } else {
-            evaluator.lookup_name(&dependency.label).map(Cursor::Value)
+            evaluator.lookup_name(&dependency.label)?.map(Cursor::Value)
         };
         if cursor.is_some()
             && deepest.is_none_or(|i: usize| {
@@ -79,9 +81,14 @@ fn run_check(evaluator: &mut Evaluator<'_, '_, '_>, info: &CheckInfo) -> Result<
         {
             deepest = Some(slot);
         }
-        evaluator
-            .dependency_slots
-            .insert(dependency.label.clone(), slot);
+        evaluator.dependency_slots.insert(
+            evaluator
+                .reader
+                .input
+                .control
+                .copy_text(&dependency.label)?,
+            slot,
+        );
         evaluator.dependencies.push(match &cursor {
             Some(Cursor::Value(v)) => Some(Kind::Value(v.clone())),
             _ => None,
@@ -101,12 +108,14 @@ fn run_check(evaluator: &mut Evaluator<'_, '_, '_>, info: &CheckInfo) -> Result<
     let mut work = vec![LiftWork::Enter(0)];
     let mut indices = Vec::new();
     while let Some(next) = work.pop() {
+        evaluator.reader.input.control.check()?;
+
         match next {
             LiftWork::Enter(level) if level == depth => {
                 evaluator.witnesses.clear();
                 let result = evaluator.evaluate(&condition)?;
                 if !result.truth() {
-                    return Err(failure(evaluator, info, deepest, &indices, result.witness).into());
+                    return Err(failure(evaluator, info, deepest, &indices, result.witness)?.into());
                 }
             }
             LiftWork::Enter(level) => {
@@ -125,13 +134,10 @@ fn run_check(evaluator: &mut Evaluator<'_, '_, '_>, info: &CheckInfo) -> Result<
                             .map_or(0, |list| evaluator.list_len(list)),
                     };
                     if length.is_some_and(|length| length != n) {
-                        return Err(evaluator
-                            .reader
-                            .error(
-                                ErrorCode::CheckRecords,
-                                "check dependencies have different numbers of records",
-                            )
-                            .into());
+                        return Err(evaluator.reader.error(
+                            ErrorCode::CheckRecords,
+                            "check dependencies have different numbers of records",
+                        ));
                     }
                     length = Some(n);
                     parents.push((slot, cursor.clone()));
@@ -170,7 +176,7 @@ fn run_check(evaluator: &mut Evaluator<'_, '_, '_>, info: &CheckInfo) -> Result<
                         Cursor::Value(value) => {
                             let selected = value.child(row).expect("aligned row");
                             evaluator.reader.work(WorkKind::Metadata, 1);
-                            let leaves = evaluator.leaf_span(&selected).len();
+                            let leaves = evaluator.leaf_span(&selected)?.len();
                             evaluator.charge(1 + leaves as u128)?;
                             evaluator.dependencies[*slot] = Some(Kind::Value(selected.clone()));
                             Cursor::Value(selected)
@@ -182,7 +188,7 @@ fn run_check(evaluator: &mut Evaluator<'_, '_, '_>, info: &CheckInfo) -> Result<
                                 .expect("nonempty marker list");
                             let record = evaluator.list_record(list, row);
                             let leaves =
-                                evaluator.marker_leaves(chain, frame.level + 1, Some(record));
+                                evaluator.marker_leaves(chain, frame.level + 1, Some(record))?;
                             evaluator.charge(1 + leaves as u128)?;
                             Cursor::Marker(Some(record))
                         }
@@ -205,36 +211,62 @@ fn failure(
     deepest: Option<usize>,
     indices: &[usize],
     witness: Option<usize>,
-) -> Error {
+) -> Result<Error, crate::cancellation::Cancelled> {
+    let (explanation, position) = failure_explanation(evaluator, info, deepest, indices, witness)?;
+    let control = &evaluator.reader.input.control;
+    let mut message = String::from("check failed");
+    if !explanation.is_empty() {
+        message.push_str(" for ");
+        control.push_text(&mut message, explanation.as_bytes())?;
+    }
+    if let Some(token) = tokens(&info.node).iter().find(|t| t.kind() == K::String) {
+        let text = &evaluator.reader.spec.index.string_literals[&token.text_range()];
+        if !text.is_empty() {
+            message.push_str(": ");
+            control.push_text(&mut message, text.as_bytes())?;
+        }
+    }
+    let mut error = evaluator.reader.language_error_at(
+        ErrorCode::CheckFailed,
+        message,
+        position.unwrap_or_else(|| evaluator.reader.input.position()),
+    )?;
+    let mut path = indices.to_vec();
+    let mut next = witness;
+    while let Some(id) = next {
+        control.check()?;
+        path.push(evaluator.witnesses[id].index);
+        next = evaluator.witnesses[id].inner;
+    }
+    evaluator.reader.work(WorkKind::Link, path.len());
+    error.details.record_path = Some(path);
+    Ok(error)
+}
+fn failure_explanation(
+    evaluator: &Evaluator<'_, '_, '_>,
+    info: &CheckInfo,
+    deepest: Option<usize>,
+    indices: &[usize],
+    witness: Option<usize>,
+) -> Result<(String, Option<Position>), crate::cancellation::Cancelled> {
+    let control = &evaluator.reader.input.control;
     let mut witnesses = Vec::new();
     let mut next = witness;
     while let Some(id) = next {
+        control.check()?;
         evaluator.reader.work(WorkKind::Link, 1);
         witnesses.push(&evaluator.witnesses[id]);
         next = evaluator.witnesses[id].inner;
     }
-    let mut path = indices.to_vec();
-    path.extend(witnesses.iter().map(|w| w.index));
-    evaluator.reader.work(WorkKind::Link, path.len());
     let mut explanation = String::new();
     let mut position = None;
     for witness in witnesses.iter().rev() {
         if !explanation.is_empty() {
             explanation.push_str(" in ");
         }
-        let label = witness
-            .record
-            .and_then(|r| evaluator.reader.spec.analysis.model.repeats()[r.0].list_definition)
-            .map(|id| {
-                format!(
-                    "'{}'",
-                    evaluator.reader.spec.analysis.model.definition(id).name
-                )
-            })
-            .unwrap_or_else(|| array_name(&witness.domain));
         write!(
             explanation,
-            "{} {} of {label}",
+            "{} {} of ",
             if witness.record.is_some() {
                 "record"
             } else {
@@ -243,6 +275,27 @@ fn failure(
             witness.index + 1
         )
         .expect("string write");
+        if let Some(id) = witness
+            .record
+            .and_then(|r| evaluator.reader.spec.analysis.model.repeats()[r.0].list_definition)
+        {
+            explanation.push('\'');
+            control.push_text(
+                &mut explanation,
+                evaluator
+                    .reader
+                    .spec
+                    .analysis
+                    .model
+                    .definition(id)
+                    .name
+                    .as_bytes(),
+            )?;
+            explanation.push('\'');
+        } else {
+            let label = array_name(&witness.domain, control)?;
+            control.push_text(&mut explanation, label.as_bytes())?;
+        }
         if position.is_none() {
             position = witness.position;
         }
@@ -263,14 +316,18 @@ fn failure(
                 let id = model.repeats()[dependency.repeats[level].0]
                     .list_definition
                     .expect("named");
-                write!(explanation, "'{}'", model.definition(id).name).expect("string write");
+                explanation.push('\'');
+                control.push_text(&mut explanation, model.definition(id).name.as_bytes())?;
+                explanation.push('\'');
                 if level > 0 {
                     explanation.push_str(" in ");
                 }
             }
         }
         if !named {
-            write!(explanation, "'{}'", dependency.label).expect("string write");
+            explanation.push('\'');
+            control.push_text(&mut explanation, dependency.label.as_bytes())?;
+            explanation.push('\'');
         }
         if position.is_none() {
             position = dependency
@@ -280,33 +337,19 @@ fn failure(
                 .map(|r| evaluator.record_start(*r));
         }
     }
-    let mut message = String::from("check failed");
-    if !explanation.is_empty() {
-        message.push_str(" for ");
-        message.push_str(&explanation);
-    }
-    if let Some(token) = tokens(&info.node).iter().find(|t| t.kind() == K::String) {
-        let text = DecodedString::new(token.text()).text;
-        if !text.is_empty() {
-            message.push_str(": ");
-            message.push_str(&text);
-        }
-    }
-    let mut error = evaluator.reader.error_at(
-        ErrorCode::CheckFailed,
-        message,
-        position.unwrap_or_else(|| evaluator.reader.input.position()),
-    );
-    error.details.record_path = Some(path);
-    error
+    Ok((explanation, position))
 }
-fn array_name(node: &SyntaxNode) -> String {
+
+fn array_name(
+    node: &SyntaxNode,
+    control: &crate::cancellation::Control,
+) -> Result<String, crate::cancellation::Cancelled> {
     let mut node = node.clone();
     while node.kind() == K::Parenthesized {
         node = expression(&node);
     }
     if node.kind() == K::Name {
-        return format!("'{}'", tokens(&node)[0].text());
+        return control.text_message(&["'", tokens(&node)[0].text(), "'"]);
     }
     if node.kind() == K::Field {
         let mut base = expression(&node);
@@ -318,16 +361,32 @@ fn array_name(node: &SyntaxNode) -> String {
                 .into_iter()
                 .find(|t| t.kind() == K::Ident)
                 .expect("resolved field name");
-            return format!("'{}.{}'", tokens(&base)[0].text(), field.text());
+            return control.text_message(&["'", tokens(&base)[0].text(), ".", field.text(), "'"]);
         }
     }
-    "the array".into()
+    Ok("the array".into())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::value::{ArrayLevel, LeafStorage};
+    #[test]
+    fn cancellation_inside_check_labels_and_frame_keys() {
+        use crate::cancellation::{SCAN_CHUNK, tests::cancel_at};
+        let name = "a".repeat(16 * SCAN_CHUNK);
+        let source = format!("{name}[1]:int check all(i in {name}:0)");
+        let spec = Spec::parse(source.as_bytes(), "spec").unwrap();
+        let domain = &spec.analysis.model.comprehensions()[0].domain;
+        cancel_at(3, |control| {
+            array_name(domain, &control).map_err(Into::into)
+        });
+        cancel_at(3, |control| {
+            Frame::default()
+                .set_controlled(name, Value::int(1), &control)
+                .map_err(Into::into)
+        });
+    }
     #[test]
     fn malformed_private_columns_fail_without_a_record_path() {
         for replacement in [
@@ -340,7 +399,7 @@ mod tests {
             },
         ] {
             let spec = Spec::parse(b"repeat 2 {x:int let y=x} if 0 {check x==y}", "spec").unwrap();
-            let mut reader = Interpreter::new(&spec, Input::new(b"1 2", "input"));
+            let mut reader = Interpreter::new(&spec, Input::new(b"1 2", "input")).unwrap();
             reader.execute(spec.parsed.syntax()).unwrap();
             reader.frames[0].set("x".into(), replacement);
             let node = &spec.analysis.model.checks()[0].node;
@@ -352,7 +411,7 @@ mod tests {
             assert_eq!(error.record_path(), None);
         }
         let spec = Spec::parse(b"repeat 2 as rows {x:int} if 0 {let v=rows[1].x}", "spec").unwrap();
-        let mut reader = Interpreter::new(&spec, Input::new(b"1 2", "input"));
+        let mut reader = Interpreter::new(&spec, Input::new(b"1 2", "input")).unwrap();
         reader.execute(spec.parsed.syntax()).unwrap();
         reader.frames[0].set(
             "x".into(),

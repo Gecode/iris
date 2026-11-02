@@ -36,7 +36,10 @@ pub(crate) fn handle_request(
             let document = analyzed_document(documents, &params.text_document.uri)?;
             let offset = offset(document, params.position, encoding)?;
             let positions = Positions::new(&document.source, &document.lines, encoding);
-            Ok(hover(document, offset, &positions, options.hover_markdown))
+            Ok(document
+                .samples
+                .hover(offset, &positions, options.hover_markdown)
+                .or_else(|| hover(document, offset, &positions, options.hover_markdown)))
         }),
         Completion::METHOD => respond::<Completion>(request, |params| {
             let params = params.text_document_position;
@@ -58,11 +61,12 @@ pub(crate) fn handle_request(
             let start = offset(document, params.range.start, encoding)?;
             let end = offset(document, params.range.end, encoding)?;
             let positions = Positions::new(&document.source, &document.lines, encoding);
-            Ok(Some(inlay_hints(
-                document,
-                TextRange::new(start, end),
-                &positions,
-            )))
+            let range = TextRange::new(start, end);
+            let declarations = inlay_hints(document, range, &positions);
+            let samples = document
+                .samples
+                .hints(range, &positions, options.hover_markdown);
+            Ok(Some(merge_hints(declarations, samples)))
         }),
         _ => unreachable!("the server dispatches only assist requests here"),
     }
@@ -231,6 +235,44 @@ fn inlay_hints(document: &Document, range: TextRange, positions: &Positions) -> 
             data: None,
         })
         .collect()
+}
+
+fn merge_hints(declarations: Vec<InlayHint>, samples: Vec<InlayHint>) -> Vec<InlayHint> {
+    merge_hints_counted(declarations, samples, &mut HintWork::default())
+}
+#[derive(Default)]
+struct HintWork {
+    #[cfg(test)]
+    visits: usize,
+}
+impl HintWork {
+    #[inline]
+    fn visit(&mut self) {
+        #[cfg(test)]
+        {
+            self.visits += 1;
+        }
+    }
+}
+fn merge_hints_counted(
+    declarations: Vec<InlayHint>,
+    samples: Vec<InlayHint>,
+    work: &mut HintWork,
+) -> Vec<InlayHint> {
+    let mut declarations = declarations.into_iter().peekable();
+    let mut samples = samples.into_iter().peekable();
+    let mut hints = Vec::new();
+    while let (Some(a), Some(b)) = (declarations.peek(), samples.peek()) {
+        work.visit();
+        if a.position <= b.position {
+            hints.push(declarations.next().expect("peeked"));
+        } else {
+            hints.push(samples.next().expect("peeked"));
+        }
+    }
+    hints.extend(declarations);
+    hints.extend(samples);
+    hints
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -821,4 +863,41 @@ fn context(token: &SyntaxToken, offset: TextSize) -> Context {
         }
     }
     context
+}
+
+#[cfg(test)]
+mod sample_hint_tests {
+    use super::*;
+    #[test]
+    fn hint_streams_merge_in_source_order_with_linear_work() {
+        let measure = |n: u32| {
+            let hint = |character| InlayHint {
+                position: Position::new(0, character),
+                label: InlayHintLabel::String("hint".into()),
+                kind: None,
+                text_edits: None,
+                tooltip: None,
+                padding_left: None,
+                padding_right: None,
+                data: None,
+            };
+            let mut work = HintWork::default();
+            let hints = merge_hints_counted(
+                (0..n).map(|i| hint(2 * i)).collect(),
+                (0..n).map(|i| hint(2 * i + 1)).collect(),
+                &mut work,
+            );
+            assert_eq!(hints.len(), 2 * n as usize);
+            assert!(
+                hints
+                    .windows(2)
+                    .all(|pair| pair[0].position < pair[1].position)
+            );
+            work.visits
+        };
+        let small = measure(128);
+        let large = measure(512);
+        assert!(large <= 6 * small);
+        assert_eq!(large, 1023);
+    }
 }

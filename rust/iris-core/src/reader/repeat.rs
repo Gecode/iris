@@ -71,7 +71,7 @@ impl Interpreter<'_, '_> {
     pub(super) fn begin_repeat(&mut self, node: &SyntaxNode) -> Result<(), Failure> {
         let mode = self.repeat_mode(node)?;
         let id = self.spec.index.repeats[&node.text_range()];
-        let columns = self.repeat_columns(id);
+        let columns = self.repeat_columns(id)?;
         let parent = self.repeats.last().map(|repeat| RecordId {
             occurrence: repeat.occurrence,
             row: repeat.row,
@@ -105,15 +105,24 @@ impl Interpreter<'_, '_> {
             let alternatives: Vec<_> = terminator_tokens
                 .iter()
                 .filter(|t| t.kind() == K::String)
-                .map(|t| DecodedString::new(t.text()).text)
-                .collect();
+                .map(|t| {
+                    self.input
+                        .control
+                        .copy_text(&self.spec.index.string_literals[&t.text_range()])
+                })
+                .collect::<Result<_, _>>()?;
             if alternatives.is_empty() {
                 Mode::Eof
             } else {
                 let store = terminator_tokens
                     .iter()
                     .position(|t| t.text() == "store")
-                    .map(|i| terminator_tokens[i + 1].text().to_owned());
+                    .map(|i| {
+                        self.input
+                            .control
+                            .copy_text(terminator_tokens[i + 1].text())
+                    })
+                    .transpose()?;
                 Mode::Tokens {
                     alternatives,
                     store,
@@ -123,7 +132,7 @@ impl Interpreter<'_, '_> {
             Mode::Count(self.admit_count(&expression(node), "repeat count")?)
         })
     }
-    fn repeat_columns(&self, id: RepeatId) -> Vec<(String, Column)> {
+    fn repeat_columns(&self, id: RepeatId) -> Result<Vec<(String, Column)>, Failure> {
         let info = &self.spec.analysis.model.repeats()[id.0];
         info.fields
             .iter()
@@ -139,7 +148,10 @@ impl Interpreter<'_, '_> {
                     ValueType::Float => "float",
                     ValueType::String => "string",
                 };
-                (field.name.clone(), Column::new(kind, depths[0]))
+                Ok((
+                    self.input.control.copy_text(&field.name)?,
+                    Column::new(kind, depths[0]),
+                ))
             })
             .collect()
     }
@@ -149,7 +161,7 @@ impl Interpreter<'_, '_> {
             Mode::Count(count) if repeat.row == *count => return Ok(false),
             Mode::Count(_) => {}
             Mode::Eof => {
-                self.input.skip_to_data();
+                self.input.skip_to_data()?;
                 if self.input.peek_byte().is_none() {
                     return Ok(false);
                 }
@@ -158,36 +170,40 @@ impl Interpreter<'_, '_> {
                 alternatives,
                 store,
             } => {
-                self.input.skip_to_data();
-                let Some(token) = self.input.peek_token() else {
-                    let expected = alternatives
-                        .iter()
-                        .map(|s| format!("'{s}'"))
-                        .collect::<Vec<_>>()
-                        .join(" or ");
-                    return Err(self
-                        .error(
-                            ErrorCode::RepeatTerminator,
-                            format!("expected {expected} before end of input"),
-                        )
-                        .into());
+                self.input.skip_to_data()?;
+                let Some(token) = self.input.peek_token()? else {
+                    let expected = self.input.control.quoted_alternatives(alternatives)?;
+                    return Err(self.error(
+                        ErrorCode::RepeatTerminator,
+                        self.input.control.text_message(&[
+                            "expected ",
+                            &expected,
+                            " before end of input",
+                        ])?,
+                    ));
                 };
-                if alternatives.iter().any(|s| s.as_bytes() == token.bytes) {
-                    self.input.next_token();
+                if self.matches_token(alternatives, token.bytes)? {
+                    self.input.next_token()?;
                     if let Some(name) = store {
-                        self.frames.last_mut().expect("enclosing frame").set(
-                            name.clone(),
-                            Value::string(
-                                String::from_utf8(token.bytes.to_vec())
-                                    .expect("whole input is valid UTF-8"),
-                            ),
-                        );
+                        self.frames
+                            .last_mut()
+                            .expect("enclosing frame")
+                            .set_controlled(
+                                self.input.control.copy_text(name)?,
+                                Value::string(
+                                    self.input
+                                        .control
+                                        .copy_utf8(token.bytes)?
+                                        .expect("whole input is valid UTF-8"),
+                                ),
+                                &self.input.control,
+                            )?;
                     }
                     return Ok(false);
                 }
             }
         }
-        let start = self.input.next_data_position();
+        let start = self.input.next_data_position()?;
         let repeat = self.repeats.last_mut().expect("active repeat");
         self.records.lists[repeat.occurrence].starts.push(start);
         self.records.active.insert(
@@ -207,12 +223,10 @@ impl Interpreter<'_, '_> {
         let repeat = self.repeats.last().expect("active iteration");
         if repeat.before == Some(self.input.position().offset) {
             if !matches!(repeat.mode, Mode::Count(_)) {
-                return Err(self
-                    .error(
-                        ErrorCode::NoProgress,
-                        "the body of a repeat until read no input",
-                    )
-                    .into());
+                return Err(self.error(
+                    ErrorCode::NoProgress,
+                    "the body of a repeat until read no input",
+                ));
             }
             self.charge_idle(1)?;
         }
@@ -222,8 +236,8 @@ impl Interpreter<'_, '_> {
         for (name, column) in &mut columns {
             let value = self.frames.last_mut().expect("local frame").take(name);
             column
-                .add_row(value)
-                .map_err(|code| self.column_error(code, name, false))?;
+                .add_row_controlled(value, &self.input.control)
+                .map_err(|e| self.column_failure(e, name, false))?;
         }
         self.frames.pop();
         self.contexts.pop();
@@ -242,17 +256,28 @@ impl Interpreter<'_, '_> {
         let repeat = self.repeats.pop().expect("finishing repeat");
         for (name, column) in repeat.columns {
             let value = column
-                .finish()
-                .map_err(|code| self.column_error(code, &name, true))?;
+                .finish_controlled(&self.input.control)
+                .map_err(|e| self.column_failure(e, &name, true))?;
             self.frames
                 .last_mut()
                 .expect("enclosing frame")
-                .set(name, value);
+                .set_controlled(name, value, &self.input.control)?;
         }
         self.records.lists[repeat.occurrence].complete = true;
         Ok(())
     }
-    fn column_error(&self, code: ErrorCode, name: &str, finishing: bool) -> Error {
+    fn column_failure(
+        &self,
+        error: crate::value::BuildError,
+        name: &str,
+        finishing: bool,
+    ) -> Failure {
+        match error {
+            crate::value::BuildError::Host(e) => e.into(),
+            crate::value::BuildError::Type(code) => self.column_error(code, name, finishing),
+        }
+    }
+    fn column_error(&self, code: ErrorCode, name: &str, finishing: bool) -> Failure {
         let detail = match code {
             ErrorCode::RepeatMissing if finishing => "is defined in no repetition",
             ErrorCode::RepeatMissing => "is defined in only some repetitions",
@@ -260,7 +285,7 @@ impl Interpreter<'_, '_> {
             ErrorCode::ValueTypeMix => "mixes strings and numbers",
             _ => unreachable!("column construction error"),
         };
-        self.error(code, format!("'{name}' {detail}"))
+        self.error_text(code, &["'", name, "' ", detail])
     }
     pub(super) fn admit_count(
         &mut self,
@@ -275,20 +300,16 @@ impl Interpreter<'_, '_> {
             )
         })?;
         if integer < 0 {
-            return Err(self
-                .error(
-                    ErrorCode::Count,
-                    format!("{description} is negative ({integer})"),
-                )
-                .into());
+            return Err(self.error(
+                ErrorCode::Count,
+                format!("{description} is negative ({integer})"),
+            ));
         }
         if integer > i32::MAX as i64 {
-            return Err(self
-                .error(
-                    ErrorCode::Count,
-                    format!("{description} is too large ({integer})"),
-                )
-                .into());
+            return Err(self.error(
+                ErrorCode::Count,
+                format!("{description} is too large ({integer})"),
+            ));
         }
         Ok(integer as usize)
     }
@@ -300,7 +321,7 @@ impl Interpreter<'_, '_> {
             .row;
         let base = self.admit_count(&expression(node), "index base")?;
         let expected = row as i128 + base as i128;
-        let token = self.input.next_token().ok_or_else(|| {
+        let token = self.input.next_token()?.ok_or_else(|| {
             self.error(
                 ErrorCode::ExpectedValue,
                 "expected a value, found end of input",
@@ -312,11 +333,11 @@ impl Interpreter<'_, '_> {
             .as_int()
             .expect("converted integer");
         if i128::from(value) != expected {
-            let mut error = self.error_at(
+            let mut error = self.language_error_at(
                 ErrorCode::IndexMismatch,
                 format!("expected index {expected}, found {value}"),
                 token.start,
-            );
+            )?;
             error.set_input_end(token.end.offset);
             return Err(error.into());
         }
@@ -330,7 +351,7 @@ mod tests {
     #[test]
     fn record_starts_parents_and_absent_lists() {
         let spec = Spec::parse(b"comment \"#\" repeat 3 as rows {each row}", "spec").unwrap();
-        let mut reader = Interpreter::new(&spec, Input::new(b" # tail\n  ", "input"));
+        let mut reader = Interpreter::new(&spec, Input::new(b" # tail\n  ", "input")).unwrap();
         reader.execute(spec.parsed.syntax()).unwrap();
         assert_eq!(reader.input.position().offset, 0);
         let list = &reader.records.lists[reader.records.occurrences[&(RepeatId(0), None)]];
@@ -350,7 +371,7 @@ mod tests {
         assert!(reader.frames[0].lookup("row").is_none());
 
         let spec = Spec::parse(b"comment \"#\" repeat 2 as rows {each row repeat 2 as ticks {each tick} k:int if k {repeat 0 as children {each child}}}", "spec").unwrap();
-        let mut reader = Interpreter::new(&spec, Input::new(b"# skip\n0\n1", "input"));
+        let mut reader = Interpreter::new(&spec, Input::new(b"# skip\n0\n1", "input")).unwrap();
         reader.execute(spec.parsed.syntax()).unwrap();
         let root = reader.records.occurrences[&(RepeatId(0), None)];
         assert_eq!(

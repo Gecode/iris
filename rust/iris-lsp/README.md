@@ -32,8 +32,10 @@ The editor owns executable discovery and installation.
 
 The server advertises incremental synchronization with open/close support.
 Open buffers are authoritative: it does not read reader specs from disk.
-Opening publishes diagnostics immediately. Changes apply in order and
-publish after a 150 ms trailing debounce for each document. Closing clears
+Opening analyzes immediately. Without runnable samples it publishes diagnostics
+immediately; with samples it schedules reading immediately and waits for that
+version’s merged result. Changes apply in order and start analysis and reading
+after a 150 ms trailing debounce for each document. Closing clears
 diagnostics and removes pending work. Each publication for an open document
 includes its version; stale and duplicate changes are ignored.
 
@@ -59,7 +61,83 @@ site can supply its final routes later.
 
 Analysis runs on the server thread using complete reparses; the document cache
 retains each tree and semantic model together and invalidates both on accepted
-changes. Live sample reading belongs to a later LSP task.
+changes. Sample reading runs on one separate worker thread.
+
+## Live sample reading
+
+A directive comment asks the server to read a sample with the whole reader spec:
+
+```iris
+# iris: sample samples/small.txt
+# iris: sample "samples/with spaces.txt" instance=2 param scale=3
+# iris: sample samples/named.txt instance="named item" param label="a b"
+```
+
+The syntax is `# iris: sample PATH [instance=SEL] [param NAME=VALUE]...`.
+Double quotes delimit whitespace-containing components of paths, selectors,
+and parameter values. Only those delimiting quotes are removed. Backslashes
+are literal; there are no escapes, shell expansion, expressions, single quotes,
+or trailing shell comments. An unmatched double quote is an error.
+`instance=SEL` uses the core `instance` parameter: a positive ordinal or an
+exact name. Parameter values remain text, and an empty parameter value is
+allowed. Repeated keys, including `param instance=...`, use the last value.
+
+Directives can appear anywhere a comment is legal, including inline and inside
+blocks. Each applies to the whole spec even inside an unexecuted branch.
+Text inside a string is not a directive. Several directives read independently,
+in source order, with their own parameters; repeated paths are not deduplicated.
+Labels include the relative path, selection when supplied, and directive line.
+Unknown command or suffix words produce a warning; a sample with an unknown
+suffix still runs. Malformed recognized clauses produce an error and skip that
+sample. Directive diagnostics do not hide the checker's parse/resolution error.
+
+PATH must be nonempty and relative; `..` is permitted. It is resolved against
+the decoded local `file:` URI's parent directory, without canonicalization or
+cwd fallback. File URI decoding follows the formatting rules below, including
+spaces and supported platform paths. Non-file documents such as `untitled:`
+receive a directive diagnostic explaining the required file URI. Missing,
+unreadable, and non-regular sample files produce diagnostics on the directive.
+
+Runtime language errors highlight their exact reader-spec statement span when
+available, using negotiated positions. Errors without such a location, including
+unknown parameters, trailing input, and input-wide invalid UTF-8, highlight the
+directive. Messages identify the sample and include its input line/column,
+bounded excerpt, context and record path when available. Language codes retain
+their documentation links; tooling errors use `sample-directive` or `sample-file`.
+Each sample diagnostic is limited to 4 KiB, with at most 80 caret columns.
+
+One worker reads serially across documents and samples. Every accepted edit
+immediately cancels obsolete work and removes cached summaries; replacement
+work starts after debounce. Stale, duplicate or invalid changes leave current
+work intact. Requests answer from the current cache without waiting for I/O.
+A buffer version publishes one merged diagnostic list after all its runnable
+samples finish. Superseded versions publish nothing; closing clears diagnostics
+and prevents late results from restoring the document. Shutdown cancels reading
+and responds immediately. Cancellation is cooperative: blocked OS acquisition,
+parser analysis, allocation and standard-library conversion can delay it and
+worker teardown. No thread is forcibly terminated.
+
+A successful directive's hover shows its sample identity, optional format name,
+and entry names, types, scalar values and shapes in definition order. Its inlay
+hint appears at the end of the physical directive line, before CR/LF, with the
+bounded preview as tooltip. Ordinary declaration hints remain available.
+Hover follows the client's Markdown/plaintext preference; arbitrary sample text
+stays literal in Markdown. Pending directives may show a reading message, and
+failures use their diagnostics instead of a successful summary hint. Clients
+advertising `workspace.inlayHint.refreshSupport` receive refresh requests after
+hint installation and invalidation; other clients see the cache on their next
+hint request.
+
+Previews inspect at most 64 entries, 1,024 second-level rows in total, and 16
+dimensions. Names, labels and scalar strings are capped at 160 Unicode scalars
+before quoting, and the preview at 16 KiB UTF-8. Omission markers identify entry,
+dimension and output limits. A shape that exceeds the row budget is explicitly
+truncated rather than reporting a prefix's min/max as the full shape. The read
+itself is complete.
+
+Sample files are reread on open and accepted reader-spec changes. There are no
+sample-file watches, save triggers or background polling: a disk edit is picked
+up by the next spec edit or close/reopen.
 
 ## Hover, completion, and inlay hints
 

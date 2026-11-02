@@ -3,7 +3,7 @@ use crate::{Params, Spec, input::Input};
 use std::{hint::black_box, time::Instant};
 
 fn prepared<'a>(spec: &'a Spec, input: &'a [u8]) -> Interpreter<'a, 'a> {
-    let mut reader = Interpreter::new(spec, Input::new(input, "input"));
+    let mut reader = Interpreter::new(spec, Input::new(input, "input")).unwrap();
     reader.capture_charges = false;
     reader.execute(spec.parsed.syntax()).unwrap();
     reader.work.set([0; 6]);
@@ -249,7 +249,7 @@ fn expression_hooks_select_views_in_order() {
         ),
     ] {
         let spec = Spec::parse(source.as_bytes(), "spec").unwrap();
-        let mut reader = Interpreter::new(&spec, Input::new(input.as_bytes(), "input"));
+        let mut reader = Interpreter::new(&spec, Input::new(input.as_bytes(), "input")).unwrap();
         reader.execute(spec.parsed.syntax()).unwrap();
         assert_eq!(
             reader
@@ -440,7 +440,7 @@ fn invalid_arguments_stop_before_their_charge() {
         ),
     ] {
         let spec = Spec::parse(source.as_bytes(), "spec").unwrap();
-        let mut reader = Interpreter::new(&spec, Input::new(b"1", "input"));
+        let mut reader = Interpreter::new(&spec, Input::new(b"1", "input")).unwrap();
         let Failure::Language(error) = reader.execute(spec.parsed.syntax()).unwrap_err() else {
             panic!("language error")
         };
@@ -463,7 +463,7 @@ fn invalid_arguments_stop_before_their_charge() {
         "repeat 1 as rows {each row x:int let a=row.x}",
     ] {
         let spec = Spec::parse(source.as_bytes(), "spec").unwrap();
-        let mut reader = Interpreter::new(&spec, Input::new(b"1", "input"));
+        let mut reader = Interpreter::new(&spec, Input::new(b"1", "input")).unwrap();
         reader.execute(spec.parsed.syntax()).unwrap();
         let expected = if source.contains("x:int") {
             vec![]

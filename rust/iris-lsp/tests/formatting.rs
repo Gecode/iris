@@ -5,23 +5,8 @@ mod support;
 use iris_syntax::{FormatOptions, LanguageVersion, TextRange, TextSize};
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent, TextEdit, Uri};
 use serde_json::{Value, json};
-use std::{fmt::Write, fs, path::Path};
-use support::Client;
-
-fn file_uri(path: &Path) -> Uri {
-    let path = path.to_str().unwrap();
-    #[cfg(windows)]
-    let path = path.replace('\\', "/");
-    let mut uri = if cfg!(windows) { "file:///" } else { "file://" }.to_owned();
-    for byte in path.bytes() {
-        if byte.is_ascii_alphanumeric() || b"/-._~:".contains(&byte) {
-            uri.push(char::from(byte));
-        } else {
-            write!(&mut uri, "%{byte:02X}").unwrap();
-        }
-    }
-    uri.parse().unwrap()
-}
+use std::fs;
+use support::{Client, file_uri};
 
 fn params(uri: &Uri) -> Value {
     // Iris has one style; these deliberately disagree with its indentation.

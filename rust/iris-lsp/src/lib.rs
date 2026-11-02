@@ -5,6 +5,8 @@ mod diagnostic;
 mod document;
 mod formatting;
 mod navigation;
+mod sample;
+mod sample_worker;
 mod semantic_tokens;
 mod server;
 mod structure;
@@ -27,3 +29,11 @@ pub fn run_stdio() -> Result<()> {
     threads.join()?;
     Ok(())
 }
+
+#[cfg(test)]
+extern crate self as iris_lsp;
+
+#[cfg(test)]
+#[allow(dead_code)]
+#[path = "../tests/support/mod.rs"]
+mod test_support;

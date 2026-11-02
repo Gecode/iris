@@ -266,6 +266,7 @@ name = "iris-lsp"
 version = "0.1.0"
 dependencies = [
  "crossbeam-channel",
+ "iris-core",
  "iris-sema",
  "iris-syntax",
  "lsp-server",

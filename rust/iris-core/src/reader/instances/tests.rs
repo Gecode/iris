@@ -3,7 +3,10 @@ use crate::Params;
 use std::{hint::black_box, time::Instant};
 
 fn execute(spec: &Spec, input: &[u8], params: &Params, catalog: bool) -> [usize; 6] {
-    let mut reader = Interpreter::new(spec, Input::new(input, "input")).with_params(params);
+    let mut reader = Interpreter::new(spec, Input::new(input, "input"))
+        .unwrap()
+        .with_params(params)
+        .unwrap();
     reader.capture_charges = false;
     if catalog {
         reader.catalog = Some(Catalog::default());

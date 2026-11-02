@@ -6,7 +6,10 @@ use crate::{
 };
 use iris_sema::{DefinitionId, DefinitionKind, ReferenceId, RepeatId, Resolution, SemanticModel};
 use iris_syntax::{DecodedString, SyntaxKind as K, SyntaxNode, SyntaxToken, TextRange};
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 const BASE_BUDGET: u128 = 1 << 20;
 
@@ -22,7 +25,11 @@ pub(crate) struct ModelIndex {
     pub structural: HashMap<String, iris_sema::Denotation>,
     patterns: HashMap<TextRange, pattern::Pattern>,
     pub pattern_literals: HashMap<TextRange, String>,
+    /// Every ordinary string token is decoded at load time. Read-time users
+    /// borrow it or copy it through the cancellation control.
+    pub string_literals: HashMap<TextRange, String>,
     sections: HashMap<TextRange, sections::Sections>,
+    alphabets: HashMap<TextRange, Arc<Alphabet>>,
 }
 impl ModelIndex {
     pub fn new(model: &SemanticModel, root: SyntaxNode) -> Self {
@@ -39,17 +46,12 @@ impl ModelIndex {
                 _ => None,
             })
             .collect();
-        let sections = root
-            .descendants()
-            .filter(|n| n.kind() == K::Sections)
-            .map(|n| (n.text_range(), sections::Sections::new(n)))
-            .collect();
         let patterns = root
             .descendants()
             .filter(|n| n.kind() == K::Pattern)
             .map(|n| (n.text_range(), pattern::Pattern::new(&n, &kinds)))
             .collect();
-        let pattern_literals = root
+        let pattern_literals: HashMap<_, _> = root
             .descendants()
             .filter(|n| n.kind() == K::Pattern)
             .flat_map(|n| {
@@ -62,6 +64,27 @@ impl ModelIndex {
             .map(|t| {
                 let inner = DecodedString::new(&format!("\"{}\"", t.text())).text;
                 (t.text_range(), DecodedString::new(&inner).text)
+            })
+            .collect();
+        let string_literals = root
+            .descendants_with_tokens()
+            .filter_map(|element| element.into_token())
+            .filter(|t| t.kind() == K::String && !pattern_literals.contains_key(&t.text_range()))
+            .map(|t| (t.text_range(), DecodedString::new(t.text()).text))
+            .collect();
+        let sections = root
+            .descendants()
+            .filter(|n| n.kind() == K::Sections)
+            .map(|n| (n.text_range(), sections::Sections::new(n, &string_literals)))
+            .collect();
+        let alphabets = root
+            .descendants()
+            .filter(|n| n.kind() == K::Alphabet)
+            .map(|n| {
+                (
+                    n.text_range(),
+                    Arc::new(Alphabet::new(&n, &string_literals)),
+                )
             })
             .collect();
         let mut params: HashSet<_> = model
@@ -117,6 +140,8 @@ impl ModelIndex {
             patterns,
             sections,
             pattern_literals,
+            string_literals,
+            alphabets,
             repeats: model
                 .repeats()
                 .iter()
@@ -176,14 +201,42 @@ enum EvaluatedType {
         lower: Option<i64>,
         upper: Option<i64>,
     },
-    Alphabet(Alphabet),
+    Alphabet(Arc<Alphabet>),
 }
-#[derive(Clone)]
+#[derive(Debug)]
 struct Alphabet {
     symbols: Vec<u8>,
     blank: Vec<u8>,
     strip: Vec<u8>,
     base: i64,
+}
+impl Alphabet {
+    fn new(node: &SyntaxNode, strings: &HashMap<TextRange, String>) -> Alphabet {
+        let symbols = tokens(node)
+            .into_iter()
+            .find(|t| t.kind() == K::String)
+            .expect("alphabet symbols");
+        let mut alphabet = Alphabet {
+            symbols: strings[&symbols.text_range()].as_bytes().to_vec(),
+            blank: vec![],
+            strip: vec![],
+            base: 1,
+        };
+        for option in node.children().filter(|n| n.kind() == K::AlphabetOption) {
+            let parts = tokens(&option);
+            match parts[0].text() {
+                "blank" => alphabet.blank = strings[&parts[1].text_range()].as_bytes().to_vec(),
+                "strip" => alphabet.strip = strings[&parts[1].text_range()].as_bytes().to_vec(),
+                "base" => {
+                    let spelling: String = parts[1..].iter().map(|t| t.text()).collect();
+                    alphabet.base = numeric::parse_integer(spelling.as_bytes())
+                        .expect("validated base literal");
+                }
+                _ => unreachable!("alphabet option"),
+            }
+        }
+        alphabet
+    }
 }
 impl EvaluatedType {
     fn empty_value(&self) -> Value {
@@ -221,10 +274,26 @@ pub(crate) struct Interpreter<'s, 'i> {
     pub(crate) work: std::cell::Cell<[usize; 6]>,
 }
 impl<'s, 'i> Interpreter<'s, 'i> {
-    pub fn new(spec: &'s Spec, input: Input<'i>) -> Self {
+    pub fn new(spec: &'s Spec, input: Input<'i>) -> Result<Self, Failure> {
         // usize input lengths fit in u64 on supported Rust targets.
         let expression_limit = BASE_BUDGET + 16 * input.bytes.len() as u128;
-        Self {
+        let mut source_lines = vec![0];
+        for (chunk_index, chunk) in spec.source.chunks(input.control.chunk_size()).enumerate() {
+            input.control.check()?;
+            let start = if input.control.is_active() {
+                chunk_index * crate::cancellation::SCAN_CHUNK
+            } else {
+                0
+            };
+            source_lines.extend(
+                chunk
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, b)| **b == b'\n')
+                    .map(|(i, _)| start + i + 1),
+            );
+        }
+        Ok(Self {
             spec,
             input,
             frames: vec![Frame::default()],
@@ -247,24 +316,27 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             selected: false,
             idle_remaining: BASE_BUDGET,
             expression_remaining: std::cell::Cell::new(expression_limit),
-            source_lines: std::iter::once(0)
-                .chain(
-                    spec.source
-                        .iter()
-                        .enumerate()
-                        .filter(|(_, byte)| **byte == b'\n')
-                        .map(|(i, _)| i + 1),
-                )
-                .collect(),
-        }
+            source_lines,
+        })
     }
-    pub fn with_params(mut self, params: &crate::Params) -> Self {
-        self.params = params.clone();
-        self
+    pub fn with_params(mut self, params: &crate::Params) -> Result<Self, Failure> {
+        if !self.input.control.is_active() {
+            self.params = params.clone();
+        } else {
+            for (name, value) in params.pairs() {
+                self.input.control.check()?;
+                self.params.set(
+                    self.input.control.copy_text(name)?,
+                    self.input.control.copy_text(value)?,
+                );
+            }
+        }
+        Ok(self)
     }
     pub fn read(mut self) -> Result<crate::Data, Failure> {
         self.execute(self.spec.parsed.syntax())?;
         self.finish_input()?;
+        self.input.control.check()?;
         Ok(self
             .frames
             .pop()
@@ -274,6 +346,7 @@ impl<'s, 'i> Interpreter<'s, 'i> {
     pub(crate) fn execute(&mut self, root: SyntaxNode) -> Result<(), Failure> {
         let mut work = vec![Work::Sequence(root.first_child())];
         while let Some(next) = work.pop() {
+            self.input.control.check()?;
             self.work(WorkKind::Dispatch, 1);
             match next {
                 Work::Sequence(Some(node)) => {
@@ -339,10 +412,7 @@ impl<'s, 'i> Interpreter<'s, 'i> {
     fn execute_statement(&mut self, node: &SyntaxNode) -> Result<(), Failure> {
         match node.kind() {
             K::Format => Ok(()),
-            K::Setting => {
-                self.execute_setting(node);
-                Ok(())
-            }
+            K::Setting => self.execute_setting(node),
             K::Declaration => self.execute_declaration(node),
             K::TypeDefinition => {
                 let descriptor = self.evaluate_domain(&child(node, K::Type))?;
@@ -354,18 +424,17 @@ impl<'s, 'i> Interpreter<'s, 'i> {
                 Ok(())
             }
             K::Let => {
-                let name = tokens(node)
+                let token = tokens(node)
                     .into_iter()
                     .filter(|t| t.kind() == K::Ident)
                     .nth(1)
-                    .expect("valid let has a name")
-                    .text()
-                    .to_owned();
+                    .expect("valid let has a name");
+                let name = self.input.control.copy_text(token.text())?;
                 let value = self.eval(&expression(node))?;
                 self.frames
                     .last_mut()
                     .expect("active frame")
-                    .set(name, value);
+                    .set_controlled(name, value, &self.input.control)?;
                 Ok(())
             }
             K::List => self.execute_list(node),
@@ -380,27 +449,33 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             _ => unreachable!("valid root/block contains statements"),
         }
     }
-    fn execute_setting(&mut self, node: &SyntaxNode) {
+    fn execute_setting(&mut self, node: &SyntaxNode) -> Result<(), Failure> {
         self.input.settings_changed();
         let own_tokens = tokens(node);
         let strings: Vec<_> = own_tokens
             .iter()
             .filter(|t| t.kind() == K::String)
-            .map(|t| DecodedString::new(t.text()).text.into_bytes())
-            .collect();
+            .map(|t| {
+                self.input
+                    .control
+                    .copy_text(&self.spec.index.string_literals[&t.text_range()])
+                    .map(String::into_bytes)
+            })
+            .collect::<Result<_, _>>()?;
         let settings = &mut self.input.settings;
         match own_tokens[0].text() {
             "comment" => settings.comments.extend(strings),
             "stop" => settings.stops.extend(strings),
-            "tokens" => settings.add_tokens(&strings[0]),
-            "separators" => settings.add_separators(&strings[0]),
+            "tokens" => settings.add_tokens(&strings[0], &self.input.control)?,
+            "separators" => settings.add_separators(&strings[0], &self.input.control)?,
             "ignore" => settings.ignore_trailing = true,
             _ => unreachable!("valid setting"),
         }
+        Ok(())
     }
     fn execute_declaration(&mut self, node: &SyntaxNode) -> Result<(), Failure> {
-        let name = tokens(node)[0].text().to_owned();
-        self.context = Some(name.clone());
+        let name = self.input.control.copy_text(tokens(node)[0].text())?;
+        self.context = Some(self.input.control.copy_text(&name)?);
         let offset = self.evaluate_offset(node)?;
         let domain = self.evaluate_domain(&child(node, K::Type))?;
         let dimensions = self.evaluate_dimensions(node)?;
@@ -414,17 +489,18 @@ impl<'s, 'i> Interpreter<'s, 'i> {
                 }
             }
         };
-        self.publish(name, value);
+        self.publish(name, value)?;
         Ok(())
     }
-    fn publish(&mut self, name: String, value: Value) {
+    fn publish(&mut self, name: String, value: Value) -> Result<(), Failure> {
         if name != "_" {
             self.frames
                 .last_mut()
                 .expect("active frame")
-                .set(name, value);
+                .set_controlled(name, value, &self.input.control)?;
         }
         self.context = None;
+        Ok(())
     }
     fn evaluate_domain(&mut self, node: &SyntaxNode) -> Result<EvaluatedType, Failure> {
         let contents = node.children().next().expect("valid type has contents");
@@ -449,14 +525,16 @@ impl<'s, 'i> Interpreter<'s, 'i> {
                     unreachable!("valid type use resolves to a named type");
                 };
                 self.types.get(&id).cloned().ok_or_else(|| {
-                    self.error(
+                    self.error_text(
                         ErrorCode::TypeUndefined,
-                        format!("the type '{}' is not defined yet", name.text()),
+                        &["the type '", name.text(), "' is not defined yet"],
                     )
                 })?
             }
             K::Range => self.evaluate_range(&contents)?,
-            K::Alphabet => EvaluatedType::Alphabet(Self::alphabet_options(&contents)),
+            K::Alphabet => {
+                EvaluatedType::Alphabet(self.spec.index.alphabets[&contents.text_range()].clone())
+            }
             _ => unreachable!("valid reading type"),
         })
     }
@@ -496,55 +574,68 @@ impl<'s, 'i> Interpreter<'s, 'i> {
         }
         Ok(EvaluatedType::Range { lower, upper })
     }
-    fn convert_scalar(&self, domain: &EvaluatedType, token: &Token<'_>) -> Result<Value, Error> {
+    fn convert_scalar(&self, domain: &EvaluatedType, token: &Token<'_>) -> Result<Value, Failure> {
         let value = match domain {
             EvaluatedType::Int | EvaluatedType::Range { .. } => {
-                numeric::parse_integer(token.bytes).map(Value::int)
+                numeric::parse_integer_controlled(token.bytes, &self.input.control)?.map(Value::int)
             }
-            EvaluatedType::Float => numeric::parse_float(token.bytes).map(Value::float),
-            EvaluatedType::Num => numeric::parse_integer(token.bytes)
-                .map(Value::int)
-                .or_else(|| numeric::parse_float(token.bytes).map(Value::float)),
+            EvaluatedType::Float => {
+                numeric::parse_float_controlled(token.bytes, &self.input.control)?.map(Value::float)
+            }
+            EvaluatedType::Num => {
+                match numeric::parse_integer_controlled(token.bytes, &self.input.control)? {
+                    Some(n) => Some(Value::int(n)),
+                    None => numeric::parse_float_controlled(token.bytes, &self.input.control)?
+                        .map(Value::float),
+                }
+            }
             EvaluatedType::Word | EvaluatedType::Rest => {
-                let text = std::str::from_utf8(token.bytes).map_err(|e| {
-                    self.error_at(
-                        ErrorCode::Utf8,
-                        "string value is not valid UTF-8",
-                        Position {
-                            offset: token.start.offset + e.valid_up_to(),
-                            column: token.start.column + e.valid_up_to(),
-                            ..token.start
-                        },
-                    )
-                })?;
-                Some(Value::string(text.to_owned()))
+                let text = self
+                    .input
+                    .control
+                    .copy_utf8(token.bytes)?
+                    .map_err(|offset| {
+                        self.error_at(
+                            ErrorCode::Utf8,
+                            "string value is not valid UTF-8",
+                            Position {
+                                offset: token.start.offset + offset,
+                                column: token.start.column + offset,
+                                ..token.start
+                            },
+                        )
+                    })?;
+                Some(Value::string(text))
             }
             EvaluatedType::Alphabet(_) => unreachable!("alphabet uses byte mapping"),
         };
-        value.ok_or_else(|| self.expected_value(domain, token))
+        match value {
+            Some(value) => Ok(value),
+            None => Err(self.expected_value(domain, token)?.into()),
+        }
     }
     fn validate_range(
         &self,
         domain: &EvaluatedType,
         value: &Value,
         token: &Token<'_>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Failure> {
         if let EvaluatedType::Range { lower, upper } = domain {
             let integer = value
                 .root()
                 .as_int()
                 .expect("range conversion produced an int");
             if lower.is_some_and(|lo| integer < lo) || upper.is_some_and(|hi| integer > hi) {
-                return Err(self.expected_value(domain, token));
+                return Err(self.expected_value(domain, token)?.into());
             }
         }
         Ok(())
     }
     fn read_scalar(&mut self, domain: &EvaluatedType) -> Result<Value, Failure> {
         let token = if matches!(domain, EvaluatedType::Rest) {
-            self.input.read_rest()
+            self.input.read_rest()?
         } else {
-            self.input.next_token()
+            self.input.next_token()?
         };
         let token = token.ok_or_else(|| {
             self.error(
@@ -557,7 +648,18 @@ impl<'s, 'i> Interpreter<'s, 'i> {
         self.validate_range(domain, &value, &token)?;
         Ok(value)
     }
-    fn expected_value(&self, domain: &EvaluatedType, token: &Token<'_>) -> Error {
+    #[cfg(test)]
+    pub(crate) fn expected_int(
+        &self,
+        token: &Token<'_>,
+    ) -> Result<Error, crate::cancellation::Cancelled> {
+        self.expected_value(&EvaluatedType::Int, token)
+    }
+    fn expected_value(
+        &self,
+        domain: &EvaluatedType,
+        token: &Token<'_>,
+    ) -> Result<Error, crate::cancellation::Cancelled> {
         let description = match domain {
             EvaluatedType::Int => "int".into(),
             EvaluatedType::Float => "float".into(),
@@ -569,16 +671,29 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             ),
             _ => "a value".into(),
         };
-        let mut error = self.error_at(
-            ErrorCode::ExpectedValue,
-            format!(
-                "expected {description}, found '{}'",
-                String::from_utf8_lossy(token.bytes)
-            ),
-            token.start,
-        );
+        let mut message = format!("expected {description}, found '");
+        self.input.control.push_text(&mut message, token.bytes)?;
+        message.push('\'');
+        let mut error = self.language_error_at(ErrorCode::ExpectedValue, message, token.start)?;
         error.set_input_end(token.end.offset);
-        error
+        Ok(error)
+    }
+    pub(crate) fn matches_token(
+        &self,
+        alternatives: &[String],
+        bytes: &[u8],
+    ) -> Result<bool, Failure> {
+        for alternative in alternatives {
+            self.input.control.check()?;
+            if self
+                .input
+                .control
+                .equal_bytes(alternative.as_bytes(), bytes)?
+            {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
     pub fn lookup(&self, name: &str) -> Option<&Value> {
         self.frames
@@ -587,48 +702,83 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             .find_map(|frame| frame.lookup(name))
     }
 
-    pub fn error(&self, code: ErrorCode, message: impl Into<String>) -> Error {
+    pub fn error(&self, code: ErrorCode, message: impl Into<String>) -> Failure {
         self.error_at(code, message, self.input.position())
+    }
+    pub(crate) fn error_text(&self, code: ErrorCode, parts: &[&str]) -> Failure {
+        match self.input.control.text_message(parts) {
+            Ok(message) => self.error(code, message),
+            Err(cancelled) => cancelled.into(),
+        }
     }
     pub(crate) fn error_at(
         &self,
         code: ErrorCode,
         message: impl Into<String>,
         position: Position,
-    ) -> Error {
-        let context = self.execution_context();
-        Error::input(
+    ) -> Failure {
+        match self.language_error_at(code, message, position) {
+            Ok(error) => error.into(),
+            Err(cancelled) => cancelled.into(),
+        }
+    }
+    fn language_error_at(
+        &self,
+        code: ErrorCode,
+        message: impl Into<String>,
+        position: Position,
+    ) -> Result<Error, crate::cancellation::Cancelled> {
+        let context = self.execution_context()?;
+        // Move the checked context into the error rather than copying it again.
+        let mut error = Error::input(
             code,
             message,
             &self.input,
             position,
             self.statement
                 .map(|(line, range)| (self.spec.parsed.origin(), line, range)),
-            context.as_deref(),
-        )
+            None,
+        );
+        error.details.context = context;
+        Ok(error)
     }
-    pub(crate) fn execution_context(&self) -> Option<String> {
-        let mut contexts: Vec<_> = self
-            .contexts
-            .iter()
-            .filter_map(|context| match context {
-                ExecutionContext::Repeat(index) => self.repeats[*index].context(),
-                ExecutionContext::Section(range) => Some(format!(
-                    "section \"{}\"",
-                    self.spec.index.patterns[range].source
-                )),
-            })
-            .collect();
+    pub(crate) fn execution_context(
+        &self,
+    ) -> Result<Option<String>, crate::cancellation::Cancelled> {
+        let control = &self.input.control;
+        let mut context = String::new();
         if let Some(instance) = &self.instance {
-            contexts.insert(0, format!("instance [{}]", instance.ordinal));
+            context = format!("instance [{}]", instance.ordinal);
         }
-        contexts.extend(self.context.iter().cloned());
-        (!contexts.is_empty()).then(|| contexts.join(" > "))
+        for item in &self.contexts {
+            control.check()?;
+            let part = match item {
+                ExecutionContext::Repeat(index) => self.repeats[*index].context(),
+                ExecutionContext::Section(range) => Some(control.text_message(&[
+                    "section \"",
+                    &self.spec.index.patterns[range].source,
+                    "\"",
+                ])?),
+            };
+            if let Some(part) = part {
+                if !context.is_empty() {
+                    context.push_str(" > ");
+                }
+                control.push_text(&mut context, part.as_bytes())?;
+            }
+        }
+        if let Some(name) = &self.context {
+            if !context.is_empty() {
+                context.push_str(" > ");
+            }
+            control.push_text(&mut context, name.as_bytes())?;
+        }
+        Ok((!context.is_empty()).then_some(context))
     }
-    fn charge_idle(&mut self, units: u128) -> Result<(), Error> {
+    fn charge_idle(&mut self, units: u128) -> Result<(), Failure> {
         self.work(WorkKind::Probe, 1);
         #[cfg(test)]
-        self.observe_charge(false, units);
+        self.observe_charge(false, units)?;
         self.idle_remaining = self.idle_remaining.checked_sub(units).ok_or_else(|| {
             self.error(
                 ErrorCode::Budget,
@@ -637,7 +787,7 @@ impl<'s, 'i> Interpreter<'s, 'i> {
         })?;
         Ok(())
     }
-    pub(crate) fn charge_expression(&self, units: u128) -> Result<(), Error> {
+    pub(crate) fn charge_expression(&self, units: u128) -> Result<(), Failure> {
         self.work(WorkKind::Probe, 1);
         let remaining = self
             .expression_remaining
@@ -653,16 +803,21 @@ impl<'s, 'i> Interpreter<'s, 'i> {
         Ok(())
     }
     #[cfg(test)]
-    fn observe_charge(&mut self, expression: bool, units: u128) {
+    fn observe_charge(
+        &mut self,
+        expression: bool,
+        units: u128,
+    ) -> Result<(), crate::cancellation::Cancelled> {
         if !self.capture_charges {
-            return;
+            return Ok(());
         }
         self.charges.push(Charge {
             expression,
             units,
             statement_line: self.statement.map(|s| s.0),
-            context: self.execution_context(),
+            context: self.execution_context()?,
         });
+        Ok(())
     }
 }
 pub(crate) fn tokens(node: &SyntaxNode) -> Vec<SyntaxToken> {
@@ -736,5 +891,105 @@ impl Interpreter<'_, '_> {
             counts[_kind as usize] += _count;
             self.work.set(counts);
         }
+    }
+}
+
+#[cfg(test)]
+mod cancellation_tests {
+    use super::*;
+    use crate::cancellation::{SCAN_CHUNK, tests::cancel_at};
+
+    #[test]
+    fn cancellation_prepared_alphabets_are_shared_across_records() {
+        for (symbols, base) in [
+            ("a".repeat(16 * SCAN_CHUNK), "1".into()),
+            ("a".into(), "0".repeat(16 * SCAN_CHUNK)),
+        ] {
+            let source = format!("repeat 4 {{x[1][1]:alphabet \"{symbols}\" base {base}}}");
+            let spec = Spec::parse(source.as_bytes(), "spec").unwrap();
+            let node = spec
+                .parsed
+                .syntax()
+                .descendants()
+                .find(|n| n.kind() == K::Type)
+                .unwrap();
+            let mut reader = Interpreter::new(&spec, Input::new(b"a a a a", "input")).unwrap();
+            let EvaluatedType::Alphabet(first) = reader.evaluate_domain(&node).unwrap() else {
+                panic!("alphabet")
+            };
+            let EvaluatedType::Alphabet(second) = reader.evaluate_domain(&node).unwrap() else {
+                panic!("alphabet")
+            };
+            let prepared = &spec.index.alphabets[&child(&node, K::Alphabet).text_range()];
+            assert!(Arc::ptr_eq(&first, prepared));
+            assert!(
+                Arc::ptr_eq(&first, &second),
+                "record execution must share the prepared alphabet, including its parsed base"
+            );
+            // With construction outside the read, both long forms stop at a
+            // short dispatch checkpoint inside the repeat.
+            cancel_at(30, |control| {
+                reader.input.control = control;
+                reader.read()
+            });
+        }
+    }
+    #[test]
+    fn cancellation_inside_prepared_repeat_and_setting_literals() {
+        let long = "a".repeat(16 * SCAN_CHUNK);
+        for source in [
+            format!("repeat until \"{long}\" {{x:int}}"),
+            format!("comment \"{long}\""),
+        ] {
+            let spec = Spec::parse(source.as_bytes(), "spec").unwrap();
+            let node = spec.parsed.syntax().first_child().unwrap();
+            let mut reader = Interpreter::new(&spec, Input::new(b"", "input")).unwrap();
+            cancel_at(3, |control| {
+                reader.input.control = control;
+                if node.kind() == K::Repeat {
+                    reader.begin_repeat(&node)
+                } else {
+                    reader.execute_setting(&node)
+                }
+            });
+        }
+    }
+    #[test]
+    fn cancellation_inside_repeat_terminator_diagnostic() {
+        let source = format!("repeat until \"{}\" {{x:int}}", "a".repeat(16 * SCAN_CHUNK));
+        let spec = Spec::parse(source.as_bytes(), "spec").unwrap();
+        let node = spec.parsed.syntax().first_child().unwrap();
+        let mut reader = Interpreter::new(&spec, Input::new(b"", "input")).unwrap();
+        // Prepare before observing, so only the EOF diagnostic can reach the gate.
+        reader.begin_repeat(&node).unwrap();
+        cancel_at(20, |control| {
+            reader.input.control = control;
+            reader.begin_iteration()
+        });
+    }
+    #[test]
+    fn cancellation_expect_uses_the_prepared_literal() {
+        let mut spec = Spec::parse(b"expect \"a\"", "spec").unwrap();
+        // Give the prepared value distinct content: cancellation in its quote
+        // then proves that execution uses the index rather than decoding again.
+        *spec.index.string_literals.values_mut().next().unwrap() = "a".repeat(16 * SCAN_CHUNK);
+        let node = spec.parsed.syntax().first_child().unwrap();
+        let mut reader = Interpreter::new(&spec, Input::new(b"", "input")).unwrap();
+        cancel_at(20, |control| {
+            reader.input.control = control;
+            reader.execute_expect(&node)
+        });
+    }
+    #[test]
+    fn cancellation_inside_section_execution_context() {
+        let source = format!("sections {{\"{}\" {{x:int}}}}", "a".repeat(16 * SCAN_CHUNK));
+        let spec = Spec::parse(source.as_bytes(), "spec").unwrap();
+        let range = *spec.index.patterns.keys().next().unwrap();
+        let mut reader = Interpreter::new(&spec, Input::new(b"", "input")).unwrap();
+        reader.contexts.push(ExecutionContext::Section(range));
+        cancel_at(3, |control| {
+            reader.input.control = control;
+            Err::<(), _>(reader.error(ErrorCode::ExpectedValue, "expected a value"))
+        });
     }
 }

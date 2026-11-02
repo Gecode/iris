@@ -33,6 +33,8 @@ pub(crate) struct Document {
     pub(crate) lines: LineIndex,
     pub(crate) deadline: Option<Instant>,
     snapshot: Option<AnalysisSnapshot>,
+    pub(crate) generation: u64,
+    pub(crate) samples: crate::sample::Samples,
 }
 
 struct AnalysisSnapshot {
@@ -49,6 +51,8 @@ impl Document {
             version,
             deadline: None,
             snapshot: None,
+            generation: 0,
+            samples: crate::sample::Samples::default(),
         }
     }
 
@@ -191,6 +195,14 @@ impl LineIndex {
         Ok(Position::new(
             u32::try_from(line_number).map_err(|_| "too many source lines")?,
             u32::try_from(character).map_err(|_| "source line is too long")?,
+        ))
+    }
+
+    pub(crate) fn physical_line(&self, number: usize) -> Option<TextRange> {
+        let line = self.lines.get(number.checked_sub(1)?)?;
+        Some(TextRange::new(
+            TextSize::try_from(line.start).ok()?,
+            TextSize::try_from(line.end).ok()?,
         ))
     }
 

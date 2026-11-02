@@ -9,8 +9,6 @@ mod fmt;
 mod list;
 #[path = "iris/read.rs"]
 mod read;
-#[path = "iris/summary.rs"]
-mod summary;
 #[derive(Parser)]
 #[command(
     name = "iris",

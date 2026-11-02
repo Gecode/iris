@@ -5,7 +5,7 @@ use crate::{
     value::LeafStorage,
 };
 use iris_sema::{DefinitionId, RepeatId};
-use iris_syntax::{DecodedString, SyntaxKind as K, SyntaxNode};
+use iris_syntax::{SyntaxKind as K, SyntaxNode};
 use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},
@@ -137,10 +137,13 @@ pub(crate) struct Evaluator<'a, 's, 'i> {
 impl Interpreter<'_, '_> {
     pub fn eval(&mut self, node: &SyntaxNode) -> Result<Value, Failure> {
         let mut evaluator = Evaluator::new(self);
-        let result = evaluator.evaluate(node).map(|result| {
+        let result = evaluator.evaluate(node).and_then(|result| {
             let view = result.kind.view();
             view.as_ref()
-                .copy_with(|count| self.work(WorkKind::Copy, count))
+                .copy_with(&self.input.control, |count| {
+                    self.work(WorkKind::Copy, count)
+                })
+                .map_err(Into::into)
         });
         #[cfg(test)]
         {
@@ -214,20 +217,21 @@ impl<'a, 's, 'i> Evaluator<'a, 's, 'i> {
                 expression: true,
                 units,
                 statement_line: self.reader.statement.map(|s| s.0),
-                context: self.reader.execution_context(),
+                context: self.reader.execution_context()?,
             });
         }
-        self.reader.charge_expression(units).map_err(Into::into)
+        self.reader.charge_expression(units)
     }
-    pub(crate) fn leaf_span(&mut self, view: &View<'_>) -> std::ops::Range<usize> {
-        self.boundary(view, view.row)..self.boundary(view, view.row + 1)
+    pub(crate) fn leaf_span(&mut self, view: &View<'_>) -> Result<std::ops::Range<usize>, Failure> {
+        Ok(self.boundary(view, view.row)?..self.boundary(view, view.row + 1)?)
     }
-    fn boundary(&mut self, view: &View<'_>, row: usize) -> usize {
+    fn boundary(&mut self, view: &View<'_>, row: usize) -> Result<usize, Failure> {
         let mut level = view.level;
         let mut row = row;
         let root = view.key();
         let mut pending = Vec::new();
         while level < view.value().depth() {
+            self.reader.input.control.check()?;
             self.reader.work(WorkKind::Metadata, 1);
             if let Some(&leaf) = self.spans.get(&(root, level, row)) {
                 row = leaf;
@@ -238,9 +242,10 @@ impl<'a, 's, 'i> Evaluator<'a, 's, 'i> {
             level += 1;
         }
         for key in pending {
+            self.reader.input.control.check()?;
             self.spans.insert(key, row);
         }
-        row
+        Ok(row)
     }
     pub fn evaluate(&mut self, node: &SyntaxNode) -> Result<ResultValue<'a>, Failure> {
         let result = self.evaluate_inner(node);
@@ -254,30 +259,45 @@ impl<'a, 's, 'i> Evaluator<'a, 's, 'i> {
         let mut work = vec![Continue::Node(node.clone())];
         let mut results = Vec::<ResultValue<'a>>::new();
         while let Some(next) = work.pop() {
+            self.reader.input.control.check()?;
             match next {
                 Continue::Node(node) => {
                     self.reader.work(WorkKind::Dispatch, 1);
                     match node.kind() {
                         K::Literal => {
                             let token = &tokens(&node)[0];
+                            let control = &self.reader.input.control;
                             let value = match token.kind() {
                                 K::Integer => Value::int(
-                                    numeric::parse_integer(token.text().as_bytes())
-                                        .expect("validated literal"),
+                                    numeric::parse_integer_controlled(
+                                        token.text().as_bytes(),
+                                        control,
+                                    )?
+                                    .expect("validated literal"),
                                 ),
                                 K::Float => Value::float(
-                                    numeric::parse_float(token.text().as_bytes())
-                                        .expect("validated literal"),
+                                    numeric::parse_float_controlled(
+                                        token.text().as_bytes(),
+                                        control,
+                                    )?
+                                    .expect("validated literal"),
                                 ),
-                                K::String => Value::string(
-                                    self.reader
-                                        .spec
-                                        .index
-                                        .pattern_literals
-                                        .get(&token.text_range())
-                                        .cloned()
-                                        .unwrap_or_else(|| DecodedString::new(token.text()).text),
-                                ),
+                                K::String => {
+                                    let index = &self.reader.spec.index;
+                                    let range = token.text_range();
+                                    Value::string(
+                                        match index
+                                            .pattern_literals
+                                            .get(&range)
+                                            .or_else(|| index.string_literals.get(&range))
+                                        {
+                                            Some(text) => control.copy_text(text)?,
+                                            None => {
+                                                unreachable!("string literal indexed at spec load")
+                                            }
+                                        },
+                                    )
+                                }
                                 _ => unreachable!("literal"),
                             };
                             results.push(ResultValue {
@@ -345,8 +365,7 @@ impl<'a, 's, 'i> Evaluator<'a, 's, 'i> {
                     } else {
                         return Err(self
                             .reader
-                            .error(ErrorCode::IntegerType, "'-' needs integers")
-                            .into());
+                            .error(ErrorCode::IntegerType, "'-' needs integers"));
                     };
                     results.push(ResultValue {
                         kind: Kind::Value(View::owned(result)),
@@ -418,8 +437,7 @@ impl<'a, 's, 'i> Evaluator<'a, 's, 'i> {
                     if index < 0 || index as u64 >= length as u64 {
                         return Err(self
                             .reader
-                            .error(ErrorCode::IndexRange, "array index out of range")
-                            .into());
+                            .error(ErrorCode::IndexRange, "array index out of range"));
                     }
                     let kind = self.element(&base, index as usize)?;
                     results.push(ResultValue {
@@ -544,13 +562,18 @@ impl<'a, 's, 'i> Evaluator<'a, 's, 'i> {
         work: &mut Vec<Continue<'a>>,
         results: &mut Vec<ResultValue<'a>>,
     ) -> Result<(), Failure> {
-        let name = tokens(node)[0].text().to_owned();
+        let name = self
+            .reader
+            .input
+            .control
+            .copy_text(tokens(node)[0].text())?;
         if name == "defined" {
             let mut argument = expression(node);
             while argument.kind() == K::Parenthesized {
+                self.reader.input.control.check()?;
                 argument = expression(&argument);
             }
-            let available = self.is_defined(&argument);
+            let available = self.is_defined(&argument)?;
             results.push(ResultValue::integer(i64::from(available)));
             return Ok(());
         }
@@ -573,9 +596,7 @@ impl<'a, 's, 'i> Evaluator<'a, 's, 'i> {
     fn length(&self, kind: &Kind<'_>, code: ErrorCode, message: &str) -> Result<usize, Failure> {
         match kind {
             Kind::Records(list) => Ok(self.list_len(*list)),
-            Kind::Value(value) => value
-                .len()
-                .ok_or_else(|| self.reader.error(code, message).into()),
+            Kind::Value(value) => value.len().ok_or_else(|| self.reader.error(code, message)),
             Kind::Record(_) => unreachable!("array required statically"),
         }
     }
@@ -583,7 +604,7 @@ impl<'a, 's, 'i> Evaluator<'a, 's, 'i> {
         match domain {
             Kind::Value(value) => {
                 let selected = value.child(index).expect("valid element");
-                let leaves = self.leaf_span(&selected).len();
+                let leaves = self.leaf_span(&selected)?.len();
                 self.charge(1 + leaves as u128)?;
                 Ok(Kind::Value(selected))
             }
@@ -649,19 +670,19 @@ impl<'a, 's, 'i> Evaluator<'a, 's, 'i> {
         id
     }
     fn add_argument(&mut self, state: &mut Aggregate, view: &View<'_>) -> Result<(), Failure> {
-        let span = self.leaf_span(view);
+        let span = self.leaf_span(view)?;
         if !span.is_empty() && view.value().value_type() != "int" {
-            return Err(self
-                .reader
-                .error(
-                    ErrorCode::FunctionType,
-                    format!("'{}' has an invalid argument type", state.function),
-                )
-                .into());
+            return Err(self.reader.error(
+                ErrorCode::FunctionType,
+                format!("'{}' has an invalid argument type", state.function),
+            ));
         }
         self.charge(span.len() as u128)?;
         if let LeafStorage::Int(integers) = &view.value().leaves {
-            for &integer in &integers[span] {
+            for (index, &integer) in integers[span].iter().enumerate() {
+                if index.is_multiple_of(crate::cancellation::VALUE_CHUNK) {
+                    self.reader.input.control.check()?;
+                }
                 self.reader.work(WorkKind::Leaf, 1);
                 match state.function.as_str() {
                     "min" => {
@@ -704,14 +725,12 @@ impl<'a, 's, 'i> Evaluator<'a, 's, 'i> {
         if matches!(operator, "/" | "%") && b == 0 {
             return Err(self
                 .reader
-                .error(ErrorCode::DivisionZero, "division by zero")
-                .into());
+                .error(ErrorCode::DivisionZero, "division by zero"));
         }
         if operator == "^" && b < 0 {
             return Err(self
                 .reader
-                .error(ErrorCode::Exponent, "negative exponent in '^'")
-                .into());
+                .error(ErrorCode::Exponent, "negative exponent in '^'"));
         }
         let result = match operator {
             "+" => a.checked_add(b),
@@ -723,12 +742,10 @@ impl<'a, 's, 'i> Evaluator<'a, 's, 'i> {
             _ => unreachable!("arithmetic operator"),
         };
         result.map(Value::int).ok_or_else(|| {
-            self.reader
-                .error(
-                    ErrorCode::IntegerOverflow,
-                    format!("integer overflow in '{operator}'"),
-                )
-                .into()
+            self.reader.error(
+                ErrorCode::IntegerOverflow,
+                format!("integer overflow in '{operator}'"),
+            )
         })
     }
     fn compare(
@@ -738,13 +755,10 @@ impl<'a, 's, 'i> Evaluator<'a, 's, 'i> {
         right: ValueRef<'_>,
     ) -> Result<Value, Failure> {
         if left.depth() > 0 || right.depth() > 0 {
-            return Err(self
-                .reader
-                .error(
-                    ErrorCode::ComparisonType,
-                    format!("'{operator}' compares single values, not arrays"),
-                )
-                .into());
+            return Err(self.reader.error(
+                ErrorCode::ComparisonType,
+                format!("'{operator}' compares single values, not arrays"),
+            ));
         }
         let a = left;
         let b = right;
@@ -760,24 +774,21 @@ impl<'a, 's, 'i> Evaluator<'a, 's, 'i> {
                 a.partial_cmp(&b)
             }
             _ if matches!(operator, "==" | "!=") => {
-                if a.as_str()
-                    .ok()
-                    .zip(b.as_str().ok())
-                    .is_some_and(|(a, b)| a == b)
-                {
-                    Some(Ordering::Equal)
-                } else {
-                    None
-                }
+                let equal = match a.as_str().ok().zip(b.as_str().ok()) {
+                    Some((a, b)) => self
+                        .reader
+                        .input
+                        .control
+                        .equal_bytes(a.as_bytes(), b.as_bytes())?,
+                    None => false,
+                };
+                if equal { Some(Ordering::Equal) } else { None }
             }
             _ => {
-                return Err(self
-                    .reader
-                    .error(
-                        ErrorCode::ComparisonType,
-                        format!("'{operator}' compares numbers"),
-                    )
-                    .into());
+                return Err(self.reader.error(
+                    ErrorCode::ComparisonType,
+                    format!("'{operator}' compares numbers"),
+                ));
             }
         };
         let result = match operator {

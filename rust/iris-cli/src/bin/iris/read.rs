@@ -79,7 +79,7 @@ fn read(arguments: &Arguments) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         } else if arguments.json {
             document.extend(data.to_json()?);
         } else {
-            super::summary::write_summary(
+            iris_core::summary::write_summary(
                 &mut document,
                 &input.to_string_lossy(),
                 format.as_deref(),

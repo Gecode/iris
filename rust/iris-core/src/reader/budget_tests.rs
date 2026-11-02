@@ -2,7 +2,7 @@ use super::*;
 use crate::Params;
 
 fn reader<'a>(spec: &'a Spec, input: &'a [u8]) -> Interpreter<'a, 'a> {
-    let mut reader = Interpreter::new(spec, Input::new(input, "input"));
+    let mut reader = Interpreter::new(spec, Input::new(input, "input")).unwrap();
     reader.capture_charges = false;
     reader
 }
@@ -48,19 +48,22 @@ fn budget_charges_are_atomic_and_do_not_overflow() {
     reader.charge_expression(BASE_BUDGET + 64).unwrap();
     reader.charge_idle(0).unwrap();
     reader.charge_expression(0).unwrap();
-    assert_eq!(reader.charge_idle(1).unwrap_err().code, ErrorCode::Budget);
     assert_eq!(
-        reader.charge_expression(1).unwrap_err().code,
+        budget_error(reader.charge_idle(1).unwrap_err()).code,
+        ErrorCode::Budget
+    );
+    assert_eq!(
+        budget_error(reader.charge_expression(1).unwrap_err()).code,
         ErrorCode::Budget
     );
 
-    let mut reader = Interpreter::new(&spec, Input::new(b"", "input"));
+    let mut reader = Interpreter::new(&spec, Input::new(b"", "input")).unwrap();
     assert_eq!(
-        reader.charge_idle(u128::MAX).unwrap_err().code,
+        budget_error(reader.charge_idle(u128::MAX).unwrap_err()).code,
         ErrorCode::Budget
     );
     assert_eq!(
-        reader.charge_expression(u128::MAX).unwrap_err().code,
+        budget_error(reader.charge_expression(u128::MAX).unwrap_err()).code,
         ErrorCode::Budget
     );
 }
@@ -75,7 +78,7 @@ fn budget_failure_after_deferred_rejection_is_hard() {
     let mut params = Params::new();
     params.set("instance", "2");
     for catalog in [false, true] {
-        let reader = reader(&spec, b"0\n1").with_params(&params);
+        let reader = reader(&spec, b"0\n1").with_params(&params).unwrap();
         let error = budget_error(if catalog {
             reader.catalog().unwrap_err()
         } else {

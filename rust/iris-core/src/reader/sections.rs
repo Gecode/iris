@@ -16,7 +16,7 @@ struct Arm {
     body: Option<SyntaxNode>,
 }
 impl Sections {
-    pub fn new(node: SyntaxNode) -> Self {
+    pub fn new(node: SyntaxNode, strings: &HashMap<TextRange, String>) -> Self {
         let mut alternatives = vec![];
         let mut store = None;
         for option in node.children().filter(|n| n.kind() == K::Terminators) {
@@ -25,7 +25,7 @@ impl Sections {
                 tokens
                     .iter()
                     .filter(|t| t.kind() == K::String)
-                    .map(|t| DecodedString::new(t.text()).text),
+                    .map(|t| strings[&t.text_range()].clone()),
             );
             if let Some(index) = tokens.iter().position(|t| t.text() == "store") {
                 store = Some(tokens[index + 1].text().to_owned());
@@ -72,35 +72,38 @@ impl Interpreter<'_, '_> {
         let state = self.sections.last().expect("active sections");
         let sections = &self.spec.index.sections[&state.descriptor];
         self.select_statement(&sections.node);
-        self.input.skip_to_data();
+        self.input.skip_to_data()?;
         if self.input.peek_byte().is_none() {
             return self.finish_sections(self.input.position(), "the end of the input");
         }
-        if let Some(position) = self.take_sections_terminator(sections) {
-            let end = sections
-                .alternatives
-                .iter()
-                .map(|s| format!("'{s}'"))
-                .collect::<Vec<_>>()
-                .join(" or ");
+        if let Some(position) = self.take_sections_terminator(sections)? {
+            let end = self
+                .input
+                .control
+                .quoted_alternatives(&sections.alternatives)?;
             return self.finish_sections(position, &end);
         }
-        let line = self.input.remaining_line().expect("data remains");
+        let line = self.input.remaining_line()?.expect("data remains");
         for (index, arm) in sections.arms.iter().enumerate() {
             let pattern = &self.spec.index.patterns[&arm.pattern];
             if let Some(captures) = self.match_pattern(pattern, &line)? {
                 if let Some(first) = self.sections.last().expect("active sections").seen[index] {
-                    let error = self.error_at(
+                    let error = self.language_error_at(
                         ErrorCode::SectionsRepeated,
-                        format!(
-                            "a second line matching \"{}\" (the first is on line {})",
-                            pattern.source, first.line
-                        ),
+                        self.input.control.text_message(&[
+                            "a second line matching \"",
+                            &pattern.source,
+                            &format!("\" (the first is on line {})", first.line),
+                        ])?,
                         line.start,
-                    );
+                    )?;
                     self.reject(
                         error,
-                        format!("a second line matching \"{}\"", pattern.source),
+                        self.input.control.text_message(&[
+                            "a second line matching \"",
+                            &pattern.source,
+                            "\"",
+                        ])?,
                     )?;
                 }
                 let state = self.sections.last_mut().expect("active sections");
@@ -118,52 +121,57 @@ impl Interpreter<'_, '_> {
             }
         }
         if sections.skip_other {
-            self.input.consume_line(&line);
+            self.input.consume_line(&line)?;
             work.push(Work::SectionsNext);
             return Ok(());
         }
-        let mut expected = sections
-            .arms
-            .iter()
-            .take(6)
-            .map(|arm| format!("\"{}\"", self.spec.index.patterns[&arm.pattern].source))
-            .collect::<Vec<_>>()
-            .join(", ");
+        let mut message = String::from("unexpected line; expected one of ");
+        for (index, arm) in sections.arms.iter().take(6).enumerate() {
+            if index > 0 {
+                message.push_str(", ");
+            }
+            message.push('"');
+            self.input.control.push_text(
+                &mut message,
+                self.spec.index.patterns[&arm.pattern].source.as_bytes(),
+            )?;
+            message.push('"');
+        }
         if sections.arms.len() > 6 {
-            expected.push_str(", ...");
+            message.push_str(", ...");
         }
-        Err(self
-            .error_at(
-                ErrorCode::SectionsUnexpected,
-                format!("unexpected line; expected one of {expected}"),
-                line.start,
-            )
-            .into())
+        Err(self.error_at(ErrorCode::SectionsUnexpected, message, line.start))
     }
-    fn take_sections_terminator(&mut self, sections: &Sections) -> Option<Position> {
+    fn take_sections_terminator(
+        &mut self,
+        sections: &Sections,
+    ) -> Result<Option<Position>, Failure> {
         if sections.alternatives.is_empty() {
-            return None;
+            return Ok(None);
         }
-        let token = self.input.peek_token()?;
-        if !sections
-            .alternatives
-            .iter()
-            .any(|s| s.as_bytes() == token.bytes)
-        {
-            return None;
+        let Some(token) = self.input.peek_token()? else {
+            return Ok(None);
+        };
+        if !self.matches_token(&sections.alternatives, token.bytes)? {
+            return Ok(None);
         }
-        self.input.next_token();
+        self.input.next_token()?;
         if let Some(name) = &sections.store {
-            self.frames.last_mut().expect("active frame").set(
-                name.clone(),
-                Value::string(
-                    std::str::from_utf8(token.bytes)
-                        .expect("literal terminator matched")
-                        .to_owned(),
-                ),
-            );
+            self.frames
+                .last_mut()
+                .expect("active frame")
+                .set_controlled(
+                    self.input.control.copy_text(name)?,
+                    Value::string(
+                        self.input
+                            .control
+                            .copy_utf8(token.bytes)?
+                            .expect("literal terminator matched"),
+                    ),
+                    &self.input.control,
+                )?;
         }
-        Some(token.start)
+        Ok(Some(token.start))
     }
     pub(super) fn after_section_body(&mut self, work: &mut Vec<Work>) -> Result<(), Failure> {
         self.contexts.pop();
@@ -172,10 +180,11 @@ impl Interpreter<'_, '_> {
         let arm = &self.spec.index.sections[&state.descriptor].arms[index];
         if arm.last {
             let position = state.seen[index].expect("matched arm");
-            let end = format!(
-                "the line matching \"{}\"",
-                self.spec.index.patterns[&arm.pattern].source
-            );
+            let end = self.input.control.text_message(&[
+                "the line matching \"",
+                &self.spec.index.patterns[&arm.pattern].source,
+                "\"",
+            ])?;
             self.finish_sections(position, &end)
         } else {
             work.push(Work::SectionsNext);
@@ -187,19 +196,22 @@ impl Interpreter<'_, '_> {
         let sections = &self.spec.index.sections[&state.descriptor];
         for (arm, seen) in sections.arms.iter().zip(&state.seen) {
             if !arm.optional && seen.is_none() {
-                let error = self.error_at(
+                let error = self.language_error_at(
                     ErrorCode::LineMatch,
-                    format!(
-                        "expected a line matching \"{}\" before {end}",
-                        self.spec.index.patterns[&arm.pattern].source
-                    ),
+                    self.input.control.text_message(&[
+                        "expected a line matching \"",
+                        &self.spec.index.patterns[&arm.pattern].source,
+                        "\" before ",
+                        end,
+                    ])?,
                     position,
-                );
-                let summary = format!(
-                    "no line matching \"{}\"",
-                    self.spec.index.patterns[&arm.pattern].source
-                );
-                self.input.skip_to_data();
+                )?;
+                let summary = self.input.control.text_message(&[
+                    "no line matching \"",
+                    &self.spec.index.patterns[&arm.pattern].source,
+                    "\"",
+                ])?;
+                self.input.skip_to_data()?;
                 if self.input.peek_byte().is_none() {
                     return Err(error.into());
                 }

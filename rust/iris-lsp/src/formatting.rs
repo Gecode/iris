@@ -135,7 +135,7 @@ fn options(uri: &Uri) -> Result<FormatOptions, ResponseError> {
     FormatOptions::for_path(&path).map_err(|error| response_error(ErrorCode::RequestFailed, error))
 }
 
-fn file_path(uri: &Uri) -> Result<PathBuf, ResponseError> {
+pub(crate) fn file_path(uri: &Uri) -> Result<PathBuf, ResponseError> {
     if uri.authority().is_some_and(|authority| {
         !authority.as_str().is_empty() && !authority.as_str().eq_ignore_ascii_case("localhost")
     }) {

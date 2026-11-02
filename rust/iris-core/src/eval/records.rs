@@ -45,17 +45,19 @@ impl<'a> Evaluator<'a, '_, '_> {
     pub(crate) fn record_start(&self, record: RecordId) -> crate::input::Position {
         self.reader.records.lists[record.occurrence].starts[record.row]
     }
-    pub(crate) fn is_defined(&mut self, node: &SyntaxNode) -> bool {
+    pub(crate) fn is_defined(&mut self, node: &SyntaxNode) -> Result<bool, Failure> {
         let token = &tokens(node)[0];
         let id = self.reader.spec.index.references[&token.text_range()];
-        match &self.reader.spec.analysis.model.reference(id).resolution {
-            Resolution::Bound(id) => self.bindings.contains_key(id),
-            Resolution::Structural {
-                denotation: Denotation::RecordList(repeat),
-                ..
-            } => self.list(*repeat, self.parent_for(*repeat)).is_some(),
-            _ => self.lookup_name(token.text()).is_some(),
-        }
+        Ok(
+            match &self.reader.spec.analysis.model.reference(id).resolution {
+                Resolution::Bound(id) => self.bindings.contains_key(id),
+                Resolution::Structural {
+                    denotation: Denotation::RecordList(repeat),
+                    ..
+                } => self.list(*repeat, self.parent_for(*repeat)).is_some(),
+                _ => self.lookup_name(token.text())?.is_some(),
+            },
+        )
     }
     pub(crate) fn name(&mut self, node: &SyntaxNode) -> Result<Kind<'a>, Failure> {
         let token = &tokens(node)[0];
@@ -95,31 +97,31 @@ impl<'a> Evaluator<'a, '_, '_> {
         }
     }
     pub(crate) fn value_name(&mut self, name: &str) -> Result<View<'a>, Failure> {
-        self.lookup_name(name).ok_or_else(|| self.undefined(name))
+        self.lookup_name(name)?.ok_or_else(|| self.undefined(name))
     }
-    pub(crate) fn lookup_name(&mut self, name: &str) -> Option<View<'a>> {
+    pub(crate) fn lookup_name(&mut self, name: &str) -> Result<Option<View<'a>>, Failure> {
         self.reader.work(WorkKind::Probe, 1);
         if let Some(value) = self.names.get(name) {
-            return value.clone();
+            return Ok(value.clone());
         }
         let mut value = None;
         for frame in self.reader.frames.iter().rev() {
+            self.reader.input.control.check()?;
             self.reader.work(WorkKind::Probe, 1);
             if let Some(root) = frame.lookup(name) {
                 value = Some(View::borrowed(root));
                 break;
             }
         }
-        self.names.insert(name.to_owned(), value.clone());
-        value
+        self.names
+            .insert(self.reader.input.control.copy_text(name)?, value.clone());
+        Ok(value)
     }
     pub(crate) fn undefined(&self, name: &str) -> Failure {
-        self.reader
-            .error(
-                ErrorCode::NameUndefined,
-                format!("'{name}' is not defined yet"),
-            )
-            .into()
+        self.reader.error_text(
+            ErrorCode::NameUndefined,
+            &["'", name, "' is not defined yet"],
+        )
     }
     pub(crate) fn field(
         &mut self,
@@ -134,26 +136,35 @@ impl<'a> Evaluator<'a, '_, '_> {
                 .map(Kind::Records)
                 .ok_or_else(|| self.undefined(field_name(node).text()));
         }
-        let name = field_name(node).text().to_owned();
+        let name = self
+            .reader
+            .input
+            .control
+            .copy_text(field_name(node).text())?;
         let root = self.value_name(&name)?;
-        let mut view = self.record_field(root, record).ok_or_else(|| {
-            self.reader.error(
+        let mut view = self.record_field(root, record)?.ok_or_else(|| {
+            self.reader.error_text(
                 ErrorCode::FieldUndefined,
-                format!("'{name}' is not defined in this record"),
+                &["'", &name, "' is not defined in this record"],
             )
         })?;
         if view.level > 0 {
-            let leaves = self.leaf_span(&view).len();
+            let leaves = self.leaf_span(&view)?.len();
             self.charge(1 + leaves as u128)?;
         }
         view.record_parent = Some(record);
         Ok(Kind::Value(view))
     }
-    fn record_field(&mut self, root: View<'a>, record: RecordId) -> Option<View<'a>> {
+    fn record_field(
+        &mut self,
+        root: View<'a>,
+        record: RecordId,
+    ) -> Result<Option<View<'a>>, Failure> {
         let key = root.key();
         let mut pending = Vec::new();
         let mut at = record;
         let mut view = loop {
+            self.reader.input.control.check()?;
             self.reader.work(WorkKind::Probe, 1);
             if let Some(view) = self.fields.get(&(key, at)) {
                 break view.clone();
@@ -169,11 +180,15 @@ impl<'a> Evaluator<'a, '_, '_> {
             }
         };
         while let Some(record) = pending.pop() {
+            self.reader.input.control.check()?;
             self.reader.work(WorkKind::Metadata, 1);
-            view = view.child(record.row)?;
+            let Some(child) = view.child(record.row) else {
+                return Ok(None);
+            };
+            view = child;
             self.fields.insert((key, record), view.clone());
         }
-        Some(view)
+        Ok(Some(view))
     }
     /// Count just the requested marker subtree, caching every intermediate node.
     pub(crate) fn marker_leaves(
@@ -181,9 +196,9 @@ impl<'a> Evaluator<'a, '_, '_> {
         chain: &[RepeatId],
         level: usize,
         parent: Option<RecordId>,
-    ) -> usize {
+    ) -> Result<usize, Failure> {
         if level == chain.len() {
-            return 1;
+            return Ok(1);
         }
         let target = *chain.last().expect("marker chain");
         let key = MarkerSubtree {
@@ -199,10 +214,11 @@ impl<'a> Evaluator<'a, '_, '_> {
         };
         let mut counts = self.reader.records.marker_counts.borrow_mut();
         if let Some(&count) = counts.get(&key) {
-            return count;
+            return Ok(count);
         }
         let mut stack = vec![(level, parent, false)];
         while let Some((level, parent, finish)) = stack.pop() {
+            self.reader.input.control.check()?;
             let key = MarkerSubtree {
                 target,
                 next: chain[level],
@@ -229,6 +245,7 @@ impl<'a> Evaluator<'a, '_, '_> {
             if finish {
                 let mut count = 0;
                 for row in 0..length {
+                    self.reader.input.control.check()?;
                     let record = self.list_record(list, row);
                     count += counts[&MarkerSubtree {
                         target,
@@ -246,11 +263,12 @@ impl<'a> Evaluator<'a, '_, '_> {
             } else {
                 stack.push((level, parent, true));
                 for row in (0..length).rev() {
+                    self.reader.input.control.check()?;
                     stack.push((level + 1, Some(self.list_record(list, row)), false));
                 }
             }
         }
-        counts[&key]
+        Ok(counts[&key])
     }
 }
 

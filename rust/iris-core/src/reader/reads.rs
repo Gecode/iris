@@ -8,10 +8,7 @@ impl Interpreter<'_, '_> {
         self.eval(&expression(&offset))?
             .root()
             .as_int()
-            .map_err(|_| {
-                self.error(ErrorCode::OffsetType, "offset must be an integer")
-                    .into()
-            })
+            .map_err(|_| self.error(ErrorCode::OffsetType, "offset must be an integer"))
     }
 
     pub(super) fn evaluate_dimensions(&mut self, node: &SyntaxNode) -> Result<Vec<usize>, Failure> {
@@ -23,24 +20,22 @@ impl Interpreter<'_, '_> {
                 .as_int()
                 .map_err(|_| self.error(ErrorCode::Count, "array size must be an integer"))?;
             if size < 0 {
-                return Err(self
-                    .error(ErrorCode::Count, format!("array size is negative ({size})"))
-                    .into());
+                return Err(
+                    self.error(ErrorCode::Count, format!("array size is negative ({size})"))
+                );
             }
             if size > i32::MAX as i64 {
-                return Err(self
-                    .error(
-                        ErrorCode::Count,
-                        format!("array size is too large ({size})"),
-                    )
-                    .into());
+                return Err(self.error(
+                    ErrorCode::Count,
+                    format!("array size is too large ({size})"),
+                ));
             }
             dimensions.push(size as usize);
         }
         Ok(dimensions)
     }
 
-    fn array_size(&self, dimensions: &[usize]) -> Result<usize, Error> {
+    fn array_size(&self, dimensions: &[usize]) -> Result<usize, Failure> {
         let mut size = 1u64;
         for &dimension in dimensions {
             size *= dimension as u64;
@@ -51,7 +46,7 @@ impl Interpreter<'_, '_> {
         Ok(size as usize)
     }
 
-    fn charge_empty_rows(&mut self, dimensions: &[usize]) -> Result<(), Error> {
+    fn charge_empty_rows(&mut self, dimensions: &[usize]) -> Result<(), Failure> {
         let mut rows = 1u128;
         for &dimension in dimensions.iter().take_while(|&&n| n != 0) {
             rows *= dimension as u128;
@@ -60,27 +55,43 @@ impl Interpreter<'_, '_> {
         Ok(())
     }
 
-    fn append_scalar(&self, value: &mut Value, scalar: Value) -> Result<(), Error> {
+    fn append_scalar(&self, value: &mut Value, scalar: Value) -> Result<(), Failure> {
         value
-            .append(scalar)
-            .map_err(|code| self.error(code, "incompatible value types"))
+            .append_controlled(scalar, &self.input.control)
+            .map_err(|e| match e {
+                crate::value::BuildError::Host(e) => e.into(),
+                crate::value::BuildError::Type(code) => {
+                    self.error(code, "incompatible value types")
+                }
+            })
     }
 
-    fn apply_offset(&self, value: &mut Value, offset: i64) -> Result<(), Error> {
+    fn apply_offset(&self, value: &mut Value, offset: i64) -> Result<(), Failure> {
+        let chunk = if self.input.control.is_active() {
+            crate::cancellation::VALUE_CHUNK
+        } else {
+            usize::MAX
+        };
         match &mut value.leaves {
             LeafStorage::Int(values) => {
-                for integer in values {
-                    *integer = integer.checked_add(offset).ok_or_else(|| {
-                        self.error(
-                            ErrorCode::IntegerOverflow,
-                            "integer overflow when applying offset",
-                        )
-                    })?;
+                for values in values.chunks_mut(chunk) {
+                    self.input.control.check()?;
+                    for integer in values {
+                        *integer = integer.checked_add(offset).ok_or_else(|| {
+                            self.error(
+                                ErrorCode::IntegerOverflow,
+                                "integer overflow when applying offset",
+                            )
+                        })?;
+                    }
                 }
             }
             LeafStorage::Float(values) => {
-                for float in values {
-                    *float += offset as f64;
+                for values in values.chunks_mut(chunk) {
+                    self.input.control.check()?;
+                    for float in values {
+                        *float += offset as f64;
+                    }
                 }
             }
             LeafStorage::String(_) => {}
@@ -99,12 +110,20 @@ impl Interpreter<'_, '_> {
         if size == 0 {
             self.charge_empty_rows(dimensions)?;
         }
-        for _ in 0..size {
-            let scalar = self.read_scalar(domain)?;
-            self.append_scalar(&mut value, scalar)?;
+        let chunk = if self.input.control.is_active() {
+            crate::cancellation::VALUE_CHUNK
+        } else {
+            usize::MAX
+        };
+        for start in (0..size).step_by(chunk) {
+            self.input.control.check()?;
+            for _ in start..start.saturating_add(chunk).min(size) {
+                let scalar = self.read_scalar(domain)?;
+                self.append_scalar(&mut value, scalar)?;
+            }
         }
         self.apply_offset(&mut value, offset)?;
-        value.set_dimensions(dimensions);
+        value.set_dimensions_controlled(dimensions, &self.input.control)?;
         Ok(value)
     }
 
@@ -125,12 +144,10 @@ impl Interpreter<'_, '_> {
         }
         let n = dimensions[0];
         if n != dimensions[1] {
-            return Err(self
-                .error(
-                    ErrorCode::Layout,
-                    format!("layout {name} needs a square matrix"),
-                )
-                .into());
+            return Err(self.error_text(
+                ErrorCode::Layout,
+                &["layout ", name, " needs a square matrix"],
+            ));
         }
         // Symmetric column traversals have the same output order as these row traversals.
         let (upper, diagonal) = match name {
@@ -139,9 +156,9 @@ impl Interpreter<'_, '_> {
             "UPPER_DIAG_ROW" | "LOWER_DIAG_COL" => (true, true),
             "LOWER_DIAG_ROW" | "UPPER_DIAG_COL" => (false, true),
             _ => {
-                return Err(self
-                    .error(ErrorCode::Layout, format!("unknown matrix layout '{name}'"))
-                    .into());
+                return Err(
+                    self.error_text(ErrorCode::Layout, &["unknown matrix layout '", name, "'"])
+                );
             }
         };
         let size = self.array_size(dimensions)?;
@@ -157,6 +174,7 @@ impl Interpreter<'_, '_> {
         };
         let mut triangle = domain.empty_value();
         for _ in cells() {
+            self.input.control.check()?;
             let scalar = self.read_scalar(domain)?;
             self.append_scalar(&mut triangle, scalar)?;
         }
@@ -164,7 +182,10 @@ impl Interpreter<'_, '_> {
         let leaves = match triangle.leaves {
             LeafStorage::Int(values) => {
                 let mut full = vec![0; size];
-                for ((i, j), value) in cells().zip(values) {
+                for (cell, ((i, j), value)) in cells().zip(values).enumerate() {
+                    if cell.is_multiple_of(crate::cancellation::VALUE_CHUNK) {
+                        self.input.control.check()?;
+                    }
                     full[i * n + j] = value;
                     full[j * n + i] = value;
                 }
@@ -172,7 +193,10 @@ impl Interpreter<'_, '_> {
             }
             LeafStorage::Float(values) => {
                 let mut full = vec![0.0; size];
-                for ((i, j), value) in cells().zip(values) {
+                for (cell, ((i, j), value)) in cells().zip(values).enumerate() {
+                    if cell.is_multiple_of(crate::cancellation::VALUE_CHUNK) {
+                        self.input.control.check()?;
+                    }
                     full[i * n + j] = value;
                     full[j * n + i] = value;
                 }
@@ -184,35 +208,8 @@ impl Interpreter<'_, '_> {
             leaves,
             levels: vec![],
         };
-        value.set_dimensions(dimensions);
+        value.set_dimensions_controlled(dimensions, &self.input.control)?;
         Ok(value)
-    }
-
-    pub(super) fn alphabet_options(node: &SyntaxNode) -> Alphabet {
-        let symbols = tokens(node)
-            .into_iter()
-            .find(|t| t.kind() == K::String)
-            .expect("alphabet symbols");
-        let mut alphabet = Alphabet {
-            symbols: DecodedString::new(symbols.text()).text.into_bytes(),
-            blank: vec![],
-            strip: vec![],
-            base: 1,
-        };
-        for option in node.children().filter(|n| n.kind() == K::AlphabetOption) {
-            let parts = tokens(&option);
-            match parts[0].text() {
-                "blank" => alphabet.blank = DecodedString::new(parts[1].text()).text.into_bytes(),
-                "strip" => alphabet.strip = DecodedString::new(parts[1].text()).text.into_bytes(),
-                "base" => {
-                    let spelling: String = parts[1..].iter().map(|t| t.text()).collect();
-                    alphabet.base = numeric::parse_integer(spelling.as_bytes())
-                        .expect("validated base literal");
-                }
-                _ => unreachable!("alphabet option"),
-            }
-        }
-        alphabet
     }
 
     pub(super) fn read_alphabet(
@@ -227,9 +224,17 @@ impl Interpreter<'_, '_> {
         let mut leaves = vec![];
         for cell in 0..size {
             let byte = loop {
-                self.input.skip_to_data();
+                self.input.skip_to_data()?;
                 match self.input.peek_byte() {
-                    Some(byte) if alphabet.strip.contains(&byte) => self.input.consume_byte(),
+                    Some(byte)
+                        if self
+                            .input
+                            .control
+                            .find_byte(&alphabet.strip, byte)?
+                            .is_some() =>
+                    {
+                        self.input.consume_byte()?
+                    }
                     byte => break byte,
                 }
             };
@@ -244,9 +249,14 @@ impl Interpreter<'_, '_> {
                 )
             };
             let byte = byte.ok_or_else(symbol_error)?;
-            let integer = if alphabet.blank.contains(&byte) {
+            let integer = if self
+                .input
+                .control
+                .find_byte(&alphabet.blank, byte)?
+                .is_some()
+            {
                 0
-            } else if let Some(index) = alphabet.symbols.iter().position(|&symbol| symbol == byte) {
+            } else if let Some(index) = self.input.control.find_byte(&alphabet.symbols, byte)? {
                 alphabet.base.checked_add(index as i64).ok_or_else(|| {
                     self.error(
                         ErrorCode::IntegerOverflow,
@@ -254,22 +264,22 @@ impl Interpreter<'_, '_> {
                     )
                 })?
             } else {
-                return Err(symbol_error().into());
+                return Err(symbol_error());
             };
-            self.input.consume_byte();
+            self.input.consume_byte()?;
             leaves.push(integer);
         }
         let mut value = Value {
             leaves: LeafStorage::Int(leaves),
             levels: vec![],
         };
-        value.set_dimensions(dimensions);
+        value.set_dimensions_controlled(dimensions, &self.input.control)?;
         Ok(value)
     }
 
     pub(super) fn execute_list(&mut self, node: &SyntaxNode) -> Result<(), Failure> {
-        let name = tokens(node)[1].text().to_owned();
-        self.context = Some(name.clone());
+        let name = self.input.control.copy_text(tokens(node)[1].text())?;
+        self.context = Some(self.input.control.copy_text(&name)?);
         let domain = self.evaluate_domain(&child(node, K::Type))?;
         let mut value = if let Some(sentinel) = node.children().find(|n| is_expression(n.kind())) {
             let sentinel = self.eval(&sentinel)?;
@@ -280,12 +290,12 @@ impl Interpreter<'_, '_> {
         };
         let offset = self.evaluate_offset(node)?;
         self.apply_offset(&mut value, offset)?;
-        value.set_dimensions(&[value.leaf_count()]);
-        self.publish(name, value);
+        value.set_dimensions_controlled(&[value.leaf_count()], &self.input.control)?;
+        self.publish(name, value)?;
         Ok(())
     }
 
-    fn list_sentinel(&self, domain: &EvaluatedType, sentinel: Value) -> Result<Value, Error> {
+    fn list_sentinel(&self, domain: &EvaluatedType, sentinel: Value) -> Result<Value, Failure> {
         if sentinel.depth() > 0 {
             return Err(self.error(
                 ErrorCode::ListTerminator,
@@ -314,7 +324,7 @@ impl Interpreter<'_, '_> {
         let mut value = domain.empty_value();
         loop {
             let string = sentinel.root().as_str().ok();
-            let token = self.input.next_token().ok_or_else(|| {
+            let token = self.input.next_token()?.ok_or_else(|| {
                 self.error(
                     if string.is_some() {
                         ErrorCode::ExpectedToken
@@ -324,7 +334,12 @@ impl Interpreter<'_, '_> {
                     "expected list terminator, found end of input",
                 )
             })?;
-            if string.is_some_and(|s| s.as_bytes() == token.bytes) {
+            if let Some(string) = string
+                && self
+                    .input
+                    .control
+                    .equal_bytes(string.as_bytes(), token.bytes)?
+            {
                 break;
             }
             let scalar = self.convert_scalar(domain, &token)?;
@@ -338,22 +353,20 @@ impl Interpreter<'_, '_> {
     }
 
     fn read_eol_list(&mut self, domain: &EvaluatedType) -> Result<Value, Failure> {
-        if !self.input.skip_to_line_data() {
-            self.input.skip_to_data();
+        if !self.input.skip_to_line_data()? {
+            self.input.skip_to_data()?;
         }
         if self.input.peek_byte().is_none() {
-            return Err(self
-                .error(
-                    ErrorCode::ExpectedValue,
-                    "expected a value, found end of input",
-                )
-                .into());
+            return Err(self.error(
+                ErrorCode::ExpectedValue,
+                "expected a value, found end of input",
+            ));
         }
         let mut value = domain.empty_value();
         loop {
             let scalar = self.read_scalar(domain)?;
             self.append_scalar(&mut value, scalar)?;
-            if !self.input.skip_to_line_data() {
+            if !self.input.skip_to_line_data()? {
                 break;
             }
         }

@@ -120,16 +120,19 @@ enum CapturedValue {
     String,
 }
 impl Capture<'_> {
-    fn value(&self) -> Value {
-        match self.value {
+    fn value(
+        &self,
+        control: &crate::cancellation::Control,
+    ) -> Result<Value, crate::cancellation::Cancelled> {
+        Ok(match self.value {
             CapturedValue::Int(n) => Value::int(n),
             CapturedValue::Float(n) => Value::float(n),
             CapturedValue::String => Value::string(
-                std::str::from_utf8(self.token.bytes)
-                    .expect("selected string validated")
-                    .to_owned(),
+                control
+                    .copy_utf8(self.token.bytes)?
+                    .expect("selected string validated"),
             ),
-        }
+        })
     }
 }
 impl<'i> Interpreter<'_, 'i> {
@@ -137,37 +140,41 @@ impl<'i> Interpreter<'_, 'i> {
         let pattern = &self.spec.index.patterns[&child(node, K::Pattern).text_range()];
         let find = node.kind() == K::Find;
         loop {
-            if let Some(line) = self.input.remaining_line() {
+            if let Some(line) = self.input.remaining_line()? {
                 if let Some(captures) = self.match_pattern(pattern, &line)? {
                     return self.take_pattern(pattern, &line, captures);
                 }
                 if find {
-                    self.input.consume_line(&line);
+                    self.input.consume_line(&line)?;
                     continue;
                 }
             }
-            return Err(self
-                .error(
-                    if find {
-                        ErrorCode::FindMatch
+            let message = if find {
+                self.input.control.text_message(&[
+                    "no line matching \"",
+                    &pattern.source,
+                    "\" found",
+                ])?
+            } else {
+                self.input.control.text_message(&[
+                    "expected a line matching \"",
+                    &pattern.source,
+                    "\"",
+                    if self.input.peek_byte().is_none() {
+                        ", found end of input"
                     } else {
-                        ErrorCode::LineMatch
+                        ""
                     },
-                    if find {
-                        format!("no line matching \"{}\" found", pattern.source)
-                    } else {
-                        format!(
-                            "expected a line matching \"{}\"{}",
-                            pattern.source,
-                            if self.input.peek_byte().is_none() {
-                                ", found end of input"
-                            } else {
-                                ""
-                            }
-                        )
-                    },
-                )
-                .into());
+                ])?
+            };
+            return Err(self.error(
+                if find {
+                    ErrorCode::FindMatch
+                } else {
+                    ErrorCode::LineMatch
+                },
+                message,
+            ));
         }
     }
     pub(super) fn match_pattern(
@@ -178,9 +185,14 @@ impl<'i> Interpreter<'_, 'i> {
         let mut offset = 0;
         let mut captures = vec![];
         for (index, item) in pattern.items.iter().enumerate() {
+            self.input.control.check()?;
             match item {
                 Item::Literal(literal) => {
-                    if !line.bytes[offset..].starts_with(literal) {
+                    if !self
+                        .input
+                        .control
+                        .starts_with(&line.bytes[offset..], literal)?
+                    {
                         return Ok(None);
                     }
                     offset += literal.len();
@@ -188,6 +200,9 @@ impl<'i> Interpreter<'_, 'i> {
                 Item::Blank { required } => {
                     let start = offset;
                     while line.bytes.get(offset).is_some_and(|&b| is_line_blank(b)) {
+                        if offset.is_multiple_of(crate::cancellation::SCAN_CHUNK) {
+                            self.input.control.check()?;
+                        }
                         offset += 1;
                     }
                     if *required && offset == start && offset != line.bytes.len() {
@@ -197,11 +212,16 @@ impl<'i> Interpreter<'_, 'i> {
                 Item::Ellipsis => offset = line.bytes.len(),
                 Item::Reference(name) => {
                     let value = self.lookup(name).ok_or_else(|| {
-                        self.error_at(
-                            ErrorCode::NameUndefined,
-                            format!("'{name}' is not defined yet"),
-                            line.start,
-                        )
+                        match self
+                            .input
+                            .control
+                            .text_message(&["'", name, "' is not defined yet"])
+                        {
+                            Ok(message) => {
+                                self.error_at(ErrorCode::NameUndefined, message, line.start)
+                            }
+                            Err(cancelled) => cancelled.into(),
+                        }
                     })?;
                     let integer;
                     let bytes = if let Ok(n) = value.root().as_int() {
@@ -210,15 +230,22 @@ impl<'i> Interpreter<'_, 'i> {
                     } else if let Ok(s) = value.root().as_str() {
                         s.as_bytes()
                     } else {
-                        return Err(self
-                            .error_at(
-                                ErrorCode::PatternReference,
-                                format!("'{name}' must be a string or an integer"),
-                                line.start,
-                            )
-                            .into());
+                        return Err(self.error_at(
+                            ErrorCode::PatternReference,
+                            self.input.control.text_message(&[
+                                "'",
+                                name,
+                                "' must be a string or an integer",
+                            ])?,
+                            line.start,
+                        ));
                     };
-                    if bytes.is_empty() || !line.bytes[offset..].starts_with(bytes) {
+                    if bytes.is_empty()
+                        || !self
+                            .input
+                            .control
+                            .starts_with(&line.bytes[offset..], bytes)?
+                    {
                         return Ok(None);
                     }
                     offset += bytes.len();
@@ -229,7 +256,7 @@ impl<'i> Interpreter<'_, 'i> {
                         Some(Item::Literal(bytes)) => bytes[0],
                         _ => 0,
                     };
-                    offset = capture_end(*kind, line.bytes, offset, stop);
+                    offset = capture_end(*kind, line.bytes, offset, stop, &self.input.control)?;
                     let bytes = &line.bytes[start..offset];
                     if bytes.is_empty() {
                         return Ok(None);
@@ -237,12 +264,22 @@ impl<'i> Interpreter<'_, 'i> {
                     let value = match kind {
                         ReadingKind::Word | ReadingKind::Rest => Some(CapturedValue::String),
                         ReadingKind::Int | ReadingKind::Range => {
-                            numeric::parse_integer(bytes).map(CapturedValue::Int)
+                            numeric::parse_integer_controlled(bytes, &self.input.control)?
+                                .map(CapturedValue::Int)
                         }
-                        ReadingKind::Float => numeric::parse_float(bytes).map(CapturedValue::Float),
-                        ReadingKind::Num => numeric::parse_integer(bytes)
-                            .map(CapturedValue::Int)
-                            .or_else(|| numeric::parse_float(bytes).map(CapturedValue::Float)),
+                        ReadingKind::Float => {
+                            numeric::parse_float_controlled(bytes, &self.input.control)?
+                                .map(CapturedValue::Float)
+                        }
+                        ReadingKind::Num => {
+                            match numeric::parse_integer_controlled(bytes, &self.input.control)? {
+                                Some(n) => Some(CapturedValue::Int(n)),
+                                None => {
+                                    numeric::parse_float_controlled(bytes, &self.input.control)?
+                                        .map(CapturedValue::Float)
+                                }
+                            }
+                        }
                         ReadingKind::Alphabet => {
                             unreachable!("alphabet capture rejected at admission")
                         }
@@ -273,15 +310,16 @@ impl<'i> Interpreter<'_, 'i> {
         // Validate every selected string before publishing any name.
         for capture in &captures {
             if matches!(capture.value, CapturedValue::String) {
-                std::str::from_utf8(capture.token.bytes).map_err(|e| {
-                    self.error_at(
-                        ErrorCode::Utf8,
-                        "string value is not valid UTF-8",
-                        line.position(
-                            capture.token.start.offset - line.start.offset + e.valid_up_to(),
-                        ),
-                    )
-                })?;
+                self.input
+                    .control
+                    .utf8(capture.token.bytes)?
+                    .map_err(|offset| {
+                        self.error_at(
+                            ErrorCode::Utf8,
+                            "string value is not valid UTF-8",
+                            line.position(capture.token.start.offset - line.start.offset + offset),
+                        )
+                    })?;
             }
         }
         for capture in &captures {
@@ -293,7 +331,11 @@ impl<'i> Interpreter<'_, 'i> {
                 self.frames
                     .last_mut()
                     .expect("active frame")
-                    .set(name.clone(), capture.value());
+                    .set_controlled(
+                        self.input.control.copy_text(name)?,
+                        capture.value(&self.input.control)?,
+                        &self.input.control,
+                    )?;
             }
         }
         for capture in &captures {
@@ -304,10 +346,14 @@ impl<'i> Interpreter<'_, 'i> {
             } = &pattern.items[capture.item]
             {
                 let domain = self.evaluate_domain(domain)?;
-                self.validate_range(&domain, &capture.value(), &capture.token)?;
+                self.validate_range(
+                    &domain,
+                    &capture.value(&self.input.control)?,
+                    &capture.token,
+                )?;
             }
         }
-        self.input.consume_line(line);
+        self.input.consume_line(line)?;
         Ok(())
     }
     pub(super) fn execute_skip(&mut self, node: &SyntaxNode) -> Result<(), Failure> {
@@ -317,34 +363,38 @@ impl<'i> Interpreter<'_, 'i> {
             1
         };
         for _ in 0..count {
-            if !self.input.skip_line() {
-                return Err(self
-                    .error(ErrorCode::SkipEof, "cannot skip a line at end of input")
-                    .into());
+            if !self.input.skip_line()? {
+                return Err(self.error(ErrorCode::SkipEof, "cannot skip a line at end of input"));
             }
         }
         Ok(())
     }
     pub(super) fn execute_expect(&mut self, node: &SyntaxNode) -> Result<(), Failure> {
         for literal in tokens(node).iter().filter(|t| t.kind() == K::String) {
-            let expected = DecodedString::new(literal.text()).text;
-            let Some(token) = self.input.next_token() else {
-                return Err(self
-                    .error(
-                        ErrorCode::ExpectedToken,
-                        format!("expected '{expected}', found end of input"),
-                    )
-                    .into());
-            };
-            if token.bytes != expected.as_bytes() {
-                let mut error = self.error_at(
+            let expected = &self.spec.index.string_literals[&literal.text_range()];
+            let Some(token) = self.input.next_token()? else {
+                return Err(self.error(
                     ErrorCode::ExpectedToken,
-                    format!(
-                        "expected '{expected}', found '{}'",
-                        String::from_utf8_lossy(token.bytes)
-                    ),
-                    token.start,
-                );
+                    self.input.control.text_message(&[
+                        "expected '",
+                        expected,
+                        "', found end of input",
+                    ])?,
+                ));
+            };
+            if !self
+                .input
+                .control
+                .equal_bytes(token.bytes, expected.as_bytes())?
+            {
+                let mut message =
+                    self.input
+                        .control
+                        .text_message(&["expected '", expected, "', found '"])?;
+                self.input.control.push_text(&mut message, token.bytes)?;
+                message.push('\'');
+                let mut error =
+                    self.language_error_at(ErrorCode::ExpectedToken, message, token.start)?;
                 error.set_input_end(token.end.offset);
                 return Err(error.into());
             }
@@ -352,20 +402,32 @@ impl<'i> Interpreter<'_, 'i> {
         Ok(())
     }
 }
-fn capture_end(kind: ReadingKind, bytes: &[u8], mut offset: usize, stop: u8) -> usize {
-    match kind {
+fn capture_end(
+    kind: ReadingKind,
+    bytes: &[u8],
+    mut offset: usize,
+    stop: u8,
+    control: &crate::cancellation::Control,
+) -> Result<usize, crate::cancellation::Cancelled> {
+    Ok(match kind {
         ReadingKind::Rest => bytes.len(),
         ReadingKind::Word => {
             while bytes
                 .get(offset)
                 .is_some_and(|&b| !is_line_blank(b) && b != stop)
             {
+                if control.is_active() && offset.is_multiple_of(crate::cancellation::SCAN_CHUNK) {
+                    control.check()?;
+                }
                 offset += 1;
             }
             offset
         }
         _ => {
             if matches!(bytes.get(offset), Some(b'+' | b'-')) {
+                if control.is_active() && offset.is_multiple_of(crate::cancellation::SCAN_CHUNK) {
+                    control.check()?;
+                }
                 offset += 1;
             }
             let float = matches!(kind, ReadingKind::Float | ReadingKind::Num);
@@ -376,6 +438,10 @@ fn capture_end(kind: ReadingKind, bytes: &[u8], mut offset: usize, stop: u8) -> 
                             || (matches!(byte, b'+' | b'-')
                                 && matches!(bytes.get(offset - 1), Some(b'e' | b'E')))))
                 {
+                    if control.is_active() && offset.is_multiple_of(crate::cancellation::SCAN_CHUNK)
+                    {
+                        control.check()?;
+                    }
                     offset += 1;
                 } else {
                     break;
@@ -383,7 +449,7 @@ fn capture_end(kind: ReadingKind, bytes: &[u8], mut offset: usize, stop: u8) -> 
             }
             offset
         }
-    }
+    })
 }
 
 #[cfg(test)]
@@ -406,7 +472,7 @@ mod tests {
         for capture in ["x", "_", ":word"] {
             let source = format!("separators \"Ã\" line \"{{{capture}}}!\"");
             let spec = Spec::parse(source.as_bytes(), "spec").unwrap();
-            let mut reader = Interpreter::new(&spec, Input::new("é!".as_bytes(), "input"));
+            let mut reader = Interpreter::new(&spec, Input::new("é!".as_bytes(), "input")).unwrap();
             let Failure::Language(error) = reader.execute(spec.parsed.syntax()).unwrap_err() else {
                 panic!("language error")
             };
@@ -429,7 +495,8 @@ mod tests {
     #[test]
     fn selected_ranges_and_post_body_hooks_keep_execution_order() {
         let spec = Spec::parse(b"a[2]:int\nfind \"A {x:0..sum(a)} Z\"\nrepeat 1 {\nsections {\"END\" last {\nrepeat 1 {\nif 0 {} else {}\n}\n}}\n}", "spec").unwrap();
-        let mut reader = Interpreter::new(&spec, Input::new(b"1 2\nA 99 NO\nA 2 Z\nEND", "input"));
+        let mut reader =
+            Interpreter::new(&spec, Input::new(b"1 2\nA 99 NO\nA 2 Z\nEND", "input")).unwrap();
         reader.execute(spec.parsed.syntax()).unwrap();
         assert_eq!(
             reader.charges,
@@ -453,7 +520,7 @@ mod tests {
             "spec",
         )
         .unwrap();
-        let mut reader = Interpreter::new(&spec, Input::new(b"1 2\n1\n2", "input"));
+        let mut reader = Interpreter::new(&spec, Input::new(b"1 2\n1\n2", "input")).unwrap();
         reader.execute(spec.parsed.syntax()).unwrap();
         assert_eq!(reader.charges.len(), 1);
         assert!(reader.charges[0].expression);

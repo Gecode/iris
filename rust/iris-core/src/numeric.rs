@@ -1,56 +1,164 @@
 //! Complete ASCII decimal conversion, separate from diagnostic policy.
 pub(crate) fn parse_integer(bytes: &[u8]) -> Option<i64> {
+    parse_integer_controlled(bytes, &crate::cancellation::Control::default())
+        .expect("uncancelled conversion")
+}
+#[inline]
+pub(crate) fn parse_integer_controlled(
+    bytes: &[u8],
+    control: &crate::cancellation::Control,
+) -> Result<Option<i64>, crate::cancellation::Cancelled> {
+    if control.is_active() {
+        parse_integer_with::<true>(bytes, control)
+    } else {
+        parse_integer_with::<false>(bytes, control)
+    }
+}
+#[inline]
+fn parse_integer_with<const CANCEL: bool>(
+    bytes: &[u8],
+    control: &crate::cancellation::Control,
+) -> Result<Option<i64>, crate::cancellation::Cancelled> {
     let digits = if matches!(bytes.first(), Some(b'+' | b'-')) {
         &bytes[1..]
     } else {
         bytes
     };
-    if digits.is_empty() || !digits.iter().all(u8::is_ascii_digit) {
-        return None;
+    if digits.is_empty() {
+        return Ok(None);
     }
-    std::str::from_utf8(bytes).ok()?.parse().ok()
+    for chunk in digits.chunks(if CANCEL {
+        crate::cancellation::SCAN_CHUNK
+    } else {
+        usize::MAX
+    }) {
+        if CANCEL {
+            control.check()?;
+        }
+        if !chunk.iter().all(u8::is_ascii_digit) {
+            return Ok(None);
+        }
+    }
+    if CANCEL {
+        control.check()?;
+    }
+    if CANCEL {
+        // Integer conversion itself can scan arbitrarily many leading zeroes.
+        // Keep the std parser on the ordinary path, and use the same checked
+        // decimal arithmetic in bounded chunks on the cancellable path.
+        let negative = bytes.first() == Some(&b'-');
+        let mut value = 0i64;
+        for chunk in digits.chunks(crate::cancellation::SCAN_CHUNK) {
+            control.check()?;
+            for &digit in chunk {
+                let Some(shifted) = value.checked_mul(10) else {
+                    return Ok(None);
+                };
+                let next = if negative {
+                    shifted.checked_sub(i64::from(digit - b'0'))
+                } else {
+                    shifted.checked_add(i64::from(digit - b'0'))
+                };
+                let Some(next) = next else {
+                    return Ok(None);
+                };
+                value = next;
+            }
+        }
+        control.check()?;
+        return Ok(Some(value));
+    }
+    let value = std::str::from_utf8(bytes).ok().and_then(|s| s.parse().ok());
+    if CANCEL {
+        control.check()?;
+    }
+    Ok(value)
 }
-pub(crate) fn parse_float(bytes: &[u8]) -> Option<f64> {
+#[inline]
+pub(crate) fn parse_float_controlled(
+    bytes: &[u8],
+    control: &crate::cancellation::Control,
+) -> Result<Option<f64>, crate::cancellation::Cancelled> {
+    if control.is_active() {
+        parse_float_with::<true>(bytes, control)
+    } else {
+        parse_float_with::<false>(bytes, control)
+    }
+}
+#[inline]
+fn parse_float_with<const CANCEL: bool>(
+    bytes: &[u8],
+    control: &crate::cancellation::Control,
+) -> Result<Option<f64>, crate::cancellation::Cancelled> {
     let mut cursor = usize::from(matches!(bytes.first(), Some(b'+' | b'-')));
     let mut significand_digits = 0;
     let mut has_nonzero_significand = false;
     while bytes.get(cursor).is_some_and(u8::is_ascii_digit) {
         has_nonzero_significand |= bytes[cursor] != b'0';
         significand_digits += 1;
+        if CANCEL && cursor.is_multiple_of(crate::cancellation::SCAN_CHUNK) {
+            control.check()?;
+        }
         cursor += 1;
     }
     if bytes.get(cursor) == Some(&b'.') {
+        if CANCEL && cursor.is_multiple_of(crate::cancellation::SCAN_CHUNK) {
+            control.check()?;
+        }
         cursor += 1;
         while bytes.get(cursor).is_some_and(u8::is_ascii_digit) {
             has_nonzero_significand |= bytes[cursor] != b'0';
             significand_digits += 1;
+            if CANCEL && cursor.is_multiple_of(crate::cancellation::SCAN_CHUNK) {
+                control.check()?;
+            }
             cursor += 1;
         }
     }
     if significand_digits == 0 {
-        return None;
+        return Ok(None);
     }
     if matches!(bytes.get(cursor), Some(b'e' | b'E')) {
+        if CANCEL && cursor.is_multiple_of(crate::cancellation::SCAN_CHUNK) {
+            control.check()?;
+        }
         cursor += 1;
         if matches!(bytes.get(cursor), Some(b'+' | b'-')) {
+            if CANCEL && cursor.is_multiple_of(crate::cancellation::SCAN_CHUNK) {
+                control.check()?;
+            }
             cursor += 1;
         }
         let start = cursor;
         while bytes.get(cursor).is_some_and(u8::is_ascii_digit) {
+            if CANCEL && cursor.is_multiple_of(crate::cancellation::SCAN_CHUNK) {
+                control.check()?;
+            }
             cursor += 1;
         }
         if start == cursor {
-            return None;
+            return Ok(None);
         }
     }
     if cursor != bytes.len() {
-        return None;
+        return Ok(None);
     }
-    let value: f64 = std::str::from_utf8(bytes).ok()?.parse().ok()?;
+    if CANCEL {
+        control.check()?;
+    }
+    let Some(value) = std::str::from_utf8(bytes)
+        .ok()
+        .and_then(|s| s.parse::<f64>().ok())
+    else {
+        return Ok(None);
+    };
+    if CANCEL {
+        control.check()?;
+    }
     if !value.is_finite() || value.is_subnormal() || (value == 0.0 && has_nonzero_significand) {
-        None
+        Ok(None)
     } else {
-        Some(value)
+        Ok(Some(value))
     }
 }
 pub(crate) fn integer_power(mut base: i64, mut exponent: i64) -> Option<i64> {
@@ -66,4 +174,43 @@ pub(crate) fn integer_power(mut base: i64, mut exponent: i64) -> Option<i64> {
         }
     }
     Some(result)
+}
+
+#[cfg(test)]
+mod cancellation_tests {
+    use super::*;
+    use crate::{CancellationToken, ReadOptions, cancellation::Control};
+    #[test]
+    fn cancellable_decimal_conversion_preserves_std_boundaries() {
+        let control = Control::new(&ReadOptions {
+            cancellation: Some(CancellationToken::default()),
+        });
+        for text in [
+            "0",
+            "+0",
+            "-0",
+            "9223372036854775807",
+            "-9223372036854775808",
+            "9223372036854775808",
+            "-9223372036854775809",
+            "",
+            "+",
+            "-",
+            "1x",
+            "1.0",
+            "01",
+            "+001",
+        ] {
+            assert_eq!(
+                parse_integer_controlled(text.as_bytes(), &control).unwrap(),
+                parse_integer(text.as_bytes()),
+                "{text}"
+            );
+        }
+        let long = format!("-{}1", "0".repeat(200000));
+        assert_eq!(
+            parse_integer_controlled(long.as_bytes(), &control).unwrap(),
+            Some(-1)
+        );
+    }
 }

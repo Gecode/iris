@@ -25,10 +25,17 @@ pub struct Client {
 
 impl Client {
     pub fn new(capabilities: Value) -> Self {
+        Self::with_server(capabilities, |connection| {
+            iris_lsp::run(connection).map_err(|error| error.to_string())
+        })
+    }
+
+    pub fn with_server(
+        capabilities: Value,
+        run: impl FnOnce(Connection) -> Result<(), String> + Send + 'static,
+    ) -> Self {
         let (connection, server_connection) = Connection::memory();
-        let server = thread::spawn(move || {
-            iris_lsp::run(server_connection).map_err(|error| error.to_string())
-        });
+        let server = thread::spawn(move || run(server_connection));
         let mut client = Self {
             connection: Some(connection),
             server: Some(server),
@@ -103,6 +110,14 @@ impl Client {
         }
     }
 
+    #[allow(dead_code)] // Only scheduler unit tests inspect server requests.
+    pub fn pending_server_request_count(&self) -> usize {
+        self.pending
+            .iter()
+            .filter(|m| matches!(m, Message::Request(_)))
+            .count()
+    }
+
     pub fn pending_diagnostic_count(&self, uri: &Uri, version: Option<i32>) -> usize {
         self.pending
             .iter()
@@ -111,7 +126,7 @@ impl Client {
     }
 
     /// Keep unmatched messages so requests never hide another document's diagnostics.
-    fn receive_until(&mut self, predicate: impl Fn(&Message) -> bool) -> Message {
+    pub fn receive_until(&mut self, predicate: impl Fn(&Message) -> bool) -> Message {
         if let Some(index) = self.pending.iter().position(&predicate) {
             return self.pending.remove(index).unwrap();
         }
@@ -172,4 +187,21 @@ fn diagnostics_match(message: &Message, uri: &Uri, version: Option<i32>) -> bool
     notification.method == "textDocument/publishDiagnostics"
         && notification.params["uri"] == uri.as_str()
         && notification.params["version"] == serde_json::to_value(version).unwrap()
+}
+
+#[allow(dead_code)] // Shared by sample, formatting and scheduler suites.
+pub fn file_uri(path: &std::path::Path) -> Uri {
+    use std::fmt::Write;
+    let path = path.to_str().unwrap();
+    #[cfg(windows)]
+    let path = path.replace('\\', "/");
+    let mut uri = if cfg!(windows) { "file:///" } else { "file://" }.to_owned();
+    for byte in path.bytes() {
+        if byte.is_ascii_alphanumeric() || b"/-._~:".contains(&byte) {
+            uri.push(char::from(byte));
+        } else {
+            write!(&mut uri, "%{byte:02X}").unwrap();
+        }
+    }
+    uri.parse().unwrap()
 }
