@@ -181,6 +181,78 @@ tests check linear work at 4× input size, I/O failures, and 65,536 dimensions
 without recursion. See the [core README](iris-core/README.md) for the
 complexity regressions and separate read/evaluator doubling measurements.
 
+## Release binaries
+
+The [release workflow](../.github/workflows/rust-v-release.yml) builds `iris`
+with cargo-dist 0.32.0. It runs only for `rust-v` version tags, such as
+`rust-v0.1.0`; pull requests and other component tags do not trigger it.
+The package version `0.1.0` maps to the GitHub release tag `rust-v0.1.0`.
+The [workspace configuration](../dist-workspace.toml) selects the platforms,
+installers and archive formats. The [CLI distribution configuration](iris-cli/dist.toml)
+names the release component `rust` so cargo-dist can parse those tags, while
+Cargo continues to build `iris-cli`. Only `iris` is distributed; `iris-driver`
+stays a conformance tool.
+
+For a package version `VERSION`, download assets from
+`https://github.com/Gecode/iris/releases/download/rust-vVERSION/ASSET`.
+Asset names are stable across versions; the release tag selects the version:
+
+| Server host | Target triple | Archive asset |
+|---|---|---|
+| Linux x86_64 | `x86_64-unknown-linux-gnu` | `rust-x86_64-unknown-linux-gnu.tar.gz` |
+| Linux aarch64 | `aarch64-unknown-linux-gnu` | `rust-aarch64-unknown-linux-gnu.tar.gz` |
+| macOS x86_64 | `x86_64-apple-darwin` | `rust-x86_64-apple-darwin.tar.gz` |
+| macOS aarch64 | `aarch64-apple-darwin` | `rust-aarch64-apple-darwin.tar.gz` |
+| Windows x86_64 | `x86_64-pc-windows-msvc` | `rust-x86_64-pc-windows-msvc.zip` |
+
+Tar archives contain `rust-TARGET/iris`; the Windows zip contains `iris.exe`
+at its root. Archives also include `LICENSE` and `README.md`. Download clients,
+including the JetBrains plugin, must select the server host's target in remote
+development, verify the archive before extraction, and check `iris --version`
+before starting `iris lsp`.
+
+Each archive has a sibling checksum asset named `ARCHIVE.sha256`. The release
+also includes `sha256.sum`, which collects the archive checksums. Both use
+the `sha256sum` binary-file format: 64 lowercase hexadecimal SHA-256 digits,
+one ASCII space, `*`, the asset basename, and a newline. Ignore empty lines
+(cargo-dist adds a trailing blank line). For example, a checksum line ends in
+` *rust-aarch64-apple-darwin.tar.gz`. Hash the downloaded archive bytes and
+compare with the entry for that exact basename; the hash is not for the
+extracted executable. With the archive and checksum in the same directory:
+
+```sh
+shasum -a 256 -c rust-aarch64-apple-darwin.tar.gz.sha256
+```
+
+Other release assets include `rust-installer.sh` (shell),
+`rust-installer.ps1` (PowerShell), `iris.rb` (Homebrew formula),
+`source.tar.gz` and its checksum, and `dist-manifest.json` (release metadata).
+The formula targets `Gecode/homebrew-tap`. The tap does not yet exist, so
+automatic Homebrew publishing is disabled; the workflow only uploads the formula
+as a release asset. Creating the tap and enabling its publish job belong to
+release preparation.
+
+Install the pinned tool and check or build the release locally from this
+directory (these commands do not publish):
+
+```sh
+cargo install cargo-dist --locked --version 0.32.0
+dist plan
+dist plan --tag rust-v0.1.0
+dist generate --check --mode ci
+dist build --target aarch64-apple-darwin --tag rust-v0.1.0
+```
+
+Replace the build target with the host's target triple. `dist plan` without a
+tag infers `vVERSION`; supply `--tag rust-vVERSION` to check the actual release
+URLs. Distribution artifacts go into `target/distrib/` at the repository root.
+`CARGO_TARGET_DIR` controls Cargo's compiled output separately. The `dist`
+profile inherits `release` and enables thin LTO; ordinary `--release` and
+benchmark builds keep their existing profile settings. Regenerate the workflow
+with `dist generate` after changing the configuration. Keep the tag namespace
+and `pr-run-mode = "skip"` in the configuration so regeneration preserves the
+trigger restrictions.
+
 ## Performance
 
 Run `cargo bench` to benchmark every `formats/*/cases/*/input.txt`, including

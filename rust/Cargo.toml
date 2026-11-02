@@ -13,3 +13,8 @@ unused_must_use = "deny"
 
 [workspace.lints.clippy]
 all = "warn"
+
+# Distribution builds are separate from ordinary release/benchmark builds.
+[profile.dist]
+inherits = "release"
+lto = "thin"

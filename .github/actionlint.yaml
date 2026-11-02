@@ -1,0 +1,8 @@
+paths:
+  .github/workflows/rust-v-release.yml:
+    ignore:
+      # cargo-dist 0.32.0 generates these scripts. Keep its CI integrity check
+      # enabled; filter its unquoted environment paths/optional flag and redirect
+      # grouping suggestions only for this generated workflow.
+      - 'shellcheck reported issue in this script: SC2086:'
+      - 'shellcheck reported issue in this script: SC2129:'
