@@ -1,6 +1,6 @@
 # fuzz
 
-Coverage-guided fuzzing of the Rust parser and reader with
+Coverage-guided fuzzing of the Rust parser, formatter and reader with
 [cargo-fuzz](https://rust-fuzz.github.io/book/cargo-fuzz.html) and libFuzzer,
 part of milestone M3 in [PLAN.md §7.4](../../PLAN.md#74-fuzzing). Differential
 fuzzing across implementations belongs to M4c.
@@ -19,6 +19,10 @@ cargo install cargo-fuzz --locked
 - `parse` parses arbitrary bytes as a reader spec. Valid UTF-8 must give a
   syntax tree whose text equals the source byte for byte; invalid UTF-8 must
   give the source error.
+- `format` formats syntax-clean reader specs at widths 40, 80 and 100. It
+  checks that formatting twice gives identical text and that the output parses
+  to the same tree, including node boundaries, token text and comments, with
+  whitespace ignored. Source failures and syntax errors are skipped.
 - `read` splits its input at the first NUL byte: the bytes before it are the
   reader spec and the bytes after it are the data input. An input without NUL
   is a spec with empty data, so specs here never contain NUL; `parse` covers
@@ -39,6 +43,7 @@ From `rust/`, write the seed corpora, then fuzz one target:
 ```sh
 python3 -I fuzz/seed-corpus.py
 cargo +nightly fuzz run --sanitizer none parse -- -max_total_time=300 -max_len=8192 -timeout=60
+cargo +nightly fuzz run --sanitizer none format -- -max_total_time=300 -max_len=8192 -timeout=60
 cargo +nightly fuzz run --sanitizer none read -- -max_total_time=300 -max_len=8192 -timeout=60
 cargo +nightly fmt --manifest-path fuzz/Cargo.toml -- --check
 cargo +nightly clippy --manifest-path fuzz/Cargo.toml --all-targets --locked -- -D warnings
@@ -62,7 +67,8 @@ failing inputs as artifacts.
 `conformance/cases/0.1` and `formats/` instead of committing them. The cases
 stay the single source, new cases join the corpora automatically, and the
 repository does not carry hundreds of copies that libFuzzer would rename and
-grow on every run. The read corpus leaves out cases for Specification
+grow on every run. The parser and formatter use the same reader spec seeds.
+The read corpus leaves out cases for Specification
 chapter 10, which take each budget to its limit by design and would spend most
 of a short run on a handful of slow seeds. `corpus/`, `artifacts/` and
 `coverage/` are ignored.
