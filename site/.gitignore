@@ -12,3 +12,5 @@ public/icon-192.png
 public/icon-512.png
 public/site.webmanifest
 public/og-image.png
+src/generated/
+public/examples/

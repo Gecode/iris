@@ -5,12 +5,24 @@ on:
     paths:
       - 'site/**'
       - 'brand/**'
+      - 'formats/**'
+      - 'rust/**'
+      - 'spec/0.1/grammar.ebnf'
+      - 'spec/0.1/errors.md'
+      - '.editorconfig'
+      - 'LICENSE'
       - 'editors/textmate/**'
       - '.github/workflows/site.yml'
   pull_request:
     paths:
       - 'site/**'
       - 'brand/**'
+      - 'formats/**'
+      - 'rust/**'
+      - 'spec/0.1/grammar.ebnf'
+      - 'spec/0.1/errors.md'
+      - '.editorconfig'
+      - 'LICENSE'
       - 'editors/textmate/**'
       - '.github/workflows/site.yml'
   workflow_dispatch:
@@ -38,6 +50,17 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: site/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache Cargo artifacts
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: site-cargo-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ hashFiles('rust/**/*.rs', 'rust/**/Cargo.toml', 'spec/0.1/grammar.ebnf', 'spec/0.1/errors.md') }}
+          restore-keys: |
+            site-cargo-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
       - name: Install SVG renderer
         run: sudo apt-get update && sudo apt-get install -y librsvg2-bin
       - run: npm ci

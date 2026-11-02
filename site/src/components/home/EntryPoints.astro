@@ -1,0 +1,14 @@
+---
+const entries = [
+  { heading: 'Start with a reader spec', copy: 'Describe the values to read, their structure, and the checks the data must satisfy.', link: 'Introduction', href: '/introduction/', border: 'border-t-iris-green' },
+  { heading: 'Explore the formats', copy: 'Compare inputs, reader specs, and data for six benchmark formats. Download a complete case to try locally.', link: 'Explore formats', href: '#formats', border: 'border-t-iris-blue' },
+  { heading: 'Use the command-line tool', copy: 'Check a reader spec, read an input, or list the instances in a file.', link: 'CLI documentation', href: '/tools/cli/', border: 'border-t-iris-orange' },
+];
+---
+<section class="iris-entry-points grid gap-8" aria-label="Explore Iris">
+  {entries.map(entry => <div class:list={['border-t-4 pt-5', entry.border]}>
+    <h2 class="font-display text-2xl leading-8 tracking-[-0.025em]">{entry.heading}</h2>
+    <p class="my-4">{entry.copy}</p>
+    <a class="inline-flex min-h-11 items-center text-iris-link underline underline-offset-4" href={entry.href}>{entry.link}</a>
+  </div>)}
+</section>

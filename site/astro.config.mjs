@@ -16,7 +16,7 @@ export default defineConfig({
     favicon: '/favicon.svg',
     logo: { src: '../brand/iris-logo-horizontal-dark.svg', alt: 'Iris', replacesTitle: true },
     customCss: ['./src/styles/custom.css', './src/styles/fonts.css'],
-    components: { Header: './src/components/Header.astro', Sidebar: './src/components/Sidebar.astro' },
+    components: { Hero: './src/components/Hero.astro', Header: './src/components/Header.astro', Sidebar: './src/components/Sidebar.astro' },
     head: [
       { tag: 'link', attrs: { rel: 'icon', href: '/favicon.ico', sizes: '16x16 32x32 48x48' } },
       { tag: 'link', attrs: { rel: 'apple-touch-icon', href: '/apple-touch-icon.png', sizes: '180x180' } },

@@ -7,14 +7,17 @@
   },
   "scripts": {
     "prepare:assets": "node scripts/prepare-assets.mjs",
-    "dev": "npm run prepare:assets && astro dev",
-    "build": "npm run prepare:assets && astro build",
+    "dev": "npm run prepare:assets && npm run prepare:examples && astro dev",
+    "build": "npm run prepare:assets && npm run prepare:examples && astro build",
     "preview": "astro preview",
     "check:astro": "astro check",
     "check:links": "node scripts/check-links.mjs",
     "check:html": "node scripts/check-html.mjs",
     "check:contrast": "node scripts/check-contrast.mjs",
-    "check": "npm run check:astro && npm run check:links && npm run check:html && npm run check:contrast"
+    "check": "npm run check:examples && npm run check:hero && npm run check:astro && npm run check:links && npm run check:html && npm run check:contrast",
+    "prepare:examples": "node scripts/prepare-examples.mjs",
+    "check:examples": "node scripts/check-examples.mjs",
+    "check:hero": "node --experimental-strip-types scripts/check-hero.mjs"
   },
   "dependencies": {
     "@astrojs/starlight": "0.42.6",

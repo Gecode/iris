@@ -8,6 +8,9 @@
   --font-sans: 'Open Sans', sans-serif;
   --font-display: 'Raleway', sans-serif;
   --font-mono: 'Roboto Mono', ui-monospace, monospace;
+  --spacing-iris-example: 22rem;
+  --spacing-iris-example-mobile: 18rem;
+  --spacing-iris-terminal: 12rem;
   --spacing-iris-rail: 17rem;
   --spacing-iris-toolbar: 4rem;
   --spacing-iris-page: 3rem;
@@ -243,10 +246,11 @@
     .iris-mobile-brand .site-title img { @apply w-26; }
     site-search > button { @apply text-iris-rail-text; }
     .sl-menu-button {
-      @apply h-11 rounded-sm bg-iris-rail-active text-iris-rail-text shadow-none gap-[0.35rem] text-sm;
+      @apply h-11 items-center justify-center rounded-sm bg-iris-rail-active text-iris-rail-text shadow-none gap-[0.35rem] text-sm;
       top: calc((var(--sl-nav-height) - 2.75rem) / 2);
     }
-    .sl-menu-button .sr-only { @apply not-sr-only; }
+    /* Expressive Code's unlayered .sr-only would otherwise clip the label. */
+    .sl-menu-button .sr-only { @apply not-sr-only! [clip:auto]!; }
   }
   @media (max-width: 360px) { :root { --sl-content-pad-x: 1rem; --sl-nav-pad-x: 1rem; } }
   @media (prefers-reduced-motion: reduce) {
@@ -254,4 +258,90 @@
   }
   @media (forced-colors: active) { :focus-visible { outline-color: Highlight !important; } }
 
+}
+
+@layer components {
+  .iris-home { container-type: inline-size; }
+  .iris-home :where(*) { margin-block-start: 0; }
+  .iris-home > * { min-width: 0; }
+  .iris-home pre { border: 0; border-radius: 0; background: transparent; padding: 0; }
+  .iris-home .iris-terminal p { max-width: none; }
+  .iris-home :is(a, button) { font-weight: 400; }
+  .iris-home code { @apply bg-transparent p-0 text-inherit rounded-none; }
+  .iris-home [hidden] { display: none !important; }
+  .iris-home .iris-section-title { @apply mb-4 font-display text-[1.9rem] leading-tight tracking-[-0.025em]; }
+  .iris-home-hero {
+    margin-inline: calc(-1 * var(--sl-content-pad-x));
+    margin-block: -1.5rem 0;
+    padding: 3rem var(--sl-content-pad-x) 2rem;
+  }
+  .iris-home-hero > h1 { @apply m-0; }
+  .iris-read-panes { @apply grid grid-cols-[minmax(0,1fr)] gap-4; }
+  .iris-read-pane { @apply min-w-0 border border-iris-border bg-iris-surface; }
+  .iris-read-pane + .iris-read-pane { position: relative; }
+  .iris-read-pane + .iris-read-pane::before {
+    content: '';
+    @apply absolute -top-4 left-6 h-4 border-s-2 border-iris-border;
+  }
+  .iris-pane-heading { @apply flex flex-wrap items-center justify-between gap-2 border-b border-iris-border px-4 py-3; }
+  .iris-pane-heading h2 { @apply m-0 text-base leading-6; }
+  .iris-pane-heading > span { @apply text-xs text-iris-muted; }
+  .iris-read-pane pre { @apply m-0 min-w-0 overflow-auto p-4 text-[0.8125rem] leading-7; }
+  /* Keep reader-spec lines intact; the pane scrolls horizontally instead. */
+  .iris-read-pane pre.iris-hero-spec { @apply whitespace-pre [contain:inline-size]; }
+  .iris-hero-data { @apply p-4 text-[0.8125rem] leading-7; }
+  .iris-trace {
+    @apply relative inline bg-transparent border-0 rounded-none p-0 text-inherit font-mono text-start;
+    font-size: inherit;
+    line-height: inherit;
+    box-decoration-break: clone;
+    box-shadow: inset 0 -1px var(--trace-colour);
+    cursor: pointer;
+  }
+  .iris-trace:disabled { cursor: text; }
+  .iris-trace[data-statement='comment'] { --trace-colour: var(--iris-orange); }
+  .iris-trace[data-statement='stop'] { --trace-colour: var(--iris-red); border-bottom: 1px dashed var(--trace-colour); box-shadow: none; }
+  .iris-trace[data-statement='header'] { --trace-colour: var(--iris-blue); }
+  .iris-trace[data-statement='clause'] { --trace-colour: var(--iris-green); }
+  [data-hero-capture][data-capture-active='true'] { outline: 1px solid var(--iris-blue); outline-offset: 2px; }
+  .iris-trace[data-read='false'] { box-shadow: none; }
+  .iris-trace[data-active='true'], .iris-trace[aria-pressed='true'] { box-shadow: inset 0 -3px var(--trace-colour); }
+  .iris-trace[data-active='true'] { background: var(--iris-hero); }
+  .iris-trace[data-cursor]::after {
+    content: '';
+    @apply absolute top-0 bottom-0 border-s-2;
+    border-color: var(--trace-colour);
+    animation: iris-reading-cursor 400ms linear both;
+    pointer-events: none;
+  }
+  .iris-tablist { @apply flex gap-1 overflow-x-auto border-b border-iris-border p-1.5; }
+  .iris-tablist a { @apply inline-flex min-h-11 shrink-0 items-center whitespace-nowrap border-b-[3px] border-transparent px-3 py-2 text-sm text-iris-muted no-underline; }
+  .iris-tablist a:nth-child(4n + 1) { --tab-colour: var(--iris-orange); }
+  .iris-tablist a:nth-child(4n + 2) { --tab-colour: var(--iris-red); }
+  .iris-tablist a:nth-child(4n + 3) { --tab-colour: var(--iris-blue); }
+  .iris-tablist a:nth-child(4n + 4) { --tab-colour: var(--iris-green); }
+  .iris-tablist a[aria-selected='true'] { @apply text-iris-ink; border-bottom-color: var(--tab-colour); }
+  .iris-tablist a:hover { @apply underline underline-offset-4; }
+  .iris-code-viewport { @apply h-iris-example-mobile min-w-0 overflow-auto; }
+  .iris-code-viewport:focus-visible, .iris-terminal pre:focus-visible { outline-offset: -4px; }
+  .iris-code-viewport.iris-code-compact { @apply h-auto; }
+  .iris-code-viewport .expressive-code { @apply m-0; }
+  .iris-code-viewport .expressive-code pre { overflow: visible; }
+  .iris-code-viewport .expressive-code .frame { border: 0; box-shadow: none; }
+  .iris-terminal { --iris-focus: var(--color-iris-focus-dark); }
+  .iris-terminal code { @apply text-iris-dark-ink; }
+  .iris-terminal pre { @apply bg-transparent; }
+  @container (min-width: 60rem) {
+    .iris-read-panes { grid-template-columns: minmax(0, .9fr) minmax(0, 1.3fr) minmax(0, .8fr); }
+    .iris-read-pane { min-height: 18rem; }
+    .iris-read-pane + .iris-read-pane::before { @apply -left-4 top-6 h-0 w-4 border-s-0 border-t-2; }
+  }
+  @container (min-width: 48rem) {
+    .iris-entry-points { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .iris-code-viewport { @apply h-iris-example; }
+  }
+  @media (forced-colors: active) {
+    .iris-trace[data-active='true'], .iris-trace[aria-pressed='true'], .iris-tablist a[aria-selected='true'] { border-bottom: 3px solid Highlight; }
+  }
+  @keyframes iris-reading-cursor { from { left: 0; } to { left: 100%; } }
 }

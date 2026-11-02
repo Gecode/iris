@@ -1,0 +1,182 @@
+---
+import { formatBySlug, caseById } from '../../data/formats';
+import { heroRelations, headerCaptures, heroEntries, byteSlice, type HeroEntry, type ByteRange } from '../../data/hero';
+const format = formatBySlug('dimacs-cnf');
+const example = caseById(format, format.homeCase);
+const entries = heroEntries(example.result.json);
+interface SourcePart { text: string; relations: string; id: string; statement: string; label: string }
+function sourceParts(source: string, side: 'input' | 'spec'): SourcePart[] {
+  const ranges = new Map<number, { range: ByteRange; relations: string[]; statement: string; label: string }>();
+  for (const relation of heroRelations) {
+    const range = side === 'input' ? relation.input : relation.spec;
+    if (!range) continue;
+    byteSlice(source, range);
+    const prior = ranges.get(range.start);
+    if (prior) { prior.relations.push(relation.id); prior.label = 'Read all three clauses; discard each terminating zero.'; }
+    else ranges.set(range.start, { range, relations: [relation.id], statement: relation.statement, label: relation.label });
+  }
+  if (side === 'spec') {
+    const text = 'repeat clauses';
+    const start = new TextEncoder().encode(source.slice(0, source.indexOf(text))).length;
+    ranges.set(start, { range: { start, end: start + text.length, text }, relations: ['clause-0', 'clause-1', 'clause-2'], statement: 'clause', label: 'Read three clauses.' });
+  }
+  const bytes = new TextEncoder().encode(source);
+  const decode = (start: number, end: number) => new TextDecoder('utf-8', { fatal: true }).decode(bytes.slice(start, end));
+  const parts: SourcePart[] = [];
+  let cursor = 0;
+  for (const { range, relations, statement, label } of [...ranges.values()].sort((a, b) => a.range.start - b.range.start)) {
+    if (cursor < range.start) parts.push({ text: decode(cursor, range.start), relations: '', id: '', statement: '', label: '' });
+    parts.push({ text: byteSlice(source, range), relations: relations.join(' '), id: `hero-${side}-${range.start}`, statement, label });
+    cursor = range.end;
+  }
+  parts.push({ text: decode(cursor, bytes.length), relations: '', id: '', statement: '', label: '' });
+  return parts;
+}
+function headerParts(text: string, side: 'input' | 'spec') {
+  const header = heroRelations.find(relation => relation.id === 'header');
+  const range = side === 'input' ? header?.input : header?.spec;
+  if (!range) throw new Error('Missing header range');
+  const bytes = new TextEncoder().encode(text);
+  const decode = (start: number, end: number) => new TextDecoder('utf-8', { fatal: true }).decode(bytes.slice(start, end));
+  const pieces: { text: string; entry: string | null }[] = [];
+  let cursor = 0;
+  for (const capture of headerCaptures) {
+    const start = capture[side].start - range.start;
+    const end = capture[side].end - range.start;
+    pieces.push({ text: decode(cursor, start), entry: null }, { text: decode(start, end), entry: capture.entry });
+    cursor = end;
+  }
+  pieces.push({ text: decode(cursor, bytes.length), entry: null });
+  return pieces;
+}
+const inputParts = sourceParts(example.input.text, 'input');
+const specParts = sourceParts(format.spec.text, 'spec');
+interface DataRow { entry: HeroEntry; index: number | null; value: string; relations: string }
+const dataRows = entries.flatMap<DataRow>(entry => typeof entry.value === 'number' ? [{ entry, index: null, value: String(entry.value), relations: 'header' }] : entry.value.map((row, index) => ({ entry, index, value: `[${row.join(', ')}]`, relations: `clause-${index}` })));
+const allParts = [...inputParts, ...specParts];
+function controlsFor(relations: string, ownId: string) {
+  const ids = relations.split(' ');
+  const sourceControls = allParts.filter(part => part.relations.split(' ').some(id => ids.includes(id))).map(part => part.id);
+  const dataControls = dataRows.filter(row => ids.includes(row.relations)).map(row => `hero-data-${row.entry.name}${row.index === null ? '' : `-${row.index}`}`);
+  return [...sourceControls, ...dataControls].filter(id => id !== ownId).join(' ') || undefined;
+}
+---
+<section class="iris-home iris-home-hero bg-iris-hero text-iris-ink" aria-labelledby="_top" data-read-through data-sweep="complete">
+  <h1 id="_top" data-page-title class="max-w-[17ch] font-display text-[clamp(2.5rem,5vw,4.75rem)] leading-[1.06] tracking-[-0.04em]">Read instance files with Iris.</h1>
+  <p class="mt-6 max-w-[46ch] text-lg leading-8">Describe a text format in a reader spec. Iris reads the input into named, typed data.</p>
+  <div class="mt-6 flex flex-wrap gap-4">
+    <a class="inline-flex min-h-11 items-center rounded-sm border border-iris-link bg-iris-link px-5 py-2 text-iris-canvas" href="/introduction/">Introduction</a>
+    <a class="inline-flex min-h-11 items-center rounded-sm border border-iris-link px-5 py-2 text-iris-link" href="#formats">Explore formats</a>
+  </div>
+  <p class="mt-8 mb-4">A DIMACS file, its reader spec, and the data it reads.</p>
+  <div class="iris-read-panes">
+    <section class="iris-read-pane" aria-labelledby="hero-input-heading">
+      <div class="iris-pane-heading"><h2 id="hero-input-heading">Input</h2><span>input.txt</span></div>
+      <pre><code data-hero-source="input">{inputParts.map(part => part.relations ? <button type="button" disabled id={part.id} class="iris-trace" data-statement={part.statement} data-relations={part.relations} data-label={part.label} aria-label={`Trace input: ${part.label}`} aria-describedby="hero-instructions" aria-controls={controlsFor(part.relations, part.id)}>{part.relations === 'header' ? headerParts(part.text, 'input').map(piece => piece.entry ? <span id={`hero-input-capture-${piece.entry}`} data-hero-capture={piece.entry}>{piece.text}</span> : piece.text) : part.text}</button> : part.text)}</code></pre>
+    </section>
+    <section class="iris-read-pane" aria-labelledby="hero-spec-heading">
+      <div class="iris-pane-heading"><h2 id="hero-spec-heading">Reader spec</h2><span>dimacs-cnf.iris</span></div>
+      <pre class="iris-hero-spec"><code data-hero-source="spec">{specParts.map(part => part.relations ? <button type="button" disabled id={part.id} class="iris-trace" data-statement={part.statement} data-relations={part.relations} data-label={part.label} aria-label={`Trace reader spec: ${part.label}`} aria-describedby="hero-instructions" aria-controls={controlsFor(part.relations, part.id)}>{part.relations === 'header' ? headerParts(part.text, 'spec').map(piece => piece.entry ? <span id={`hero-spec-capture-${piece.entry}`} data-hero-capture={piece.entry}>{piece.text}</span> : piece.text) : part.text}</button> : part.text)}</code></pre>
+    </section>
+    <section class="iris-read-pane" aria-labelledby="hero-data-heading">
+      <div class="iris-pane-heading"><h2 id="hero-data-heading">Data</h2><span>typed entries</span></div>
+      <div class="iris-hero-data">
+        {dataRows.map(row => {
+          const id = `hero-data-${row.entry.name}${row.index === null ? '' : `-${row.index}`}`;
+          return <div class="mb-3">
+            {(row.index === null || row.index === 0) && <p class="mb-1 font-mono text-xs text-iris-muted">{row.entry.name} <span>int{row.entry.depth ? ` · depth ${row.entry.depth}` : ''}</span></p>}
+            <button type="button" disabled id={id} class="iris-trace font-mono" data-statement={row.relations === 'header' ? 'header' : 'clause'} data-relations={row.relations} data-entry={row.index === null ? row.entry.name : undefined} data-label={row.index === null ? `The header reads ${row.entry.name} = ${row.value}.` : heroRelations.find(relation => relation.id === row.relations)?.label} aria-label={`Trace ${row.entry.name}${row.index === null ? '' : ` row ${row.index + 1}`}: ${row.value}`} aria-describedby="hero-instructions" aria-controls={[controlsFor(row.relations, id), ...(row.index === null ? [`hero-input-capture-${row.entry.name}`, `hero-spec-capture-${row.entry.name}`] : [])].join(' ')}><span data-hero-value={`${row.entry.name}${row.index === null ? '' : `/${row.index}`}`}>{row.value}</span></button>
+          </div>;
+        })}
+      </div>
+    </section>
+  </div>
+  <p id="hero-instructions" class="mt-4 max-w-[68ch] text-sm text-iris-muted">Focus or point to connect input, reader spec, and data. Select to keep a connection; Escape clears it.</p>
+  <p class="mt-2 min-h-12 text-sm" data-hero-explanation>All three clauses read; terminating zeros are consumed without being stored.</p>
+  <p class="sr-only" role="status" aria-live="polite" data-hero-status></p>
+</section>
+<script>
+  const hero = document.querySelector<HTMLElement>('[data-read-through]');
+  if (hero) {
+    const controls = [...hero.querySelectorAll<HTMLButtonElement>('[data-relations]')];
+    const explanation = hero.querySelector<HTMLElement>('[data-hero-explanation]');
+    const status = hero.querySelector<HTMLElement>('[data-hero-status]');
+    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+    let pinned: HTMLButtonElement | null = null;
+    let focused: HTMLButtonElement | null = null;
+    let hovered: HTMLButtonElement | null = null;
+    let animationFrame = 0;
+    let finished = reducedMotion.matches;
+    const defaultExplanation = explanation?.textContent ?? '';
+    const relations = (control: HTMLButtonElement) => (control.dataset.relations ?? '').split(' ');
+    const sequence = ['comment', 'header', 'clause-0', 'clause-1', 'clause-2'];
+
+    function showRelations(ids: string[], label: string, entry?: string) {
+      controls.forEach(control => {
+        control.dataset.active = String(relations(control).some(id => ids.includes(id)));
+        control.setAttribute('aria-pressed', String(control === pinned));
+      });
+      hero?.querySelectorAll<HTMLElement>('[data-hero-capture]').forEach(capture => {
+        capture.dataset.captureActive = String(ids.includes('header') && (!entry || capture.dataset.heroCapture === entry));
+      });
+      if (explanation) explanation.textContent = label;
+    }
+    function inspect() {
+      const control = focused ?? hovered ?? pinned;
+      showRelations(control ? relations(control) : [], control?.dataset.label ?? defaultExplanation, control?.dataset.entry);
+    }
+    function finish() {
+      finished = true;
+      cancelAnimationFrame(animationFrame);
+      if (hero) hero.dataset.sweep = 'complete';
+      controls.forEach(control => { control.dataset.read = 'true'; control.removeAttribute('data-cursor'); });
+      inspect();
+    }
+    controls.forEach(control => {
+      control.disabled = false;
+      control.setAttribute('aria-pressed', 'false');
+      control.addEventListener('pointerenter', () => { finish(); hovered = control; inspect(); });
+      control.addEventListener('pointerleave', () => { hovered = null; inspect(); });
+      control.addEventListener('focus', () => { finish(); focused = control; inspect(); });
+      control.addEventListener('blur', () => { focused = null; inspect(); });
+      control.addEventListener('click', () => {
+        finish();
+        pinned = pinned === control ? null : control;
+        inspect();
+        if (status) status.textContent = pinned ? `Selected. ${control.dataset.label}` : 'Connection cleared.';
+      });
+    });
+    hero.addEventListener('pointerdown', finish, { once: true });
+    hero.addEventListener('keydown', event => {
+      if (event.key !== 'Escape') return;
+      pinned = null;
+      inspect();
+      if (status) status.textContent = 'Connection cleared.';
+    });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) finish(); });
+    reducedMotion.addEventListener('change', () => { if (reducedMotion.matches) finish(); });
+    async function startSweep() {
+      await document.fonts.ready;
+      if (finished || reducedMotion.matches || document.hidden) { finish(); return; }
+      if (hero) hero.dataset.sweep = 'running';
+      const start = performance.now();
+      function frame(now: number) {
+        if (finished) return;
+        const elapsed = now - start;
+        if (elapsed >= 2500) { finish(); return; }
+        const stage = Math.floor((elapsed - 300) / 400);
+        const current = stage >= 0 && stage < sequence.length ? sequence[stage] : '';
+        controls.forEach(control => {
+          control.dataset.read = String(relations(control).some(id => sequence.indexOf(id) < stage));
+          if (control.closest('[data-hero-source="input"]') && relations(control).includes(current)) {
+            if (!control.hasAttribute('data-cursor')) control.dataset.cursor = 'true';
+          } else control.removeAttribute('data-cursor');
+        });
+        showRelations(current ? [current] : [], controls.find(control => relations(control).includes(current))?.dataset.label ?? defaultExplanation);
+        animationFrame = requestAnimationFrame(frame);
+      }
+      animationFrame = requestAnimationFrame(frame);
+    }
+    if (finished) finish(); else void startSweep();
+  }
+</script>

@@ -50,7 +50,7 @@ setup, and retain the Worker version ID printed by Wrangler.
 
 ## Deploy a checked build
 
-Use Node 22.12 or newer, npm, and `rsvg-convert`, as described in
+Use stable Rust, Node 22.12 or newer, npm, and `rsvg-convert`, as described in
 [the site README](README.md). From this directory:
 
 ```sh

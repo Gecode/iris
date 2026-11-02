@@ -2,12 +2,15 @@
 
 The static Astro Starlight site for `iris.gecode.dev`, described in
 [PLAN.md §8.10](../PLAN.md#810-documentation-site-site) and delivered in
-milestone M5. The scaffold has an introduction, a minimal splash, and planned
-pages for every documentation section. Later tasks supply the full content.
+milestone M5. The home page connects a DIMACS input to its reader spec and
+typed data,
+then shows executable examples of all six formats. The introduction and planned
+documentation pages use the same shell.
 
 ## Build and check
 
-Use Node 22.12 or newer and npm. Asset preparation also requires `rsvg-convert`:
+Use Node 22.12 or newer, npm, and the stable Rust toolchain. Asset preparation
+also requires `rsvg-convert`:
 install `librsvg` with Homebrew or `librsvg2-bin` on Ubuntu.
 
 In this directory:
@@ -19,10 +22,13 @@ npm run check
 npx astro check
 ```
 
-`check` runs Astro diagnostics, checks internal links and anchors against
+`check` first compares all example text and downloads with the current local
+CLI, then checks the hero’s UTF-8 ranges and data relationships. It also runs
+Astro diagnostics, checks internal links and anchors against
 `dist/`, validates all built HTML, and checks text/control colour contrast.
 Build first: checks do not silently rebuild. They do not crawl external sites.
-The contrast table includes both themes, the rail, and syntax highlighting;
+The contrast table includes both themes, the rail, terminal, and syntax
+highlighting;
 original logo colours are reported as decorative, not used as a text palette.
 These checks support accessibility review; they do not prove WCAG conformance.
 
@@ -49,8 +55,13 @@ Tailwind 4 runs through `@tailwindcss/vite`, with `@astrojs/starlight-tailwind`
 compatibility and the documented `base, starlight, theme, components, utilities`
 layer order. `src/styles/custom.css` defines the colour, font, and spacing
 tokens in `@theme`, maps Starlight’s theme roles, and applies utilities to
-stock components. Only Header and Sidebar are overridden; Starlight owns
-search, theme selection, native mobile navigation, and tabs.
+stock components. Header, Sidebar, and the home Hero are overridden. Starlight
+owns
+search, theme selection, native mobile navigation, and documentation tabs.
+The home showcase enhances fragment links into keyboard-accessible tabs; its
+leaf URLs restore the format and representation on reload and Back/Forward.
+The hero animates once, settles on interaction, and starts complete when reduced
+motion is requested.
 The semantic colour mapping follows the compatibility package in the utilities
 layer so its default gray palette cannot replace the checked Iris tones.
 
@@ -78,6 +89,29 @@ The checker treats only Expressive Code’s line wrappers and copy icon divs as
 phrasing content; nesting checks stay active everywhere else. The 404 page
 sets its canonical and open graph URL to the emitted `/404.html` explicitly.
 
-Later tasks extend `npm run check` with example freshness when they add CLI
-output, and extend CI path filters when builds begin consuming formats, the
-Specification, or Rust sources.
+## Executable examples
+
+Every dev/build also runs `scripts/prepare-examples.mjs`. Cargo builds the local
+`iris` and `iris-driver` binaries; their executable paths come from Cargo’s
+artifact messages. `CARGO_TARGET_DIR` is respected. No installed Iris binary is
+used. The script collects every case under the six formats, including errors,
+parameters, summaries, and job shop/Sudoku catalogs. It checks canonical JSON
+against each successful fixture and error codes/locations against error fixtures.
+
+The ignored `src/generated/formats.ts` and `public/examples/` hold the results.
+`src/data/formats.ts` exposes the records for build-time use by home and format
+pages. Downloads include exact source and output bytes, complete case bundles,
+and the existing Gecode and MIT notices. Long code panels display a bounded,
+labelled excerpt with a full-file link; JSON remains the CLI’s text.
+
+`npm run check:examples` collects current results without writing them and checks
+the generated module, public downloads, built downloads, and marked HTML code.
+Missing, extra, or changed output fails. Build first after changing a source or
+the CLI. `npm run check:hero` checks the authored DIMACS mapping against the
+current CLI and the built entry view. Both checks are part of `npm run check`.
+CI installs Rust and caches Cargo artifacts before running these same commands.
+
+Add metadata in `scripts/format-examples.mjs` when adding a format. New cases
+within those formats are discovered automatically. Use the example marker
+attributes from `ExamplePane.astro` and `ExampleTerminal.astro` when rendering
+these records on another page, so their output enters the freshness check.

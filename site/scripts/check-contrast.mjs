@@ -24,6 +24,10 @@ for (const background of ['rail', 'rail-active']) {
     check(`${role} / ${background}`, shared[`iris-${role}`], shared[`iris-${background}`], ['rail-edge', 'focus-dark'].includes(role) ? 3 : 4.5);
   }
 }
+for (const role of ['ink', 'muted', 'green', 'red', 'border']) {
+  check(`terminal ${role} / dark canvas in both themes`, shared[`iris-dark-${role}`], shared['iris-dark-canvas'], role === 'border' ? 3 : 4.5);
+}
+check('terminal focus / dark canvas in both themes', shared['iris-focus-dark'], shared['iris-dark-canvas'], 3);
 for (const [name, colour] of Object.entries({ orange: '#EB891B', red: '#DA251D', blue: '#005CA1', green: '#0B7646', ink: '#27393E' })) {
   for (const background of ['#FFFFFF', shared['iris-rail'], '#081E2D']) check(`asset ${name} / ${background}`, colour, background, 0);
 }

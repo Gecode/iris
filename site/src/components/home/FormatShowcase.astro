@@ -1,0 +1,128 @@
+---
+import { formats, caseById } from '../../data/formats';
+import ExamplePane from './ExamplePane.astro';
+import ExampleTerminal from './ExampleTerminal.astro';
+const representations = [{ id: 'input', label: 'input' }, { id: 'spec', label: 'spec.iris' }, { id: 'json', label: 'JSON' }, { id: 'dzn', label: 'dzn' }] as const;
+---
+<section id="formats" class="iris-showcase scroll-mt-20" aria-labelledby="formats-title">
+  <h2 id="formats-title" class="iris-section-title">Read a real format.</h2>
+  <p class="mb-6 max-w-[68ch]">Choose a format to inspect its input, reader spec, and data. These examples run through the Iris command-line tool.</p>
+  <div class="min-w-0 border border-iris-border bg-iris-surface">
+    <div class="iris-tablist" data-format-tabs aria-label="Format">
+      {formats.map(format => <a id={`format-tab-${format.slug}`} href={`#format-${format.slug}-input`} data-format={format.slug}>{format.title}</a>)}
+    </div>
+    {formats.map(format => {
+      const example = caseById(format, format.homeCase);
+      if (example.result.kind !== 'success') throw new Error(`${format.id}: home case failed`);
+      const sources = { input: example.input.text, spec: format.spec.text, json: example.result.json, dzn: example.result.dzn };
+      const hrefs = { input: example.downloads.input, spec: example.downloads.spec, json: example.downloads['data.json'], dzn: example.downloads['data.dzn'] };
+      return <div id={`format-${format.slug}`} data-format-region={format.slug}>
+        <div class="iris-tablist iris-representation-tabs" data-representation-tabs aria-label={`Representation for ${format.title}`}>
+          {representations.map(representation => <a id={`tab-${format.slug}-${representation.id}`} href={`#format-${format.slug}-${representation.id}`} data-representation-tab={representation.id}>{representation.label}</a>)}
+        </div>
+        <p class="m-0 border-b border-iris-border px-4 py-3 text-sm text-iris-muted">{format.description}</p>
+        {representations.map(representation => <div id={`format-${format.slug}-${representation.id}`} data-leaf-panel={representation.id} class="scroll-mt-20">
+          <ExamplePane source={sources[representation.id]} href={hrefs[representation.id]} label={`${example.id} · ${representation.label}`} exampleKey={`${format.id}/${example.id}`} representation={representation.id} highlighted={representation.id === 'spec'} />
+        </div>)}
+        <div class="flex flex-wrap gap-4 border-t border-iris-border px-4 py-3 text-sm">
+          <a class="text-iris-link underline underline-offset-4" href={example.downloads.case} download>Download full case</a>
+          <a class="text-iris-link underline underline-offset-4" href={`/formats/${format.slug}/`}>About {format.title}</a>
+        </div>
+        <ExampleTerminal example={example} formatId={format.id} />
+      </div>;
+    })}
+  </div>
+</section>
+<script>
+  const showcase = document.querySelector<HTMLElement>('.iris-showcase');
+  if (showcase) {
+    const formatList = showcase.querySelector<HTMLElement>('[data-format-tabs]');
+    const formatTabs = [...showcase.querySelectorAll<HTMLAnchorElement>('[data-format]')];
+    const regions = [...showcase.querySelectorAll<HTMLElement>('[data-format-region]')];
+    let selectedFormat = formatTabs[0].dataset.format ?? '';
+    let selectedRepresentation = 'input';
+
+    function revealTab(tab: HTMLAnchorElement) {
+      const list = tab.parentElement;
+      if (!list) return;
+      const targetBounds = tab.getBoundingClientRect();
+      const listBounds = list.getBoundingClientRect();
+      if (targetBounds.left < listBounds.left + 6) list.scrollLeft += targetBounds.left - listBounds.left - 6;
+      else if (targetBounds.right > listBounds.right - 6) list.scrollLeft += targetBounds.right - listBounds.right + 6;
+    }
+    function select(format: string, representation: string) {
+      selectedFormat = format;
+      selectedRepresentation = representation;
+      formatTabs.forEach(tab => {
+        const active = tab.dataset.format === format;
+        tab.setAttribute('aria-selected', String(active));
+        tab.tabIndex = active ? 0 : -1;
+        tab.href = `#format-${tab.dataset.format}-${representation}`;
+        if (active) revealTab(tab);
+      });
+      regions.forEach(region => {
+        region.hidden = region.dataset.formatRegion !== format;
+        region.querySelectorAll<HTMLAnchorElement>('[data-representation-tab]').forEach(tab => {
+          const active = tab.dataset.representationTab === representation;
+          tab.setAttribute('aria-selected', String(active));
+          tab.tabIndex = active ? 0 : -1;
+          if (active && !region.hidden) revealTab(tab);
+        });
+        region.querySelectorAll<HTMLElement>('[data-leaf-panel]').forEach(panel => { panel.hidden = panel.dataset.leafPanel !== representation; });
+      });
+    }
+    function restoreFromUrl() {
+      const panel = regions.flatMap(region => [...region.querySelectorAll<HTMLElement>('[data-leaf-panel]')]).find(panel => `#${panel.id}` === location.hash);
+      select(panel?.closest<HTMLElement>('[data-format-region]')?.dataset.formatRegion ?? formatTabs[0].dataset.format ?? '', panel?.dataset.leafPanel ?? 'input');
+    }
+    function navigate(tab: HTMLAnchorElement) {
+      const format = tab.dataset.format ?? selectedFormat;
+      const representation = tab.dataset.representationTab ?? selectedRepresentation;
+      select(format, representation);
+      const url = new URL(location.href);
+      url.hash = `format-${format}-${representation}`;
+      if (url.href !== location.href) history.pushState(null, '', url);
+    }
+    function enhanceTabs(list: HTMLElement, tabs: HTMLAnchorElement[], panelId: (tab: HTMLAnchorElement) => string) {
+      list.setAttribute('role', 'tablist');
+      tabs.forEach((tab, index) => {
+        tab.setAttribute('role', 'tab');
+        tab.setAttribute('aria-controls', panelId(tab));
+        const panel = document.getElementById(panelId(tab));
+        panel?.setAttribute('role', 'tabpanel');
+        panel?.setAttribute('aria-labelledby', tab.id);
+        tab.addEventListener('click', event => {
+          if (event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          event.preventDefault();
+          navigate(tab);
+        });
+        tab.addEventListener('keydown', event => {
+          if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+          let next: number;
+          switch (event.key) {
+            case 'ArrowRight': next = (index + 1) % tabs.length; break;
+            case 'ArrowLeft': next = (index + tabs.length - 1) % tabs.length; break;
+            case 'Home': next = 0; break;
+            case 'End': next = tabs.length - 1; break;
+            case 'Enter': case ' ': event.preventDefault(); navigate(tab); return;
+            default: return;
+          }
+          event.preventDefault();
+          tabs.forEach((item, itemIndex) => { item.tabIndex = itemIndex === next ? 0 : -1; });
+          tabs[next].focus({ preventScroll: true });
+          revealTab(tabs[next]);
+        });
+      });
+    }
+    if (formatList && formatTabs.length && regions.length === formatTabs.length) {
+      enhanceTabs(formatList, formatTabs, tab => `format-${tab.dataset.format}`);
+      regions.forEach(region => {
+        const list = region.querySelector<HTMLElement>('[data-representation-tabs]');
+        if (list) enhanceTabs(list, [...list.querySelectorAll<HTMLAnchorElement>('a')], tab => tab.hash.slice(1));
+      });
+      restoreFromUrl();
+      window.addEventListener('hashchange', restoreFromUrl);
+      window.addEventListener('popstate', restoreFromUrl);
+    }
+  }
+</script>
