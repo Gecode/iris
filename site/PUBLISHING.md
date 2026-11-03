@@ -84,10 +84,10 @@ Cloudflare's [Workers permissions documentation](https://developers.cloudflare.c
 says existing connections can serve new Worker versions without changing the
 connection's permissions. The [Custom Domains documentation](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/)
 describes DNS creation during attachment. Omitting routes avoids domain and
-DNS writes during subsequent CI deploys, so the existing token should suffice.
-This conclusion follows the documentation and the pinned Wrangler's code;
-deployment with that particular token remains unverified until the first
-successful CI run. A local dry run does not test API permissions.
+DNS writes during subsequent CI deploys, so the existing token suffices: CI
+has deployed `iris-site` with it, for example in
+[run 41600748716](https://github.com/Gecode/iris/actions/runs/41600748716).
+A local dry run does not test API permissions.
 
 ## Verify the result
 
