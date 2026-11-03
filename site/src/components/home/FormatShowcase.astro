@@ -6,7 +6,7 @@ const showcasedFormats = formats.filter(format => format.homeCase !== null);
 const representations = [{ id: 'input', label: 'input' }, { id: 'spec', label: 'spec.iris' }, { id: 'json', label: 'JSON' }, { id: 'dzn', label: 'dzn' }] as const;
 ---
 <section id="formats" class="iris-showcase scroll-mt-20" aria-labelledby="formats-title">
-  <h2 id="formats-title" class="iris-section-title">Read a real format.</h2>
+  <h2 id="formats-title" class="iris-section-title">Examples from the format library</h2>
   <p class="mb-6 max-w-[68ch]">Choose a format to inspect its input, reader spec, and data. These examples run through the Iris command-line tool.</p>
   <div class="min-w-0 border border-iris-border bg-iris-surface">
     <div class="iris-tablist" data-format-tabs aria-label="Format">
@@ -19,19 +19,19 @@ const representations = [{ id: 'input', label: 'input' }, { id: 'spec', label: '
       const sources = { input: example.input.text, spec: format.spec.text, json: example.result.json, dzn: example.result.dzn };
       const hrefs = { input: example.downloads.input, spec: example.downloads.spec, json: example.downloads['data.json'], dzn: example.downloads['data.dzn'] };
       return <div id={`format-${format.slug}`} data-format-region={format.slug}>
+        <p class="m-0 max-w-none px-4 pt-4 text-sm text-iris-muted">{format.description}</p>
         <div class="iris-tablist iris-representation-tabs" data-representation-tabs aria-label={`Representation for ${format.title}`}>
           {representations.map(representation => <a id={`tab-${format.slug}-${representation.id}`} href={`#format-${format.slug}-${representation.id}`} data-representation-tab={representation.id}>{representation.label}</a>)}
         </div>
-        <p class="m-0 border-b border-iris-border px-4 py-3 text-sm text-iris-muted">{format.description}</p>
         {representations.map(representation => <div id={`format-${format.slug}-${representation.id}`} data-leaf-panel={representation.id} class="scroll-mt-20">
           <ExamplePane source={sources[representation.id]} href={hrefs[representation.id]} label={`${example.id} · ${representation.label}`} exampleKey={`${format.id}/${example.id}`} representation={representation.id} highlighted={representation.id === 'spec'} />
         </div>)}
-        <div class="flex flex-wrap gap-4 border-t border-iris-border px-4 py-3 text-sm">
+        <div class="flex flex-wrap gap-4 px-4 pt-1 pb-4 text-sm">
           <a data-playground-link={`${format.id}/${example.id}`} href={`/playground/?example=${format.id}/${example.id}`}>Open in playground</a>
           <a class="text-iris-link underline underline-offset-4" href={example.downloads.case} download>Download full case</a>
           <a class="text-iris-link underline underline-offset-4" href={`/formats/${format.slug}/`}>About {format.title}</a>
         </div>
-        <ExampleTerminal fixedHeight example={example} formatId={format.id} />
+        <ExampleTerminal fixedHeight framed={false} example={example} formatId={format.id} />
       </div>;
     })}
   </div>

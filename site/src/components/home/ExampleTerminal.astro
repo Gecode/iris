@@ -1,19 +1,20 @@
 ---
 import type { FormatCase } from '../../data/formats';
 // The showcase keeps one height across tabs; elsewhere the output sets it.
-interface Props { example: FormatCase; formatId: string; error?: boolean; fixedHeight?: boolean }
-const { example, formatId, error = false, fixedHeight = false } = Astro.props;
+// A framed terminal draws its own edge; inside another frame it relies on its fill.
+interface Props { example: FormatCase; formatId: string; error?: boolean; fixedHeight?: boolean; framed?: boolean }
+const { example, formatId, error = false, fixedHeight = false, framed = true } = Astro.props;
 const key = `${formatId}/${example.id}`;
 const output = example.result.kind === 'success' ? example.result.dzn : example.result.diagnostic;
 ---
-<div class="iris-terminal mt-0 min-w-0 border border-iris-dark-border bg-iris-dark-canvas text-iris-dark-ink" aria-label={error ? 'Read error' : 'Read the input'}>
-  <div class="flex flex-wrap justify-between gap-2 border-b border-iris-dark-border px-4 py-3 text-sm">
-    <span>{error ? 'Read rejected' : 'Read the input'}</span>
+<div class:list={['iris-terminal mt-0 min-w-0 bg-iris-dark-canvas text-iris-dark-ink', framed && 'border border-iris-dark-border']} aria-label={error ? 'Read error' : 'Read the input'}>
+  <div class="flex flex-wrap justify-between gap-2 px-4 pt-3 text-sm">
+    <span class="text-iris-dark-muted">{error ? 'Read rejected' : 'Read the input'}</span>
     <span class="text-iris-dark-muted">Run from the repository root.</span>
   </div>
-  <div class="px-4 pt-4 pb-3 font-mono text-[0.8125rem] leading-6">
+  <div class="px-4 pt-2 pb-3 font-mono text-[0.8125rem] leading-6">
     <span aria-hidden="true" class="text-iris-dark-green">$ </span><code class="whitespace-pre-wrap wrap-break-word" data-example={key} data-representation="command" data-final-lf="kept">{example.commands.readDzn}</code>
   </div>
   <pre class:list={['m-0 overflow-auto px-4 pb-4 text-[0.8125rem] leading-6', fixedHeight ? 'h-iris-terminal' : 'max-h-iris-terminal']} tabindex="0" role="group" aria-label={error ? 'CLI error diagnostic' : 'dzn output'}><code data-example={key} data-representation={error ? 'diagnostic' : 'dzn'} data-final-lf="kept">{error ? output.split(/( +\^\n)/).map(part => /^ +\^\n$/.test(part) ? <span class="text-iris-dark-red">{part}</span> : part) : output}</code></pre>
-  <p class:list={['m-0 border-t border-iris-dark-border px-4 py-2 text-sm', error ? 'text-iris-dark-red' : 'text-iris-dark-green']}>{error ? 'Input rejected' : 'Read succeeded'}</p>
+  <p class:list={['m-0 px-4 pb-3 text-sm', error ? 'text-iris-dark-red' : 'text-iris-dark-green']}>{error ? 'Input rejected' : 'Read succeeded'}</p>
 </div>

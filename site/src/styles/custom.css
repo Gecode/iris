@@ -357,6 +357,7 @@
   .iris-tablist a:nth-child(4n + 4) { --tab-colour: var(--iris-green); }
   .iris-tablist a[aria-selected='true'] { @apply text-iris-ink; border-bottom-color: var(--tab-colour); }
   .iris-tablist a:hover { @apply underline underline-offset-4; }
+  .iris-representation-tabs { @apply border-b-0 px-2.5 pt-2 pb-0; }
   .iris-code-viewport { @apply h-iris-example-mobile min-w-0 overflow-auto; }
   .iris-code-viewport:focus-visible, .iris-terminal pre:focus-visible { outline-offset: -4px; }
   .iris-code-viewport.iris-code-compact { @apply h-auto; }

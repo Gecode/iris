@@ -6,11 +6,11 @@ const { source, href, label, exampleKey, representation, highlighted = false, co
 const preview = examplePreview(source, href);
 ---
 <div class="iris-example-pane min-w-0" data-example-pane data-example-key={exampleKey} data-pane-representation={representation} data-truncated={String(preview.truncated)}>
-  <div class="flex flex-wrap items-center justify-between gap-3 border-b border-iris-border px-4 py-3 text-sm">
-    <span>{label}</span><a class="text-iris-link underline underline-offset-4" href={href}>View full {representation === 'spec' ? 'reader spec' : representation}</a>
+  <div class="flex flex-wrap items-center justify-between gap-3 px-4 pt-3 text-sm">
+    <span class="text-iris-muted">{label}</span><a class="text-iris-link underline underline-offset-4" href={href}>View full {representation === 'spec' ? 'reader spec' : representation}</a>
   </div>
   <div class:list={['iris-code-viewport p-4', compact && 'iris-code-compact']} tabindex="0" role="group" aria-label={`${label} code`}>
     {highlighted ? <div data-example-highlighted={exampleKey} data-representation={representation} data-final-lf="omitted"><Code code={preview.text.replace(/\n$/, '')} lang="iris" /></div> : <pre class:list={['m-0 text-[0.8125rem] leading-6', representation === 'json' && 'whitespace-pre-wrap wrap-anywhere']}><code data-example={exampleKey} data-representation={representation} data-final-lf="kept">{preview.text}</code></pre>}
   </div>
-  {preview.truncated && <div class="border-t border-iris-border px-4 py-2 text-sm" data-excerpt-note><span aria-hidden="true">…</span> Excerpt · <a class="text-iris-link underline underline-offset-4" href={href}>View full {representation === 'spec' ? 'reader spec' : representation}</a></div>}
+  {preview.truncated && <div class="px-4 pb-3 text-sm" data-excerpt-note><span aria-hidden="true">…</span> Excerpt · <a class="text-iris-link underline underline-offset-4" href={href}>View full {representation === 'spec' ? 'reader spec' : representation}</a></div>}
 </div>

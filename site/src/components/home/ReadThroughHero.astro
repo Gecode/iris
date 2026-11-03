@@ -63,8 +63,9 @@ function controlsFor(relations: string, ownId: string) {
 }
 ---
 <section class="iris-home iris-home-hero bg-iris-hero text-iris-ink" aria-labelledby="_top" data-read-through data-sweep="complete">
-  <h1 id="_top" data-page-title class="max-w-[17ch] font-display text-[clamp(2.5rem,5vw,4.75rem)] leading-[1.06] tracking-[-0.04em]">Read instance files with Iris.</h1>
-  <p class="mt-6 max-w-[46ch] text-lg leading-8">Describe a text format in a reader spec. Iris reads the input into named, typed data.</p>
+  <h1 id="_top" data-page-title class="max-w-[22ch] font-display text-[clamp(2.25rem,4vw,3.5rem)] leading-[1.1] tracking-[-0.03em]">A specification language for structured text formats</h1>
+  <p class="mt-6 max-w-[68ch] text-lg leading-8">Iris describes the structure of a text format in a reader spec: which values a file contains, how they are laid out, how they are collected into arrays, and which conditions they must satisfy. From that one description, Iris reads each input into named, typed data, or rejects it with the input position and the reader-spec statement that failed.</p>
+  <p class="mt-4 max-w-[68ch]">The format library has reader specs for formats such as DIMACS CNF, TSPLIB and Sudoku. Iris began as the instance reader introduced in Gecode 6.5.0. Run a reader spec from the command line, call it from Rust, or try it in the playground.</p>
   <div class="mt-6 flex flex-wrap gap-4">
     <a class="inline-flex min-h-11 items-center rounded-sm border border-iris-link bg-iris-link px-5 py-2 text-iris-canvas" href="/introduction/">Introduction</a>
     <a class="inline-flex min-h-11 items-center rounded-sm border border-iris-link px-5 py-2 text-iris-link" href="#formats">Explore formats</a>
