@@ -649,8 +649,9 @@ absence. That is enough to generate the same handles a builder returns:
   style of the Java section, for Rust, Python, C++, Java, Kotlin, or
   TypeScript. A name whose facts are not a single value type and depth
   gets a dynamic handle.
-- **The `iris!` macro** (PLAN.md §8.1) can emit the handles next to the
-  `Spec` at compile time, so that Rust needs no generated file.
+- **The `iris!` macro** (PLAN.md §8.1) expands to a value with a `spec`
+  field and one field per handle, generated at compile time, so that Rust
+  needs no generated file.
 - **In Java, an annotation processor** does the same at compile time.
   `@IrisSpec("jobshop.iris")` on a class generates its handle constants
   and a matching record.
