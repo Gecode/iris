@@ -64,8 +64,8 @@ function controlsFor(relations: string, ownId: string) {
 ---
 <section class="iris-home iris-home-hero bg-iris-hero text-iris-ink" aria-labelledby="_top" data-read-through data-sweep="complete">
   <h1 id="_top" data-page-title class="max-w-[22ch] font-display text-[clamp(2.25rem,4vw,3.5rem)] leading-[1.1] tracking-[-0.03em]">A specification language for structured text formats</h1>
-  <p class="mt-6 max-w-[68ch] text-lg leading-8">A reader spec describes a text format: which values a file contains, how they are laid out, how they are collected into arrays, and which conditions they must satisfy. From that description, Iris reads each input into named, typed data, or rejects it with the input position and the statement that failed.</p>
-  <p class="mt-4 max-w-[68ch]">Iris began as the instance reader introduced in Gecode 6.5.0, a constraint solver. Its format library has reader specs for formats such as DIMACS CNF, TSPLIB and Sudoku. A reader spec runs from the command line, from a Rust program, or in the playground in your browser.</p>
+  <p class="mt-6 max-w-[68ch] text-lg leading-8">A program in Iris is a <em>reader spec</em>. It describes one format: which values a file contains, how they are laid out, how they are collected into arrays, and which conditions they must satisfy. Given a reader spec and an input file, Iris either returns the file’s contents as named, typed data or rejects the file with the position and the statement that failed.</p>
+  <p class="mt-4 max-w-[68ch]">Iris began as the instance reader introduced in Gecode 6.5.0, a constraint solver, but any line- and token-oriented text format is a candidate. The same reader spec works in the command-line tool, in a program that embeds an implementation, and in the playground.</p>
   <div class="mt-6 flex flex-wrap gap-4">
     <a class="inline-flex min-h-11 items-center rounded-sm border border-iris-link bg-iris-link px-5 py-2 text-iris-canvas" href="/introduction/">Introduction</a>
     <a class="inline-flex min-h-11 items-center rounded-sm border border-iris-link px-5 py-2 text-iris-link" href="#formats">Explore formats</a>
