@@ -424,7 +424,13 @@ reported upstream. Gecode itself needs no changes.
   - `@NullMarked` (JSpecify), so Kotlin sees non-null types rather than
     platform types.
   - `IrisException extends RuntimeException`: no checked exceptions.
-  - Factory methods with simple parameters, not builders.
+  - Factory methods with simple parameters, not builders, in the reading
+    API. Spec builders (§8.15) are a separate API. They declare handles as
+    typed constants, and a scoped value holds the open block.
+  - Data can be read into records: `spec.reader(Shop.class,
+    MethodHandles.lookup())` checks the record's components against the
+    entries once, then reads through the canonical constructor.
+  - No preview features in the published API.
   - Collections are `List`, not arrays, wherever no primitives are
     involved.
 - `iris-kotlin`: operator `get` (`data["clause"][3]`), extensions that
@@ -791,6 +797,41 @@ RustRover, and the other JetBrains IDEs.
   and a headless test that opens a format library spec and expects
   highlighting and no diagnostics.
 
+### 8.15 Spec builders
+
+Many users want to write reader specs in their own language for type
+safety: entry names and value types checked by the compiler or type
+checker, not discovered when data is read. Every implementation gets a
+spec builder, and so does the TypeScript package once it exists.
+[docs/builders.md](docs/builders.md) is the design brief, with sketches in
+every language. In short:
+
+- A builder prints Iris text for one language version and parses and checks
+  it with the ordinary `Spec::parse`. Builder construct and syntax
+  correspond one to one: no builder-only semantics, no second syntax-tree
+  contract, no raw-text escape hatch. `source()` returns the text.
+- Defining statements return typed handles, or define handles declared
+  beforehand, as Java does. A handle carries the name, value type, depth,
+  and possible absence. `data.get(handle)` returns host types and
+  cannot fail on a name or a type. A scope's repeat depth fixes each
+  handle's depth.
+- Each language uses its own idioms for blocks, operators, ranges, and line
+  patterns. A host operator builds an Iris operator only when the two mean
+  the same thing.
+- Errors carry the language error code, the emitted line, and the host
+  call site.
+- The same handle types serve typed views of text specs: `iris gen --lang
+  L SPEC` and the `iris!` macro generate them from `iris-sema`'s facts.
+- Placement: a `build` module in the Rust workspace re-exported by
+  `gecode-iris`; pure Python in `gecode_iris.build`, with stubs;
+  `iris/build.hpp`; the package `dev.gecode.iris.build`, with the Kotlin
+  DSL in `iris-kotlin`; and pure TypeScript in the TypeScript package.
+- **Tests:** a generator, `iris gen builder --lang L`, turns every checked
+  conformance and format spec into builder code. Running that code must
+  reproduce the spec, compared as syntax trees by an `iris-conformance`
+  subcommand. Each format also gets an idiomatic hand-written builder, and
+  type tests check that misuse fails to compile.
+
 ---
 
 ## 9. Engineering practices
@@ -877,6 +918,7 @@ Dependencies flow downward. Work in the same row can run in parallel.
 | M6 | Skill | `skill/iris`, evals | The eval set passes, for example 8 of 10 formats read correctly on the first attempt |
 | M6b | Lint decision | Review `docs/lint-candidates.md` (§8.13, §12 open question 3), then build what the decision calls for | The decision is recorded in §12; any lints that ship have tests, fixes where possible, and site pages. Not required for M7 |
 | M7 | 0.1.0 release | The 0.1 Specification frozen, every package published as 0.1.0, announcement | Every registry and marketplace (including JetBrains Marketplace) has 0.1.0, and the docs are live |
+| M7b | Spec builders | Builders in every implementation (§8.15), `iris gen`, the round-trip generator and comparison, a builder page in each API guide | Every checked conformance and format spec round-trips through each language's builder, and every format has an idiomatic builder whose cases pass. Not required for M7; ships in 0.x package releases |
 
 M4a to M4e can start once M2 is done, and run in parallel, which is where
 splitting the work between agents pays off. Some need parts of M3 to start

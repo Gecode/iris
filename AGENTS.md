@@ -14,6 +14,9 @@ coding agent. `CLAUDE.md` imports it.
 - `docs/adr/` holds the architecture decision records.
 - `docs/1.0-ideas.md` collects candidate changes for Iris 1.0. Add an entry
   there when Iris 0.1 cannot express something, or expresses it awkwardly.
+- [`docs/builders.md`](docs/builders.md) is the design brief for spec
+  builders in every implementation language. Follow its principles when
+  designing or reviewing a builder API.
 - `docs/lint-candidates.md` collects evidence for lints. Add an entry there
   when a valid reader spec contained a mistake that a tool could have
   flagged.
