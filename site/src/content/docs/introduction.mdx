@@ -1,6 +1,6 @@
 ---
 title: Introduction
-description: What a reader spec is, a first DIMACS CNF example, and where Iris comes from.
+description: What a reader spec is, a first DIMACS CNF example with valid and invalid input, and where Iris comes from.
 editUrl: false
 prev: false
 next: false
@@ -12,6 +12,9 @@ import { formatBySlug, caseById } from '../../data/formats';
 export const format = formatBySlug('dimacs-cnf');
 export const example = caseById(format, 'three-variables');
 export const key = `${format.id}/${example.id}`;
+export const invalid = caseById(format, 'literal-out-of-range');
+export const invalidKey = `${format.id}/${invalid.id}`;
+export const invalidCode = JSON.parse(invalid.result.json).code;
 
 Iris is a specification language for structured text formats. A program in
 Iris is a *reader spec*. It describes one format: which values a file
@@ -46,9 +49,11 @@ stored. `stop "%"` handles the end marker used by SATLIB files.
   <ExamplePane source={format.spec.text} href={example.downloads.spec} label="Reader spec" exampleKey={key} representation="spec" highlighted compact />
 </div>
 
-[Build the CLI](/tools/cli/#build-from-source), then run this command from the
-repository root. The paths are the library's actual files. The `--dzn` option
-prints the data in MiniZinc's data format:
+To try this reader without installing anything,
+[open the example in the playground](/playground/?example=dimacs-cnf/three-variables).
+To run it locally, [build the CLI](/tools/cli/#build-from-source), then run
+this command from the repository root. The paths are the library's actual
+files. The `--dzn` option prints the data in MiniZinc's data format:
 
 <div class="iris-format-library min-w-0">
   <ExampleTerminal example={example} formatId={format.id} />
@@ -59,10 +64,31 @@ one row per clause. Rows can have different lengths, so the array is ragged.
 The CLI can also print [JSON or a summary](/tools/cli/#read-input), and a
 [Rust program](/using/rust/) reads the same data through typed accessors.
 
+## Invalid input
+
+This file also declares three variables, but its second clause uses the
+literal `4`:
+
+<div class="iris-format-library min-w-0">
+  <ExamplePane source={invalid.input.text} href={invalid.downloads.input} label="Input" exampleKey={invalidKey} representation="input" compact />
+</div>
+
+The range on each literal rejects it. Iris stops at the first failure and
+reports the input position, the value it found, and the line of the reader spec
+that rejected it:
+
+<div class="iris-format-library min-w-0">
+  <ExampleTerminal example={invalid} formatId={format.id} error />
+</div>
+
+A failed read prints no partial data, and the CLI exits with status 1. Every
+failure also has a stable [error code](/specification/0.1/errors/), here
+<code data-example={invalidKey} data-representation="error-code" data-final-lf="kept">{invalidCode}</code>.
+
 ## Iris and Gecode
 
 Iris began as the instance reader in the constraint solver
-[Gecode](https://www.gecode.org), which uses reader specs to load benchmark
+[Gecode](https://www.gecode.dev), which uses reader specs to load benchmark
 files for its examples. The [Iris Language Specification](/specification/0.1/)
 defines the language independently of Gecode, and its
 [appendix C](/specification/0.1/appendix-c-differences/) lists the deliberate
@@ -71,7 +97,7 @@ library are Gecode's.
 
 Rust is the reference implementation and the source of the command-line tool
 and the playground. A Python binding and native C++ and Java implementations
-are planned; see [using Iris from a program](/using/rust/).
+are planned; see [other implementations](/using/other-implementations/).
 
 ## Where to go next
 

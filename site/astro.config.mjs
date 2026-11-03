@@ -23,7 +23,7 @@ export default defineConfig({
   },
   integrations: [starlight({
     title: 'Iris',
-    description: 'A declarative language for reading text instance files.',
+    description: 'A specification language for structured text formats.',
     favicon: '/favicon.svg',
     logo: { src: '../brand/iris-logo-horizontal-dark.svg', alt: 'Iris', replacesTitle: true },
     customCss: ['./src/styles/custom.css', './src/styles/fonts.css'],
@@ -63,7 +63,7 @@ export default defineConfig({
         items: pages.map(page => ({ label: page.file === 'README.md' ? 'Chapter index' : page.title, link: page.url })),
       })) },
       { label: 'Formats', collapsed: true, items: [{ label: 'Format library', link: '/formats/' }, ...formats.map(format => ({ label: format.title, link: `/formats/${format.slug}/` }))] },
-      { label: 'Using Iris from', collapsed: true, items: ['using/rust', 'using/python', 'using/java', 'using/kotlin', 'using/cpp', 'using/gecode'] },
+      { label: 'Using Iris from', collapsed: true, items: ['using/rust', 'using/other-implementations'] },
       { label: 'Tools', collapsed: true, items: ['tools', 'tools/cli', 'tools/formatter', 'tools/lsp', 'tools/editors', 'tools/agent-skill'] },
       { label: 'Playground', link: '/playground/' },
     ],

@@ -13,7 +13,7 @@ see [building the CLI](/tools/cli/#build-from-source).
 - [Patterns](/guides/patterns/): match headers, capture typed fields and refer
   to a value already read.
 - [Sections](/guides/sections/): read keyword lines in different orders and
-  handle required, optional and repeated arms.
+  require or allow headers and reject repeated ones.
 - [Records and checks](/guides/records-and-checks/): store repeated fields as
   columns and check each record or a whole collection.
 - [Several instances](/guides/instances/): list a catalog and select by ordinal

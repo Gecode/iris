@@ -13,7 +13,6 @@ strictEqual(await readFile(resolve(siteDirectory, 'src/generated/documentation.t
 for (const directory of ['public/examples', 'dist/examples']) await checkDownloads(directory, files);
 const examples = new Map(formats.flatMap(format => format.cases.map(example => [`${format.id}/${example.id}`, { format, example }])));
 const homeRequired = new Set(formats.filter(format => format.homeCase !== null).flatMap(format => ['input', 'spec', 'json', 'dzn', 'command'].map(representation => `${format.id}/${format.homeCase}/${representation}`)));
-for (const representation of ['input', 'diagnostic', 'command', 'error-code']) homeRequired.add(`dimacs-cnf/literal-out-of-range/${representation}`);
 const requiredPages = new Map([['index.html', homeRequired]]);
 for (const format of formats) {
   const markers = new Set([`${format.id}/${format.cases[0].id}/spec`]);
@@ -23,7 +22,10 @@ for (const format of formats) {
   }
   requiredPages.set(`formats/${format.slug}/index.html`, markers);
 }
-requiredPages.set('introduction/index.html', new Set(['input', 'spec', 'command', 'dzn'].map(part => `dimacs-cnf/three-variables/${part}`)));
+requiredPages.set('introduction/index.html', new Set([
+  ...['input', 'spec', 'command', 'dzn'].map(part => `dimacs-cnf/three-variables/${part}`),
+  ...['input', 'command', 'diagnostic', 'error-code'].map(part => `dimacs-cnf/literal-out-of-range/${part}`),
+]));
 const seen = new Set();
 const documentationSeen = new Set();
 const paths = await builtHtmlFiles();
