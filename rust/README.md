@@ -18,12 +18,16 @@ dependency on implementation crates.
 [iris-lsp](iris-lsp/README.md) provides `iris lsp`, the stdio language server
 with parse and resolution diagnostics (milestone M4b).
 
-[gecode-iris](gecode-iris/README.md) re-exports the public `iris-core` API. Its
-package name is `gecode-iris`; Rust imports it as `gecode_iris`. All workspace
+[gecode-iris](gecode-iris/README.md) re-exports the public `iris-core` API and
+provides the `iris!` macro, which checks a reader spec at compile time. Its
+package name is `gecode-iris`; Rust imports it as `gecode_iris`. The macro's
+implementation crate, [iris-macros](iris-macros/README.md), depends on
+`iris-syntax` and `iris-sema` but not on `iris-core`. All workspace
 crates currently set `publish = false`; publication belongs to milestone M7.
 Package metadata and versioned internal dependencies are prepared without
 enabling publication. The planned crates.io order is `iris-syntax`, `iris-sema`,
-`iris-core`, `gecode-iris`, `iris-conformance`, `iris-lsp`, then `iris-cli`.
+`iris-core`, `iris-macros`, `gecode-iris`, `iris-conformance`, `iris-lsp`, then
+`iris-cli`.
 The standalone `iris-conformance` runner can be published at any point before
 `iris-cli`; it has no implementation dependencies. The separate nightly fuzz
 crate remains unpublished.
@@ -55,6 +59,18 @@ RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
 cargo test --locked -p iris-syntax --features editorconfig
 cargo test --locked -p gecode-iris --doc
 cargo test --locked -p iris-cli --test complete
+```
+
+The `iris!` macro has its own checks. `macro_errors` compares compile errors
+with trybuild snapshots (bless with `TRYBUILD=overwrite`); `macro_corpus`
+compiles every valid conformance and format spec through the macro and
+compares its reads with `Spec::parse`. It takes about two minutes, mostly
+reading the work-budget cases in a debug build:
+
+```sh
+cargo test --locked -p iris-macros
+cargo test --locked -p gecode-iris --test macro_errors
+cargo test --locked -p gecode-iris --test macro_corpus -- --nocapture
 ```
 
 For the MSRV checks, run `cargo +1.88.0 build --workspace --locked` and

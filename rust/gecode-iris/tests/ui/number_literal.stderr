@@ -1,0 +1,5 @@
+error: expected a string literal or `file = "PATH"`
+ --> tests/ui/number_literal.rs:2:36
+  |
+2 |     let _spec = gecode_iris::iris!(42);
+  |                                    ^^

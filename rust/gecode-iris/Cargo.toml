@@ -18,3 +18,9 @@ workspace = true
 
 [dependencies]
 iris-core = { version = "0.1.0", path = "../iris-core" }
+iris-macros = { version = "0.1.0", path = "../iris-macros" }
+
+[dev-dependencies]
+iris-conformance = { version = "0.1.0", path = "../iris-conformance" }
+serde_json = "1.0"
+trybuild = "1.0"

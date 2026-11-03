@@ -1,0 +1,5 @@
+error: unknown key `path`; expected a string literal or `file = "PATH"`
+ --> tests/ui/unknown_key.rs:2:36
+  |
+2 |     let _spec = gecode_iris::iris!(path = "spec.iris");
+  |                                    ^^^^

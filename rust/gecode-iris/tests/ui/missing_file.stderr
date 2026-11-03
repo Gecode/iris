@@ -1,0 +1,5 @@
+error: tests/ui/missing.iris: No such file or directory (os error 2)
+ --> tests/ui/missing_file.rs:2:43
+  |
+2 |     let _spec = gecode_iris::iris!(file = "tests/ui/missing.iris");
+  |                                           ^^^^^^^^^^^^^^^^^^^^^^^

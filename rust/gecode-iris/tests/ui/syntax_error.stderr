@@ -1,0 +1,11 @@
+error: E-SPEC-CHARACTER: iris!:3: unexpected character '@'
+       3 |         let y = @
+         |                 ^
+ --> tests/ui/syntax_error.rs:2:36
+  |
+2 |       let _spec = gecode_iris::iris!(r#"
+  |  ____________________________________^
+3 | |         x:int # the count
+4 | |         let y = @
+5 | |     "#);
+  | |______^

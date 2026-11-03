@@ -1,0 +1,7 @@
+error: E-SPEC-UNKNOWN-TYPE: iris!:1: unknown type 'integer'
+       1 | x:integer
+         |          ^
+ --> tests/ui/unknown_type.rs:2:36
+  |
+2 |     let _spec = gecode_iris::iris!("x:integer");
+  |                                    ^^^^^^^^^^^

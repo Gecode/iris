@@ -1,0 +1,5 @@
+error: unexpected tokens after the reader spec
+ --> tests/ui/trailing_tokens.rs:2:43
+  |
+2 |     let _spec = gecode_iris::iris!("x:int", "y:int");
+  |                                           ^

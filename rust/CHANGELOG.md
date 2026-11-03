@@ -9,6 +9,10 @@
 - Add streaming `Data::write_json`; preserve `to_json` and its canonical bytes.
 - Share source diagnostic and formatter rendering through `iris-sema`, keeping
   `iris_cli::render_error` available as a re-export.
+- Add `gecode_iris::iris!`, which checks an inline or file reader spec at
+  compile time, reports its first error as a compile error with the code and
+  the `iris check` text, and expands to a `Spec`. The new `iris-macros` crate
+  implements it without depending on `iris-core`.
 
 - Implement Iris 0.1 parsing, name resolution, type and shape analysis, reading,
   and expression evaluation, including arrays, repeats, line patterns,

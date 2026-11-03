@@ -105,6 +105,7 @@ iris-syntax   lexer, lossless CST (rowan), error-tolerant parser, formatter
 iris-sema     name resolution, scopes, record names, types and shapes,
      │        diagnostics with codes
      ├── iris-lint   lints and their fixes, if built (§8.13)
+     ├── iris-macros the `iris!` proc macro, used through gecode-iris
      │
 iris-core     reader, expression evaluator, data model, work budgets,
      │        JSON and dzn output
@@ -116,6 +117,9 @@ iris-core     reader, expression evaluator, data model, work budgets,
 
 `iris-lint` depends on `iris-sema` only, so the reader and the Python
 binding do not carry it. The CLI, the LSP, and the WASM crate use it.
+`iris-macros` depends on `iris-syntax` and `iris-sema`, never on
+`iris-core`: it checks a spec at compile time, and the code it expands to
+calls the reader through `gecode-iris`.
 
 The parser must be **lossless and error-tolerant** from the start. The LSP
 and formatter need a syntax tree for broken input, and the reader needs
@@ -373,6 +377,23 @@ reported upstream. Gecode itself needs no changes.
   expands to a ready `Spec`. It depends on `proc-macro2`, `quote` and
   `syn`; small dependencies like these are acceptable throughout the Rust
   crates.
+  - Input: `iris!("...")`, usually a raw literal, so that Rust's tokenizer
+    never sees Iris syntax such as `#` comments or `..<`; or
+    `iris!(file = "PATH")`, with PATH relative to the calling package's
+    `CARGO_MANIFEST_DIR`. The file form embeds the file with
+    `include_bytes!`, so the file may hold any bytes, and editing it
+    rebuilds the caller. Anything else, including macro calls such as
+    `concat!`, is a usage error.
+  - Origin: `iris!` for an inline spec, the path as written for a file.
+  - Expansion: `Spec::parse` on the same bytes and origin, so the spec is
+    parsed again at run time. A cheaper expansion would need `iris-core`
+    types, or a serialized form of them, in the macro.
+  - Diagnostics: the error code, then exactly what `iris check` prints.
+    Stable Rust can only mark the whole literal or file path; on nightly the
+    macro marks the error's position inside the literal.
+  - `gecode-iris` defines `iris!` as a `macro_rules!` wrapper that passes
+    `$crate` to the proc macro, so the expansion works when a dependent
+    renames the crate.
 - Performance target: at least as fast as Gecode on the 100 MB DIMACS
   benchmark from #270 (1.40 s), with ordinary buffered input (§12). A
   `criterion` benchmark suite tracks the format library inputs.

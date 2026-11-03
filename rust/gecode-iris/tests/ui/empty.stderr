@@ -1,0 +1,7 @@
+error: unexpected end of input, expected a string literal or `file = "PATH"`
+ --> tests/ui/empty.rs:2:17
+  |
+2 |     let _spec = gecode_iris::iris!();
+  |                 ^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the macro `$crate::__private::iris` which comes from the expansion of the macro `gecode_iris::iris` (in Nightly builds, run with -Z macro-backtrace for more info)

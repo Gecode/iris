@@ -1,0 +1,5 @@
+error: unexpected suffix `spec` on the string literal
+ --> tests/ui/literal_suffix.rs:2:36
+  |
+2 |     let _spec = gecode_iris::iris!("x:int"spec);
+  |                                    ^^^^^^^^^^^

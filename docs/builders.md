@@ -309,9 +309,10 @@ For brevity the sketches shorten the two long check messages to `MSG_*`
 ### Rust
 
 Builders suit specs assembled at run time. For a spec fixed at compile
-time, the planned `iris!` macro (PLAN.md §8.1) is the more natural route in
-Rust. The macro can generate the same typed handles from the text, as
-described in [Type safety for text specs](#type-safety-for-text-specs).
+time, the `iris!` macro (PLAN.md §8.1) is the more natural route in Rust:
+it checks the spec when the program compiles. The macro is also planned to
+generate the same typed handles from the text, as described in
+[Type safety for text specs](#type-safety-for-text-specs).
 
 ```rust
 use gecode_iris::build::{distinct, gecode, lit, pattern, sum, word, SpecBuilder};
@@ -649,9 +650,9 @@ absence. That is enough to generate the same handles a builder returns:
   style of the Java section, for Rust, Python, C++, Java, Kotlin, or
   TypeScript. A name whose facts are not a single value type and depth
   gets a dynamic handle.
-- **The `iris!` macro** (PLAN.md §8.1) expands to a value with a `spec`
-  field and one field per handle, generated at compile time, so that Rust
-  needs no generated file.
+- **The `iris!` macro** (PLAN.md §8.1) expands to a plain `Spec` today.
+  It will instead expand to a value with a `spec` field and one field per
+  handle, generated at compile time, so that Rust needs no generated file.
 - **In Java, an annotation processor** does the same at compile time.
   `@IrisSpec("jobshop.iris")` on a class generates its handle constants
   and a matching record.

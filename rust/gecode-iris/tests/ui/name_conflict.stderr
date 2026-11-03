@@ -1,0 +1,7 @@
+error: E-SPEC-NAME-CONFLICT: iris!:1: 't' names a type, so it cannot also name a value
+       1 | type t = int
+         | ^
+ --> tests/ui/name_conflict.rs:2:36
+  |
+2 |     let _spec = gecode_iris::iris!("type t = int\nt:int");
+  |                                    ^^^^^^^^^^^^^^^^^^^^^

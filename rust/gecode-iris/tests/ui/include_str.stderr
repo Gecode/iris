@@ -1,0 +1,5 @@
+error: expected a string literal or `file = "PATH"`
+ --> tests/ui/include_str.rs:2:36
+  |
+2 |     let _spec = gecode_iris::iris!(include_str!("spec.iris"));
+  |                                    ^^^^^^^^^^^
