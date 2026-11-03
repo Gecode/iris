@@ -7,8 +7,8 @@ next: false
 ---
 
 The Iris agent skill is a `SKILL.md` with references for writing, explaining and
-debugging reader specs. It covers Iris 0.1, the Gecode 6.5.0 language. An agent
-uses the real [CLI](/tools/cli/) to validate its work.
+debugging reader specs. It covers Iris 0.1. The skill has the agent validate
+its work with the [CLI](/tools/cli/).
 
 ## Install from the repository
 
@@ -19,8 +19,8 @@ places it at `.claude/skills/iris/`; a project-local Codex installation places i
 at `.agents/skills/iris/`. Keep the reference paths relative to `SKILL.md` intact.
 Build the CLI and make `iris` available on the agent's `PATH`.
 
-A packaged Claude Code plugin is planned. The source-directory installation
-is available today.
+A packaged Claude Code plugin is planned; copying the directory is the
+installation path for now.
 
 ## What it covers
 

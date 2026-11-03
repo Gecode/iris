@@ -20,8 +20,8 @@ number and duration for each operation:
 <CheckedExample id="jobshop-checks-input" title="site/examples/tutorial/jobshop.txt" />
 <CheckedExample id="jobshop-checks" />
 
-The data has `machine` and `duration` columns of depth 2. It has no record
-objects or extra entries named `job` or `jobs`. `as jobs` names the record list;
+The data has `machine` and `duration` columns of depth 2. There are no record
+objects and no entries named `job` or `jobs`. `as jobs` names the record list;
 `each job` names its individual records. Place `each` first in its repeat.
 
 See [column construction](/specification/0.1/07-structure/#75-column-construction-and-missing-rows)
@@ -57,8 +57,8 @@ the canonical error's `record_path` starts at 0, so this job has path `[0]`.
 A check without a record witness uses the current input cursor instead.
 
 Checks stop at the first false condition. A hard evaluation error, such as an
-out-of-range array index, retains its own error kind. Guard optional data with `defined` and short circuit operators before
-accessing it.
+out-of-range array index, keeps its own error code. Guard optional data with
+`defined` and short-circuit operators before accessing it.
 
 For the complete reader, including descriptions and named instances, see the
 [job shop tutorial](/tutorial/job-shop/) and [library page](/formats/job-shop/).

@@ -31,13 +31,13 @@ Read the diagnostic in three parts:
 - `spec:` gives the reader-spec path and active statement's line. An active
   `while reading:` context, when present, identifies repeats, sections or fields.
 
-Columns count UTF-8 bytes. The renderer escapes control characters and bounds
-long excerpts. A caret is a location marker; it does not always cover the full
-bad token. The numbered records in diagnostic messages start at 1.
+Columns count UTF-8 bytes. Control characters are escaped and long excerpts
+are cut. A caret marks a position; it does not always cover the whole
+bad token. Record numbers in diagnostic messages start at 1.
 
 ## Find the stable error code
 
-The user CLI prints a human-readable diagnostic, without an error code.
+The `iris` command prints a human-readable diagnostic, without an error code.
 `--json` selects data output on success; it does not change errors into JSON.
 Build the [conformance driver](/tools/cli/#run-conformance-cases) to get
 a canonical error document for the same failing read. Put `iris-driver` on

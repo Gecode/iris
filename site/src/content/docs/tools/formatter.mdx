@@ -7,15 +7,15 @@ next: false
 ---
 import CheckedExample from '../../../components/docs/CheckedExample.astro';
 
-The formatter changes whitespace and line breaks in an Iris 0.1 reader spec.
-It preserves tokens, comments, strings, names, numbers, and statement order.
-Text inside a line pattern stays byte for byte, including captures and spaces.
+The formatter changes only whitespace and line breaks in a reader spec. Tokens,
+comments, strings, names, numbers, and statement order stay as they are, and
+text inside a line pattern is kept byte for byte, including captures and spaces.
 
 ## Before and after
 
 This pair comes from the repository's
 [formatting guide](https://github.com/Gecode/iris/blob/main/docs/formatting.md).
-The site checks the result against the real formatter.
+The site checks the result against the formatter when it is built.
 
 <CheckedExample id="format-before" title="Before" />
 

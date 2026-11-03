@@ -7,10 +7,10 @@ next: false
 ---
 import CheckedExample from '../../../components/docs/CheckedExample.astro';
 
-TSPLIB uses keyword/value headers followed by a coordinate or edge-weight
-section. Use `sections` when header lines can occur in different orders.
-This step builds a reader for `EUC_2D` coordinates, then moves to the full
-[TSPLIB library reader](/formats/tsplib/).
+A TSPLIB file has keyword/value headers followed by a coordinate or
+edge-weight section. The headers can come in any order, which is what
+`sections` is for. This step builds a reader for `EUC_2D` coordinates, then
+compares it with the full [TSPLIB library reader](/formats/tsplib/).
 
 All commands run from the repository root. Start with
 [DIMACS CNF](/tutorial/dimacs/) if captures and repeats are new to you.
@@ -39,8 +39,8 @@ are checked when sections end. See
 
 An arm's body can read subsequent input. The `NODE_COORD_SECTION` body reads
 `n` triples: a node ID, an x coordinate and a y coordinate. The dimension
-must have been read before this body runs. Sections allow flexible arm order;
-they do not postpone a body until its dependencies are available.
+must have been read before this body runs. Sections accept arms in any order,
+but they do not postpone a body until the names it uses are defined.
 
 <CheckedExample id="tsplib-coordinates-spec" title="site/examples/tutorial/tsplib-coordinates.iris" />
 <CheckedExample id="tsplib-coordinates-input" title="site/examples/tutorial/tsplib-coordinates.txt" />

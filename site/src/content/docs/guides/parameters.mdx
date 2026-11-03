@@ -52,8 +52,9 @@ A decimal value does not convert to an integer parameter:
 
 This is [E-PARAM-TYPE](/specification/0.1/errors/#e-param-type).
 A float default converts numeric strings to floats, including integer
-spellings. A string default keeps the supplied text as a string. Without a default, a supplied value tries integer conversion, then
-float conversion, then remains a string. With neither a default nor a supplied
+spellings. A string default keeps the supplied text as a string. Without a
+default, a supplied value tries integer conversion, then float conversion,
+then remains a string. With neither a default nor a supplied
 value, the parameter reports
 [E-PARAM-MISSING](/specification/0.1/errors/#e-param-missing).
 
@@ -62,5 +63,6 @@ Names are case-sensitive. An undeclared caller key reports
 The CLI splits an assignment at its first `=` and later assignments replace
 earlier ones. Parameter strings are not Iris expressions.
 
-The special `instance` selector is admitted by an `instances` block. See
-[several instances](/guides/instances/) for its ordinal and name rules.
+The `instance` parameter is special: an `instances` block admits it without
+a declaration. See [several instances](/guides/instances/) for its ordinal
+and name rules.

@@ -6,8 +6,8 @@ prev: false
 next: false
 ---
 
-Each guide explains one part of a reader spec with an input and the real CLI
-result. Commands run from the repository root with `iris` on your `PATH`;
+Each guide explains one part of a reader spec with an input and the CLI's
+actual output. Commands run from the repository root with `iris` on your `PATH`;
 see [building the CLI](/tools/cli/#build-from-source).
 
 - [Patterns](/guides/patterns/): match headers, capture typed fields and refer
@@ -24,5 +24,5 @@ see [building the CLI](/tools/cli/#build-from-source).
   and find an error code's definition.
 - [Performance](/guides/performance/): understand input progress and work budgets.
 
-For a continuous walkthrough, start with the [tutorial](/tutorial/).
+For a walkthrough that builds up a reader spec, start with the [tutorial](/tutorial/).
 For exact rules, use the [Specification](/specification/0.1/).

@@ -35,7 +35,8 @@ diagnostics.
 - Inlay hints for definitions, an outline of repeats, sections and instances, folding, and semantic tokens.
 - Document and range [formatting](/tools/formatter/) using the same style as the CLI.
 
-Unknown facts remain unknown; ambiguous definitions are marked as such.
+Hover and hints do not guess: a fact the server cannot determine is shown as
+`unknown`, and several possible definitions are listed and marked `ambiguous`.
 Rename requires a reader spec without parse or resolution errors. Navigation
 uses the available semantic model even when the source has an error. Features
 available in an editor also depend on its LSP client.
@@ -50,7 +51,7 @@ Save a file at `samples/small.txt` relative to the reader spec's directory.
 On open and accepted reader-spec edits, the server reads it and merges any
 runtime errors with the document diagnostics. A successful sample gets a hover
 summary and inlay hint with entry names, types, scalar values and shapes.
-These previews are bounded; the read itself is complete.
+The previews are truncated for large data; the read itself is complete.
 
 A directive can add `instance=2` or `param NAME=VALUE`. Double quotes delimit
 components containing spaces; backslashes are literal. Paths must be relative

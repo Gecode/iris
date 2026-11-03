@@ -20,19 +20,18 @@ Use Rust 1.88 or newer with Cargo. In the repository's `rust/` directory, run:
 The executable is `rust/target/debug/iris` relative to the repository root
 (`iris.exe` on Windows). If you set `CARGO_TARGET_DIR`, use that directory's
 `debug` subdirectory instead. Add the executable's directory to `PATH` for the
-commands below. **All following examples run from the repository root.**
+commands below. All of them run from the repository root.
 
-The Rust packages are at version 0.1.0 and have publication disabled.
-The repository has a release workflow, but its changelog remains Unreleased;
-building from source is the installation path described here. Crates.io
-publication and packaged releases are planned.
+Building from source is the only installation path for now. The Rust packages
+are at version 0.1.0 and are not published; crates.io publication and binary
+releases are planned.
 
 ## Check a reader spec
 
 <CheckedExample id="check" />
 
-A successful check validates parsing and resolution without reading input.
-It does not execute expressions or parameter defaults. Read a sample as well:
+A successful check means the reader spec parses and its names resolve. It
+does not execute expressions or parameter defaults, so read a sample as well:
 a name used in an expression can still fail at read time.
 
 ## Read input
@@ -128,9 +127,9 @@ for its driver protocol and case format.
 ## Errors and exit status
 
 Checks and reads exit 0 on success, 1 for language, file or resource errors, and
-2 for incorrect usage. Diagnostics show a location, source excerpt and caret;
-read errors also identify the active reader-spec line. No partial read data is
-printed. The [format library](/formats/dimacs-cnf/#case-literal-out-of-range)
+2 for incorrect usage. Diagnostics show a location, a source excerpt and a caret;
+read errors also identify the active reader-spec line. A failed read prints no
+partial data. The [format library](/formats/dimacs-cnf/#case-literal-out-of-range)
 shows a real failed read; the [Specification](/specification/0.1/errors/)
 defines the error codes and their order.
 

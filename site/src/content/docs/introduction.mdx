@@ -1,6 +1,6 @@
 ---
 title: Introduction
-description: Read text instance files into named, typed data with Iris.
+description: What a reader spec is, a first DIMACS CNF example, and where Iris comes from.
 editUrl: false
 prev: false
 next: false
@@ -13,12 +13,20 @@ export const format = formatBySlug('dimacs-cnf');
 export const example = caseById(format, 'three-variables');
 export const key = `${format.id}/${example.id}`;
 
-Iris is a declarative language for reading text instance files into named,
-typed data. A **reader spec** describes the input format: which values to read,
-how to collect them into arrays, and which conditions they must satisfy.
-The same reader spec can serve a command-line tool or a host program.
+Iris is a specification language for structured text formats. A program in
+Iris is a *reader spec*. It describes one format: which values a file
+contains, how they are laid out, how they are collected into arrays, and which
+conditions they must satisfy. Given a reader spec and an input file, Iris
+either returns the file's contents as named, typed data or rejects the file
+with the position and the statement that failed.
 
-## Read a formula in two minutes
+The formats Iris was built for are the benchmark and instance files of
+combinatorial problems, such as SAT formulas, travelling salesman instances
+and scheduling problems. Any line- and token-oriented text format is a
+candidate. The same reader spec works in the command-line tool, in a program
+that embeds an implementation, and in the [playground](/playground/).
+
+## A first example: DIMACS CNF
 
 This small [DIMACS CNF](/formats/dimacs-cnf/) file describes a Boolean formula
 with three variables and three clauses. A positive number names a variable;
@@ -28,45 +36,47 @@ a negative number negates it. Each clause ends with `0`.
   <ExamplePane source={example.input.text} href={example.downloads.input} label="Input" exampleKey={key} representation="input" compact />
 </div>
 
-The library's reader spec skips comment lines beginning with `c`, captures the
-counts from the `p cnf` header, then reads one list per clause. The range checks
-that every literal refers to an existing variable. The sentinel `0` ends each
-list and is consumed without being stored. `stop "%"` handles the end marker
-used by SATLIB files.
+The reader spec for DIMACS CNF in the [format library](/formats/) skips
+comment lines beginning with `c`, captures the two counts from the `p cnf`
+header, then reads one list per clause. The range on each literal checks that it refers to a
+declared variable. The sentinel `0` ends each list and is consumed without being
+stored. `stop "%"` handles the end marker used by SATLIB files.
 
 <div class="iris-format-library min-w-0">
   <ExamplePane source={format.spec.text} href={example.downloads.spec} label="Reader spec" exampleKey={key} representation="spec" highlighted compact />
 </div>
 
 [Build the CLI](/tools/cli/#build-from-source), then run this command from the
-repository root. The paths refer to the library's actual files. Choose `--dzn`
-to print MiniZinc data:
+repository root. The paths are the library's actual files. The `--dzn` option
+prints the data in MiniZinc's data format:
 
 <div class="iris-format-library min-w-0">
   <ExampleTerminal example={example} formatId={format.id} />
 </div>
 
-The result contains the two integer counts and `clause`, a ragged array of integers:
-one row of literals per clause, and rows can have different lengths.
-The CLI can also print [JSON or a summary](/tools/cli/#read-input).
-A [Rust program](/using/rust/) can access the same data through typed accessors.
+The data has the two integer counts and `clause`, an array of integers with
+one row per clause. Rows can have different lengths, so the array is ragged.
+The CLI can also print [JSON or a summary](/tools/cli/#read-input), and a
+[Rust program](/using/rust/) reads the same data through typed accessors.
 
 ## Iris and Gecode
 
-Iris grew out of Gecode's instance reader. **Iris 0.1 is the Gecode 6.5.0
-language**, with the deliberate differences listed in
-[appendix C of the Specification](/specification/0.1/appendix-c-differences/).
-Until Gecode's `release-6.5.0` tag exists, the reference is commit
-`5e7bbd5c26b0702c6fd652356b2289da0710ac3c`.
+Iris began as the instance reader in the constraint solver
+[Gecode](https://www.gecode.org), which uses reader specs to load benchmark
+files for its examples. The [Iris Language Specification](/specification/0.1/)
+defines the language independently of Gecode, and its
+[appendix C](/specification/0.1/appendix-c-differences/) lists the deliberate
+differences from Gecode's reader. The reader specs in the format
+library are Gecode's.
 
-Rust is the reference implementation in this repository. Iris 1.0 develops the
-language further for Gecode 7; that work is planned. Language versions and
-package versions are separate: a Rust package version does not define an Iris
-language version.
+Rust is the reference implementation and the source of the command-line tool
+and the playground. A Python binding and native C++ and Java implementations
+are planned; see [using Iris from a program](/using/rust/).
 
 ## Where to go next
 
-- The [tutorial](/tutorial/) is the planned step-by-step introduction to writing reader specs.
-- The [format library](/formats/) has complete reader specs, sample inputs, data, and failure examples.
-- The [Iris Language Specification](/specification/0.1/) defines the language, including its [data model](/specification/0.1/03-data-model/) and [errors](/specification/0.1/errors/).
+- The [tutorial](/tutorial/) builds three reader specs step by step.
+- The [guides](/guides/) explain one construct at a time, such as sections, records and checks, or parameters.
+- The [format library](/formats/) has complete reader specs, sample inputs, data, and rejected inputs.
+- The [Specification](/specification/0.1/) defines the language, including its [data model](/specification/0.1/03-data-model/) and [error codes](/specification/0.1/errors/).
 - The [tools](/tools/) check, read, format, and edit reader specs.

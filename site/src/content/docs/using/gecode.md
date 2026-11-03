@@ -7,8 +7,8 @@ next: false
 ---
 
 The Gecode 7 integration and this guide are planned, without a release date.
-Iris 0.1 is the Gecode 6.5.0 language; see the
-[language relationship](/introduction/#iris-and-gecode) and
+Gecode 6.5.0 already reads the Iris 0.1 language through its own reader; see
+[Iris and Gecode](/introduction/#iris-and-gecode) in the introduction and the
 [documented differences](/specification/0.1/appendix-c-differences/).
 
 Today, use the [CLI](/tools/cli/) to read input into JSON or dzn, or embed

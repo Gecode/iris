@@ -24,11 +24,11 @@ line-pattern captures and current-value references. TextMate examines one physic
 line at a time, so contextual names can retain keyword highlighting. Semantic
 tokens from the language server can correct these classifications.
 
-The repository supplies the grammar, rather than an installable VS Code package.
-A VS Code extension combining it with an LSP client is planned. For now, integrating
-it into an editor requires that editor's grammar and LSP configuration. Highlighting
-alone does not validate a reader spec; use the [CLI](/tools/cli/) to check it and
-read a sample. The [grammar README](https://github.com/Gecode/iris/blob/main/editors/textmate/README.md)
+The repository supplies the grammar, not an installable VS Code package; the
+extension that combines it with an LSP client is planned. For now, using it in
+an editor means configuring that editor's grammar and language-server support
+yourself. Highlighting alone does not validate a reader spec; use the
+[CLI](/tools/cli/) to check it and read a sample. The [grammar README](https://github.com/Gecode/iris/blob/main/editors/textmate/README.md)
 describes its scope and tests.
 
 ## JetBrains
@@ -68,7 +68,6 @@ Applying a changed setting restarts the server. Use
 binary is found, **Configure Iris** opens the setting and the warning explains
 how to build the server.
 
-The plugin implements an optional, explicit server download with checksum and
-version verification. This requires matching GitHub release assets; release
-preparation does not establish that those assets are published. Building and
-configuring a local binary works independently of release availability.
+The plugin can also download a matching server release and verify its checksum
+and version, but no release assets are published yet. Until they are, build the
+binary locally and point the setting at it.

@@ -35,10 +35,10 @@ on physical job lines. See
 
 ## Check each job and the whole instance
 
-Range checks admit each machine number separately. To ensure a job uses every
-machine exactly once, also check that its machine numbers are distinct. Since
-there are exactly `n_machines` operations and every number is in range,
-distinctness gives the required coverage.
+The range admits each machine number on its own. To require that a job uses
+every machine exactly once, also check that its machine numbers are distinct:
+with exactly `n_machines` operations, all in range, distinct numbers cover
+every machine.
 
 <CheckedExample id="jobshop-checks-spec" title="site/examples/tutorial/jobshop-checks.iris" />
 <CheckedExample id="jobshop-checks-input" title="site/examples/tutorial/jobshop.txt" />
@@ -54,7 +54,8 @@ A duplicate machine is in range but fails the record check:
 <CheckedExample id="jobshop-invalid-input" title="site/examples/guides/jobshop-invalid.txt" />
 <CheckedExample id="jobshop-invalid" />
 
-The diagnostic identifies the first job and points at its saved start.
+The diagnostic names the first job and points at the position where that
+job's record started.
 This is [E-CHECK-FAILED](/specification/0.1/errors/#e-check-failed). See the
 [records and checks guide](/guides/records-and-checks/) and the Specification's
 [record access](/specification/0.1/08-expressions-and-checks/#812-record-names-and-field-access)

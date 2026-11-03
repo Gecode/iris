@@ -18,8 +18,8 @@ the repository root; see the [tutorial setup](/tutorial/#before-you-start).
 
 A `line` pattern matches a whole remaining line. Literal text checks `p cnf`;
 the two captures read integers and store them as `vars` and `clauses`.
-The ranges reject negative counts. `gecode.int_max` is 2147483646, the fixed
-Iris 0.1 host constant used by the library reader.
+The ranges reject negative counts. `gecode.int_max` is a host constant, fixed
+at 2147483646, which the library reader uses as the upper bound.
 
 <CheckedExample id="dimacs-header-spec" title="site/examples/tutorial/dimacs-header.iris" />
 
@@ -59,9 +59,9 @@ and [lists](/specification/0.1/06-types-and-values/#69-sentinel-and-end-of-line-
 ## Check an application policy
 
 Suppose your application accepts only nonempty clauses. Add a `check` after
-the repeat. In `count(clause)`, `clause` denotes one record's list, so the condition
-runs once per clause. A direct `size(clause)` would instead inspect the outer
-column and count clauses; `size` has a whole-array exception.
+the repeat. In `count(clause)`, `clause` denotes one record's list, so the
+condition runs once per clause. `size(clause)` would instead count the clauses,
+because a direct name in `size` always refers to the whole column.
 
 <CheckedExample id="dimacs-nonempty-spec" title="site/examples/tutorial/dimacs-nonempty.iris" />
 <CheckedExample id="dimacs-nonempty-input" title="site/examples/tutorial/dimacs-clauses.txt" />
@@ -79,9 +79,9 @@ make a check range over records.
 
 ## Finish with the library reader
 
-DIMACS itself permits an empty clause: it makes the formula unsatisfiable.
-The library therefore leaves out our application policy. It adds a format name
-and `stop "%"` for the SATLIB trailer. The stop prefix makes the rest of the
+DIMACS itself permits an empty clause, which makes the formula unsatisfiable,
+so the library reader leaves out that policy. It adds a format name and
+`stop "%"` for the SATLIB trailer. The stop prefix makes the rest of the
 input unavailable to reading, including the trailer's final zero.
 
 This is the complete [DIMACS CNF library reader](/formats/dimacs-cnf/):

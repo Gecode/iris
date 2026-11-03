@@ -25,9 +25,9 @@ and inputs are files in `site/examples/tutorial/`. You can edit those files in
 a local checkout or copy the displayed text into files of your own and adjust
 the command paths. Inputs and reader specs must be UTF-8.
 
-The examples use Iris 0.1. Each step finishes with the actual reader spec in
-the [format library](/formats/), including the checks and input conventions
-used by Gecode. The site runs every example during its build and freshness check.
+Each step finishes with the actual reader spec from the [format library](/formats/),
+including the checks and input conventions used by Gecode. The site runs every
+example when it is built, so the output shown is the CLI's.
 
 ## Find a particular construct
 

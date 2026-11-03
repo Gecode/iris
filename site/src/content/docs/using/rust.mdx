@@ -7,9 +7,9 @@ next: false
 ---
 import CheckedExample from '../../../components/docs/CheckedExample.astro';
 
-Rust is the reference implementation of Iris 0.1. The `gecode-iris` crate
+Rust is the reference implementation of Iris. The `gecode-iris` crate
 re-exports the public reader API from `iris-core`; import it as `gecode_iris`.
-It reads named, typed entries, including arrays with rows of different lengths.
+It returns named, typed entries, including arrays whose rows have different lengths.
 
 ## Add a local dependency
 
@@ -74,5 +74,5 @@ variants requires a fallback arm.
 For more detail, read the
 [umbrella crate source](https://github.com/Gecode/iris/blob/main/rust/gecode-iris/src/lib.rs)
 and [core API guide](https://github.com/Gecode/iris/blob/main/rust/iris-core/README.md).
-Published API hosting is planned. Local Cargo documentation can be built from the
-workspace without waiting for publication.
+Publication on docs.rs is planned; until then, `cargo doc` in the workspace
+builds the API documentation locally.
