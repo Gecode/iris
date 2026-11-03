@@ -1,0 +1,1 @@
+repeat 2 {list c:int until 0} check size(c)>0 "empty"

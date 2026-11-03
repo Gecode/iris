@@ -2,3 +2,10 @@
 operation = "read"
 section = "spec/0.1/08-expressions-and-checks.md"
 source = "spec:spec/0.1/08-expressions-and-checks.md#expressions-whole-vs-record"
+
+[[known_failure]]
+driver = "gecode-6.5.0-5e7bbd5c26b0"
+outcome = "error"
+expected_file = "known/gecode-6.5.0-5e7bbd5c26b0/error.json"
+reason = "Gecode reads size(a) as the whole column, 2 rows, so size(a)==3 fails for the first record."
+difference = "spec/0.1/appendix-c-differences.md#c5-direct-names-in-size"

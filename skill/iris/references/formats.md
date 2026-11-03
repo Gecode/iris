@@ -71,7 +71,7 @@ sections until "EOF" {
   "NODE_COORD_TYPE : {node_coord_type:word}" optional
   "DISPLAY_DATA_TYPE : {display_data_type:word}" optional
   "NODE_COORD_SECTION" optional {
-    repeat n {
+    repeat n as nodes {
       node: int
       x: float
       y: float
@@ -105,7 +105,7 @@ if edge_weight_type == "EXPLICIT" {
     edge_weight_type == "GEO"
     "EDGE_WEIGHT_TYPE must be EXPLICIT, EUC_2D, CEIL_2D, ATT, or GEO"
   check defined(x) "no NODE_COORD_SECTION"
-  check size(x) == n "coordinates do not match DIMENSION"
+  check size(nodes) == n "coordinates do not match DIMENSION"
   check x >= -1e9 && x <= 1e9 && y >= -1e9 && y <= 1e9 "coordinates must be between -1e9 and 1e9"
 }
 ```
@@ -280,19 +280,19 @@ sections skip other {
   "width {width:1..}"
   "height {height:1..}"
   "rows" {
-    repeat height {
+    repeat height as rows {
       list row: 0.. until eol
     }
   }
   "columns" {
-    repeat width {
+    repeat width as cols {
       list col: 0.. until eol
     }
   }
 }
 
 check height <= 1000000 / width "the board must have at most a million fields"
-check size(row) == height && size(col) == width
+check size(rows) == height && size(cols) == width
   "the numbers of rows and columns differ from the board size"
 check count(row) <= 1 || min(row) > 0 "a 0 must be the only clue of its row"
 check count(col) <= 1 || min(col) > 0 "a 0 must be the only clue of its column"

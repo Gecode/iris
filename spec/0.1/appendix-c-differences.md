@@ -98,3 +98,23 @@ the reference. The other dzn examples agree with the pinned reference.
 
 The omission is a Gecode 6.5.0 bug expected to be fixed before release.
 This entry is to be removed once the reference pin includes the fix.
+
+## C.5 Direct names in size
+
+In a check, a direct ordinary name in `size` MUST resolve like any other
+use of the name: a field of a completed repeat denotes one record's value,
+exactly as in `count`
+([§8.12](08-expressions-and-checks.md#812-record-names-and-field-access)).
+`size` and `count` are therefore interchangeable. A check counts the
+records of a column with a comprehension, as in `count(r in a:1)`, or with
+`size` of a record list named by `as`. This deliberate difference follows
+[ADR 0016](../../docs/adr/0016-size-lifts-like-count.md).
+
+The pinned reference gives a direct name in `size` the whole-array rule
+that `defined` and comprehension domains have. After `repeat 2 {list
+c:int until 0}`, it reads `check size(c)>0` as "there are clauses", so an
+empty clause passes; Iris checks each clause and reports
+`E-CHECK-FAILED` for the empty one
+([`expressions-size-lifts`](08-expressions-and-checks.md#812-record-names-and-field-access)).
+The two functions differed only in this position, which made `size` an
+easy mistake for a per-record test.

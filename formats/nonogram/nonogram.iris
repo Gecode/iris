@@ -5,19 +5,19 @@ sections skip other {
   "width {width:1..}"
   "height {height:1..}"
   "rows" {
-    repeat height {
+    repeat height as rows {
       list row: 0.. until eol
     }
   }
   "columns" {
-    repeat width {
+    repeat width as cols {
       list col: 0.. until eol
     }
   }
 }
 
 check height <= 1000000 / width "the board must have at most a million fields"
-check size(row) == height && size(col) == width
+check size(rows) == height && size(cols) == width
   "the numbers of rows and columns differ from the board size"
 check count(row) <= 1 || min(row) > 0 "a 0 must be the only clue of its row"
 check count(col) <= 1 || min(col) > 0 "a 0 must be the only clue of its column"

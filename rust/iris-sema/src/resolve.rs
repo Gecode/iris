@@ -291,10 +291,8 @@ impl Resolver<'_> {
             K::Call => {
                 let callee = first_ident(node).expect("callee");
                 for argument in expressions(node) {
-                    let denotation = self.resolve_expression(
-                        &argument,
-                        matches!(callee.text(), "size" | "defined"),
-                    )?;
+                    let denotation =
+                        self.resolve_expression(&argument, callee.text() == "defined")?;
                     if !matches!(callee.text(), "size" | "count" | "defined")
                         || !matches!(denotation, Denotation::RecordList(_))
                     {

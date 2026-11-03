@@ -145,7 +145,7 @@ fn type_record_and_binding_navigation() {
 #[test]
 fn runtime_uncertainty_and_whole_array_positions() {
     let analysis = analyze(
-        "a[2]:float param p=a let missing=undefined let bad=1/0 index 0 repeat 2 {r[3]:int} check size((r))==2 check defined(r) check count(r)>0 let total=sum(x in a:x) let outside=x",
+        "a[2]:float param p=a let missing=undefined let bad=1/0 index 0 repeat 2 {r[3]:int} check size((r))==3 check defined(r) check count(r)>0 let total=sum(x in a:x) let outside=x",
     );
     let model = &analysis.model;
     assert_eq!(
@@ -156,7 +156,7 @@ fn runtime_uncertainty_and_whole_array_positions() {
         definition(model, "p").facts.value_types,
         Possibilities::one(ValueType::Float)
     );
-    assert!(model.checks()[0].dependencies.is_empty());
+    assert_eq!(model.checks()[0].deepest, vec![RepeatId(0)]);
     assert!(model.checks()[1].dependencies.is_empty());
     assert_eq!(model.checks()[2].deepest, vec![RepeatId(0)]);
     assert!(reference(model, "x").resolution.definitions().is_empty());

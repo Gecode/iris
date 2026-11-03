@@ -59,9 +59,8 @@ and [lists](/specification/0.1/06-types-and-values/#69-sentinel-and-end-of-line-
 ## Check an application policy
 
 Suppose your application accepts only nonempty clauses. Add a `check` after
-the repeat. In `count(clause)`, `clause` denotes one record's list, so the
-condition runs once per clause. `size(clause)` would instead count the clauses,
-because a direct name in `size` always refers to the whole column.
+the repeat. In a check, `clause` denotes one record's list, so the condition
+runs once per clause. `size(clause)` means the same as `count(clause)`.
 
 <CheckedExample id="dimacs-nonempty-spec" title="site/examples/tutorial/dimacs-nonempty.iris" />
 <CheckedExample id="dimacs-nonempty-input" title="site/examples/tutorial/dimacs-clauses.txt" />

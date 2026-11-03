@@ -433,6 +433,24 @@ fn known_failure(id: &str) -> Option<KnownExampleFailure> {
             reason: "Gecode accepts invalid UTF-8 inside reader-spec strings and comments during parsing.",
             section: "c2-reader-spec-source",
         }),
+        "expressions-whole-vs-record" => Some(KnownExampleFailure {
+            outcome: "error",
+            alternate: Some((
+                "error.json",
+                "{\"code\":\"E-CHECK-FAILED\",\"message\":\"check failed for record 1 of 'a'\",\"input_location\":{\"origin\":\"input.bin\",\"line\":1,\"column\":1},\"spec_location\":{\"origin\":\"spec.iris\",\"line\":1,\"column\":null},\"context\":null,\"record_path\":[0]}\n",
+            )),
+            reason: "Gecode reads size(a) as the whole column, 2 rows, so size(a)==3 fails for the first record.",
+            section: "c5-direct-names-in-size",
+        }),
+        "expressions-size-lifts" => Some(KnownExampleFailure {
+            outcome: "data",
+            alternate: Some((
+                "expected.json",
+                "{\"iris\":\"0.1\",\"entries\":[{\"name\":\"c\",\"type\":\"int\",\"depth\":2,\"value\":[[1],[]]}]}\n",
+            )),
+            reason: "Gecode reads size(c) as the whole column of 2 lists, so the empty list passes.",
+            section: "c5-direct-names-in-size",
+        }),
         "dzn-float-precision-gap" => Some(KnownExampleFailure {
             outcome: "dzn",
             alternate: Some((

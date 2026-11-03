@@ -10,7 +10,7 @@ sections until "EOF" {
   "NODE_COORD_TYPE : {node_coord_type:word}" optional
   "DISPLAY_DATA_TYPE : {display_data_type:word}" optional
   "NODE_COORD_SECTION" optional {
-    repeat n {
+    repeat n as nodes {
       node: int
       x: float
       y: float
@@ -44,6 +44,6 @@ if edge_weight_type == "EXPLICIT" {
     edge_weight_type == "GEO"
     "EDGE_WEIGHT_TYPE must be EXPLICIT, EUC_2D, CEIL_2D, ATT, or GEO"
   check defined(x) "no NODE_COORD_SECTION"
-  check size(x) == n "coordinates do not match DIMENSION"
+  check size(nodes) == n "coordinates do not match DIMENSION"
   check x >= -1e9 && x <= 1e9 && y >= -1e9 && y <= 1e9 "coordinates must be between -1e9 and 1e9"
 }

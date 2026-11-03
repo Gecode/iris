@@ -23,3 +23,4 @@ the Specification and new conformance cases
 | 0013 | [Raw lines and character matrices](0013-raw-lines-and-character-matrices.md) | Proposed |
 | 0014 | [Integers beyond 64 bits and in other radixes](0014-integers-beyond-64-bits.md) | Proposed |
 | 0015 | [Line blocks for reads confined to one line](0015-line-local-reads.md) | Proposed |
+| 0016 | [`size` lifts in checks like `count`](0016-size-lifts-like-count.md) | Accepted |

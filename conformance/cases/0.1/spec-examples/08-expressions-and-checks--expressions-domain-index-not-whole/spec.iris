@@ -1,0 +1,1 @@
+repeat 2 {a[3]:int} check all(t in a[0]:t>0)

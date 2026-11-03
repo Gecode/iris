@@ -1,1 +1,1 @@
-repeat 2 {a[3]:int} check size(a)==2 && count(a)==3 && sum(r in a:sum(r))==21 && defined(a)
+repeat 2 {a[3]:int} check size(a)==3 && count(a)==3 && count(r in a:1)==2 && sum(r in a:sum(r))==21 && defined(a)

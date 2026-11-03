@@ -622,8 +622,8 @@ Invalid arity, unknown functions, ordinary calls to `all` or `any`, and a
 `defined` argument other than a parsed name MUST report `E-SPEC-FUNCTION`
 during parsing, including in unreachable bodies. Parentheses around a
 name retain its name-expression form. `defined` is not general error
-recovery. Direct names in `size` and `defined` have the whole-array rule in
-§8.12; `count` does not.
+recovery. A direct name in `defined` has the whole-array rule in §8.12;
+`size` and `count` have no such rule and are interchangeable.
 
 ```iris example
 id: expressions-sum-no-args
@@ -1044,11 +1044,10 @@ below with id prefix `expressions-`; §8.2 supplies the current-frame example.
 |---|---|---|
 | Ordinary use outside a check | A completed repeated field is its whole column; no implicit record quantification in `let`, `if`, or counts. | `ordinary-outside` |
 | Current iteration | Local value if available, otherwise enclosing lookup; no previous-iteration value. | `lookup-frame` (§8.2) |
-| Direct ordinary name in `size` | Whole-array lookup; suppress implicit lifting. | `whole-vs-record` |
 | Direct ordinary name after `in` | Whole domain; free names in the body can still lift. | `whole-vs-record`; `check-mixed-witness` (§8.13) |
 | Direct ordinary name in `defined` | Availability of the whole name, without lifting. | `guard-absent` |
-| Direct ordinary name in `count` | No exception: lift the field in a check. | `whole-vs-record` |
-| Whole-array positions containing indexing or field access | The exception is shallow: resolve the base normally, so it can lift. | `size-index-not-whole`, `size-field-lifts` |
+| Direct ordinary name in `size` or `count` | No exception: lift the field in a check. | `whole-vs-record`, `size-lifts` |
+| Whole-array positions containing indexing or field access | The exception is shallow: resolve the base normally, so it can lift. | `domain-index-not-whole`, `domain-field-lifts` |
 | Fields of the same repeat | Select corresponding fields of one record, not a Cartesian product. | `same-repeat` |
 | Nested repeats | Visit each outer record's inner records with its own outer fields. | `nested-repeat` |
 | Check inside an active outer repeat | Lift only the suffix beyond the active common prefix. | `nested-completed-current`; `check-context-path` (§8.13) |
@@ -1095,13 +1094,24 @@ repeat 2 {x:int} let total=sum(x) let first=x[0] if count(x)==2 {let yes=1}
 id: expressions-whole-vs-record
 operation: read
 --- spec no-final-newline
-repeat 2 {a[3]:int} check size(a)==2 && count(a)==3 && sum(r in a:sum(r))==21 && defined(a)
+repeat 2 {a[3]:int} check size(a)==3 && count(a)==3 && count(r in a:1)==2 && sum(r in a:sum(r))==21 && defined(a)
 --- input no-final-newline
 1 2 3 4 5 6
 --- expected data
 {"iris": "0.1", "entries": [
   {"name": "a", "type": "int", "depth": 2, "value": [[1, 2, 3], [4, 5, 6]]}
 ]}
+```
+
+```iris example
+id: expressions-size-lifts
+operation: read
+--- spec no-final-newline
+repeat 2 {list c:int until 0} check size(c)>0 "empty"
+--- input no-final-newline
+1 0 0
+--- expected error
+{"code": "E-CHECK-FAILED", "message": "check failed for record 2 of 'c': empty", "input_location": {"origin": "input.bin", "line": 1, "column": 5}, "spec_location": {"origin": "spec.iris", "line": 1, "column": null}, "context": null, "record_path": [1]}
 ```
 
 ```iris example
@@ -1125,21 +1135,21 @@ if 0 {repeat 2 {x:int}} check x>0
 ```
 
 ```iris example
-id: expressions-size-index-not-whole
+id: expressions-domain-index-not-whole
 operation: read
 --- spec no-final-newline
-repeat 2 {a[3]:int} check size(a[0])==3
+repeat 2 {a[3]:int} check all(t in a[0]:t>0)
 --- input no-final-newline
 1 2 3 4 5 6
 --- expected error
-{"code": "E-FUNCTION-TYPE", "message": "'size' takes an array", "input_location": {"origin": "input.bin", "line": 1, "column": 12}, "spec_location": {"origin": "spec.iris", "line": 1, "column": null}, "context": null, "record_path": null}
+{"code": "E-FUNCTION-TYPE", "message": "comprehension needs an array", "input_location": {"origin": "input.bin", "line": 1, "column": 12}, "spec_location": {"origin": "spec.iris", "line": 1, "column": null}, "context": null, "record_path": null}
 ```
 
 ```iris example
-id: expressions-size-field-lifts
+id: expressions-domain-field-lifts
 operation: read
 --- spec no-final-newline
-repeat 2 as rows {each row a[3]:int} check size(row.a)==3
+repeat 2 as rows {each row a[3]:int} check all(t in row.a:t>0)
 --- input no-final-newline
 1 2 3 4 5 6
 --- expected data
@@ -1174,7 +1184,7 @@ repeat 2 {k:int repeat 2 {x:int}} check x<k "limit"
 id: expressions-nested-completed-current
 operation: read
 --- spec no-final-newline
-repeat 2 {repeat 2 {x:int} check size(x)==2 && x>0}
+repeat 2 {repeat 2 {x:int} check count(r in x:1)==2 && x>0}
 --- input no-final-newline
 1 2 3 4
 --- expected data
@@ -1238,7 +1248,7 @@ let x=1 repeat 1 {x:int} check x>0
 id: expressions-ambiguous-whole
 operation: read
 --- spec no-final-newline
-let x=1 repeat 1 {x:int} check size(x)==1 && defined(x) && all(t in x:t>0)
+let x=1 repeat 1 {x:int} check count(t in x:1)==1 && defined(x) && all(t in x:t>0)
 --- input no-final-newline
 2
 --- expected data

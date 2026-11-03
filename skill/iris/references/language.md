@@ -550,11 +550,10 @@ The record names are lifted **only in checks**. In `let`, `if`, sizes, and
 counts, a repeat field is the whole column.
 
 Inside a check, these positions see the **whole column** instead:
-a name directly inside `size(...)` or `defined(...)`, and a name directly
-after `in` in a comprehension. `count`, `sum`, `min`, `max`, and `distinct`
-are *not* such positions: `check sum(demand) <= capacity` checks each
-demand separately, and `check count(x) == n` fails if `x` is a scalar
-field. To check a whole column, compute it with `let` first or use a
+a name directly inside `defined(...)`, and a name directly after `in` in a
+comprehension. `size`, `count`, `sum`, `min`, `max`, and `distinct` are
+*not* such positions: `check sum(demand) <= capacity` checks each demand
+separately, and `check size(x) == n` fails if `x` is a scalar field. To check a whole column, compute it with `let` first or use a
 comprehension:
 
 ```iris
@@ -563,7 +562,7 @@ capacity: 0..
 repeat n {
   demand: 0..
 }
-check size(demand) == n
+check count(d in demand: 1) == n
 let total_demand = sum(demand)
 check total_demand <= capacity "the demand exceeds the capacity"
 check sum(d in demand: d) <= capacity "the same check, written inline"

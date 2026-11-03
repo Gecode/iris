@@ -353,7 +353,6 @@ n: 1..
 repeat n {
   list row: int until eol
 }
-check size(row) == n
 ```
 
 ```input
