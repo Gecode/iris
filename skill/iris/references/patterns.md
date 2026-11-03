@@ -571,14 +571,43 @@ Numeric operation codes work the same way with `op: 1..3` and
 `if op == 1 { ... }`. Commands until end of file use `repeat until eof`.
 
 To choose among several line forms, read the token that tells them apart
-and branch on it, as above. A `line` pattern cannot select a form: it is a
-single match that fails when the line does not fit. When no token tells
-the forms apart (`red 10` and `10 red` in one file), read every field as
-`word` and leave the typing to the host.
+and branch on it, as above. When the forms differ in shape instead (`red
+10` and `10 red`, `3-9` and `7`, a time with or without a speed), put a
+`sections` statement with one `optional last` arm per form inside the
+repeat. Each iteration handles one line with the first arm that matches,
+and `last` ends the statement there. Every arm must define every field,
+with `let` where its line lacks one:
+
+```iris
+n: 1..
+repeat n {
+  sections {
+    "{colour} {size:1..}" optional last
+    "{size:1..} {colour}" optional last
+    "{size:1..}" optional last {
+      let colour = "none"
+    }
+  }
+}
+```
+
+```input
+3
+red 10
+20 blue
+5
+```
+
+```data
+n = 3
+colour = ["red", "blue", "none"]
+size = [10, 20, 5]
+```
+
+A line that no arm matches is an error that lists the patterns.
 
 Avoid `list args: int until eol` for queries: a query with no arguments
-makes it read the next query's line. Sections cannot read queries either,
-because each arm matches at most once.
+makes it read the next query's line.
 
 ## Character grids
 

@@ -103,7 +103,7 @@ not names used in expressions: a misspelled name such as `a: 1..nn` passes
 | `expected a line matching "..."` | A `line` pattern failed. Compare spacing (`N={n}` rejects `N = 5`), case, and literal text. Also reported for a required sections arm that never matched (`... before the end of the input`). |
 | `no line matching "..." found` | `find` reached the end of the input. |
 | `unexpected line; expected one of ...` | A line matched no sections arm. Add an arm, or `skip other`. |
-| `a second line matching "..." (the first is on line 3)` | A sections arm matched twice. Sections cannot read repeated records; use `repeat`. |
+| `a second line matching "..." (the first is on line 3)` | A sections arm matched twice. One sections statement cannot read repeated records; use `repeat`, with the sections inside it when each record is one of several line forms. |
 | `expected 'END' before end of input` | A `repeat until "END"` never met its terminator. |
 | `expected list terminator, found end of input` | A sentinel list never met its sentinel. |
 | `the body of a repeat until read no input` | A `repeat until` body consumed nothing. |

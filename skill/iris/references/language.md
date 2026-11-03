@@ -473,8 +473,11 @@ demand = [0, 4, 5]
 - Each line is matched against the arms in order; the first match runs. An
   arm's body may read the following input (the section's data).
 - Every arm must match **exactly once**, unless marked `optional` (at most
-  once). A second matching line is an error, so sections cannot read
-  repeated records; use `repeat` for those.
+  once). A second matching line is an error, so one sections statement
+  cannot read repeated records; use `repeat` for those. A sections
+  statement with `optional last` arms inside a repeat reads one line per
+  iteration in whichever form it takes ([choosing among line
+  forms](patterns.md#query-lines-with-an-operation-keyword)).
 - `until "EOF"` ends at that token (optional at end of input); `store x`
   keeps it. `skip other` ignores lines no arm matches; without it they are
   errors.
