@@ -19,3 +19,7 @@ the Specification and new conformance cases
 | 0009 | [C++23 and Java 27 baselines](0009-cpp23-and-java27-baselines.md) | Accepted |
 | 0010 | [MIT license](0010-mit-license.md) | Accepted |
 | 0011 | [UTF-8 input, reader specs, and strings](0011-utf8-strings.md) | Accepted |
+| 0012 | [Variant types for values with several forms](0012-variant-types.md) | Proposed |
+| 0013 | [Raw lines and character matrices](0013-raw-lines-and-character-matrices.md) | Proposed |
+| 0014 | [Integers beyond 64 bits and in other radixes](0014-integers-beyond-64-bits.md) | Proposed |
+| 0015 | [Line blocks for reads confined to one line](0015-line-local-reads.md) | Proposed |
