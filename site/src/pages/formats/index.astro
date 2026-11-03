@@ -4,7 +4,7 @@ import { formats } from '../../data/formats';
 ---
 <StarlightPage hasSidebar={true} frontmatter={{ title: 'Format library', description: 'Reader specs, sample inputs, and real Iris output for benchmark formats.', tableOfContents: false, prev: false, next: false }}>
   <div class="iris-format-library">
-    <p class="max-w-[68ch]">Ready-made Iris 0.1 reader specs for benchmark formats. Each page includes the reader spec, every sample input, and the data or error produced by the Iris command-line tool.</p>
+    <p class="max-w-[68ch]">Reader specs for benchmark formats, taken from Gecode's examples. Each page has the reader spec, every sample input, and the data or diagnostic the Iris command-line tool produces for it.</p>
     <ul class="m-0 mt-8 list-none p-0" aria-label="Formats" data-format-index>
       {formats.map(format => <li class="m-0 border-t border-iris-border py-6" data-format={format.id}>
         <h2 class="m-0 text-2xl"><a href={`/formats/${format.slug}/`}>{format.title}</a></h2>
@@ -12,6 +12,6 @@ import { formats } from '../../data/formats';
         <p class="mt-2 mb-0 text-sm text-iris-muted">{format.cases.length} cases · {format.cases.filter(example => example.result.kind === 'error').length} rejected</p>
       </li>)}
     </ul>
-    <p class="border-t border-iris-border pt-6 text-sm text-iris-muted">These reader specs come from Gecode’s examples. Samples were written by hand for this repository. <a href="/examples/GECODE-LICENSE.md">Gecode notices</a> · <a href="/examples/LICENSE">MIT license</a> · <a href="https://github.com/Gecode/iris/blob/main/formats/README.md">Library sources and validation</a></p>
+    <p class="border-t border-iris-border pt-6 text-sm text-iris-muted">The reader specs come from Gecode's examples; the sample inputs were written by hand for this repository. <a href="/examples/GECODE-LICENSE.md">Gecode notices</a> · <a href="/examples/LICENSE">MIT license</a> · <a href="https://github.com/Gecode/iris/blob/main/formats/README.md">Library sources and validation</a></p>
   </div>
 </StarlightPage>

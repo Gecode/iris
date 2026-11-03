@@ -3,11 +3,11 @@ import { formats, caseById } from '../../data/formats';
 import ExamplePane from './ExamplePane.astro';
 import ExampleTerminal from './ExampleTerminal.astro';
 const showcasedFormats = formats.filter(format => format.homeCase !== null);
-const representations = [{ id: 'input', label: 'input' }, { id: 'spec', label: 'spec.iris' }, { id: 'json', label: 'JSON' }, { id: 'dzn', label: 'dzn' }] as const;
+const representations = [{ id: 'input', label: 'input' }, { id: 'spec', label: 'reader spec' }, { id: 'json', label: 'JSON' }, { id: 'dzn', label: 'dzn' }] as const;
 ---
 <section id="formats" class="iris-showcase scroll-mt-20" aria-labelledby="formats-title">
   <h2 id="formats-title" class="iris-section-title">Examples from the format library</h2>
-  <p class="mb-6 max-w-[68ch]">Choose a format to inspect its input, reader spec, and data. These examples run through the Iris command-line tool.</p>
+  <p class="mb-6 max-w-[68ch]">Choose a format to see a sample input, its reader spec, and the data Iris reads. The output comes from the Iris command-line tool, run when the site is built.</p>
   <div class="min-w-0 border border-iris-border bg-iris-surface">
     <div class="iris-tablist" data-format-tabs aria-label="Format">
       {showcasedFormats.map(format => <a id={`format-tab-${format.slug}`} href={`#format-${format.slug}-input`} data-format={format.slug}>{format.title}</a>)}

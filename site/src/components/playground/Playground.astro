@@ -51,7 +51,7 @@ const initial = { language: '0.1', spec: format.spec.text, input: example.input.
   <section data-diagnostic hidden class="mt-4 min-w-0 border-s-4 border-iris-red bg-iris-surface p-4" aria-labelledby="play-diagnostic-title">
     <h2 id="play-diagnostic-title" class="m-0 text-lg"></h2><p class="my-2"><a data-error-code></a></p><pre class="iris-play-code" tabindex="0"><code data-diagnostic-text></code></pre><button type="button" data-focus-error hidden class="iris-play-button mt-3">Focus reader spec error</button>
   </section>
-  <p class="mt-5 text-sm text-iris-muted">Check diagnostics come from the Rust implementation. Formatting uses a line width of 100. <a href="/tools/cli/">Use the CLI</a> for larger files, or choose another example from the <a href="/formats/">format library</a>.</p>
+  <p class="mt-5 text-sm text-iris-muted">Diagnostics come from the Rust implementation, compiled to WebAssembly. Formatting uses a line width of 100. <a href="/tools/cli/">Use the CLI</a> for larger files, or choose another example from the <a href="/formats/">format library</a>.</p>
 </div>
 <script>
   import { mountPlayground } from '../../playground/controller';
