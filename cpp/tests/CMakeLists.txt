@@ -92,6 +92,10 @@ if(IRIS_CONFORMANCE_TESTS)
       "IRIS_CONFORMANCE_TESTS needs cargo to run the conformance runner; "
       "install Rust or configure with -DIRIS_CONFORMANCE_TESTS=OFF")
   endif()
+  # The runner's limit for one case. Sanitized drivers run slower, so
+  # their presets raise it.
+  set(IRIS_CONFORMANCE_CASE_TIMEOUT 30 CACHE STRING
+    "Seconds the conformance runner allows the driver for one case")
   foreach(operation IN ITEMS parse read catalog dzn)
     add_test(NAME ${operation}-conformance
       COMMAND "${CMAKE_COMMAND}"
@@ -99,8 +103,11 @@ if(IRIS_CONFORMANCE_TESTS)
         "-DREPOSITORY=${PROJECT_SOURCE_DIR}/.."
         "-DCARGO=${IRIS_CARGO}"
         -DOPERATION=${operation}
+        "-DCASE_TIMEOUT=${IRIS_CONFORMANCE_CASE_TIMEOUT}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/conformance.cmake")
-    # Whichever test runs first builds the runner with cargo.
-    set_tests_properties(${operation}-conformance PROPERTIES TIMEOUT 1800)
+    # Whichever test runs first builds the runner with cargo. The whole
+    # test may take as long as 60 cases at the limit, 30 minutes by default.
+    math(EXPR timeout "60 * ${IRIS_CONFORMANCE_CASE_TIMEOUT}")
+    set_tests_properties(${operation}-conformance PROPERTIES TIMEOUT ${timeout})
   endforeach()
 endif()

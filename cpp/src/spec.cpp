@@ -54,6 +54,10 @@
 #include <system_error>
 #include <utility>
 
+#ifdef _WIN32
+#include <share.h>
+#endif
+
 namespace iris {
 
 namespace {
@@ -87,7 +91,9 @@ detail::String read_file(const std::filesystem::path &path) {
                             std::string(what) + ' ' + path.string());
   };
 #ifdef _WIN32
-  std::FILE *file = _wfopen(path.c_str(), L"rb");
+  // _wfsopen, as MSVC deprecates _wfopen, and _wfopen_s denies other
+  // readers of the file.
+  std::FILE *file = _wfsopen(path.c_str(), L"rb", _SH_DENYNO);
 #else
   std::FILE *file = std::fopen(path.c_str(), "rb");
 #endif

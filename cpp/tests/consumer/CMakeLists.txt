@@ -4,6 +4,10 @@
 cmake_minimum_required(VERSION 3.28)
 project(iris-consumer LANGUAGES CXX)
 
+# The consumer uses no C++ modules either, so it needs no dependency
+# scanner, such as clang-scan-deps for Clang.
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+
 set(IRIS_SOURCE_DIR "" CACHE PATH "Fetch the library from this source tree instead of finding it")
 
 if(IRIS_SOURCE_DIR)

@@ -1,0 +1,209 @@
+name: C++
+
+on:
+  push:
+    paths:
+      - 'cpp/**'
+      - 'conformance/**'
+      - 'formats/**'
+      - 'rust/**'
+      - '.github/workflows/cpp.yml'
+  pull_request:
+    paths:
+      - 'cpp/**'
+      - 'conformance/**'
+      - 'formats/**'
+      - 'rust/**'
+      - '.github/workflows/cpp.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cpp-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+# Every job but lint runs ctest, whose conformance tests run the whole suite
+# through the driver with the runner in rust/, so each needs Rust.
+jobs:
+  test:
+    name: Test (${{ matrix.compiler }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: GCC 14
+            os: ubuntu-24.04
+            packages: g++-14
+            cxx: g++-14
+          # Clang compiles against GCC 14's libstdc++.
+          - compiler: Clang 20
+            os: ubuntu-24.04
+            packages: clang-20 g++-14
+            cxx: clang++-20
+          - compiler: Apple Clang
+            os: macos-latest
+            cxx: clang++
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: cpp
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install compiler
+        if: matrix.packages
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ${{ matrix.packages }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: astral-sh/setup-uv@v7
+      - name: Install CMake and Ninja
+        run: |
+          uv tool install cmake==4.4.4
+          uv tool install ninja==1.13.0
+          uv tool dir --bin >> "$GITHUB_PATH"
+      - name: Cache Cargo artifacts
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: cpp-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ hashFiles('rust/**/*.rs', 'rust/**/Cargo.toml') }}
+          restore-keys: |
+            cpp-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+      - name: Show compiler
+        run: ${{ matrix.cxx }} --version
+      - name: Configure
+        env:
+          CXX: ${{ matrix.cxx }}
+        run: cmake --preset dev
+      - name: Build
+        run: cmake --build --preset dev
+      - name: Test
+        run: ctest --preset dev
+
+  msvc:
+    name: Test (MSVC)
+    runs-on: windows-latest
+    defaults:
+      run:
+        # PowerShell, as Git Bash's link.exe would shadow the MSVC linker.
+        shell: pwsh
+        working-directory: cpp
+    steps:
+      # The conformance cases compare bytes, so check them out with LF.
+      - name: Keep line endings
+        working-directory: .
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: astral-sh/setup-uv@v7
+      - name: Install CMake and Ninja
+        shell: bash
+        run: |
+          uv tool install cmake==4.4.4
+          uv tool install ninja==1.13.0
+          uv tool dir --bin >> "$GITHUB_PATH"
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Cache Cargo artifacts
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: cpp-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ hashFiles('rust/**/*.rs', 'rust/**/Cargo.toml') }}
+          restore-keys: |
+            cpp-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+      - name: Configure
+        env:
+          CXX: cl
+        run: cmake --preset dev
+      - name: Build
+        run: cmake --build --preset dev
+      - name: Test
+        run: ctest --preset dev
+
+  sanitizers:
+    name: Sanitizers (${{ matrix.preset }}, ${{ matrix.compiler }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - preset: asan
+            compiler: Clang 20
+            packages: clang-20 libclang-rt-20-dev g++-14
+            cxx: clang++-20
+          # GCC links the TSan runtime as a shared library, so the memory
+          # test's operator new replaces the runtime's. Clang links it
+          # statically on Linux, where the two definitions clash.
+          - preset: tsan
+            compiler: GCC 14
+            packages: g++-14
+            cxx: g++-14
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+        working-directory: cpp
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install compiler
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ${{ matrix.packages }}
+      # TSan's shadow memory needs fewer random bits in mmap addresses than
+      # the runner's kernel uses.
+      - name: Reduce mmap randomization
+        if: matrix.preset == 'tsan'
+        run: sudo sysctl vm.mmap_rnd_bits=28
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: astral-sh/setup-uv@v7
+      - name: Install CMake and Ninja
+        run: |
+          uv tool install cmake==4.4.4
+          uv tool install ninja==1.13.0
+          uv tool dir --bin >> "$GITHUB_PATH"
+      - name: Cache Cargo artifacts
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: cpp-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ hashFiles('rust/**/*.rs', 'rust/**/Cargo.toml') }}
+          restore-keys: |
+            cpp-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+      # The conformance tests run the sanitized driver.
+      - name: Configure
+        env:
+          CXX: ${{ matrix.cxx }}
+        run: cmake --preset ${{ matrix.preset }}
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }}
+      - name: Test
+        run: ctest --preset ${{ matrix.preset }}
+
+  lint:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install compiler
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang-20 g++-14
+      - uses: astral-sh/setup-uv@v7
+      - name: Install CMake and Ninja
+        run: |
+          uv tool install cmake==4.4.4
+          uv tool install ninja==1.13.0
+          uv tool dir --bin >> "$GITHUB_PATH"
+      - name: Check formatting
+        run: git ls-files 'cpp/*.hpp' 'cpp/*.cpp' | xargs uvx clang-format==22.1.8 --dry-run --Werror
+      # clang-tidy needs only compile_commands.json, which configuring writes.
+      - name: Configure
+        working-directory: cpp
+        env:
+          CXX: clang++-20
+        run: cmake --preset dev -DIRIS_CONFORMANCE_TESTS=OFF
+      - name: Lint
+        run: git ls-files 'cpp/*.cpp' | xargs uvx clang-tidy==22.1.8 -p cpp/build/dev --quiet

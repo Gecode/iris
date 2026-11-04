@@ -12,12 +12,44 @@
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "CMAKE_COMPILE_WARNING_AS_ERROR": "ON"
       }
+    },
+    {
+      "name": "asan",
+      "inherits": "dev",
+      "displayName": "AddressSanitizer and UndefinedBehaviorSanitizer",
+      "description": "The dev build under ASan and UBSan, which stop at the first error (GCC or Clang)",
+      "binaryDir": "${sourceDir}/build/asan",
+      "cacheVariables": {
+        "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined",
+        "IRIS_CONFORMANCE_CASE_TIMEOUT": "300"
+      }
+    },
+    {
+      "name": "tsan",
+      "inherits": "dev",
+      "displayName": "ThreadSanitizer",
+      "description": "The dev build under TSan (GCC or Clang)",
+      "binaryDir": "${sourceDir}/build/tsan",
+      "cacheVariables": {
+        "CMAKE_CXX_FLAGS": "-fsanitize=thread -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=thread",
+        "IRIS_CONFORMANCE_CASE_TIMEOUT": "300"
+      }
     }
   ],
   "buildPresets": [
     {
       "name": "dev",
       "configurePreset": "dev"
+    },
+    {
+      "name": "asan",
+      "configurePreset": "asan"
+    },
+    {
+      "name": "tsan",
+      "configurePreset": "tsan"
     }
   ],
   "testPresets": [
@@ -26,6 +58,22 @@
       "configurePreset": "dev",
       "output": {
         "outputOnFailure": true
+      }
+    },
+    {
+      "name": "asan",
+      "inherits": "dev",
+      "configurePreset": "asan",
+      "environment": {
+        "UBSAN_OPTIONS": "print_stacktrace=1"
+      }
+    },
+    {
+      "name": "tsan",
+      "inherits": "dev",
+      "configurePreset": "tsan",
+      "environment": {
+        "TSAN_OPTIONS": "halt_on_error=1 second_deadlock_stack=1"
       }
     }
   ]

@@ -114,8 +114,8 @@ A vendored copy builds no tests and has no install rules unless
 
 ## Requirements
 
-- A C++23 compiler and standard library. Apple Clang 21 and GCC 14 are
-  tested.
+- A C++23 compiler and standard library. Apple Clang 21, GCC 14 and
+  Clang 20 with GCC 14's libstdc++ are tested; CI also builds with MSVC.
 - CMake 3.28 or newer. `uvx --from cmake==4.4.4 cmake` runs a pinned one.
 - Ninja, for the presets.
 - Stable Rust, for the conformance test, which runs the shared runner in
@@ -164,19 +164,32 @@ The driver implements the `parse`, `read`, `catalog` and `dzn` operations.
 
 `-DIRIS_BUILD_TESTS=OFF` builds the library alone, and
 `-DIRIS_CONFORMANCE_TESTS=OFF` drops the conformance test.
+`-DIRIS_CONFORMANCE_CASE_TIMEOUT=SECONDS` sets the runner's limit for one
+case, 30 seconds by default; each conformance test may take 60 times that.
 
 ## Sanitizers
 
-From the repository root:
+The `asan` preset builds the `dev` configuration in `build/asan` under
+AddressSanitizer and UndefinedBehaviorSanitizer, which stop at the first
+error, and the `tsan` preset in `build/tsan` under ThreadSanitizer. Both
+need GCC or Clang. From `cpp/`:
 
 ```sh
-cmake -S cpp -B cpp/build/asan -G Ninja -DCMAKE_BUILD_TYPE=Debug \
-  -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
-  '-DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer' \
-  '-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined'
-cmake --build cpp/build/asan
-ctest --test-dir cpp/build/asan --output-on-failure
+cmake --preset asan
+cmake --build --preset asan
+ctest --preset asan
 ```
+
+and the same with `tsan`. The conformance tests then run the sanitized
+driver, and `memory` reads with one spec on two threads at once, which TSan
+checks. The `tsan` test preset sets `TSAN_OPTIONS=halt_on_error=1`, and
+both presets allow the slower sanitized driver 300 seconds a case. A build
+directory configured before keeps its cache, so add `--fresh` to the first
+command to apply the preset to it again. On Linux, use GCC for `tsan`:
+Clang links the TSan runtime statically there, and its `operator new`
+clashes with the one the `memory` test defines. TSan may also fail at
+startup with "unexpected memory mapping" until
+`sudo sysctl vm.mmap_rnd_bits=28`.
 
 ## Format and lint
 
@@ -214,6 +227,17 @@ The container runs all four conformance tests too. The cases in
 [`libstdcxx-skips.txt`](../conformance/adapters/gecode/libstdcxx-skips.txt),
 which the Gecode reference reads or prints wrongly with libstdc++, must pass
 there as they do with libc++.
+
+## Continuous integration
+
+[`.github/workflows/cpp.yml`](../.github/workflows/cpp.yml) runs on changes
+to `cpp/`, `conformance/`, `formats/`, `rust/` and the workflow. It builds
+the `dev` preset and runs `ctest`, including the four conformance tests,
+with GCC 14 and Clang 20 on Ubuntu 24.04, Apple Clang on macOS, and MSVC on
+Windows; runs the `asan` preset with Clang 20 and the `tsan` preset with
+GCC 14 on Ubuntu; and
+checks the formatting and runs clang-tidy as above. CMake 4.4.4 and Ninja
+come from PyPI through uv.
 
 ## Layout
 

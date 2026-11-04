@@ -1,7 +1,7 @@
 # Run the conformance cases of one operation through a driver.
 #
 #   cmake -DDRIVER=... -DREPOSITORY=... -DCARGO=... -DOPERATION=parse
-#         -P conformance.cmake
+#         [-DCASE_TIMEOUT=seconds] -P conformance.cmake
 #
 # Discovers the cases in conformance/cases/0.1 and formats as the runner
 # does, selects those whose case.toml names OPERATION (read without one),
@@ -14,6 +14,10 @@ foreach(variable IN ITEMS DRIVER REPOSITORY CARGO OPERATION)
     message(FATAL_ERROR "conformance.cmake needs -D${variable}=...")
   endif()
 endforeach()
+# The runner's limit for one case, its default unless given
+if(NOT DEFINED CASE_TIMEOUT)
+  set(CASE_TIMEOUT 30)
+endif()
 
 # The runner shows canonical absolute paths, so the cases are found below
 # the canonical repository path too.
@@ -102,7 +106,8 @@ function(run_batches paths)
     list(TRANSFORM batch PREPEND "${REPOSITORY}/")
     execute_process(
       COMMAND "${CARGO}" run --quiet --locked -p iris-conformance --
-        run --driver "\"${DRIVER}\"" --version 0.1 ${batch}
+        run --driver "\"${DRIVER}\"" --version 0.1 --timeout ${CASE_TIMEOUT}
+        ${batch}
       WORKING_DIRECTORY "${REPOSITORY}/rust"
       RESULT_VARIABLE exit_status
       OUTPUT_VARIABLE output

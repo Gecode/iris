@@ -21,6 +21,10 @@
 #include <system_error>
 #include <thread>
 
+#ifdef _WIN32
+#include <malloc.h>
+#endif
+
 namespace {
 
 /// Return `bytes` of memory aligned to `alignment` from the C heap, or null
