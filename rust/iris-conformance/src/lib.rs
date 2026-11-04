@@ -1,6 +1,7 @@
 //! A standalone conformance runner; it has no implementation-crate dependency.
 pub mod canonical;
 pub mod case;
+pub mod differential;
 pub mod driver;
 pub mod examples;
 pub mod grammar;

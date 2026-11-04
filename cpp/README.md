@@ -132,7 +132,7 @@ cmake --build --preset dev
 ctest --preset dev
 ```
 
-`ctest` runs thirteen tests. `spec-api` and `data-api` check the public
+`ctest` runs fifteen tests. `spec-api` and `data-api` check the public
 API; `data-api` also checks the driver's JSON of data, and both outputs
 under every rounding mode. `budget` checks the exact budget limits that no
 conformance case reaches. `memory` checks the allocation hook: it replaces
@@ -148,7 +148,9 @@ installs the build to `build/dev/tests/consumer/prefix`;
 source tree. Both use this build's compiler and flags. `parse-conformance`, `read-conformance`,
 `catalog-conformance` and `dzn-conformance` run the driver `iris-driver` on
 every case of their operation in `conformance/cases/0.1` and `formats`, and
-fail unless all of them pass. Run one alone with, for example, `ctest
+fail unless all of them pass. `fuzz-replay-parse` and `fuzz-replay-read`
+run the two fuzz targets (see [Fuzzing](#fuzzing)) over every file in
+`formats`. Run one alone with, for example, `ctest
 --preset dev -R read-conformance`. The first conformance run builds the
 runner with Cargo.
 
@@ -190,6 +192,85 @@ Clang links the TSan runtime statically there, and its `operator new`
 clashes with the one the `memory` test defines. TSan may also fail at
 startup with "unexpected memory mapping" until
 `sudo sysctl vm.mmap_rnd_bits=28`.
+
+## Fuzzing
+
+Two libFuzzer targets in `fuzz/` exercise the library under ASan and UBSan:
+
+- `iris-fuzz-parse` parses arbitrary bytes as a reader spec. It renders
+  every error, and aborts unless the spec is rejected with
+  `E-SPEC-UTF8` exactly when its bytes are not valid UTF-8.
+- `iris-fuzz-read` splits its input at the first NUL byte into a reader
+  spec and data input, as Rust's `read` target does. It parses the spec,
+  then reads and catalogs the input with no parameters, and renders data
+  as the driver's JSON and as dzn, and errors as text and as the driver's
+  JSON.
+
+libFuzzer comes with LLVM Clang. Apple Clang lacks it, so on macOS use
+Homebrew LLVM; on Ubuntu 24.04 install `clang-20` and
+`libclang-rt-20-dev`. From `cpp/`:
+
+```sh
+export SDKROOT="$(xcrun --show-sdk-path)"           # macOS only
+CXX=/opt/homebrew/opt/llvm/bin/clang++ cmake --preset fuzz   # or CXX=clang++-20
+cmake --build --preset fuzz
+```
+
+The `fuzz` preset builds with `-O1`, assertions, and ASan and UBSan, which
+stop at the first error, in `build/fuzz`. Configuring it with another
+compiler fails. The Rust seed corpora serve both implementations: write
+them once from the repository root with `python3 -I
+rust/fuzz/seed-corpus.py`, then fuzz a target from `cpp/`:
+
+```sh
+mkdir -p build/fuzz/corpus/parse build/fuzz/artifacts/parse
+build/fuzz/fuzz/iris-fuzz-parse build/fuzz/corpus/parse ../rust/fuzz/corpus/parse \
+  -dict=fuzz/iris.dict -max_total_time=300 -max_len=8192 -timeout=60 \
+  -artifact_prefix=build/fuzz/artifacts/parse/
+```
+
+and the same with `read`. New inputs go to the first corpus directory, in
+the ignored build directory, so the Rust corpus stays as written.
+`fuzz/iris.dict` lists the keywords, types, functions, layouts and
+punctuation of the language. Reproduce a failing input with
+`build/fuzz/fuzz/iris-fuzz-parse FILE`. Every other build compiles the
+targets with `fuzz/replay.cpp` in place of libFuzzer, as
+`build/dev/fuzz/iris-fuzz-parse FILE_OR_DIRECTORY...`, which runs them
+with any compiler.
+
+### Comparing with Rust
+
+`iris-conformance differential` generates cases, runs them through the Rust
+driver and this one, and fails on any difference in outcome. Half the cases
+are reader specs generated with matching input; the other half mutate the
+conformance cases given as roots. Build the Rust driver in release mode and
+the sanitized driver, then from `rust/`:
+
+```sh
+cargo build --release --locked -p iris-cli -p iris-conformance
+(cd ../cpp && cmake --preset asan && cmake --build --preset asan --target iris-driver)
+ASAN_OPTIONS=abort_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:abort_on_error=1 \
+  target/release/iris-conformance differential \
+  --driver "\"$PWD/target/release/iris-driver\"" \
+  --driver "\"$PWD/../cpp/build/asan/iris-driver\"" \
+  --duration 600 --jobs 8 --keep /tmp/iris-differential \
+  ../conformance/cases/0.1 ../formats
+```
+
+`abort_on_error` matters: without it a sanitizer report exits 1, which the
+driver protocol reads as a language error. The run prints its seed and its
+counts per strategy, operation and outcome. On a disagreement it reduces
+the case, writes `original/` and `reduced/` case directories under `--keep`
+with the drivers' output in `drivers.txt`, prints the command that replays
+the case alone, and exits 1. See
+[`rust/iris-conformance/README.md`](../rust/iris-conformance/README.md#differential-runs).
+
+A crash or disagreement that is a bug here is fixed in `src/`, and its
+reduced input becomes a conformance case in the right area of
+`conformance/cases/0.1`, which must pass with both drivers and
+`check-grammar`. A crash that no case can express becomes a replay input.
+If the Rust implementation or the Specification is at fault, report it
+rather than changing the reader here.
 
 ## Format and lint
 
@@ -235,8 +316,11 @@ to `cpp/`, `conformance/`, `formats/`, `rust/` and the workflow. It builds
 the `dev` preset and runs `ctest`, including the four conformance tests,
 with GCC 14 and Clang 20 on Ubuntu 24.04, Apple Clang on macOS, and MSVC on
 Windows; runs the `asan` preset with Clang 20 and the `tsan` preset with
-GCC 14 on Ubuntu; and
-checks the formatting and runs clang-tidy as above. CMake 4.4.4 and Ninja
+GCC 14 on Ubuntu;
+runs each fuzz target for two minutes with Clang 20; compares the Rust
+driver with the `asan` driver for five minutes, seeded with the run's ID;
+and checks the formatting and runs clang-tidy as above. A failing fuzz or
+differential job uploads its failing inputs or reproducers. CMake 4.4.4 and Ninja
 come from PyPI through uv.
 
 ## Layout
@@ -259,6 +343,9 @@ come from PyPI through uv.
   rounding mode, and `dzn.cpp` spells floats with integer arithmetic.
 - `driver/`: `iris-driver`, the conformance driver. It speaks the protocol
   in [`conformance/README.md`](../conformance/README.md).
+- `fuzz/`: the libFuzzer targets `parse.cpp` and `read.cpp`, the
+  dictionary `iris.dict`, and `replay.cpp`, which runs a target without
+  libFuzzer.
 - `tests/`: the API, budget and memory tests; `conformance.cmake`, which
   selects the cases of one operation and runs them in batches;
   `no-gecode.cmake`; and `consumer/`, a project that uses the library.

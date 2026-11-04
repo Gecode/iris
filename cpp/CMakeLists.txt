@@ -12,6 +12,7 @@ if(EXISTS "${PROJECT_SOURCE_DIR}/../conformance/cases")
 else()
   set(iris_has_conformance OFF)
 endif()
+option(IRIS_FUZZ "Build the fuzz targets with libFuzzer (Clang only)" OFF)
 option(IRIS_CONFORMANCE_TESTS "Run the conformance suite through the driver (needs cargo)"
   ${iris_has_conformance})
 
@@ -93,4 +94,8 @@ if(IRIS_BUILD_TESTS)
   iris_set_warnings(iris-driver)
   enable_testing()
   add_subdirectory(tests)
+endif()
+
+if(IRIS_FUZZ OR IRIS_BUILD_TESTS)
+  add_subdirectory(fuzz)
 endif()

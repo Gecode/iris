@@ -2,8 +2,9 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Duration;
 
-use clap::{Parser, Subcommand};
+use clap::{ArgGroup, Parser, Subcommand};
 use iris_conformance::RunOptions;
+use iris_conformance::differential::{self, Limit};
 
 #[derive(Parser)]
 #[command(
@@ -41,6 +42,39 @@ enum Commands {
         #[arg(long, default_value = "30", value_parser = parse_timeout)]
         timeout: Duration,
         #[arg(required = true)]
+        cases_dir: Vec<PathBuf>,
+    },
+    /// Compare drivers on generated and mutated cases until the first
+    /// difference in canonical outcome.
+    #[command(group(ArgGroup::new("limit").required(true).args(["cases", "duration"])))]
+    Differential {
+        /// A driver command; give two or more.
+        #[arg(long = "driver", required = true)]
+        drivers: Vec<String>,
+        /// The run's seed; by default one from the clock, which the summary prints.
+        #[arg(long)]
+        seed: Option<u64>,
+        /// The index of the first case.
+        #[arg(long, default_value_t = 0)]
+        start: u64,
+        /// Stop after this many cases.
+        #[arg(long)]
+        cases: Option<u64>,
+        /// Stop starting cases after this many seconds.
+        #[arg(long, value_parser = parse_seconds)]
+        duration: Option<Duration>,
+        /// Cases compared at the same time.
+        #[arg(long, default_value_t = 1)]
+        jobs: usize,
+        /// Seconds each driver may take for one request.
+        #[arg(long, default_value = "30", value_parser = parse_timeout)]
+        timeout: Duration,
+        /// Write the original and reduced failing case to this empty directory.
+        #[arg(long)]
+        keep: Option<PathBuf>,
+        #[arg(long, default_value = "0.1")]
+        version: String,
+        /// Conformance case roots whose cases the mutate strategy changes.
         cases_dir: Vec<PathBuf>,
     },
 }
@@ -102,6 +136,61 @@ fn main() -> ExitCode {
                 }
             }
         }
+        Commands::Differential {
+            drivers,
+            seed,
+            start,
+            cases,
+            duration,
+            jobs,
+            timeout,
+            keep,
+            version,
+            cases_dir,
+        } => {
+            let limit = match (cases, duration) {
+                (Some(cases), _) => Limit::Cases(cases),
+                (None, Some(duration)) => Limit::Duration(duration),
+                (None, None) => unreachable!("clap requires --cases or --duration"),
+            };
+            let options = differential::Options {
+                drivers,
+                seed: seed.unwrap_or_else(clock_seed),
+                start,
+                limit,
+                jobs,
+                timeout,
+                keep,
+                version,
+                roots: cases_dir,
+            };
+            match differential::run(&options) {
+                Ok(report) => {
+                    print!("{}", report.render());
+                    ExitCode::from(report.exit_code())
+                }
+                Err(error) => {
+                    eprintln!("error: {error}");
+                    ExitCode::from(2)
+                }
+            }
+        }
+    }
+}
+
+fn clock_seed() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_nanos() as u64)
+}
+
+fn parse_seconds(text: &str) -> Result<Duration, String> {
+    let seconds: f64 = text
+        .parse()
+        .map_err(|_| "duration must be positive seconds".to_string())?;
+    match Duration::try_from_secs_f64(seconds) {
+        Ok(duration) if !duration.is_zero() => Ok(duration),
+        _ => Err("duration must be finite, positive seconds".into()),
     }
 }
 
