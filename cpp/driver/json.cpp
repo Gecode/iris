@@ -255,28 +255,52 @@ std::string encode_location(const std::optional<Location> &location) {
          ",\"column\":" + number(location->column) + "}";
 }
 
-/// Append the JSON of `value` to `out`
+/// Append the JSON of single value `value` to `out`
+void append_single(std::string &out, const ValueRef &value) {
+  switch (value.type()) {
+  case ValueType::Int:
+    out += std::to_string(value.integer());
+    return;
+  case ValueType::Float:
+    out += encode_float(value.number());
+    return;
+  case ValueType::String:
+    out += quote_json(value.text());
+    return;
+  }
+}
+
+/// Append the JSON of `value` to `out`, with an explicit stack of the
+/// arrays being written that keeps deep arrays off the call stack
 void append_value(std::string &out, const ValueRef &value) {
   if (value.depth() == 0) {
-    switch (value.type()) {
-    case ValueType::Int:
-      out += std::to_string(value.integer());
-      return;
-    case ValueType::Float:
-      out += encode_float(value.number());
-      return;
-    case ValueType::String:
-      out += quote_json(value.text());
-      return;
+    append_single(out, value);
+    return;
+  }
+  // An array being written and its first element not yet written
+  struct Open {
+    ValueRef array;
+    std::size_t next;
+  };
+  std::vector<Open> open{{.array = value, .next = 0}};
+  out += '[';
+  while (!open.empty()) {
+    Open &o = open.back();
+    if (o.next == o.array.size()) {
+      out += ']';
+      open.pop_back();
+      continue;
+    }
+    if (o.next > 0)
+      out += ',';
+    const ValueRef element = o.array[o.next++];
+    if (element.depth() == 0) {
+      append_single(out, element);
+    } else {
+      out += '[';
+      open.push_back({.array = element, .next = 0});
     }
   }
-  out += '[';
-  for (std::size_t i = 0; i < value.size(); ++i) {
-    if (i > 0)
-      out += ',';
-    append_value(out, value[i]);
-  }
-  out += ']';
 }
 
 } // namespace

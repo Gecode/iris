@@ -38,6 +38,7 @@
 
 #include "text.hpp"
 
+#include <cfenv>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -78,11 +79,36 @@ std::optional<std::int64_t> parse_int(std::string_view t);
  * Return the decimal float `t`, which may have a sign, or nothing if `t` is
  * not one or is not representable
  *
- * The value is rounded to nearest. A value that overflows, or a nonzero
- * value that rounds to a subnormal or to zero, is not representable
- * (Specification §4.5).
+ * The value is rounded to nearest, which needs a NearestRounding in scope.
+ * A value that overflows, or a nonzero value that rounds to a subnormal or
+ * to zero, is not representable (Specification §4.5).
  */
 std::optional<double> parse_float(std::string_view t);
+
+/**
+ * Round to nearest, ties to even, while this object exists
+ *
+ * Every conversion to binary64 in a read rounds to nearest, whatever the
+ * caller's rounding mode (Specification §4.5 and §6.2). The library's
+ * entry points hold one of these. Destruction restores the caller's
+ * floating-point environment, exception flags included, and no exception
+ * traps in between.
+ */
+class NearestRounding {
+public:
+  NearestRounding() {
+    std::feholdexcept(&caller_);
+    std::fesetround(FE_TONEAREST);
+  }
+  ~NearestRounding() { std::fesetenv(&caller_); }
+  NearestRounding(const NearestRounding &) = delete;
+  NearestRounding(NearestRounding &&) = delete;
+  NearestRounding &operator=(const NearestRounding &) = delete;
+  NearestRounding &operator=(NearestRounding &&) = delete;
+
+private:
+  std::fenv_t caller_{};
+};
 
 /*
  * Checked integer arithmetic (Specification §8.4): each function returns

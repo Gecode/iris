@@ -53,4 +53,14 @@ namespace iris::detail {
 DataImpl read(const SpecImpl &spec, std::string_view text, std::string origin,
               const ParamsImpl &params);
 
+/**
+ * Run reader spec `spec` on the input `text` from `origin` with the
+ * parameters `params`, and return the catalog of its instances
+ * (Specification §9.6)
+ *
+ * Throws Error for every language error.
+ */
+DataImpl catalog(const SpecImpl &spec, std::string_view text,
+                 std::string origin, const ParamsImpl &params);
+
 } // namespace iris::detail

@@ -1,15 +1,26 @@
 #include <iris/iris.hpp>
 
+#include "json.hpp"
+
+#include <array>
+#include <bit>
+#include <cfenv>
+#include <charconv>
+#include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
 #include <iostream>
+#include <limits>
 #include <optional>
 #include <source_location>
 #include <span>
+#include <string>
 #include <string_view>
 #include <system_error>
+#include <thread>
 #include <vector>
 
 namespace {
@@ -163,6 +174,209 @@ void returns_errors() {
   check(thrown, "missing file");
 }
 
+void catalogs_instances() {
+  const iris::Spec spec = iris::Spec::parse(
+      "instances {name: word n: int check n > 0 \"positive\"}", "spec.iris");
+  const iris::Data catalog = spec.catalog_text("a 1\nb 0\n", "input.txt");
+  check((catalog.size() == 3) && (catalog.name(0) == "instances") &&
+            (catalog.name(1) == "name") && (catalog.name(2) == "failed"),
+        "catalog entries");
+  check(catalog.integer("instances") == 2, "instance count");
+  check((catalog.text("name", {0}) == "a") &&
+            (catalog.text("name", {1}) == "b"),
+        "instance names");
+  check((catalog.text("failed", {0}).empty()) &&
+            (catalog.text("failed", {1}) == "positive"),
+        "rejection summaries");
+  // The selector does not restrict a catalog
+  const auto selected = spec.try_catalog_text("a 1\nb 2\n", "input.txt",
+                                              iris::Params{{"instance", "b"}});
+  check(selected && (selected->size() == 2) &&
+            (selected->integer("instances") == 2),
+        "try_catalog_text data");
+  const auto failed = spec.try_catalog_text("a x\n", "input.txt");
+  check(!failed && (failed.error().code() == iris::ErrorCode::ExpectedValue) &&
+            (failed.error().context() == "instance [1] > n"),
+        "try_catalog_text error");
+  bool thrown = false;
+  try {
+    check(!spec.try_catalog(std::filesystem::path("no/such/input.txt")),
+          "no catalog of a missing file");
+  } catch (const std::system_error &) {
+    thrown = true;
+  }
+  check(thrown, "missing catalog file");
+}
+
+void renders_dzn() {
+  const iris::Spec spec =
+      iris::Spec::parse("n: int x[2]: float var: word", "spec.iris");
+  const iris::Data data = spec.read_text("3 0.5 20 \"q\"\n", "input.txt");
+  check(data.dzn() == "n = 3;\nx = [0.5, 20.0];\n'var' = \"\\\"q\\\"\";\n",
+        "dzn");
+  check(iris::Data().dzn().empty(), "dzn without entries");
+}
+
+/**
+ * Return the spelling of finite nonzero `f` from appendix B.3 by the
+ * library's own conversions, which follow the algorithm only when rounding
+ * to nearest
+ */
+std::string library_spelling(double f) {
+  const double m = std::fabs(f);
+  int precision = 1;
+  double power = 10.0;
+  while ((m < 1e17) && (m >= power)) {
+    precision++;
+    power *= 10.0;
+  }
+  std::array<char, 32> text{};
+  for (;; precision++) {
+    char *end = std::to_chars(text.data(), text.data() + text.size(), f,
+                              std::chars_format::general, precision)
+                    .ptr;
+    double back = 0.0;
+    std::from_chars(text.data(), end, back);
+    if ((back == f) || (precision == 17)) {
+      std::string t(text.data(), end);
+      if (t.find_first_of(".e") == std::string::npos)
+        t += ".0";
+      return t;
+    }
+  }
+}
+
+/// Return the shortest decimal that reads back as `f`
+std::string shortest(double f) {
+  std::array<char, 32> text{};
+  return {text.data(),
+          std::to_chars(text.data(), text.data() + text.size(), f).ptr};
+}
+
+void renders_floats_exactly() {
+  // Powers of two and ten with their neighbours, integers near 1e17, and
+  // random bit patterns, all normal as input floats are
+  std::vector<double> values;
+  const auto add = [&values](double f) {
+    for (const double x : {f, std::nextafter(f, 0.0), std::nextafter(f, 2 * f)})
+      if (std::isnormal(x))
+        values.push_back(x);
+  };
+  for (int e = -1022; e <= 1023; e++)
+    add(std::ldexp(1.0, e));
+  for (int e = -307; e <= 308; e++)
+    add(std::stod("1e" + std::to_string(e)));
+  for (const double f : {9007199254740992.0, 99999999999999984.0, 1e17, 0.3})
+    add(f);
+  // SplitMix64, for the same bit patterns on every platform
+  std::uint64_t state = 2026;
+  for (int i = 0; i < 20000; i++) {
+    std::uint64_t z = (state += 0x9e3779b97f4a7c15U);
+    z = (z ^ (z >> 30U)) * 0xbf58476d1ce4e5b9U;
+    z = (z ^ (z >> 27U)) * 0x94d049bb133111ebU;
+    const auto f = std::bit_cast<double>(z ^ (z >> 31U));
+    if (std::isnormal(f))
+      values.push_back(f);
+  }
+  std::string input;
+  for (const double f : values)
+    input += shortest(f) + '\n';
+  const std::string spec = "f[" + std::to_string(values.size()) + "]: float";
+  const std::string dzn = iris::Spec::parse(spec).read_text(input).dzn();
+  // The leaves between "f = [" and "];\n"
+  std::string_view rest = std::string_view(dzn).substr(5);
+  for (const double f : values) {
+    const std::size_t end = rest.find_first_of(",]");
+    if (rest.substr(0, end) != library_spelling(f)) {
+      check(false, "float spelling of " + shortest(f) + ": " +
+                       std::string(rest.substr(0, end)));
+      return;
+    }
+    rest.remove_prefix(rest[end] == ',' ? end + 2 : end);
+  }
+  check(rest == "];\n", "all floats spelled");
+}
+
+/// Set the rounding mode for the lifetime of this object
+class RoundingMode {
+public:
+  explicit RoundingMode(int mode) { std::fesetround(mode); }
+  ~RoundingMode() { std::fesetround(FE_TONEAREST); }
+  RoundingMode(const RoundingMode &) = delete;
+  RoundingMode(RoundingMode &&) = delete;
+  RoundingMode &operator=(const RoundingMode &) = delete;
+  RoundingMode &operator=(RoundingMode &&) = delete;
+};
+
+void ignores_rounding_mode() {
+  // Values whose conversions depend on the rounding mode: decimals, an
+  // offset, integers beyond 2^53, and float spellings
+  const std::string_view spec_text =
+      "let f=0.1 g[6]: float h: float offset 1 n[2]: num";
+  const std::string_view input =
+      "0.3333333333333333 1e23 123456.789 2.2250738585072014e-308 "
+      "1.7976931348623157e308 9007199254740993\n0.1\n0.5 9007199254740993\n";
+  const std::string expected =
+      "f = 0.1;\n"
+      "g = [0.3333333333333333, 1e+23, 123456.789, 2.2250738585072014e-308, "
+      "1.7976931348623157e+308, 9007199254740992.0];\n"
+      "h = 1.1;\n"
+      "n = [0.5, 9007199254740992.0];\n";
+  const iris::Data nearest = iris::Spec::parse(spec_text).read_text(input);
+  check(nearest.dzn() == expected, "dzn when rounding to nearest");
+  const std::string json = iris::driver::encode_data(nearest);
+  check(iris::driver::encode_float(0.1) == "0.1", "JSON float");
+  for (const auto &[mode, name] :
+       {std::pair{FE_DOWNWARD, "downward"}, std::pair{FE_UPWARD, "upward"},
+        std::pair{FE_TOWARDZERO, "toward zero"}}) {
+    const RoundingMode rounding(mode);
+    const std::string when = std::string(" when rounding ") + name;
+    check(nearest.dzn() == expected, "dzn" + when);
+    check(iris::driver::encode_data(nearest) == json, "JSON" + when);
+    // Reading leaves the caller's environment, flags included, as it was
+    std::feclearexcept(FE_ALL_EXCEPT);
+    const iris::Data read = iris::Spec::parse(spec_text).read_text(input);
+    check(std::fegetround() == mode, "rounding mode restored" + when);
+    check(std::fetestexcept(FE_ALL_EXCEPT) == 0, "no flags raised" + when);
+    check(read.dzn() == expected, "dzn of data read" + when);
+    check(iris::driver::encode_data(read) == json, "JSON of data read" + when);
+    check(std::fegetround() == mode, "rounding mode kept" + when);
+  }
+}
+
+void renders_deep_arrays() {
+  // Deep arrays are valid, so rendering them must not exhaust the stack
+  constexpr std::size_t depth = 30000;
+  std::string spec = "x";
+  for (std::size_t i = 0; i < depth; i++)
+    spec += "[1]";
+  spec += ": int";
+  const iris::Data data = iris::Spec::parse(spec).read_text("1");
+  std::string dzn;
+  std::string json;
+  // A thread of its own has less stack than the main thread
+  std::thread([&] {
+    dzn = data.dzn();
+    json = iris::driver::encode_data(data);
+  }).join();
+  std::string expected = "% x: ";
+  for (std::size_t i = 1; i < depth; i++)
+    expected += "array[int] of tuple(";
+  expected += "array[int] of int" + std::string(depth - 1, ')') + "\nx = ";
+  for (std::size_t i = 1; i < depth; i++)
+    expected += "[(";
+  expected += "[1]";
+  for (std::size_t i = 1; i < depth; i++)
+    expected += ",)]";
+  check(dzn == expected + ";\n", "dzn of a deep array");
+  check(json ==
+            R"({"iris":"0.1","entries":[{"name":"x","type":"int","depth":)" +
+                std::to_string(depth) +
+                ",\"value\":" + std::string(depth, '[') + "1" +
+                std::string(depth, ']') + "}]}\n",
+        "JSON of a deep array");
+}
+
 } // namespace
 
 int main() {
@@ -172,6 +386,11 @@ int main() {
     rejects_misuse();
     passes_params();
     returns_errors();
+    catalogs_instances();
+    renders_dzn();
+    renders_floats_exactly();
+    ignores_rounding_mode();
+    renders_deep_arrays();
   } catch (const std::exception &error) {
     std::cerr << "unexpected exception: " << error.what() << '\n';
     return EXIT_FAILURE;

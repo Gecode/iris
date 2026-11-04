@@ -31,6 +31,7 @@ add_library(iris::iris ALIAS iris)
 target_sources(iris
   PRIVATE
     src/data.cpp
+    src/dzn.cpp
     src/error.cpp
     src/eval.cpp
     src/lexer.cpp

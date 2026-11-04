@@ -1,6 +1,6 @@
 // The conformance driver of the C++ library: it answers the requests of the
-// conformance runner (conformance/README.md). It implements parse and read;
-// catalog and dzn fail as host failures until the library implements them.
+// conformance runner (conformance/README.md) for parse, read, catalog, and
+// dzn.
 
 #include "json.hpp"
 
@@ -8,6 +8,7 @@
 
 #include <csignal>
 #include <exception>
+#include <expected>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -18,14 +19,23 @@
 #include <utility>
 #include <vector>
 
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+#endif
+
 namespace {
 
 using iris::driver::Misuse;
 
 enum class Operation { Parse, Read, Catalog, Dzn };
 
+/// How successful data is written
+enum class Output { Json, Dzn };
+
 struct Request {
   Operation operation = Operation::Parse;
+  Output output = Output::Json;
   std::string spec_path;
   std::string input_path;
   iris::driver::ParamPairs params;
@@ -43,7 +53,6 @@ constexpr int host_failure_status = 3;
 
 Request parse_request(int argc, char **argv);
 std::string read_binary_file(const std::string &path);
-std::string_view command_name(Operation operation);
 
 Response execute_request(const Request &request) {
   const std::string spec_text = read_binary_file(request.spec_path);
@@ -55,34 +64,22 @@ Response execute_request(const Request &request) {
   }
   if (request.operation == Operation::Parse)
     return {.output = "{\"iris\":\"0.1\",\"parsed\":true}\n", .status = 0};
-  if (request.operation != Operation::Read)
-    throw std::runtime_error(std::string(command_name(request.operation)) +
-                             " is not implemented yet");
   iris::Params params;
   for (const auto &[name, value] : request.params)
     params.set(name, value);
   const std::string input = read_binary_file(request.input_path);
-  const auto data = spec->try_read_text(input, request.input_path, params);
+  const std::expected<iris::Data, iris::Error> data =
+      (request.operation == Operation::Catalog)
+          ? spec->try_catalog_text(input, request.input_path, params)
+          : spec->try_read_text(input, request.input_path, params);
   if (!data) {
     std::cerr << data.error().what() << '\n';
     return {.output = iris::driver::encode_error(data.error()),
             .status = language_error_status};
   }
+  if (request.output == Output::Dzn)
+    return {.output = data->dzn(), .status = 0};
   return {.output = iris::driver::encode_data(*data), .status = 0};
-}
-
-std::string_view command_name(Operation operation) {
-  switch (operation) {
-  case Operation::Parse:
-    return "parse";
-  case Operation::Read:
-    return "read";
-  case Operation::Catalog:
-    return "catalog";
-  case Operation::Dzn:
-    return "dzn";
-  }
-  std::unreachable();
 }
 
 Operation parse_operation(std::string_view command) {
@@ -104,6 +101,8 @@ Request parse_request(int argc, char **argv) {
   const std::vector<std::string_view> args(argv + 1, argv + argc);
   Request request;
   request.operation = parse_operation(args[0]);
+  if (request.operation == Operation::Dzn)
+    request.output = Output::Dzn;
   request.spec_path = args[1];
   std::size_t next = 2;
   if (request.operation != Operation::Parse) {
@@ -133,6 +132,8 @@ Request parse_request(int argc, char **argv) {
     } else if ((request.operation != Operation::Catalog) ||
                ((value != "json") && (value != "dzn"))) {
       throw Misuse("--format json|dzn is only valid for catalog");
+    } else {
+      request.output = (value == "dzn") ? Output::Dzn : Output::Json;
     }
   }
   if ((request.operation == Operation::Parse) && !request.params.empty())
@@ -158,6 +159,10 @@ int main(int argc, char **argv) {
 #ifdef SIGPIPE
   // Let failed pipe writes reach the host-failure boundary.
   std::signal(SIGPIPE, SIG_IGN);
+#endif
+#ifdef _WIN32
+  // Write dzn and JSON bytes unchanged, without CR before LF.
+  _setmode(_fileno(stdout), _O_BINARY);
 #endif
   try {
     const Response response = execute_request(parse_request(argc, argv));

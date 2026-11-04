@@ -52,6 +52,28 @@ public:
   try_read_text(std::string_view text, std::string origin = "<input>",
                 const Params &params = {}) const;
 
+  /// Catalog the instances of the input file at `path` with the parameters
+  /// `params`: read every instance and return the entries `instances`,
+  /// `name` if every instance has a name, and `failed` if an instance is
+  /// rejected (Specification §9.6). Throws like read().
+  [[nodiscard]] Data catalog(const std::filesystem::path &path,
+                             const Params &params = {}) const;
+  /// Catalog the input `text` from `origin` like catalog(). Throws Error for
+  /// every language error.
+  [[nodiscard]] Data catalog_text(std::string_view text,
+                                  std::string origin = "<input>",
+                                  const Params &params = {}) const;
+  /// Catalog like catalog(), but return a language error instead of
+  /// throwing it. A file that cannot be read still throws std::system_error.
+  [[nodiscard]] std::expected<Data, Error>
+  try_catalog(const std::filesystem::path &path,
+              const Params &params = {}) const;
+  /// Catalog like catalog_text(), but return the Error instead of throwing
+  /// it.
+  [[nodiscard]] std::expected<Data, Error>
+  try_catalog_text(std::string_view text, std::string origin = "<input>",
+                   const Params &params = {}) const;
+
 private:
   explicit Spec(std::shared_ptr<const detail::SpecImpl> impl);
 

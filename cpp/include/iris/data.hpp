@@ -7,6 +7,7 @@
 #include <optional>
 #include <span>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 
 namespace iris {
@@ -102,6 +103,11 @@ public:
   [[nodiscard]] ValueRef value(std::size_t i) const;
   /// Return the value of the entry called `name`, or nothing if there is none
   [[nodiscard]] std::optional<ValueRef> find(std::string_view name) const;
+
+  /// Return the entries as a MiniZinc data file (Specification appendix B):
+  /// one assignment per entry, each ending with a newline, or nothing
+  /// without entries
+  [[nodiscard]] std::string dzn() const;
 
   [[nodiscard]] ValueRef at(std::string_view name,
                             std::span<const std::size_t> path = {}) const;

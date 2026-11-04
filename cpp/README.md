@@ -29,8 +29,12 @@ instead of throwing it. `iris::Data` holds the entries in definition order;
 its accessors throw `iris::AccessError` on misuse, such as an unknown name
 or a value of another type.
 
-The library does not implement the work budgets of Specification chapter
-10, catalog mode, or `dzn` output yet.
+`Spec::catalog` reads every instance of a file and returns the catalog of
+Specification §9.6: the entries `instances`, `name` and `failed`.
+`catalog_text`, `try_catalog` and `try_catalog_text` mirror the read
+functions. `Data::dzn()` returns the entries as MiniZinc data, in the bytes
+of appendix B. Reading and cataloging enforce the work budgets of chapter
+10.
 
 ## Requirements
 
@@ -52,36 +56,25 @@ cmake --build --preset dev
 ctest --preset dev
 ```
 
-`ctest` runs four tests. `spec-api` and `data-api` check the public API.
-`parse-conformance` and `read-conformance` run the driver `iris-driver` on
-every case whose operation is `parse` or `read` in `conformance/cases/0.1`
-and `formats`, and fail unless all of them pass, apart from the deferred
-cases below. Run one alone with, for example, `ctest --preset dev -R
-read-conformance`. The first conformance run builds the runner with Cargo.
+`ctest` runs seven tests. `spec-api` and `data-api` check the public API;
+`data-api` also checks the driver's JSON of data, and both outputs under
+every rounding mode. `budget` checks the exact budget limits that no
+conformance case reaches. `parse-conformance`, `read-conformance`,
+`catalog-conformance` and `dzn-conformance` run the driver `iris-driver` on
+every case of their operation in `conformance/cases/0.1` and `formats`, and
+fail unless all of them pass. Run one alone with, for example, `ctest
+--preset dev -R read-conformance`. The first conformance run builds the
+runner with Cargo.
 
 To run the runner by hand, from the repository root:
 
 ```sh
 (cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$PWD/../cpp/build/dev/iris-driver\"" ../conformance/cases/0.1)
+(cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$PWD/../cpp/build/dev/iris-driver\"" ../formats)
 ```
 
-The driver implements the `parse` and `read` operations. For `catalog` and
-`dzn` it parses the spec and reports a spec error as usual, but exits with
-status 3 once the spec parses, so the runner reports the other cases of
-those operations as failures.
-
-### Deferred cases
-
-[`tests/deferred-cases.txt`](tests/deferred-cases.txt) lists the read cases
-that need a work budget, which the library does not implement yet. Each line
-is a repository-relative case path and the section of Specification chapter
-10, from `10.1` to `10.6`, whose budget the case needs. `read-conformance`
-fails if a listed case is not a read case, if its `error.json` does not
-expect `E-BUDGET`, or if it passes, and it fails if an unlisted case does
-not pass. So the list only shrinks: implementing a budget makes its cases
-pass, and they must then leave the list. The listed cases run with a
-2-second runner timeout, so that a case that runs away without its budget
-stops early.
+The driver implements the `parse`, `read`, `catalog` and `dzn` operations.
+`catalog` writes JSON, or dzn with `--format dzn`.
 
 `-DIRIS_BUILD_TESTS=OFF` builds the library alone, and
 `-DIRIS_CONFORMANCE_TESTS=OFF` drops the conformance test.
@@ -131,10 +124,10 @@ docker run --rm -v "$PWD":/iris:ro -w /iris ubuntu:24.04 bash -c '
 ```
 
 The `gcc` package provides the `cc` that Cargo links build scripts with.
-The container runs `read-conformance` too. The read cases in
+The container runs all four conformance tests too. The cases in
 [`libstdcxx-skips.txt`](../conformance/adapters/gecode/libstdcxx-skips.txt),
-which the Gecode reference reads wrongly with libstdc++, must pass there as
-they do with libc++.
+which the Gecode reference reads or prints wrongly with libstdc++, must pass
+there as they do with libc++.
 
 ## Layout
 
@@ -145,10 +138,12 @@ they do with libc++.
   `reader.cpp` ports `reader.cpp`, the interpreter that reads input;
   `eval.cpp` and `eval.hpp` port the expression evaluator and checks, and
   `input.hpp` the input cursor. `value.hpp` and `data.cpp` port the values
-  of `impl.hpp` and `data.cpp`. `budget.hpp` marks where the work budgets
-  will charge. `text.cpp` checks UTF-8, and `numbers.cpp` converts number
-  literals.
+  of `impl.hpp` and `data.cpp`, and `dzn.cpp` the dzn output of
+  `data.cpp`. `budget.hpp` holds the work budgets of Specification chapter
+  10. `text.cpp` checks UTF-8, and `numbers.cpp` converts number literals.
+  The entry points in `spec.cpp` round to nearest whatever the caller's
+  rounding mode, and `dzn.cpp` spells floats with integer arithmetic.
 - `driver/`: `iris-driver`, the conformance driver. It speaks the protocol
   in [`conformance/README.md`](../conformance/README.md).
-- `tests/`: the API tests, `conformance.cmake`, which selects the cases of
-  one operation and runs them in batches, and the deferred list.
+- `tests/`: the API and budget tests, and `conformance.cmake`, which
+  selects the cases of one operation and runs them in batches.

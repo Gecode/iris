@@ -134,13 +134,29 @@ struct Capture {
   std::size_t to;
 };
 
+/// What an interpreter returns
+enum class Mode {
+  /// The data read (Specification §9.4)
+  Read,
+  /// The catalog of the instances (Specification §9.6)
+  Catalog
+};
+
+/// What a catalog keeps of an instance
+struct Listing {
+  /// The name, or empty
+  std::string name;
+  /// The summary of the first rejection, or empty
+  std::string summary;
+};
+
 /// Interpreter running a reader spec on an input
 class Interpreter : public Evaluator {
 public:
-  /// Initialize
+  /// Initialize to return `mode`
   Interpreter(const SpecImpl &s, std::string_view text, std::string origin,
-              const ParamsImpl &p)
-      : Evaluator(s, text, std::move(origin)), params_(p) {}
+              const ParamsImpl &p, Mode mode)
+      : Evaluator(s, text, std::move(origin)), params_(p), mode_(mode) {}
 
   /// Add the names of the param statements in `b` to `out`
   static void declared_params(const Block &b, Seq<std::string> &out) {
@@ -156,7 +172,7 @@ public:
     }
   }
 
-  /// Run the reader spec and return the data
+  /// Run the reader spec and return the data, or the catalog
   DataImpl run() {
     // A misspelt parameter would otherwise be ignored silently
     Seq<std::string> known;
@@ -183,6 +199,8 @@ public:
                         Location{.origin = in.origin,
                                  .line = in.line,
                                  .column = in.here().column()});
+    if (mode_ == Mode::Catalog)
+      return catalog_data();
     DataImpl d;
     for (Entry &e : frames[0])
       if (!is_internal(e.name))
@@ -191,8 +209,48 @@ public:
   }
 
 private:
+  /**
+   * Return the catalog (Specification §9.6): the number of instances, their
+   * names if all have one, and their first rejections if there are any
+   *
+   * Without an instances statement, the input is one instance.
+   */
+  [[nodiscard]] DataImpl catalog_data() const {
+    DataImpl d;
+    const std::size_t n = listings_ ? listings_->size() : 1;
+    d.entries.push_back(
+        Entry{.name = "instances",
+              .value = Value::integer(static_cast<std::int64_t>(n))});
+    if (!listings_)
+      return d;
+    const Seq<Listing> &l = *listings_;
+    if (!l.empty() && std::ranges::none_of(
+                          l, [](const Listing &x) { return x.name.empty(); }))
+      d.entries.push_back(
+          Entry{.name = "name", .value = strings(l, &Listing::name)});
+    if (std::ranges::any_of(
+            l, [](const Listing &x) { return !x.summary.empty(); }))
+      d.entries.push_back(
+          Entry{.name = "failed", .value = strings(l, &Listing::summary)});
+    return d;
+  }
+  /// Return the list of the `field` of each of `l`
+  static Value strings(const Seq<Listing> &l, std::string Listing::*field) {
+    Value v;
+    v.type = ValueType::String;
+    for (const Listing &x : l)
+      v.strings.push_back(x.*field);
+    v.end_list();
+    return v;
+  }
+
   /// The parameters
   const ParamsImpl &params_;
+  /// What run returns
+  const Mode mode_;
+  /// The instances read for a catalog, or nothing without an instances
+  /// statement
+  std::optional<Seq<Listing>> listings_;
   /// Row numbers of the active repeats
   Seq<std::size_t> rows_;
   /// Whether input after the reader spec is allowed
@@ -209,6 +267,8 @@ private:
   std::size_t instance_frame_ = 0;
   /// The first rejection of the instance being read
   std::optional<Error> deferred_;
+  /// The summary of that rejection, for a catalog
+  std::string deferred_summary_;
   /// Whether the selected instance has been read
   bool selected_ = false;
   /// The ranges of the named types, by type statement
@@ -220,8 +280,13 @@ private:
   /// Most lists kept in spare
   static constexpr std::size_t max_spare = 8;
 
-  /// Account for `k` units of work that read no input (Specification §10.2)
-  void work(std::uint64_t k) { budget.charge_idle(k); }
+  /// Account for `k` units of work that read no input, failing if that is
+  /// too much (Specification §10.2)
+  void work(std::uint64_t k) {
+    if (!budget.charge_idle(k))
+      fail(ErrorCode::Budget,
+           "too many repetitions or empty rows without reading input");
+  }
 
   /*
    * Reading
@@ -981,6 +1046,8 @@ private:
   [[nodiscard]] bool may_be_skipped() const {
     if (current_ == 0)
       return false;
+    if (mode_ == Mode::Catalog)
+      return true;
     if (!select_)
       return current_ != 1;
     if (number_)
@@ -989,16 +1056,18 @@ private:
   }
 
   /**
-   * Reject the instance being read with error `e`
+   * Reject the instance being read with error `e`, summed up by `summary`
    *
    * Reading stops, unless the instance may not be the selected one: then
    * the first rejection is recorded, and reading continues (see instances).
    */
-  void reject(Error e) {
+  void reject(Error e, std::string summary) {
     if (!may_be_skipped())
       throw std::move(e);
-    if (!deferred_)
+    if (!deferred_) {
       deferred_ = std::move(e);
+      deferred_summary_ = std::move(summary);
+    }
   }
 
   /// check e "message"
@@ -1006,13 +1075,17 @@ private:
     std::optional<Error> e;
     // holds() sets e when the check fails
     if (!holds(s, e) && e)
-      reject(std::move(*e));
+      reject(std::move(*e),
+             s.message.empty()
+                 ? "check on line " + std::to_string(s.line) + " of the spec"
+                 : s.message);
   }
 
   /// Read instance `n` with the body `b` into a frame, and return it
   Seq<Entry> instance(const Block &b, std::size_t n) {
     current_ = n;
     deferred_.reset();
+    deferred_summary_.clear();
     context.push_back(
         Context{.text = "instance", .iteration = n, .iterations = {}});
     frames.emplace_back();
@@ -1044,7 +1117,8 @@ private:
    * the instance is the one wanted. The parameter `instance` selects an
    * instance by number (from 1) if it is a number, and by the value of
    * `name` otherwise. Without it, the file must contain a single instance.
-   * Reading stops after the selected instance.
+   * Reading stops after the selected instance. A catalog reads all
+   * instances and keeps only their names and first rejections.
    *
    * A rejection (see reject) of an instance that is not the selected one
    * does not stop reading, so that an invalid instance does not hide the
@@ -1059,6 +1133,8 @@ private:
       if (number_ && (*number_ < 1))
         fail(ErrorCode::InstanceNumber, "instance numbers start at 1");
     }
+    if (mode_ == Mode::Catalog)
+      listings_.emplace();
     std::size_t n = 0;
     while (in.skip_to_data()) {
       n++;
@@ -1067,6 +1143,11 @@ private:
       spec_line = s.line;
       if (in.pos == start)
         fail(ErrorCode::NoProgress, "an instance must read some input");
+      if (listings_) {
+        listings_->push_back(Listing{.name = instance_name(f),
+                                     .summary = std::move(deferred_summary_)});
+        continue;
+      }
       bool chosen = (n == 1);
       if (select_)
         chosen =
@@ -1084,6 +1165,8 @@ private:
         }
       }
     }
+    if (listings_)
+      return;
     if (n == 0)
       fail(ErrorCode::InstanceEmpty, "the file contains no instance");
     if (select_)
@@ -1228,7 +1311,8 @@ private:
         reject(located(ErrorCode::SectionsRepeated,
                        m + " (the first is on line " +
                            std::to_string(seen[*found]) + ")",
-                       at));
+                       at),
+               m);
       } else {
         seen[*found] = at.line;
       }
@@ -1254,7 +1338,8 @@ private:
         // At the end of the input, no later instance can be hidden
         if (!in.skip_to_data())
           throw std::move(e);
-        reject(std::move(e));
+        reject(std::move(e),
+               "no line matching \"" + s.arms[k].pattern.source + "\"");
         return;
       }
   }
@@ -1308,7 +1393,13 @@ private:
 
 DataImpl read(const SpecImpl &spec, std::string_view text, std::string origin,
               const ParamsImpl &params) {
-  Interpreter i(spec, text, std::move(origin), params);
+  Interpreter i(spec, text, std::move(origin), params, Mode::Read);
+  return i.run();
+}
+
+DataImpl catalog(const SpecImpl &spec, std::string_view text,
+                 std::string origin, const ParamsImpl &params) {
+  Interpreter i(spec, text, std::move(origin), params, Mode::Catalog);
   return i.run();
 }
 

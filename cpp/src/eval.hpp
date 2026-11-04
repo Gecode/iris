@@ -163,8 +163,13 @@ protected:
   [[noreturn]] void fail(ErrorCode code, std::string msg) const;
   /// Throw an error for the shape error `e` of the value of `n`
   [[noreturn]] void fail(const ShapeError &e, const std::string &n) const;
-  /// Account for visiting `k` values in expressions (Specification §10.3)
-  void visit(std::uint64_t k) { budget.charge_effort(k); }
+  /// Account for visiting `k` values in expressions, failing if that is
+  /// too much work (Specification §10.3)
+  void visit(std::uint64_t k) {
+    if (!budget.charge_effort(k))
+      fail(ErrorCode::Budget,
+           "the expressions do too much work for the size of the input");
+  }
   /// Define `n` as `v` in the innermost frame
   void set(const std::string &n, Value &&v);
   /// Return the value of `n`, or null if it is not defined

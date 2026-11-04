@@ -38,6 +38,7 @@
 
 #include "ast.hpp"
 #include "lexer.hpp"
+#include "numbers.hpp"
 #include "parser.hpp"
 #include "reader.hpp"
 #include "text.hpp"
@@ -94,6 +95,7 @@ Spec::Spec(std::shared_ptr<const detail::SpecImpl> impl)
     : impl_(std::move(impl)) {}
 
 Spec Spec::parse(std::string_view text, std::string origin) {
+  const detail::NearestRounding rounding;
   check_utf8(text, origin);
   detail::ParsedSpec parsed =
       detail::parse_tokens(detail::lex(text, origin), origin);
@@ -121,6 +123,7 @@ Data Spec::read(const std::filesystem::path &path, const Params &params) const {
 
 Data Spec::read_text(std::string_view text, std::string origin,
                      const Params &params) const {
+  const detail::NearestRounding rounding;
   return Data(std::make_shared<const detail::DataImpl>(
       detail::read(*impl_, text, std::move(origin), *params.impl_)));
 }
@@ -135,6 +138,33 @@ std::expected<Data, Error> Spec::try_read_text(std::string_view text,
                                                const Params &params) const {
   try {
     return read_text(text, std::move(origin), params);
+  } catch (const Error &error) {
+    return std::unexpected(error);
+  }
+}
+
+Data Spec::catalog(const std::filesystem::path &path,
+                   const Params &params) const {
+  return catalog_text(read_file(path), path.string(), params);
+}
+
+Data Spec::catalog_text(std::string_view text, std::string origin,
+                        const Params &params) const {
+  const detail::NearestRounding rounding;
+  return Data(std::make_shared<const detail::DataImpl>(
+      detail::catalog(*impl_, text, std::move(origin), *params.impl_)));
+}
+
+std::expected<Data, Error> Spec::try_catalog(const std::filesystem::path &path,
+                                             const Params &params) const {
+  return try_catalog_text(read_file(path), path.string(), params);
+}
+
+std::expected<Data, Error> Spec::try_catalog_text(std::string_view text,
+                                                  std::string origin,
+                                                  const Params &params) const {
+  try {
+    return catalog_text(text, std::move(origin), params);
   } catch (const Error &error) {
     return std::unexpected(error);
   }

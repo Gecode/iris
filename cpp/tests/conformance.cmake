@@ -1,20 +1,12 @@
 # Run the conformance cases of one operation through a driver.
 #
 #   cmake -DDRIVER=... -DREPOSITORY=... -DCARGO=... -DOPERATION=parse
-#         [-DDEFERRED=FILE] [-DDEFERRED_TIMEOUT=SECONDS] -P conformance.cmake
+#         -P conformance.cmake
 #
 # Discovers the cases in conformance/cases/0.1 and formats as the runner
 # does, selects those whose case.toml names OPERATION (read without one),
 # and runs them with the runner from rust/. Fails unless every selected
-# case passes, except the cases listed in DEFERRED, which must fail.
-#
-# Each line of DEFERRED is a repository-relative case path and the section
-# of chapter 10 of the Specification whose work budget the case needs, such
-# as `conformance/cases/0.1/pinned/effort-sum-over 10.3`. Blank lines and
-# lines starting with `#` are ignored. A listed case must be a selected case
-# whose error.json has the code E-BUDGET. Listed cases run with the runner
-# timeout DEFERRED_TIMEOUT (2 seconds by default), so that a case that runs
-# away without its budget stops early.
+# case passes.
 cmake_minimum_required(VERSION 3.28)
 
 foreach(variable IN ITEMS DRIVER REPOSITORY CARGO OPERATION)
@@ -22,9 +14,6 @@ foreach(variable IN ITEMS DRIVER REPOSITORY CARGO OPERATION)
     message(FATAL_ERROR "conformance.cmake needs -D${variable}=...")
   endif()
 endforeach()
-if(NOT DEFINED DEFERRED_TIMEOUT)
-  set(DEFERRED_TIMEOUT 2)
-endif()
 
 # The runner shows canonical absolute paths, so the cases are found below
 # the canonical repository path too.
@@ -74,8 +63,8 @@ function(case_operation case result)
   set(${result} "${operation}" PARENT_SCOPE)
 endfunction()
 
-# The selected cases by repository-relative path, which names them in the
-# deferred list and in messages
+# The selected cases by repository-relative path, which names them in
+# messages
 set(selected "")
 foreach(case IN LISTS cases)
   if(case MATCHES ";")
@@ -93,58 +82,6 @@ if(count EQUAL 0)
   message(FATAL_ERROR "no ${OPERATION} cases among ${discovered} discovered")
 endif()
 
-# The deferred cases and their rules, in list order
-set(deferred "")
-set(deferred_rules "")
-if(DEFINED DEFERRED AND NOT DEFERRED STREQUAL "")
-  file(READ "${DEFERRED}" content)
-  if(content MATCHES ";")
-    message(FATAL_ERROR "${DEFERRED}: the list cannot contain ';'")
-  endif()
-  string(REPLACE "\r" "" content "${content}")
-  string(REPLACE "\n" ";" lines "${content}")
-  set(number 0)
-  foreach(line IN LISTS lines)
-    math(EXPR number "${number} + 1")
-    if(line MATCHES "^[ \t]*(#.*)?$")
-      continue()
-    endif()
-    if(NOT line MATCHES "^([^ \t#]+)[ \t]+(10\\.[1-6])[ \t]*$")
-      message(FATAL_ERROR "${DEFERRED}:${number}: expected a case path and "
-        "a rule from 10.1 to 10.6, found: ${line}")
-    endif()
-    set(path "${CMAKE_MATCH_1}")
-    set(rule "${CMAKE_MATCH_2}")
-    if(path IN_LIST deferred)
-      message(FATAL_ERROR "${DEFERRED}:${number}: ${path} is listed twice")
-    endif()
-    if(NOT path IN_LIST selected)
-      message(FATAL_ERROR "${DEFERRED}:${number}: ${path} is not a "
-        "${OPERATION} case")
-    endif()
-    set(code "")
-    if(EXISTS "${REPOSITORY}/${path}/error.json")
-      file(READ "${REPOSITORY}/${path}/error.json" document)
-      string(JSON code ERROR_VARIABLE json_error GET "${document}" code)
-    endif()
-    if(NOT code STREQUAL "E-BUDGET")
-      message(FATAL_ERROR "${DEFERRED}:${number}: ${path} does not expect "
-        "E-BUDGET, so no work budget makes it pass")
-    endif()
-    list(APPEND deferred "${path}")
-    list(APPEND deferred_rules "${rule}")
-  endforeach()
-endif()
-
-set(regular "")
-foreach(path IN LISTS selected)
-  if(NOT path IN_LIST deferred)
-    list(APPEND regular "${path}")
-  endif()
-endforeach()
-set(listed ${deferred})
-list(SORT listed)
-
 set(statuses total pass xfail fail xpass unrepresentable)
 foreach(status IN LISTS statuses)
   set(${status} 0)
@@ -154,9 +91,8 @@ set(result_paths "")
 set(result_statuses "")
 set(problems "")
 
-# Run the cases `paths` in batches, with the runner options `options`.
-# Failed cases are tolerated, and checked afterwards, only if `may_fail`.
-function(run_batches paths may_fail options)
+# Run the cases `paths` in batches.
+function(run_batches paths)
   list(LENGTH paths n)
   foreach(start RANGE 0 ${n} ${batch_size})
     if(start EQUAL n)
@@ -166,17 +102,17 @@ function(run_batches paths may_fail options)
     list(TRANSFORM batch PREPEND "${REPOSITORY}/")
     execute_process(
       COMMAND "${CARGO}" run --quiet --locked -p iris-conformance --
-        run --driver "\"${DRIVER}\"" --version 0.1 ${options} ${batch}
+        run --driver "\"${DRIVER}\"" --version 0.1 ${batch}
       WORKING_DIRECTORY "${REPOSITORY}/rust"
       RESULT_VARIABLE exit_status
       OUTPUT_VARIABLE output
       ERROR_VARIABLE errors)
     message("${output}${errors}")
-    # Status 1 reports failed cases, which are checked below
+    # Status 1 reports failed cases, which are listed below
     if(NOT exit_status EQUAL 0 AND NOT exit_status EQUAL 1)
       message(FATAL_ERROR "the runner exited with status ${exit_status}")
     endif()
-    if(exit_status EQUAL 1 AND NOT may_fail)
+    if(exit_status EQUAL 1)
       list(APPEND problems "the runner reported failed cases")
     endif()
     if(output MATCHES "Summary: total=([0-9]+) pass=([0-9]+) xfail=([0-9]+) fail=([0-9]+) xpass=([0-9]+) unrepresentable=([0-9]+)")
@@ -220,8 +156,7 @@ function(run_batches paths may_fail options)
   set(problems "${problems}" PARENT_SCOPE)
 endfunction()
 
-run_batches("${regular}" FALSE "")
-run_batches("${listed}" TRUE "--timeout;${DEFERRED_TIMEOUT}")
+run_batches("${selected}")
 
 set(passed 0)
 foreach(path IN LISTS selected)
@@ -231,35 +166,16 @@ foreach(path IN LISTS selected)
     continue()
   endif()
   list(GET result_statuses ${at} status)
-  if(path IN_LIST deferred)
-    if(status STREQUAL "PASS")
-      list(APPEND problems "${path} passes, so remove it from ${DEFERRED}")
-    endif()
-  elseif(status STREQUAL "PASS")
+  if(status STREQUAL "PASS")
     math(EXPR passed "${passed} + 1")
   else()
-    list(APPEND problems "${path}: ${status}, and it is not in the deferred list")
+    list(APPEND problems "${path}: ${status}")
   endif()
 endforeach()
 
-list(LENGTH deferred deferred_count)
 message("Selected ${count} ${OPERATION} cases from ${discovered} discovered in "
   "conformance/cases/0.1 and formats")
-message("Passed ${passed}; deferred ${deferred_count}")
-foreach(rule IN ITEMS 10.1 10.2 10.3 10.4 10.5 10.6)
-  set(n 0)
-  foreach(r IN LISTS deferred_rules)
-    if(r STREQUAL rule)
-      math(EXPR n "${n} + 1")
-    endif()
-  endforeach()
-  if(n GREATER 0)
-    message("  ${rule}: ${n}")
-  endif()
-endforeach()
-foreach(path rule IN ZIP_LISTS deferred deferred_rules)
-  message("  deferred ${path} (${rule})")
-endforeach()
+message("Passed ${passed}")
 message("Summary of all batches: total=${total} pass=${pass} xfail=${xfail} "
   "fail=${fail} xpass=${xpass} unrepresentable=${unrepresentable}")
 if(NOT total EQUAL count)
