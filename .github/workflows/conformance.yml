@@ -112,3 +112,5 @@ jobs:
         run: cargo "+${{ steps.msrv.outputs.version }}" test --workspace --locked
       - name: Check browser crate on wasm32
         run: cargo "+${{ steps.msrv.outputs.version }}" check -p iris-wasm --target wasm32-unknown-unknown --locked
+      - name: Check TypeScript binding crate on wasm32
+        run: cargo "+${{ steps.msrv.outputs.version }}" check -p iris-js --target wasm32-unknown-unknown --locked

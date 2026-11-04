@@ -16,7 +16,7 @@ use iris_sema::Analysis;
 pub use iris_syntax::LanguageVersion;
 use iris_syntax::{Parse, ParseError};
 use std::{collections::HashMap, fmt, path::Path};
-pub use value::{AccessError, Data, Entry, Value, ValueRef};
+pub use value::{AccessError, ColumnError, Data, Entry, Leaves, Value, ValueRef};
 
 #[derive(Debug)]
 pub struct Spec {

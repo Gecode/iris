@@ -52,6 +52,7 @@ clause.
 | [`formats/`](formats/) | Reader specs for standard benchmark formats |
 | [`rust/`](rust/) | The Rust reference implementation, the `iris` CLI, and the language server |
 | [`python/`](python/) | The Python package, a binding to the Rust crate |
+| [`typescript/`](typescript/) | The TypeScript package, a WebAssembly binding to the Rust crate |
 | [`cpp/`](cpp/) | The C++ library |
 | [`java/`](java/) | The Java library and its Kotlin module |
 | [`tree-sitter-iris/`](tree-sitter-iris/) | The tree-sitter grammar |

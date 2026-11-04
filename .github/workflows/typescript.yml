@@ -1,0 +1,102 @@
+name: TypeScript
+
+on:
+  push:
+    paths:
+      - 'typescript/**'
+      - 'rust/**'
+      - 'conformance/**'
+      - 'formats/**'
+      - '.github/workflows/typescript.yml'
+  pull_request:
+    paths:
+      - 'typescript/**'
+      - 'rust/**'
+      - 'conformance/**'
+      - 'formats/**'
+      - '.github/workflows/typescript.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: typescript-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            node: '22'
+          - os: ubuntu-latest
+            node: '26'
+          - os: macos-latest
+            node: '26'
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: typescript
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: typescript/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+      - name: Cache wasm-bindgen CLI
+        id: bindings
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/iris-typescript-tools/wasm-bindgen-0.2.129
+          key: typescript-wasm-bindgen-${{ runner.os }}-${{ runner.arch }}-0.2.129
+      - name: Install wasm-bindgen CLI
+        if: steps.bindings.outputs.cache-hit != 'true'
+        run: cargo install wasm-bindgen-cli --locked --version 0.2.129 --root "$HOME/.cache/iris-typescript-tools/wasm-bindgen-0.2.129"
+      - name: Add wasm-bindgen CLI to PATH
+        run: echo "$HOME/.cache/iris-typescript-tools/wasm-bindgen-0.2.129/bin" >> "$GITHUB_PATH"
+      - name: Cache Cargo artifacts
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: typescript-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ hashFiles('rust/**/*.rs', 'rust/**/Cargo.toml') }}
+          restore-keys: |
+            typescript-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+      - run: npm ci
+      - name: Check formatting
+        run: npm run format:check
+      - name: Build package
+        run: npm run build
+      # Lint and type tests need the generated glue and the built declarations.
+      - name: Lint
+        run: npm run lint
+      - name: Check types and declarations
+        run: npm run test:types
+      - name: Test package
+        run: npm test
+      - name: Run conformance cases with the Node driver
+        working-directory: rust
+        run: cargo run --locked -p iris-conformance -- run --driver "\"$(command -v node)\" \"$PWD/../typescript/test/conformance-driver.ts\"" ../conformance/cases/0.1
+      - name: Run format cases with the Node driver
+        working-directory: rust
+        run: cargo run --locked -p iris-conformance -- run --driver "\"$(command -v node)\" \"$PWD/../typescript/test/conformance-driver.ts\"" ../formats
+      - name: Lint iris-js
+        working-directory: rust
+        run: cargo clippy -p iris-js --all-targets --locked -- -D warnings
+      # Native clippy never compiles the wasm-bindgen exports.
+      - name: Lint iris-js on wasm32
+        working-directory: rust
+        run: cargo clippy -p iris-js --target wasm32-unknown-unknown --locked -- -D warnings
+      - name: Test iris-js
+        working-directory: rust
+        run: cargo test --locked -p iris-js

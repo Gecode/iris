@@ -13,6 +13,9 @@ __pycache__/
 /python/python/gecode_iris/*.so
 /python/python/gecode_iris/*.pyd
 
+# TypeScript: the WebAssembly module and glue that npm run build generates
+/typescript/wasm/
+
 # Gradle
 .gradle/
 

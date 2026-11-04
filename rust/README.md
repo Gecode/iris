@@ -35,7 +35,11 @@ crate remains unpublished.
 formatter to the browser playground (M5, PLAN.md §8.10). Its string-only API
 keeps canonical output and signed 64-bit integers exact. It stays unpublished;
 if enabled later, it follows `iris-syntax`, `iris-sema` and `iris-core` in
-publication order. Later work may add `iris-lint`.
+publication order. [iris-js](iris-js/README.md) is the unpublished
+WebAssembly boundary of the npm package in `typescript/` (M4f, PLAN.md §8.16).
+It parses a spec once into a handle, returns data in a binary layout that
+JavaScript copies, and renders JSON and dzn through iris-core on request.
+Later work may add `iris-lint`.
 [PLAN.md §4.2](../PLAN.md#42-the-rust-reference-implementation-is-layered)
 describes the layers; §8.1, §8.7, §8.12 and §8.13 describe the crates. Milestones
 M3, M4b, M4e and M6b cover the core/CLI, language server, formatter and linter.
@@ -88,6 +92,16 @@ From this directory:
 ```sh
 cargo test --locked -p iris-wasm
 cargo +1.88.0 check -p iris-wasm --target wasm32-unknown-unknown --locked
+```
+
+From `typescript/`, `npm run build` builds `iris-js` with the same `wasm`
+profile; see the [TypeScript package guide](../typescript/README.md). From this
+directory:
+
+```sh
+cargo test --locked -p iris-js
+cargo clippy -p iris-js --target wasm32-unknown-unknown --locked -- -D warnings
+cargo +1.88.0 check -p iris-js --target wasm32-unknown-unknown --locked
 ```
 
 The MSRV target must be installed for that compiler. Native tests exercise the

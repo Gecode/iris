@@ -97,7 +97,73 @@ impl fmt::Display for AccessError {
     }
 }
 impl std::error::Error for AccessError {}
+
+/// A value's leaves, borrowed in storage order.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Leaves<'a> {
+    Int(&'a [i64]),
+    Float(&'a [f64]),
+    String(&'a [String]),
+}
+
+/// Columns that do not form a valid value, or entries that do not form valid data.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ColumnError {
+    /// The outermost level does not have exactly two offsets.
+    RootLevel,
+    /// A level's first offset is not 0.
+    LevelStart { level: usize },
+    /// A level's offsets decrease.
+    DecreasingOffsets { level: usize },
+    /// A level does not have one more offset than the rows of the level above.
+    LevelLength {
+        level: usize,
+        expected: usize,
+        actual: usize,
+    },
+    /// The leaf count differs from the innermost level's last offset, or from 1 for a scalar.
+    LeafCount { expected: usize, actual: usize },
+    /// A float leaf is infinite or NaN.
+    NonFiniteFloat,
+    /// Two entries have the same name.
+    DuplicateEntry(String),
+}
+impl fmt::Display for ColumnError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::RootLevel => f.write_str("level 0 must have exactly two offsets"),
+            Self::LevelStart { level } => write!(f, "level {level} does not start at 0"),
+            Self::DecreasingOffsets { level } => write!(f, "level {level} has decreasing offsets"),
+            Self::LevelLength {
+                level,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "level {level} has {actual} offsets, but the level above requires {expected}"
+            ),
+            Self::LeafCount { expected, actual } => {
+                write!(f, "expected {expected} leaves, but there are {actual}")
+            }
+            Self::NonFiniteFloat => f.write_str("float leaves must be finite"),
+            Self::DuplicateEntry(name) => write!(f, "duplicate entry '{name}'"),
+        }
+    }
+}
+impl std::error::Error for ColumnError {}
+
 impl Data {
+    /// Data from entries in definition order; names must be unique.
+    pub fn from_entries(entries: Vec<Entry>) -> Result<Self, ColumnError> {
+        let mut names = std::collections::HashSet::with_capacity(entries.len());
+        for entry in &entries {
+            if !names.insert(entry.name.as_str()) {
+                return Err(ColumnError::DuplicateEntry(entry.name.clone()));
+            }
+        }
+        Ok(Self { entries })
+    }
     pub fn entries(&self) -> &[Entry] {
         &self.entries
     }
@@ -117,11 +183,87 @@ impl Data {
     }
 }
 impl Entry {
+    pub fn new(name: impl Into<String>, value: Value) -> Self {
+        Self {
+            name: name.into(),
+            value,
+        }
+    }
     pub fn name(&self) -> &str {
         &self.name
     }
     pub fn value(&self) -> &Value {
         &self.value
+    }
+}
+/// Column constructors and views. A value has one level of cumulative offsets
+/// per array level, outermost first. Level 0 is `[0, n]` for `n` rows; each
+/// later level has one more offset than the rows of the level above, which is
+/// that level's last offset. The innermost last offset counts the leaves; a
+/// scalar has no levels and one leaf.
+impl Value {
+    pub fn from_ints(leaves: Vec<i64>, levels: Vec<Vec<usize>>) -> Result<Self, ColumnError> {
+        Self::from_columns(LeafStorage::Int(leaves), levels)
+    }
+    /// Float leaves must be finite, as every read value is.
+    pub fn from_floats(leaves: Vec<f64>, levels: Vec<Vec<usize>>) -> Result<Self, ColumnError> {
+        if !leaves.iter().all(|leaf| leaf.is_finite()) {
+            return Err(ColumnError::NonFiniteFloat);
+        }
+        Self::from_columns(LeafStorage::Float(leaves), levels)
+    }
+    pub fn from_strings(leaves: Vec<String>, levels: Vec<Vec<usize>>) -> Result<Self, ColumnError> {
+        Self::from_columns(LeafStorage::String(leaves), levels)
+    }
+    fn from_columns(leaves: LeafStorage, levels: Vec<Vec<usize>>) -> Result<Self, ColumnError> {
+        let mut rows = None;
+        for (level, offsets) in levels.iter().enumerate() {
+            let expected = rows.map_or(2, |rows: usize| rows.saturating_add(1));
+            if offsets.len() != expected {
+                return Err(if level == 0 {
+                    ColumnError::RootLevel
+                } else {
+                    ColumnError::LevelLength {
+                        level,
+                        expected,
+                        actual: offsets.len(),
+                    }
+                });
+            }
+            if offsets[0] != 0 {
+                return Err(ColumnError::LevelStart { level });
+            }
+            if offsets.windows(2).any(|pair| pair[0] > pair[1]) {
+                return Err(ColumnError::DecreasingOffsets { level });
+            }
+            rows = offsets.last().copied();
+        }
+        let value = Self {
+            leaves,
+            levels: levels
+                .into_iter()
+                .map(|offsets| ArrayLevel { offsets })
+                .collect(),
+        };
+        let expected = rows.unwrap_or(1);
+        if value.leaf_count() != expected {
+            return Err(ColumnError::LeafCount {
+                expected,
+                actual: value.leaf_count(),
+            });
+        }
+        Ok(value)
+    }
+    pub fn leaves(&self) -> Leaves<'_> {
+        match &self.leaves {
+            LeafStorage::Int(v) => Leaves::Int(v),
+            LeafStorage::Float(v) => Leaves::Float(v),
+            LeafStorage::String(v) => Leaves::String(v),
+        }
+    }
+    /// Each level's cumulative offsets, outermost first.
+    pub fn levels(&self) -> impl ExactSizeIterator<Item = &[usize]> {
+        self.levels.iter().map(|level| level.offsets.as_slice())
     }
 }
 impl Value {
@@ -852,6 +994,89 @@ mod tests {
         assert_eq!(
             Value::empty("int").append(Value::string("x".into())),
             Err(crate::ErrorCode::ValueTypeMix)
+        );
+    }
+    #[test]
+    fn columns_round_trip_accepted_shapes() {
+        let scalar = Value::from_ints(vec![-7], vec![]).unwrap();
+        assert_eq!(scalar.depth(), 0);
+        assert_eq!(scalar.root().as_int().unwrap(), -7);
+        let empty = Value::from_floats(vec![], vec![vec![0, 0]]).unwrap();
+        assert_eq!(empty.value_type(), "float");
+        assert_eq!(empty.root().size().unwrap(), 0);
+        let empty_rows = Value::from_strings(vec![], vec![vec![0, 0], vec![0]]).unwrap();
+        assert_eq!(empty_rows.depth(), 2);
+        let ragged = Value::from_ints(vec![1, 2, 3], vec![vec![0, 3], vec![0, 2, 2, 3]]).unwrap();
+        assert_eq!(ragged.select(&[0]).unwrap().as_ints().unwrap(), &[1, 2]);
+        assert!(ragged.select(&[1]).unwrap().as_ints().unwrap().is_empty());
+        let deep = Value::from_strings(
+            vec!["a".into(), "b".into()],
+            vec![vec![0, 2], vec![0, 1, 2], vec![0, 0, 2]],
+        )
+        .unwrap();
+        assert_eq!(deep.select(&[1, 0, 1]).unwrap().as_str().unwrap(), "b");
+        assert_eq!(deep.leaves(), Leaves::String(&["a".into(), "b".into()]));
+        let levels: Vec<&[usize]> = deep.levels().collect();
+        assert_eq!(levels, [&[0, 2][..], &[0, 1, 2], &[0, 0, 2]]);
+        let copy = Value::from_strings(
+            vec!["a".into(), "b".into()],
+            deep.levels().map(<[usize]>::to_vec).collect(),
+        )
+        .unwrap();
+        let data = Data::from_entries(vec![Entry::new("deep", copy), Entry::new("n", scalar)]);
+        assert_eq!(data.unwrap().int("n"), Ok(-7));
+    }
+    #[test]
+    fn columns_reject_malformed_shapes() {
+        assert_eq!(
+            Value::from_ints(vec![], vec![]).unwrap_err(),
+            ColumnError::LeafCount {
+                expected: 1,
+                actual: 0
+            }
+        );
+        assert_eq!(
+            Value::from_ints(vec![1], vec![vec![0, 1, 1]]).unwrap_err(),
+            ColumnError::RootLevel
+        );
+        assert_eq!(
+            Value::from_ints(vec![1], vec![vec![1, 1]]).unwrap_err(),
+            ColumnError::LevelStart { level: 0 }
+        );
+        assert_eq!(
+            Value::from_ints(vec![1], vec![vec![0, 2], vec![1, 1, 1]]).unwrap_err(),
+            ColumnError::LevelStart { level: 1 }
+        );
+        assert_eq!(
+            Value::from_ints(vec![1], vec![vec![0, 2], vec![0, 1, 0]]).unwrap_err(),
+            ColumnError::DecreasingOffsets { level: 1 }
+        );
+        assert_eq!(
+            Value::from_ints(vec![1], vec![vec![0, 2], vec![0, 1]]).unwrap_err(),
+            ColumnError::LevelLength {
+                level: 1,
+                expected: 3,
+                actual: 2
+            }
+        );
+        assert_eq!(
+            Value::from_ints(vec![1, 2], vec![vec![0, 1]]).unwrap_err(),
+            ColumnError::LeafCount {
+                expected: 1,
+                actual: 2
+            }
+        );
+        assert_eq!(
+            Value::from_floats(vec![f64::NAN], vec![]).unwrap_err(),
+            ColumnError::NonFiniteFloat
+        );
+        assert_eq!(
+            Data::from_entries(vec![
+                Entry::new("x", Value::int(1)),
+                Entry::new("x", Value::int(2)),
+            ])
+            .unwrap_err(),
+            ColumnError::DuplicateEntry("x".into())
         );
     }
 }

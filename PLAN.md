@@ -36,8 +36,10 @@ Gecode 7.
    conforms to a language version when it passes that version's suite.
 3. **Implementations people want to use:**
    - Rust crate: the reference implementation, also used by the CLI, LSP,
-     formatter, WASM playground, and Python package.
+     formatter, WASM playground, and the Python and TypeScript packages.
    - Python package built on the Rust crate.
+   - TypeScript package built on the Rust crate through WebAssembly, for
+     Node, browsers, and edge runtimes.
    - Java library for current Java, designed to work well from Kotlin,
      plus a small Kotlin extensions module.
    - C++ library with no Gecode dependency, designed so that Gecode 7 can
@@ -90,6 +92,7 @@ File extension for reader specs: **`.iris`**.
 |---|---|---|
 | Rust | **Reference implementation**, native | Safe, fast, compiles to native and WASM, and one parser serves the reader, LSP, formatter, and playground. |
 | Python | **Binding** to the Rust crate (PyO3 + maturin) | Wheels are easy to build, and Python users get Rust speed. |
+| TypeScript | **Binding** to the Rust crate through WebAssembly (wasm-bindgen) | One artifact runs in Node, browsers, and edge runtimes, and every fix in Rust reaches TypeScript users. |
 | C++ | **Native**, ported from Gecode's implementation | The C++ code exists and is tested, so the port mostly removes Gecode types (`IntArgs`, Gecode heap, `Exception`) and modernizes the API. It is the candidate for Gecode 7. |
 | Java/Kotlin | **Native**, pure Java | JVM users avoid native dependencies. A pure-Java jar runs everywhere, including Android, and the JIT makes it fast enough. |
 
@@ -112,6 +115,7 @@ iris-core     reader, expression evaluator, data model, work budgets,
      ├── iris-cli    `iris` binary
      ├── iris-lsp    language server
      ├── iris-wasm   wasm-bindgen API for the playground
+     ├── iris-js     wasm-bindgen binding for the TypeScript package
      └── (python/)   PyO3 binding
 ```
 
@@ -198,6 +202,7 @@ iris/
 ├── rust/                    Cargo workspace (crates from §4.2, and the
 │                            conformance runner iris-conformance, §7.2)
 ├── python/                  PyO3/maturin package
+├── typescript/              npm package over rust/iris-js (WebAssembly)
 ├── cpp/                     C++ library (CMake)
 ├── java/                    Gradle build: iris (Java), iris-kotlin
 ├── tree-sitter-iris/        grammar.js, queries/, tests, bindings
@@ -355,8 +360,8 @@ reported upstream. Gecode itself needs no changes.
 ### 8.1 Rust (`rust/`)
 
 - Crates: `iris-syntax`, `iris-sema`, `iris-core`, `iris-cli`,
-  `iris-lsp`, `iris-wasm`, `iris-macros` (after 0.1), and `iris-lint` if
-  built (§8.13), published
+  `iris-lsp`, `iris-wasm`, `iris-js`, `iris-macros` (after 0.1), and
+  `iris-lint` if built (§8.13), published
   under the umbrella crate `gecode-iris`.
 - API sketch:
   ```rust
@@ -430,6 +435,8 @@ reported upstream. Gecode itself needs no changes.
   `pip install gecode-iris` (or `uvx gecode-iris`) is enough to use the
   skill.
 - Tests: pytest, plus the conformance driver.
+- The TypeScript package (§8.16) binds the Rust crate the same way,
+  through WebAssembly.
 
 ### 8.3 Java and Kotlin (`java/`)
 
@@ -608,10 +615,10 @@ cannot express, or expresses awkwardly, is input to the 1.0 design.
   4. **Language Specification:** the normative text from `spec/`, with a
      version switcher (0.1, 1.0).
   5. **Format library:** pages generated from `formats/`.
-  6. **Using Iris from:** Rust, Python, Java, Kotlin, C++, Gecode. Each
-     links to its generated API docs (docs.rs, a Python API reference built
-     with mkdocstrings or pdoc and hosted on the site, Javadoc and Dokka,
-     and Doxygen for C++).
+  6. **Using Iris from:** Rust, Python, TypeScript, Java, Kotlin, C++,
+     Gecode. Each links to its generated API docs (docs.rs, a Python API
+     reference built with mkdocstrings or pdoc and hosted on the site,
+     Javadoc and Dokka, and Doxygen for C++).
   7. **Tools:** CLI, formatter, linter if built (one page per lint), LSP,
      editors, and the agent skill.
   8. **Playground:** the Rust implementation compiled to WASM. Edit a spec
@@ -823,7 +830,7 @@ RustRover, and the other JetBrains IDEs.
 Many users want to write reader specs in their own language for type
 safety: entry names and value types checked by the compiler or type
 checker, not discovered when data is read. Every implementation gets a
-spec builder, and so does the TypeScript package once it exists.
+spec builder, and so does the TypeScript package (§8.16).
 [docs/builders.md](docs/builders.md) is the design brief, with sketches in
 every language. In short:
 
@@ -852,6 +859,76 @@ every language. In short:
   reproduce the spec, compared as syntax trees by an `iris-conformance`
   subcommand. Each format also gets an idiomatic hand-written builder, and
   type tests check that misuse fails to compile.
+
+### 8.16 TypeScript (`typescript/`)
+
+- Distribution name `gecode-iris` on npm, matching crates.io and PyPI.
+  ESM only, for Node 22.12 or later, browsers, Deno, Bun, and edge
+  runtimes such as Cloudflare Workers.
+- The package binds the Rust crate through WebAssembly, as Python binds
+  it through PyO3 (ADR 0017). The crate `rust/iris-js`, built with
+  wasm-bindgen 0.2.129 like `iris-wasm`, is the boundary; `iris-wasm`
+  stays the playground's crate with its own contract and size budget.
+  WebAssembly adds no semantics: parsing, reading, errors, JSON, and dzn
+  come from `iris-core`, so a conformance difference is a binding bug.
+  The API does not depend on the backend, so a pure-TypeScript backend
+  could replace WebAssembly later without breaking users.
+- API:
+  ```ts
+  import { Spec } from "gecode-iris";
+  const spec = Spec.parse(text, "jobshop.iris");   // parsed once
+  const data = spec.read(input, "la01.txt", { params: { instance: "la01" } });
+  data.entries;               // [{ name, valueType, depth }, ...]
+  data.entry("n_jobs");       // value type, depth, presence
+  data.int("n_jobs");         // number
+  data.ints("machine", [3]);  // number[]
+  data.toJSON(); data.toDzn();
+  ```
+  `read` and `catalog` accept a `Uint8Array` or a string. Looking up an
+  entry reports its value type, depth, and presence, so the spec
+  builder's typed layer (§8.15) sits on `Data` without parsing JSON.
+  `toJSON()` returns the canonical text and is never parsed internally.
+- **64-bit integers:** accessors that return `number` throw `RangeError`
+  outside `Number.MAX_SAFE_INTEGER`; the `bigint` and `BigInt64Array`
+  variants are always exact.
+- **Memory:** `Data` is copied into JavaScript typed arrays with offsets
+  per level, so it needs no `free()`. Only `Spec` holds a WebAssembly
+  handle; it supports `[Symbol.dispose]` with a `FinalizationRegistry`
+  fallback and never requires `free()`. `iris-core`'s validated column
+  constructors carry data across the boundary in a binary layout, and
+  JSON and dzn are rendered by `iris-core` only on request.
+- **Errors:** `IrisError extends Error` with `code`, `message`,
+  `inputLocation` and `specLocation` (each `{ origin, line, column }` or
+  `null`), `context`, `recordPath`, the diagnostic text, and `toJSON()`.
+  Python keeps one location; TypeScript keeps both because spec builders
+  map the spec location back to the host call site, also for
+  `E-CHECK-FAILED` while reading (`docs/builders.md`, principle 8).
+- **Packaging:** export conditions for `node` (synchronous load, so
+  `require()` works), `browser` (top-level `await`), and
+  `workerd`/`edge-light` (a static `.wasm` import), plus an `inline` entry
+  with the bytes embedded and compiled synchronously. In every entry
+  `Spec.parse` works as soon as an importing module evaluates, because
+  spec builders define specs at module scope. `initialize()` remains for
+  callers that supply their own module or URL. Pages with a strict
+  Content-Security-Policy need `'wasm-unsafe-eval'`. A `gecode-iris/build`
+  entry is left for the spec builder.
+- **Resilience:** the crate builds with `panic = "abort"`, so a trap
+  surfaces as `RuntimeError: unreachable`. The package turns it into an
+  `IrisInternalError` and recreates the instance; it also recreates the
+  instance after a large read, because WebAssembly memory never shrinks.
+- **Budgets and deadlines:** synchronous WebAssembly cannot be cancelled
+  from its own thread. The language's fixed work budgets (Specification
+  chapter 10, `E-BUDGET`) bound every read; the package adds no budget
+  settings, and its guide recommends a Worker for wall-clock deadlines,
+  as the playground does.
+- **Tests:** the conformance suite through a Node driver that uses the
+  package, `node:test` unit tests, type tests of the published
+  declarations with `tsc`, one browser smoke test with the site's
+  Playwright setup, and one Workers smoke test in `workerd`.
+- **Toolchain and code style:** stable Rust with `wasm32-unknown-unknown`,
+  wasm-bindgen-cli 0.2.129, Binaryen's `wasm-opt`, and Node. The
+  formatter's output is the style: oxfmt and type-aware oxlint, pinned as
+  devDependencies, run in check mode in CI with warnings denied.
 
 ---
 
@@ -935,15 +1012,16 @@ Dependencies flow downward. Work in the same row can run in parallel.
 | M4c | C++ | Port, CMake package | 100% conformance, sanitizer runs clean, differential fuzzing against Rust |
 | M4d | Java and Kotlin | Core library, Kotlin module | 100% conformance, JMH baseline recorded |
 | M4e | Formatter | `iris fmt`, `.editorconfig` line width, the style guide | The checks of §8.12 pass on every conformance case, and the format library is formatted |
+| M4f | TypeScript | The npm package `gecode-iris` over `rust/iris-js` (§8.16), Node driver, browser and Workers packaging, site guide | 100% conformance through the Node driver; the package loads in Node (ESM and `require()`), a browser, and `workerd`; the published declarations type-check |
 | M5 | Site and playground | Starlight site, the Specification rendered, guides, WASM playground, format pages | Deployed at `iris.gecode.dev` |
 | M6 | Skill | `skill/iris`, evals | The eval set passes, for example 8 of 10 formats read correctly on the first attempt |
 | M6b | Lint decision | Review `docs/lint-candidates.md` (§8.13, §12 open question 3), then build what the decision calls for | The decision is recorded in §12; any lints that ship have tests, fixes where possible, and site pages. Not required for M7 |
 | M7 | 0.1.0 release | The 0.1 Specification frozen, every package published as 0.1.0, announcement | Every registry and marketplace (including JetBrains Marketplace) has 0.1.0, and the docs are live |
 | M7b | Spec builders | Builders in every implementation (§8.15), `iris gen`, the round-trip generator and comparison, a builder page in each API guide | Every checked conformance and format spec round-trips through each language's builder, and every format has an idiomatic builder whose cases pass. Not required for M7; ships in 0.x package releases |
 
-M4a to M4e can start once M2 is done, and run in parallel, which is where
+M4a to M4f can start once M2 is done, and run in parallel, which is where
 splitting the work between agents pays off. Some need parts of M3 to start
-or to finish: Python binds the Rust core; the LSP and the formatter start
+or to finish: Python and TypeScript bind the Rust core; the LSP and the formatter start
 on the Rust parser and resolver and need the complete reader only for live
 reading and the same-result check; C++'s differential fuzzing needs the
 Rust driver. The LSP's formatting needs M4e. M6b needs the
@@ -957,7 +1035,7 @@ before M4e.
 | # | Milestone | Contents | Done when |
 |---|---|---|---|
 | M8 | 1.0 design | Ideas from §10.1 reviewed, ADRs, `spec/1.0/` draft, the compatibility rules of §10.2 | The 1.0 Specification is feature-complete as a draft |
-| M9 | 1.0 implementations | 1.0 in Rust, C++, Java, and Python, with `iris migrate` and tooling updates, all supporting 0.1 and 1.0 | 100% on the 1.0 suite and on the 0.1 suite (with listed exceptions) |
+| M9 | 1.0 implementations | 1.0 in Rust, C++, Java, Python, and TypeScript, with `iris migrate` and tooling updates, all supporting 0.1 and 1.0 | 100% on the 1.0 suite and on the 0.1 suite (with listed exceptions) |
 | M10 | Gecode 7 integration | Decide whether Gecode 7 adopts the C++ library; if so, integrate it and run Gecode's examples and tests on it | Gecode 7 reads Iris 1.0 specs |
 | M11 | 1.0.0 release | 1.0 Specification frozen, all packages at 1.0.0 | Released together with Gecode 7 |
 
@@ -968,6 +1046,15 @@ before M4e.
 ### Decided
 
 - **C++ and Java are native implementations.** Python binds Rust.
+- **TypeScript binds Rust through WebAssembly:** the npm package
+  `gecode-iris` wraps the crate `rust/iris-js`, separate from the
+  playground's `iris-wasm` (§8.16, ADR 0017). Confirmed on 2026-11-03. One
+  implementation keeps every fix and Iris 1.0 change in step with Rust,
+  and one artifact runs in browsers, Node, Deno, Bun, and edge workers;
+  the playground's optimized module measured 645 KiB raw and 271 KiB
+  gzipped. A native Node addon and a pure-TypeScript reader were
+  rejected; a pure-TypeScript backend may later replace WebAssembly
+  behind the same API.
 - **Names:** the umbrella name `gecode-iris` on crates.io, PyPI, and npm.
   Python imports `gecode_iris`, Maven uses `dev.gecode:iris`, the C++
   namespace is `iris`, the CLI is `iris`, files use `.iris`, the site is

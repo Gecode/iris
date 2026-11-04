@@ -81,6 +81,14 @@ Values store typed contiguous leaves and cumulative offsets for each array
 level, preserving ragged rows, empty arrays, value types, and depths.
 `Data::value(name, path)` selects a borrowed value; `int(name)` reads an
 integer scalar, and `ints(name, path)` returns a borrowed integer row.
+`Value::leaves` borrows the typed leaves and `Value::levels` the offsets of each
+level, outermost first. `Value::from_ints`, `from_floats` and `from_strings`
+build a value from such columns, `Entry::new` names it, and
+`Data::from_entries` collects entries in order. They return `ColumnError`
+instead of panicking when a level does not start at 0, offsets decrease, a
+level's length does not match the rows above it, the leaf count does not match,
+a float is not finite, or two entries share a name. The TypeScript binding uses
+them to move data across the WebAssembly boundary.
 `ValueRef::size` returns an array row's element count in constant time from its
 stored offsets, and returns `AccessError::ExpectedArray` for scalars.
 Expression evaluation retains borrowed row views internally; only a result
