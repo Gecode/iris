@@ -1,0 +1,115 @@
+# Run the conformance cases of one operation through a driver.
+#
+#   cmake -DDRIVER=... -DREPOSITORY=... -DCARGO=... -DOPERATION=parse
+#         -P conformance.cmake
+#
+# Discovers the cases in conformance/cases/0.1 and formats as the runner
+# does, selects those whose case.toml names OPERATION (read without one),
+# and runs them with the runner from rust/. Fails unless every selected
+# case passes.
+cmake_minimum_required(VERSION 3.28)
+
+foreach(variable IN ITEMS DRIVER REPOSITORY CARGO OPERATION)
+  if(NOT DEFINED ${variable})
+    message(FATAL_ERROR "conformance.cmake needs -D${variable}=...")
+  endif()
+endforeach()
+
+set(roots "${REPOSITORY}/conformance/cases/0.1" "${REPOSITORY}/formats")
+# The runner gets at most this many case directories per command line, to
+# stay below the command-length limit of Windows.
+set(batch_size 100)
+
+# A case directory has a spec.iris, spec.bin, or case.toml.
+set(cases "")
+foreach(root IN LISTS roots)
+  file(GLOB_RECURSE markers LIST_DIRECTORIES false
+    "${root}/spec.iris" "${root}/spec.bin" "${root}/case.toml")
+  foreach(marker IN LISTS markers)
+    get_filename_component(case "${marker}" DIRECTORY)
+    list(APPEND cases "${case}")
+  endforeach()
+endforeach()
+list(REMOVE_DUPLICATES cases)
+list(LENGTH cases discovered)
+
+# Reads the operation from the top-level `operation = "..."` line. This is
+# not a TOML parser, so any other way of writing an operation key (quoted,
+# escaped, dotted, or inside a table) stops the test rather than silently
+# selecting the case as a read. Quoted top-level keys are rejected outright,
+# since an escape can spell `operation` without the word appearing.
+function(case_operation case result)
+  set(operation read)
+  if(EXISTS "${case}/case.toml")
+    file(STRINGS "${case}/case.toml" lines
+      REGEX "^[ \t]*\\[|^[^=#]*operation[^=]*=|^[^=#]*[\"']")
+    set(in_table FALSE)
+    foreach(line IN LISTS lines)
+      if(line MATCHES "^[ \t]*\\[")
+        set(in_table TRUE)
+      elseif(in_table AND NOT line MATCHES "^[^=#]*operation[^=]*=")
+        # A quoted key inside a table cannot set the top-level operation.
+      elseif(NOT in_table AND line MATCHES
+             "^[ \t]*operation[ \t]*=[ \t]*\"(parse|read|catalog|dzn)\"[ \t]*(#.*)?$")
+        set(operation "${CMAKE_MATCH_1}")
+      else()
+        message(FATAL_ERROR "${case}/case.toml: unsupported operation line: ${line}")
+      endif()
+    endforeach()
+  endif()
+  set(${result} "${operation}" PARENT_SCOPE)
+endfunction()
+
+set(selected "")
+foreach(case IN LISTS cases)
+  case_operation("${case}" operation)
+  if(operation STREQUAL OPERATION)
+    file(RELATIVE_PATH path "${REPOSITORY}/rust" "${case}")
+    list(APPEND selected "${path}")
+  endif()
+endforeach()
+list(SORT selected)
+list(LENGTH selected count)
+if(count EQUAL 0)
+  message(FATAL_ERROR "no ${OPERATION} cases among ${discovered} discovered")
+endif()
+
+set(statuses total pass xfail fail xpass unrepresentable)
+foreach(status IN LISTS statuses)
+  set(${status} 0)
+endforeach()
+set(failed_batches 0)
+foreach(start RANGE 0 ${count} ${batch_size})
+  if(start EQUAL count)
+    break()
+  endif()
+  list(SUBLIST selected ${start} ${batch_size} batch)
+  execute_process(
+    COMMAND "${CARGO}" run --quiet --locked -p iris-conformance --
+      run --driver "\"${DRIVER}\"" --version 0.1 ${batch}
+    WORKING_DIRECTORY "${REPOSITORY}/rust"
+    RESULT_VARIABLE exit_status
+    OUTPUT_VARIABLE output
+    ERROR_VARIABLE errors)
+  message("${output}${errors}")
+  if(NOT exit_status EQUAL 0)
+    math(EXPR failed_batches "${failed_batches} + 1")
+  endif()
+  if(output MATCHES "Summary: total=([0-9]+) pass=([0-9]+) xfail=([0-9]+) fail=([0-9]+) xpass=([0-9]+) unrepresentable=([0-9]+)")
+    set(group 1)
+    foreach(status IN LISTS statuses)
+      math(EXPR ${status} "${${status}} + ${CMAKE_MATCH_${group}}")
+      math(EXPR group "${group} + 1")
+    endforeach()
+  else()
+    math(EXPR failed_batches "${failed_batches} + 1")
+  endif()
+endforeach()
+
+message("Selected ${count} ${OPERATION} cases from ${discovered} discovered in "
+  "conformance/cases/0.1 and formats")
+message("Summary of all batches: total=${total} pass=${pass} xfail=${xfail} "
+  "fail=${fail} xpass=${xpass} unrepresentable=${unrepresentable}")
+if(NOT failed_batches EQUAL 0 OR NOT total EQUAL count OR NOT pass EQUAL count)
+  message(FATAL_ERROR "${OPERATION} conformance failed")
+endif()
