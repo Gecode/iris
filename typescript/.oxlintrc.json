@@ -9,7 +9,7 @@
   "ignorePatterns": ["dist/**", "wasm/**"],
   "overrides": [
     {
-      "files": ["test/**/*.test.ts"],
+      "files": ["test/**/*.test.ts", "test/*-smoke.ts"],
       "rules": {
         "typescript/no-floating-promises": "off"
       }

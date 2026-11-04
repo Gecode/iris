@@ -2,15 +2,19 @@
 // and never run. Each @ts-expect-error line must report an error.
 import {
   Data,
+  initialize,
   IrisError,
   Spec,
   type BigIntValue,
   type Entry,
   type Location,
+  type ModuleSource,
   type Params,
   type Value,
   type ValueType,
 } from "gecode-iris";
+import { Spec as InlineSpec } from "gecode-iris/inline";
+import { initialize as initializeManually, Spec as ManualSpec } from "gecode-iris/manual";
 
 export function validUsage(input: Uint8Array): void {
   using spec = Spec.parse("n: int  a[n]: int", "counted.iris");
@@ -35,6 +39,16 @@ export function validUsage(input: Uint8Array): void {
   void [exactValue, object, exactObject, documents];
 }
 
+export async function loading(bytes: Uint8Array, response: Response): Promise<void> {
+  const source: ModuleSource = new URL("https://example.com/iris_js_bg.wasm");
+  await initialize(source);
+  await initializeManually(fetch("/iris_js_bg.wasm"));
+  await initializeManually(bytes);
+  await initializeManually(response);
+  const specs: Spec[] = [InlineSpec.parse("n: int"), ManualSpec.parse("n: int")];
+  void specs;
+}
+
 export function errorFields(error: unknown): void {
   if (error instanceof IrisError) {
     const code: string = error.code;
@@ -55,6 +69,8 @@ export function misuse(data: Data, error: IrisError, entry: Entry): void {
   const empty = new Data(new Uint8Array());
   // @ts-expect-error -- spec text is a string or bytes
   Spec.parse(42);
+  // @ts-expect-error -- initialize needs a source
+  void initialize();
   // @ts-expect-error -- parameter values are strings
   Spec.parse("").read("", "input.txt", { params: { n: 3 } });
   // @ts-expect-error -- entry names are strings

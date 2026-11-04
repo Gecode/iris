@@ -84,6 +84,14 @@ jobs:
         run: npm run test:types
       - name: Test package
         run: npm test
+      - name: Test the packed package in a strict consumer
+        run: npm run test:package
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Smoke test in a browser
+        run: npm run test:browser
+      - name: Smoke test in workerd
+        run: npm run test:workerd
       - name: Run conformance cases with the Node driver
         working-directory: rust
         run: cargo run --locked -p iris-conformance -- run --driver "\"$(command -v node)\" \"$PWD/../typescript/test/conformance-driver.ts\"" ../conformance/cases/0.1

@@ -1,6 +1,6 @@
 // Builds the package: rust/iris-js to WebAssembly, its JavaScript glue, and dist/.
 import { spawnSync, type SpawnSyncOptions } from "node:child_process";
-import { readFileSync, renameSync, rmSync } from "node:fs";
+import { readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 
@@ -8,10 +8,12 @@ const packageDirectory = fileURLToPath(new URL("..", import.meta.url));
 const rustDirectory = fileURLToPath(new URL("../../rust", import.meta.url));
 const wasmDirectory = fileURLToPath(new URL("../wasm", import.meta.url));
 const crateManifest = new URL("../../rust/iris-js/Cargo.toml", import.meta.url);
+const wasmModule = `${wasmDirectory}/iris_js_bg.wasm`;
 
 requireToolchain();
 generateGlue(buildCrate());
-optimize(`${wasmDirectory}/iris_js_bg.wasm`);
+optimize(wasmModule);
+writeInlineModule(wasmModule);
 compileTypeScript();
 
 function requireToolchain(): void {
@@ -117,8 +119,23 @@ function optimize(binary: string): void {
     throw new Error("the optimized WebAssembly module is not valid");
   }
   renameSync(optimized, binary);
+  printSize("WebAssembly", bytes);
+}
+
+/** Embeds the module as base64 for the gecode-iris/inline entry point. */
+function writeInlineModule(binary: string): void {
+  const source = `export default "${readFileSync(binary).toString("base64")}";\n`;
+  writeFileSync(`${wasmDirectory}/iris_js_inline.js`, source);
+  writeFileSync(
+    `${wasmDirectory}/iris_js_inline.d.ts`,
+    "declare const moduleBase64: string;\nexport default moduleBase64;\n",
+  );
+  printSize("Inline module", Buffer.from(source));
+}
+
+function printSize(label: string, bytes: Uint8Array): void {
   const gzip = gzipSync(bytes, { level: 9 }).length;
-  console.log(`WebAssembly: ${bytes.length} bytes raw, ${gzip} bytes gzip`);
+  console.log(`${label}: ${bytes.length} bytes raw, ${gzip} bytes gzip`);
 }
 
 function compileTypeScript(): void {

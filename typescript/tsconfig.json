@@ -8,6 +8,7 @@
     "types": ["node"],
     "verbatimModuleSyntax": true,
     "erasableSyntaxOnly": true,
+    "rewriteRelativeImportExtensions": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "declaration": true,

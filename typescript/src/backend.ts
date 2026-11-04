@@ -1,21 +1,21 @@
-// The only module that calls the WebAssembly glue. It turns the failure
-// envelopes of rust/iris-js into JavaScript errors.
+// The only module that calls the WebAssembly glue's exports, once loading.ts
+// has installed its instance. It turns the failure envelopes of rust/iris-js
+// into JavaScript errors.
 import {
-  initSync,
   renderDzn as renderDznGlue,
   renderJson as renderJsonGlue,
   SpecHandle,
 } from "../wasm/iris_js.js";
 import { IrisError } from "./errors.js";
+import { isLoaded } from "./loading.js";
 
 export type { SpecHandle };
 
-/** Instantiates the WebAssembly module; every other function requires it. */
-export function instantiate(module: WebAssembly.Module): void {
-  initSync({ module });
-}
-
+/** Every handle comes from here, so no other function needs the check. */
 export function parseSpec(source: Uint8Array, origin: string): SpecHandle {
+  if (!isLoaded()) {
+    throw new Error("the WebAssembly module is not loaded; await initialize() first");
+  }
   return call(() => SpecHandle.parse(source, origin));
 }
 

@@ -14,13 +14,26 @@
     "dist",
     "wasm/iris_js.js",
     "wasm/iris_js_bg.wasm",
+    "wasm/iris_js_inline.js",
     "README.md"
   ],
   "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "node": "./dist/node.js"
+      "workerd": "./dist/workerd.js",
+      "edge-light": "./dist/workerd.js",
+      "node": "./dist/node.js",
+      "browser": "./dist/browser.js",
+      "default": "./dist/browser.js"
+    },
+    "./inline": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/inline.js"
+    },
+    "./manual": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     },
     "./package.json": "./package.json"
   },
@@ -30,7 +43,10 @@
     "test:types": "tsc -p tsconfig.json",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "lint": "oxlint --type-aware --deny-warnings"
+    "lint": "oxlint --type-aware --deny-warnings",
+    "test:browser": "node --test --test-force-exit test/browser-smoke.ts",
+    "test:workerd": "node --test --test-force-exit test/workerd-smoke.ts",
+    "test:package": "node --test test/package-smoke.ts"
   },
   "devDependencies": {
     "@types/node": "22.20.5",
@@ -38,7 +54,9 @@
     "oxfmt": "0.76.0",
     "oxlint": "1.91.0",
     "oxlint-tsgolint": "7.0.2005",
-    "typescript": "7.0.2"
+    "playwright": "1.63.0",
+    "typescript": "7.0.2",
+    "wrangler": "4.157.0"
   },
   "engines": {
     "node": ">=22.12.0"
