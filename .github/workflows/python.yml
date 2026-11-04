@@ -1,0 +1,264 @@
+name: Python
+
+on:
+  push:
+    paths:
+      - 'python/**'
+      - 'rust/**'
+      - 'conformance/**'
+      - 'formats/**'
+      - '.github/workflows/python.yml'
+  pull_request:
+    paths:
+      - 'python/**'
+      - 'rust/**'
+      - 'conformance/**'
+      - 'formats/**'
+      - '.github/workflows/python.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: python-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: python
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: astral-sh/setup-uv@v7
+      # ty resolves pytest from .venv, and pyright and mypy need the package.
+      - name: Set up development environment
+        run: |
+          uv venv --python 3.15
+          uvx maturin@1.16.0 develop --uv
+          uv pip install --group test --group lint
+      - name: Check Python formatting
+        run: uv run --no-sync ruff format --check
+      - name: Lint Python
+        run: uv run --no-sync ruff check
+      - name: Type-check Python
+        run: uv run --no-sync ty check
+      - name: Check stubs accept the documented API
+        run: |
+          uv run --no-sync --with numpy mypy tests/typecheck/data_usage.py
+          uv run --no-sync --with numpy pyright tests/typecheck/data_usage.py
+      - name: Check stubs reject misuse on each marked line
+        run: |
+          file=tests/typecheck/data_misuse.py
+          expected=$(grep -n '# error:' "$file" | cut -d: -f1)
+          status=0
+          mypy=$(uv run --no-sync --with numpy mypy "$file") || status=$?
+          test "$status" -eq 1
+          actual=$(sed -n 's|^tests/typecheck/data_misuse\.py:\([0-9]*\): error:.*|\1|p' <<< "$mypy" | sort -nu)
+          diff <(echo "$expected") <(echo "$actual") || { echo "$mypy"; exit 1; }
+          status=0
+          pyright=$(uv run --no-sync --with numpy pyright "$file") || status=$?
+          test "$status" -eq 1
+          actual=$(sed -n 's|^ *.*/data_misuse\.py:\([0-9]*\):[0-9]* - error:.*|\1|p' <<< "$pyright" | sort -nu)
+          diff <(echo "$expected") <(echo "$actual") || { echo "$pyright"; exit 1; }
+      - name: Check Rust formatting
+        run: cargo fmt --all -- --check
+      - name: Lint Rust crate
+        run: cargo clippy --all-targets --locked -- -D warnings
+
+  wheel:
+    name: Wheel (${{ matrix.wheel }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux wheels cross-compile in maturin-action's containers.
+          - wheel: manylinux-x86_64
+            runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            manylinux: auto
+          - wheel: manylinux-aarch64
+            runner: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            manylinux: auto
+          - wheel: musllinux-x86_64
+            runner: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            manylinux: musllinux_1_2
+          - wheel: musllinux-aarch64
+            runner: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            manylinux: musllinux_1_2
+          - wheel: macos-arm64
+            runner: macos-15
+            target: aarch64-apple-darwin
+          - wheel: macos-x86_64
+            runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - wheel: windows-x86_64
+            runner: windows-latest
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          working-directory: python
+          maturin-version: v1.16.0
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux }}
+          # pyproject.toml sets locked = true; --locked repeats it here.
+          args: --release --locked --out dist
+      - name: Check wheel is abi3
+        run: |
+          wheels=(python/dist/*.whl)
+          ls -l "${wheels[@]}"
+          test "${#wheels[@]}" -eq 1
+          [[ "$(basename "${wheels[0]}")" == gecode_iris-*-cp310-abi3-*.whl ]]
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wheel-${{ matrix.wheel }}
+          path: python/dist/*.whl
+          if-no-files-found: error
+
+  sdist:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: astral-sh/setup-uv@v7
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          working-directory: python
+          maturin-version: v1.16.0
+          command: sdist
+          args: --out dist
+      # The sdist carries the rust/ crates it depends on; build it outside the checkout.
+      - name: Build wheel from sdist
+        run: |
+          cp python/dist/*.tar.gz "$RUNNER_TEMP/"
+          cd "$RUNNER_TEMP"
+          uv build --wheel --out-dir wheel ./*.tar.gz
+          uv venv --python 3.10 env
+          uv pip install --python env/bin/python wheel/*.whl
+          env/bin/python -I -c 'import gecode_iris as iris; assert iris.Spec.parse("n: int\n").read(b"3\n")["n"] == 3'
+          env/bin/iris --version
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sdist
+          path: python/dist/*.tar.gz
+          if-no-files-found: error
+
+  test:
+    name: Test (${{ matrix.wheel }}, Python ${{ matrix.python }})
+    needs: wheel
+    strategy:
+      fail-fast: false
+      matrix:
+        wheel:
+          - manylinux-x86_64
+          - manylinux-aarch64
+          - musllinux-x86_64
+          - musllinux-aarch64
+          - macos-arm64
+          - macos-x86_64
+          - windows-x86_64
+        # The abi3 floor and the newest release.
+        python: ['3.10', '3.15']
+        include:
+          - wheel: manylinux-x86_64
+            runner: ubuntu-latest
+            conformance: true
+          - wheel: manylinux-aarch64
+            runner: ubuntu-24.04-arm
+          - wheel: musllinux-x86_64
+            runner: ubuntu-latest
+            alpine: true
+          - wheel: musllinux-aarch64
+            runner: ubuntu-24.04-arm
+            alpine: true
+          - wheel: macos-arm64
+            runner: macos-15
+            conformance: true
+          - wheel: macos-x86_64
+            runner: macos-15-intel
+          - wheel: windows-x86_64
+            runner: windows-latest
+            conformance: true
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # The tests compare bytes with checked-in files, so keep LF line endings.
+      - name: Keep line endings
+        if: runner.os == 'Windows'
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: wheel-${{ matrix.wheel }}
+          path: dist
+      - uses: astral-sh/setup-uv@v7
+        if: ${{ !matrix.alpine }}
+      - name: Install wheel
+        if: ${{ !matrix.alpine }}
+        working-directory: python
+        run: |
+          env="$RUNNER_TEMP/iris-env"
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            scripts="$env/Scripts" exe=.exe
+          else
+            scripts="$env/bin" exe=
+          fi
+          uv venv --python "${{ matrix.python }}" "$env"
+          uv pip install --python "$scripts/python$exe" ../dist/*.whl --group test
+          { echo "PY=$scripts/python$exe"; echo "IRIS=$scripts/iris$exe"; } >> "$GITHUB_ENV"
+      - name: Run pytest
+        if: ${{ !matrix.alpine }}
+        working-directory: python
+        run: '"$PY" -m pytest'
+      - name: Run pytest with numpy
+        if: ${{ !matrix.alpine }}
+        working-directory: python
+        run: |
+          uv pip install --python "$PY" numpy
+          "$PY" -m pytest
+      - name: Run console script
+        if: ${{ !matrix.alpine }}
+        run: |
+          "$IRIS" --version
+          "$IRIS" check formats/dimacs-cnf/dimacs-cnf.iris
+      - name: Run conformance cases
+        if: ${{ matrix.conformance && matrix.python == '3.15' }}
+        run: |
+          driver="\"$PY\" -I \"$GITHUB_WORKSPACE/python/tests/conformance_driver.py\""
+          "$IRIS" conformance "$driver" conformance/cases/0.1
+          "$IRIS" conformance "$driver" formats
+      # JavaScript actions do not run in Alpine containers, so start one directly.
+      - name: Test wheel in Alpine
+        if: ${{ matrix.alpine }}
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/iris" -w /iris/python \
+            "ghcr.io/astral-sh/uv:python${{ matrix.python }}-alpine" sh -euxc '
+              uv venv --python-preference only-system /tmp/env
+              uv pip install --python /tmp/env/bin/python ../dist/*.whl --group test
+              /tmp/env/bin/python -m pytest -p no:cacheprovider
+              uv pip install --python /tmp/env/bin/python numpy
+              /tmp/env/bin/python -m pytest -p no:cacheprovider
+              /tmp/env/bin/iris --version
+              /tmp/env/bin/iris check ../formats/dimacs-cnf/dimacs-cnf.iris
+            '

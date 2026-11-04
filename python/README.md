@@ -136,17 +136,19 @@ both.
 ## Build and test
 
 The tools are uv for environments, interpreters, dependencies and running
-tools; maturin, through `uvx`, for the extension; ruff for linting and
-formatting; and ty for type checking. ruff and ty are configured in
-`pyproject.toml`. The Rust crate needs the stable toolchain that `rust/`
+tools; maturin 1.16.0, through `uvx`, for the extension; ruff for linting and
+formatting; ty for type checking; and pyright and mypy for the stub checks.
+The `lint` dependency group in `pyproject.toml` pins the exact versions of
+ruff, ty, pyright and mypy, and CI installs the same group. ruff and ty are
+configured in `pyproject.toml`. The Rust crate needs the stable toolchain that `rust/`
 uses.
 
 Set up a development environment in `python/`:
 
 ```sh
 uv venv --python 3.15
-uvx maturin develop --uv
-uv pip install --group test
+uvx maturin@1.16.0 develop --uv
+uv pip install --group test --group lint
 uv run --no-sync pytest
 ```
 
@@ -160,9 +162,9 @@ Lint, format and type-check in `python/`, after the setup above, since ty
 resolves `pytest` from `.venv`:
 
 ```sh
-uvx ruff format --check
-uvx ruff check
-uvx ty check
+uv run --no-sync ruff format --check
+uv run --no-sync ruff check
+uv run --no-sync ty check
 ```
 
 The package ships `py.typed` and the stub `python/gecode_iris/_native.pyi`
@@ -189,10 +191,10 @@ and report an error on each line of `data_misuse.py` that ends in an
 pyright's strict mode reports them as unknown:
 
 ```sh
-uv run --no-sync --with numpy --with mypy mypy tests/typecheck/data_usage.py
-uv run --no-sync --with numpy --with pyright pyright tests/typecheck/data_usage.py
-uv run --no-sync --with numpy --with mypy mypy tests/typecheck/data_misuse.py
-uv run --no-sync --with numpy --with pyright pyright tests/typecheck/data_misuse.py
+uv run --no-sync --with numpy mypy tests/typecheck/data_usage.py
+uv run --no-sync --with numpy pyright tests/typecheck/data_usage.py
+uv run --no-sync --with numpy mypy tests/typecheck/data_misuse.py
+uv run --no-sync --with numpy pyright tests/typecheck/data_misuse.py
 ```
 
 The last two commands exit with status 1. Each reports errors on every
@@ -212,7 +214,7 @@ it into a fresh environment in `python/`. uv downloads a managed Python 3.10
 when none is installed:
 
 ```sh
-uvx maturin build --release --out target/wheels
+uvx maturin@1.16.0 build --release --out target/wheels
 uv venv --python 3.10 "$TMPDIR/iris-py3.10"
 uv pip install --python "$TMPDIR/iris-py3.10/bin/python" target/wheels/*.whl --group test
 "$TMPDIR/iris-py3.10/bin/python" -m pytest
@@ -236,3 +238,40 @@ PY="$PWD/python/.venv/bin/python"
 ```
 
 Every case passes with no `--driver-id` and no exemptions.
+
+## Source distribution
+
+The crates in `rust/` that the package depends on are outside `python/`, and
+`maturin sdist` copies them into the source distribution. A crate must
+therefore not read files outside its own directory at build time;
+`iris-conformance` embeds copies of the two Specification files it needs for
+this reason (see [its README](../rust/iris-conformance/README.md)). To check
+that the source distribution builds, build a wheel from it outside the
+checkout, in `python/`:
+
+```sh
+uvx maturin@1.16.0 sdist --out dist
+uv build --wheel --out-dir "$TMPDIR/iris-sdist" dist/*.tar.gz
+```
+
+## Continuous integration
+
+[`.github/workflows/python.yml`](../.github/workflows/python.yml) runs on
+changes to `python/`, `rust/`, `conformance/`, `formats/` and the workflow
+itself. It publishes nothing; publishing is milestone M7.
+
+- `lint` runs the formatter, linter and type checks above, the pyright and
+  mypy stub checks, and `cargo fmt` and `clippy` for the crate. For
+  `data_misuse.py` it compares the lines each checker reports with the lines
+  marked `# error:`.
+- `wheel` builds one abi3 wheel per platform with `PyO3/maturin-action` and
+  maturin 1.16.0, using
+  the committed `Cargo.lock`: manylinux and musllinux for x86_64 and aarch64,
+  macOS for arm64 and x86_64, and Windows for x86_64.
+- `sdist` builds the source distribution, then builds a wheel from it outside
+  the checkout and imports it.
+- `test` installs each wheel into a new uv environment, on Python 3.10 and
+  3.15, and runs pytest without and with numpy, and the `iris` script. The
+  musllinux wheels run in an Alpine container. On Linux x86_64, macOS arm64
+  and Windows, Python 3.15 also runs the conformance suite through the
+  installed `iris conformance`, against `conformance/cases/0.1` and `formats`.

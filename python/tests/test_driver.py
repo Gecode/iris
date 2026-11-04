@@ -14,14 +14,14 @@ DRIVER = Path(__file__).with_name("conformance_driver.py")
 @pytest.fixture
 def spec(tmp_path: Path) -> str:
     path = tmp_path / "spec.iris"
-    path.write_text("param p = 1\nn: int\n")
+    path.write_text("param p = 1\nn: int\n", newline="\n")
     return str(path)
 
 
 @pytest.fixture
 def instance(tmp_path: Path) -> str:
     path = tmp_path / "input.txt"
-    path.write_text("3\n")
+    path.write_text("3\n", newline="\n")
     return str(path)
 
 

@@ -7,6 +7,7 @@ import re
 import shutil
 import signal
 import subprocess
+import sys
 import sysconfig
 from collections.abc import Callable
 from pathlib import Path
@@ -48,7 +49,7 @@ def test_check_reports_the_format() -> None:
 
 def test_check_renders_a_language_error(tmp_path: Path) -> None:
     spec = tmp_path / "bad.iris"
-    spec.write_text("x: array[k] of int\n")
+    spec.write_text("x: array[k] of int\n", newline="\n")
     result = iris("check", str(spec))
     assert (result.returncode, result.stdout) == (1, b"")
     assert result.stderr.decode() == (
@@ -95,14 +96,14 @@ def test_fmt_check_accepts_a_formatted_spec() -> None:
 
 def test_fmt_check_reports_an_unformatted_spec(tmp_path: Path) -> None:
     spec = tmp_path / "spec.iris"
-    spec.write_text("n:int\n")
+    spec.write_text("n:int\n", newline="\n")
     result = iris("fmt", "--check", str(spec))
     assert (result.returncode, result.stdout, result.stderr.decode()) == (
         1,
         b"",
         f"{spec}: would reformat\n",
     )
-    assert spec.read_text() == "n:int\n"
+    assert spec.read_bytes() == b"n:int\n"
 
 
 def test_fmt_reads_standard_input() -> None:
@@ -113,6 +114,8 @@ def test_fmt_reads_standard_input() -> None:
 def test_usage_errors_name_the_program_and_exit_2() -> None:
     result = iris("read", "spec.iris")
     assert (result.returncode, result.stdout) == (2, b"")
+    # The name is the file name of the script, as for the Rust binary. On
+    # Windows the console-script launcher strips ".exe" from sys.argv[0].
     assert result.stderr == (
         b"error: the following required arguments were not provided:\n"
         b"  <INPUT>...\n"
@@ -145,7 +148,9 @@ def test_a_panic_exits_101_without_a_python_traceback() -> None:
         os.close(write_end)
     assert result.returncode == 101
     assert b"panicked at" in result.stderr
-    assert b"failed printing to stdout: Broken pipe" in result.stderr
+    # Windows describes the closed pipe in its own words.
+    broken_pipe = b"The pipe is being closed" if sys.platform == "win32" else b"Broken pipe"
+    assert b"failed printing to stdout: " + broken_pipe in result.stderr
     assert b"Traceback" not in result.stderr
 
 

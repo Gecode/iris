@@ -59,9 +59,9 @@ def test_parse_reports_invalid_utf8_in_bytes() -> None:
 
 def test_load_uses_the_path_as_origin(tmp_path: Path) -> None:
     path = tmp_path / "row.iris"
-    path.write_text(ROW_SPEC)
+    path.write_text(ROW_SPEC, newline="\n")
     assert read_row(iris.Spec.load(path)) == ROW_JSON
-    path.write_text("x:integer")
+    path.write_text("x:integer", newline="\n")
     with pytest.raises(iris.Error) as raised:
         iris.Spec.load(str(path))
     assert raised.value.origin == str(path)

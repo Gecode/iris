@@ -12,7 +12,8 @@ use crate::case::{self, Case};
 use ebnf::Grammar;
 use recognize::{Failure, Recognizer};
 
-const GRAMMAR: &str = include_str!("../../../../spec/0.1/grammar.ebnf");
+// A copy of spec/0.1/grammar.ebnf; tests/embedded.rs keeps it in step.
+const GRAMMAR: &str = include_str!("../../embedded/0.1/grammar.ebnf");
 
 #[derive(Debug, Default)]
 pub struct GrammarReport {

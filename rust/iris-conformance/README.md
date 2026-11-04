@@ -13,4 +13,11 @@ cargo test --locked -p iris-conformance
 cargo run --locked -p iris-conformance -- --help
 ```
 
+The runner embeds two Specification files in `embedded/0.1/`, so that the
+crate builds outside the repository, as in the Python source distribution:
+`grammar.ebnf` is a copy of `spec/0.1/grammar.ebnf`, and `error-codes.txt`
+lists the codes in the first column of `spec/0.1/errors.md`, one per line.
+`tests/embedded.rs` fails when either differs from the Specification; after a
+change to those files, update the copies to match.
+
 Publication is disabled until milestone M7, as for the other workspace crates.

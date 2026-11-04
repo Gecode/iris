@@ -271,12 +271,9 @@ where
 
 fn decode_error(bytes: &[u8]) -> Result<ErrorKey, String> {
     let document: ErrorDocument = decode_json(bytes)?;
-    let registry = include_str!("../../../spec/0.1/errors.md");
-    let registered = registry.lines().any(|line| {
-        line.strip_prefix("| `")
-            .and_then(|tail| tail.split_once('`'))
-            .is_some_and(|(code, _)| code == document.code)
-    });
+    // The codes registered in spec/0.1/errors.md; tests/embedded.rs keeps them in step.
+    let registry = include_str!("../embedded/0.1/error-codes.txt");
+    let registered = registry.lines().any(|code| code == document.code);
     if document.code == "E-UNMAPPED" {
         return Err("E-UNMAPPED is a hard adapter failure".into());
     }
