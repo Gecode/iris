@@ -1,6 +1,6 @@
 ---
 title: Other implementations
-description: The status of the C++ and Java implementations and of Gecode.
+description: The status of the Java implementation and of Gecode.
 editUrl: false
 prev: false
 next: false
@@ -11,14 +11,14 @@ input into JSON or dzn, or embed the [Rust API](/using/rust/) in a host
 program. The [Python package](/using/python/) binds the Rust implementation
 and installs the same `iris` command. The
 [TypeScript package](/using/typescript/) runs the Rust implementation as
-WebAssembly in Node, browsers and edge runtimes.
+WebAssembly in Node, browsers and edge runtimes. The
+[C++ library](/using/cpp/) is a native implementation for C++23.
 
 ## Planned implementations
 
-- **C++:** a native implementation.
 - **Java and Kotlin:** a native Java implementation with a Kotlin module.
 
-None of them has a release date. The
+It has no release date. The
 [conformance suite](https://github.com/Gecode/iris/blob/main/conformance/README.md)
 holds the language-neutral cases that every implementation must pass.
 

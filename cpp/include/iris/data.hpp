@@ -21,7 +21,11 @@ struct DataImpl;
 class Spec;
 
 /// The type of the leaves of a value (Specification §3.1)
-enum class ValueType { Int, Float, String };
+enum class ValueType {
+  Int,    ///< A 64-bit signed integer
+  Float,  ///< A double-precision float
+  String, ///< A UTF-8 string
+};
 
 /// Return the spelling of `type` in canonical data: `int`, `float`, or
 /// `string`
@@ -43,7 +47,9 @@ public:
  */
 class ValueRef {
 public:
+  /// Return the type of the leaves
   [[nodiscard]] ValueType type() const;
+  /// Return the number of array levels, 0 for a single value
   [[nodiscard]] std::size_t depth() const;
   /// Return the number of elements of this array
   [[nodiscard]] std::size_t size() const;
@@ -51,6 +57,7 @@ public:
   [[nodiscard]] ValueRef operator[](std::size_t i) const;
   /// Return the part that `path` selects, one index per level
   [[nodiscard]] ValueRef at(std::span<const std::size_t> path) const;
+  /// Return the part that the braced `path` selects, as in `at({1, 0})`
   [[nodiscard]] ValueRef at(std::initializer_list<std::size_t> path) const {
     return at(std::span<const std::size_t>(path.begin(), path.size()));
   }
@@ -112,47 +119,61 @@ public:
   /// spec that read the data.
   [[nodiscard]] std::pmr::string dzn() const;
 
+  /// Return the part of entry `name` that `path` selects
   [[nodiscard]] ValueRef at(std::string_view name,
                             std::span<const std::size_t> path = {}) const;
+  /// Return the number of elements of the array that `path` selects
   [[nodiscard]] std::size_t size(std::string_view name,
                                  std::span<const std::size_t> path = {}) const;
+  /// Return the single integer that `path` selects
   [[nodiscard]] std::int64_t
   integer(std::string_view name, std::span<const std::size_t> path = {}) const;
+  /// Return the single number that `path` selects, converting an integer to a
+  /// float
   [[nodiscard]] double number(std::string_view name,
                               std::span<const std::size_t> path = {}) const;
+  /// Return the single string that `path` selects
   [[nodiscard]] std::string_view
   text(std::string_view name, std::span<const std::size_t> path = {}) const;
+  /// Return the integers of the one-dimensional array that `path` selects
   [[nodiscard]] std::span<const std::int64_t>
   ints(std::string_view name, std::span<const std::size_t> path = {}) const;
+  /// Return the floats of the one-dimensional array that `path` selects
   [[nodiscard]] std::span<const double>
   floats(std::string_view name, std::span<const std::size_t> path = {}) const;
 
-  // The same with a braced path, as in data.ints("clause", {3})
+  /// The same as at() with a braced path, as in `data.at("clause", {3})`
   [[nodiscard]] ValueRef at(std::string_view name,
                             std::initializer_list<std::size_t> path) const {
     return at(name, span(path));
   }
+  /// The same as size() with a braced path
   [[nodiscard]] std::size_t
   size(std::string_view name, std::initializer_list<std::size_t> path) const {
     return size(name, span(path));
   }
+  /// The same as integer() with a braced path
   [[nodiscard]] std::int64_t
   integer(std::string_view name,
           std::initializer_list<std::size_t> path) const {
     return integer(name, span(path));
   }
+  /// The same as number() with a braced path
   [[nodiscard]] double number(std::string_view name,
                               std::initializer_list<std::size_t> path) const {
     return number(name, span(path));
   }
+  /// The same as text() with a braced path
   [[nodiscard]] std::string_view
   text(std::string_view name, std::initializer_list<std::size_t> path) const {
     return text(name, span(path));
   }
+  /// The same as ints() with a braced path, as in `data.ints("clause", {3})`
   [[nodiscard]] std::span<const std::int64_t>
   ints(std::string_view name, std::initializer_list<std::size_t> path) const {
     return ints(name, span(path));
   }
+  /// The same as floats() with a braced path
   [[nodiscard]] std::span<const double>
   floats(std::string_view name, std::initializer_list<std::size_t> path) const {
     return floats(name, span(path));

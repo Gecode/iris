@@ -85,6 +85,25 @@ if(IRIS_INSTALL)
       --test-command consumer)
 endif()
 
+# The examples of the site's C++ guide, which read files under formats/. Each
+# must print its recorded output.
+if(iris_has_conformance)
+  file(GLOB example_sources CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/examples/*.cpp")
+  foreach(source IN LISTS example_sources)
+    cmake_path(GET source STEM example)
+    add_executable(iris-example-${example} "${source}")
+    target_link_libraries(iris-example-${example} PRIVATE iris::iris)
+    set_target_properties(iris-example-${example} PROPERTIES CXX_EXTENSIONS OFF)
+    iris_set_warnings(iris-example-${example})
+    add_test(NAME example-${example}
+      COMMAND "${CMAKE_COMMAND}"
+        "-DEXAMPLE=$<TARGET_FILE:iris-example-${example}>"
+        "-DRECORDING=${PROJECT_SOURCE_DIR}/examples/${example}.out"
+        "-DREPOSITORY=${PROJECT_SOURCE_DIR}/.."
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/example.cmake")
+  endforeach()
+endif()
+
 if(IRIS_CONFORMANCE_TESTS)
   find_program(IRIS_CARGO cargo)
   if(NOT IRIS_CARGO)

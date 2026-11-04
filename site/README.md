@@ -8,15 +8,18 @@ then shows executable format examples. The format library renders every
 format’s README, highlighted reader spec, and cases with their real output.
 The Language Specification is rendered directly from `spec/`, with versioned
 chapter pages and error-code links shared with the language server.
-The introduction, tutorial, guides, tools, Rust, Python and TypeScript pages use the same
-shell, and so does the Python API reference that pdoc generates.
+The introduction, tutorial, guides, tools, Rust, Python, TypeScript and C++ pages use the same
+shell, and so do the Python API reference that pdoc generates and the C++ API
+reference that Doxygen generates.
 The other implementations page identifies planned implementations.
 
 ## Build and check
 
 Use Node 22.12 or newer, npm, the stable Rust toolchain, and
 [uv](https://docs.astral.sh/uv/), which builds the Python package for its API
-reference. Asset preparation also requires `rsvg-convert`:
+reference. The C++ API reference requires
+[Doxygen](https://www.doxygen.nl/) 1.9.8 or newer: install `doxygen` with
+Homebrew or apt. Asset preparation also requires `rsvg-convert`:
 install `librsvg` with Homebrew or `librsvg2-bin` on Ubuntu.
 
 In this directory:
@@ -218,6 +221,28 @@ commands and the Content-Security-Policy line still appear in
 `typescript/test/examples.test.ts`, part of `npm test` in `typescript/`,
 type-checks every example against the built package and runs the ones with a
 recorded output; see the [TypeScript README](../typescript/README.md#tests).
+
+## C++ guide and API reference
+
+`/using/cpp/` renders the examples in `cpp/examples` the same way, collected
+by `scripts/cpp-examples.mjs`, which also checks that the install command and
+the CMake snippets still appear in `cpp/README.md`. The site build compiles no
+C++: the `example-` tests in `cpp/` compile and run every example and compare
+its output; see the [C++ README](../cpp/README.md#guide-examples).
+
+Every dev/build runs `scripts/prepare-cpp-api.mjs`. It runs `doxygen` with
+`cpp/Doxyfile`, the file the `iris-docs` target uses, so a warning in the public
+headers fails the build, and so does a missing `doxygen`. The script keeps the
+content of the main page, the namespace page, and each class page, and drops
+Doxygen's index pages and page frame. It gives headings their anchors, drops
+layout attributes HTML no longer has, and points links at the new URLs, such
+as `/using/cpp/api/value-ref/`; a link to a dropped page fails the build. The
+ignored `src/generated/cpp-api.json` holds the fragments and their outlines,
+`src/pages/using/cpp/api/[...page].astro` places each in a Starlight page, and
+the `.iris-cpp-api` rules in `src/styles/custom.css` style Doxygen's markup. The
+pages therefore pass the ordinary link, HTML and contrast checks.
+`npm run check:cpp-api`, part of `npm run check`, compares the built pages with
+that output and requires every public class and the members the guide names.
 
 ## Playground
 

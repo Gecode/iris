@@ -1,0 +1,6 @@
+E-SPEC-UNKNOWN-TYPE
+input.txt:1:6: expected int, found 'twenty'
+     1 | 2 10 twenty
+       |      ^
+  while reading: row
+  spec: example.iris:1

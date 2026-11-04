@@ -10,6 +10,10 @@ on:
       - 'python/**'
       - 'typescript/examples/**'
       - 'typescript/README.md'
+      - 'cpp/include/**'
+      - 'cpp/examples/**'
+      - 'cpp/Doxyfile'
+      - 'cpp/README.md'
       - 'spec/**'
       - '.editorconfig'
       - 'LICENSE'
@@ -26,6 +30,10 @@ on:
       - 'python/**'
       - 'typescript/examples/**'
       - 'typescript/README.md'
+      - 'cpp/include/**'
+      - 'cpp/examples/**'
+      - 'cpp/Doxyfile'
+      - 'cpp/README.md'
       - 'spec/**'
       - '.editorconfig'
       - 'LICENSE'
@@ -88,8 +96,9 @@ jobs:
             site-cargo-${{ runner.os }}-${{ runner.arch }}-${{ steps.compiler.outputs.identity }}-${{ hashFiles('rust/Cargo.lock', 'python/Cargo.lock', 'rust/rust-toolchain.toml') }}-
       # The build renders the Python API reference with maturin and pdoc through uv.
       - uses: astral-sh/setup-uv@v7
-      - name: Install SVG renderer
-        run: sudo apt-get update && sudo apt-get install -y librsvg2-bin
+      # The build renders brand assets, and the C++ API reference with Doxygen.
+      - name: Install SVG renderer and Doxygen
+        run: sudo apt-get update && sudo apt-get install -y librsvg2-bin doxygen
       - run: npm ci
       - run: npm run build
       - run: npm run check

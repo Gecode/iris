@@ -87,6 +87,24 @@ if(IRIS_INSTALL)
     DESTINATION "${iris_package_dir}")
 endif()
 
+# The API reference of the public headers, in docs/html of the build directory.
+# Doxyfile treats every warning as an error.
+if(PROJECT_IS_TOP_LEVEL)
+  find_program(IRIS_DOXYGEN doxygen)
+  if(IRIS_DOXYGEN)
+    add_custom_target(iris-docs
+      COMMAND "${CMAKE_COMMAND}" -E env "IRIS_DOXYGEN_OUTPUT=${PROJECT_BINARY_DIR}/docs"
+        "${IRIS_DOXYGEN}" Doxyfile
+      WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+      VERBATIM)
+  else()
+    add_custom_target(iris-docs
+      COMMAND "${CMAKE_COMMAND}" -E echo "iris-docs needs doxygen"
+      COMMAND "${CMAKE_COMMAND}" -E false
+      VERBATIM)
+  endif()
+endif()
+
 if(IRIS_BUILD_TESTS)
   add_executable(iris-driver driver/main.cpp driver/json.cpp)
   target_link_libraries(iris-driver PRIVATE iris::iris)

@@ -190,8 +190,8 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v7
-      - name: Install compiler
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang-20 g++-14
+      - name: Install compiler and Doxygen
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang-20 g++-14 doxygen
       - uses: astral-sh/setup-uv@v7
       - name: Install CMake and Ninja
         run: |
@@ -208,6 +208,8 @@ jobs:
         run: cmake --preset dev -DIRIS_CONFORMANCE_TESTS=OFF
       - name: Lint
         run: git ls-files 'cpp/*.cpp' | xargs uvx clang-tidy==22.1.8 -p cpp/build/dev --quiet
+      - name: Build the API reference
+        run: cmake --build cpp/build/dev --target iris-docs
 
   fuzz:
     name: Fuzz (${{ matrix.target }})

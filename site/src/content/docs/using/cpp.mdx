@@ -1,0 +1,144 @@
+---
+title: C++
+description: Read input with a reader spec from C++23 with the native iris library, and access typed data without copying it.
+editUrl: false
+prev: false
+next: false
+---
+import CheckedExample from '../../../components/docs/CheckedExample.astro';
+
+The `iris` library is a native C++23 implementation of Iris that needs only the
+standard library. It passes the same conformance suite as the Rust reference
+implementation, so it reads every input as the [CLI](/tools/cli/) does. The
+[C++ API reference](/using/cpp/api/) lists every public class and method.
+
+## Add the library to a CMake project
+
+Use a C++23 compiler and standard library, such as GCC 14, Clang 20 with GCC
+14's libstdc++, Apple Clang 21 or MSVC, and CMake 3.28 or newer. The library is
+not published yet; vcpkg and Conan packages are planned. Package versions and
+language versions are separate; the current library is 0.1.0 and implements
+Iris 0.1.
+
+To install it, run this in the `cpp` directory of an Iris checkout:
+
+<CheckedExample id="cpp-install" />
+
+A project then finds the package, with `-DCMAKE_PREFIX_PATH=/opt/iris`:
+
+<CheckedExample id="cpp-find-package" title="CMakeLists.txt" />
+
+To build the library with your project instead, fetch a copy of the repository
+with FetchContent. Add `SOURCE_SUBDIR cpp` for a Git or archive source.
+
+<CheckedExample id="cpp-fetch-content" title="CMakeLists.txt" />
+
+A fetched copy builds no tests. It has no install rules unless you set
+`-DIRIS_INSTALL=ON`, which a project that installs targets linking `iris::iris`
+needs.
+
+## Parse a reader spec and read input
+
+The examples on this page are in
+[`cpp/examples`](https://github.com/Gecode/iris/tree/main/cpp/examples), and a
+test compiles each one, runs it and compares its output. They read files from
+the format library, so run them from the root of an Iris checkout.
+
+<CheckedExample id="cpp-read" title="read.cpp" />
+
+`iris/iris.hpp` declares the whole API. `Spec::parse` parses and checks a
+reader spec. The declaration reads `n`, then a row of `n` integers.
+`spec.read_text` reads input from memory; the origin names, such as
+`example.iris` and `input.txt`, appear in error messages. A `Spec` can read any
+number of inputs, and threads can read with one spec at the same time. Copies
+of a `Spec` or a `Data` share their contents, so they are cheap.
+
+## Read files, instances and parameters
+
+`Spec::load` reads a reader spec file, and `spec.read` and `spec.catalog` take
+a path. `read_text` and `catalog_text` take input from memory.
+
+<CheckedExample id="cpp-files" title="files.cpp" />
+
+`spec.catalog` lists the instances in an input as data. The `instance`
+parameter selects one instance during a read, by name or by its number,
+counting from 1. `Params` holds name and value strings, as the
+[Specification](/specification/0.1/09-params-and-instances/) defines: write
+`{"instance", "2"}`, not a number. `params.set` adds a value to existing
+`Params`.
+
+## Access data
+
+`data.size()` counts the entries, and `data.name(i)` and `data.value(i)` return
+them in the order the reader spec defines them. `data.find(name)` returns an
+entry's value as a `std::optional`.
+
+<CheckedExample id="cpp-access" title="access.cpp" />
+
+A path holds indices counted from 0, one per array level.
+`data.size(name, path)` returns the length of the array that the path selects.
+`data.integer`, `data.number` and `data.text` return a scalar, and `data.ints`
+and `data.floats` return a row as a `std::span`. `data.at` returns a
+`ValueRef`, a view with the same accessors, which walks a value of any depth,
+including arrays whose rows have different lengths and arrays of strings.
+
+Nothing here copies. Spans, `std::string_view`s and `ValueRef`s borrow from the
+`Data`, and stay valid while any copy of it exists. An unknown name, a value of
+another type or depth, or an index out of range throws `AccessError`, which is
+a usage error and not a language error.
+
+## dzn
+
+`data.dzn()` returns the MiniZinc data of the
+[dzn appendix](/specification/0.1/appendix-b-dzn/). Every line ends in a
+newline.
+
+<CheckedExample id="cpp-output" title="output.cpp" />
+
+The library has no JSON output. The canonical JSON document is the
+[CLI](/tools/cli/)'s, and the conformance driver in `cpp/driver` renders it for
+testing.
+
+## Handle errors
+
+A language error is an `iris::Error`, which comes in two styles. `Spec::parse`,
+`load`, `read` and the catalog functions throw it. It derives from
+`std::runtime_error`, and `what()` is the diagnostic that
+[Specification chapter 11](/specification/0.1/errors/) describes.
+
+<CheckedExample id="cpp-errors" title="errors.cpp" />
+
+`code()` returns the `ErrorCode` of the stable
+[error code](/specification/0.1/errors/), and `code_name` its spelling.
+`message()` is the message without a location. `input_location()` and
+`spec_location()` return an optional `Location`, whose `line` and `column` are
+optional too. `context()`, `excerpt()`, `record_path()` and
+`earlier_rejection()` are optional as well; each is present when the error has
+it, and `details()` returns them all as one `ErrorDetails`.
+
+Every function that throws `Error` has a `try_` variant that returns it in a
+`std::expected` instead:
+
+<CheckedExample id="cpp-expected" title="expected.cpp" />
+
+Both styles leave the other failures as exceptions: a file that cannot be read
+throws `std::system_error`, misuse throws `AccessError`, and `std::bad_alloc`
+reports exhausted memory. The language's fixed
+[work budgets](/specification/0.1/10-work-budgets/) bound every read. A read
+that exhausts one fails with the code `E-BUDGET`, and the library has no budget
+settings.
+
+## Supply the memory
+
+Every allocation the library makes comes from a `std::pmr::memory_resource`, so
+a host can supply its own heap. `Spec::parse` and `Spec::load` take one as their
+last argument, the default resource unless given. The spec, every read with it
+and the data they return allocate from it:
+
+<CheckedExample id="cpp-memory" title="memory.cpp" />
+
+`Params` takes its own resource when it is constructed. The resource must
+outlive the spec, the parameters and the data, and it must be thread-safe if
+threads read with one spec at the same time. Errors leave the library, so
+`Error`, `AccessError` and `std::system_error` use the global heap. Reading a
+file opens it with the C library, whose `FILE` may come from `malloc`.

@@ -1,0 +1,4 @@
+# An exception that escapes an example's main ends the example and fails its
+# test, and a try block in each example would bury what it teaches.
+InheritParentConfig: true
+Checks: -bugprone-exception-escape

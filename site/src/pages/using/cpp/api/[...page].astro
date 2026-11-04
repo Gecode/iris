@@ -1,0 +1,21 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+// Generated during every build by scripts/prepare-cpp-api.mjs.
+import reference from '../../../../generated/cpp-api.json';
+
+export function getStaticPaths() {
+  return reference.pages.map(page => ({ params: { page: page.slug || undefined }, props: { page } }));
+}
+const { page } = Astro.props;
+---
+<StarlightPage hasSidebar={true} headings={page.headings} frontmatter={{
+  title: page.title,
+  description: `${page.title} of the iris C++ library.`,
+  editUrl: false, prev: false, next: false,
+}}>
+  <p class="max-w-[68ch]">
+    Doxygen {reference.doxygen} generates this <a href="/using/cpp/api/">reference</a> during each
+    site build from the public headers. The <a href="/using/cpp/">C++ guide</a> shows the API in use.
+  </p>
+  <div class="iris-cpp-api min-w-0 max-w-[76ch]" data-cpp-api set:html={page.html} />
+</StarlightPage>

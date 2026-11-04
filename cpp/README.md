@@ -5,7 +5,10 @@ files with them. It is a native port of Gecode's implementation
 (`gecode/instance/spec.cpp`, `resolve.cpp`, `reader.cpp`, `eval.cpp`,
 `data.cpp` and `impl.hpp` at commit `5e7bbd5c26b0`) that does not depend on
 Gecode, built with CMake. It is designed so that Gecode 7 can adopt it.
-`PLAN.md` §8.4 describes the library; milestone M4c builds it.
+`PLAN.md` §8.4 describes the library; milestone M4c builds it. The
+[C++ guide](https://iris.gecode.dev/using/cpp/) on the site shows how to use
+it, and its [API reference](https://iris.gecode.dev/using/cpp/api/) lists
+every public class and method.
 
 The ported files keep Gecode's copyright notice. Like Gecode and the rest of
 this repository, the library is released under the [MIT License](../LICENSE).
@@ -120,6 +123,7 @@ A vendored copy builds no tests and has no install rules unless
 - Ninja, for the presets.
 - Stable Rust, for the conformance test, which runs the shared runner in
   `rust/`.
+- Doxygen 1.9.8 or newer, for the `iris-docs` target alone.
 
 ## Build and test
 
@@ -132,7 +136,7 @@ cmake --build --preset dev
 ctest --preset dev
 ```
 
-`ctest` runs fifteen tests. `spec-api` and `data-api` check the public
+`ctest` runs twenty-two tests. `spec-api` and `data-api` check the public
 API; `data-api` also checks the driver's JSON of data, and both outputs
 under every rounding mode. `budget` checks the exact budget limits that no
 conformance case reaches. `memory` checks the allocation hook: it replaces
@@ -150,8 +154,9 @@ source tree. Both use this build's compiler and flags. `parse-conformance`, `rea
 every case of their operation in `conformance/cases/0.1` and `formats`, and
 fail unless all of them pass. `fuzz-replay-parse` and `fuzz-replay-read`
 run the two fuzz targets (see [Fuzzing](#fuzzing)) over every file in
-`formats`. Run one alone with, for example, `ctest
---preset dev -R read-conformance`. The first conformance run builds the
+`formats`. `example-read` and the other `example-` tests run the guide's
+examples (see [Guide examples](#guide-examples)). Run one alone with, for
+example, `ctest --preset dev -R read-conformance`. The first conformance run builds the
 runner with Cargo.
 
 To run the runner by hand, from the repository root:
@@ -168,6 +173,31 @@ The driver implements the `parse`, `read`, `catalog` and `dzn` operations.
 `-DIRIS_CONFORMANCE_TESTS=OFF` drops the conformance test.
 `-DIRIS_CONFORMANCE_CASE_TIMEOUT=SECONDS` sets the runner's limit for one
 case, 30 seconds by default; each conformance test may take 60 times that.
+
+## Guide examples
+
+The site's C++ guide shows each file in `examples/`. The build compiles every
+`.cpp` file there, and its `example-` test runs it from the repository root,
+since the examples read files under `formats/`, and compares its output with
+the `.out` file of the same name. The site's check fails when the page and the
+files disagree, so a new example needs a `.out` recording and a place in
+`site/scripts/cpp-examples.mjs` and on the page. After a change, write a
+recording from the root with `cpp/build/dev/tests/iris-example-read >
+cpp/examples/read.out`.
+
+## API reference
+
+The `iris-docs` target runs Doxygen over the public headers and writes HTML
+to `build/dev/docs/html`:
+
+```sh
+cmake --build --preset dev --target iris-docs
+```
+
+`Doxyfile` treats every warning as an error, and an undocumented public
+member is a warning. The target fails with a message if CMake found no
+`doxygen`. The site build runs the same `Doxyfile`; see the
+[site README](../site/README.md#c-guide-and-api-reference).
 
 ## Sanitizers
 
@@ -319,7 +349,7 @@ Windows; runs the `asan` preset with Clang 20 and the `tsan` preset with
 GCC 14 on Ubuntu;
 runs each fuzz target for two minutes with Clang 20; compares the Rust
 driver with the `asan` driver for five minutes, seeded with the run's ID;
-and checks the formatting and runs clang-tidy as above. A failing fuzz or
+and checks the formatting, runs clang-tidy as above and builds `iris-docs`. A failing fuzz or
 differential job uploads its failing inputs or reproducers. CMake 4.4.4 and Ninja
 come from PyPI through uv.
 
@@ -328,6 +358,7 @@ come from PyPI through uv.
 - `include/iris/`: the public headers. `iris.hpp` includes the others:
   `spec.hpp`, `data.hpp`, `params.hpp` and `error.hpp`. None depends on
   Gecode.
+- `Doxyfile`: the settings of the API reference.
 - `cmake/`: the template of the package's `iris-config.cmake`.
 - `src/`: the library. `lexer.cpp`, `parser.cpp` and `resolve.cpp` port
   Gecode's lexer, parser and name resolution; `ast.hpp` ports `impl.hpp`.
@@ -346,6 +377,8 @@ come from PyPI through uv.
 - `fuzz/`: the libFuzzer targets `parse.cpp` and `read.cpp`, the
   dictionary `iris.dict`, and `replay.cpp`, which runs a target without
   libFuzzer.
+- `examples/`: the guide's examples and their recorded output.
 - `tests/`: the API, budget and memory tests; `conformance.cmake`, which
   selects the cases of one operation and runs them in batches;
+  `example.cmake`, which runs an example and compares its output;
   `no-gecode.cmake`; and `consumer/`, a project that uses the library.

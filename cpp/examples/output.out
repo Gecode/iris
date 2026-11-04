@@ -1,0 +1,4 @@
+vars = 3;
+clauses = 3;
+% clause: array[int] of tuple(array[int] of int)
+clause = [([1, -2],), ([2, 3, -1],), ([-3],)];

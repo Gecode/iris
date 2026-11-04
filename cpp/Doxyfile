@@ -1,0 +1,28 @@
+# The API reference of the public headers. Run doxygen from this directory
+# with IRIS_DOXYGEN_OUTPUT set to the output directory, as the iris-docs
+# target and the site's scripts/prepare-cpp-api.mjs do. The tags are few, so
+# that every Doxygen from 1.9.8 reads them without a warning.
+PROJECT_NAME = Iris
+OUTPUT_DIRECTORY = $(IRIS_DOXYGEN_OUTPUT)
+INPUT = include/iris
+FILE_PATTERNS = *.hpp
+STRIP_FROM_INC_PATH = include
+EXCLUDE_SYMBOLS = iris::detail
+# The same file names on every file system
+CASE_SENSE_NAMES = NO
+
+JAVADOC_AUTOBRIEF = YES
+ALWAYS_DETAILED_SEC = YES
+HIDE_FRIEND_COMPOUNDS = YES
+VERBATIM_HEADERS = NO
+ALPHABETICAL_INDEX = NO
+HAVE_DOT = NO
+CLASS_GRAPH = NO
+SEARCHENGINE = NO
+GENERATE_LATEX = NO
+
+QUIET = YES
+WARN_IF_UNDOCUMENTED = YES
+WARN_IF_INCOMPLETE_DOC = NO
+WARN_NO_PARAMDOC = NO
+WARN_AS_ERROR = FAIL_ON_WARNINGS

@@ -63,7 +63,7 @@ export default defineConfig({
         items: pages.map(page => ({ label: page.file === 'README.md' ? 'Chapter index' : page.title, link: page.url })),
       })) },
       { label: 'Formats', collapsed: true, items: [{ label: 'Format library', link: '/formats/' }, ...formats.map(format => ({ label: format.title, link: `/formats/${format.slug}/` }))] },
-      { label: 'Using Iris from', collapsed: true, items: ['using/rust', 'using/python', { label: 'Python API reference', link: '/using/python/api/' }, 'using/typescript', 'using/other-implementations'] },
+      { label: 'Using Iris from', collapsed: true, items: ['using/rust', 'using/python', { label: 'Python API reference', link: '/using/python/api/' }, 'using/typescript', 'using/cpp', { label: 'C++ API reference', link: '/using/cpp/api/' }, 'using/other-implementations'] },
       { label: 'Tools', collapsed: true, items: ['tools', 'tools/cli', 'tools/formatter', 'tools/lsp', 'tools/editors', 'tools/agent-skill'] },
       { label: 'Playground', link: '/playground/' },
     ],
