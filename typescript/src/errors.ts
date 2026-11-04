@@ -49,6 +49,16 @@ export class IrisError extends Error {
   }
 }
 
+/**
+ * A failure inside the WebAssembly module, such as a trap caused by a bug.
+ * It is never a problem with a reader spec or an input. The package has
+ * replaced the instance, so later calls, including those on existing specs,
+ * work; `cause` holds the original `WebAssembly.RuntimeError`.
+ */
+export class IrisInternalError extends Error {
+  override readonly name = "IrisInternalError" as const;
+}
+
 interface ErrorFields {
   readonly code: string;
   readonly message: string;

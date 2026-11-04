@@ -15,6 +15,8 @@ __pycache__/
 
 # TypeScript: the WebAssembly module and glue that npm run build generates
 /typescript/wasm/
+# The test build that npm test generates, with the fault-injection module
+/typescript/test-build/
 # Local state of the workerd smoke test's wrangler dev
 /typescript/test/smoke/workerd/.wrangler/
 

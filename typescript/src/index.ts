@@ -11,4 +11,4 @@ export {
   type ValueOptions,
   type ValueType,
 } from "./data.js";
-export { IrisError, type Location } from "./errors.js";
+export { IrisError, IrisInternalError, type Location } from "./errors.js";

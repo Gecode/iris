@@ -1,8 +1,8 @@
 // Loads the WebAssembly module. Every loading path installs its instance
-// through one synchronous step, so exactly one instance is ever installed.
-// The exported declarations name no glue type, so the public declarations
-// never import the glue.
-import { initSync } from "../wasm/iris_js.js";
+// through one synchronous step, and a replacement swaps it synchronously, so
+// exactly one instance is ever live. The exported declarations name no glue
+// type, so the public declarations never import the glue.
+import { __wbg_reset_state as resetState, initSync } from "../wasm/iris_js.js";
 
 /**
  * The WebAssembly module of `gecode-iris`, as a compiled module, its bytes, a
@@ -18,6 +18,8 @@ export type ModuleSource =
 
 let loaded = false;
 let loading: Promise<void> | undefined;
+let generation = 0;
+let replacementPending = false;
 
 /** Whether an instance is installed. */
 export function isLoaded(): boolean {
@@ -29,6 +31,31 @@ export function instantiate(module: WebAssembly.Module): void {
   if (!loaded) {
     initSync({ module });
     loaded = true;
+  }
+}
+
+/** Counts replacements; a handle from an earlier generation is stale. */
+export function instanceGeneration(): number {
+  return generation;
+}
+
+/**
+ * Replaces the instance with a fresh one from the same compiled module,
+ * releasing the old memory. The generation advances first, so a failed
+ * replacement still leaves every earlier handle stale, and the replacement
+ * stays pending.
+ */
+export function replaceInstance(): void {
+  replacementPending = true;
+  generation++;
+  resetState();
+  replacementPending = false;
+}
+
+/** Completes a pending replacement; throws if it fails again. */
+export function completeReplacement(): void {
+  if (replacementPending) {
+    replaceInstance();
   }
 }
 

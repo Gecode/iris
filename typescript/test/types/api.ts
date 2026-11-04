@@ -4,6 +4,7 @@ import {
   Data,
   initialize,
   IrisError,
+  IrisInternalError,
   Spec,
   type BigIntValue,
   type Entry,
@@ -57,6 +58,11 @@ export function errorFields(error: unknown): void {
     const path: readonly number[] | null = error.recordPath;
     const text: string = error.diagnostic + error.toJSON() + error.message;
     void [code, line, path, text, error.context];
+  }
+  if (error instanceof IrisInternalError) {
+    const cause: unknown = error.cause;
+    const name: "IrisInternalError" = error.name;
+    void [cause, name, error.message];
   }
 }
 

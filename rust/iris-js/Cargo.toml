@@ -16,6 +16,11 @@ crate-type = ["cdylib", "rlib"]
 [lints]
 workspace = true
 
+[features]
+# Adds the armTrap export, which makes the next read or catalog trap. Only the
+# TypeScript package's test build enables it.
+fault-injection = []
+
 [dependencies]
 iris-core = { version = "0.1.0", path = "../iris-core" }
 serde_json = "1"

@@ -1,4 +1,4 @@
-import { catalogData, parseSpec, readData, type SpecHandle } from "./backend.js";
+import { BoundSpec } from "./backend.js";
 import { Data } from "./data.js";
 
 /** Caller parameters: an object of strings, or name/value pairs applied in order. */
@@ -15,47 +15,51 @@ const utf8 = new TextEncoder();
  *
  * Disposing a spec releases its WebAssembly memory early; later use throws
  * `TypeError`. A spec that is never disposed is released when it is
- * garbage-collected.
+ * garbage-collected. A spec keeps its text and origin, so it keeps working
+ * when the package replaces the WebAssembly instance.
  */
 export class Spec {
-  #handle: SpecHandle | undefined;
+  #bound: BoundSpec | undefined;
 
-  private constructor(handle: SpecHandle) {
-    this.#handle = handle;
+  private constructor(bound: BoundSpec) {
+    this.#bound = bound;
   }
 
   /** Parses and checks a reader spec given as text or UTF-8 bytes. */
   static parse(text: string | Uint8Array, origin: string = "<string>"): Spec {
-    return new Spec(parseSpec(toBytes(text, "spec text"), checkedText(origin, "origin")));
+    // A copy, so the caller may reuse the bytes after parsing. The Uint8Array
+    // constructor copies; a subclass's slice, such as Buffer's, may not.
+    const source = text instanceof Uint8Array ? new Uint8Array(text) : toBytes(text, "spec text");
+    return new Spec(new BoundSpec(source, checkedText(origin, "origin")));
   }
 
   /** Reads one instance from input text or bytes. */
   read(input: Uint8Array | string, origin: string = "<input>", options: ReadOptions = {}): Data {
-    return this.#run(readData, input, origin, options);
+    return this.#run("read", input, origin, options);
   }
 
   /** Lists the instances in an input, with the same arguments as `read`. */
   catalog(input: Uint8Array | string, origin: string = "<input>", options: ReadOptions = {}): Data {
-    return this.#run(catalogData, input, origin, options);
+    return this.#run("catalog", input, origin, options);
   }
 
   [Symbol.dispose](): void {
-    this.#handle?.free();
-    this.#handle = undefined;
+    this.#bound?.dispose();
+    this.#bound = undefined;
   }
 
   #run(
-    operation: typeof readData,
+    operation: "read" | "catalog",
     input: Uint8Array | string,
     origin: string,
     options: ReadOptions,
   ): Data {
-    if (this.#handle === undefined) {
+    if (this.#bound === undefined) {
       throw new TypeError("the spec has been disposed");
     }
     const params = flattenParams(options.params);
     const bytes = toBytes(input, "input");
-    return Data.fromTransfer(operation(this.#handle, bytes, checkedText(origin, "origin"), params));
+    return Data.fromTransfer(this.#bound[operation](bytes, checkedText(origin, "origin"), params));
   }
 }
 

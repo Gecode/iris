@@ -22,6 +22,13 @@ all come from iris-core.
   `{"kind":"host","category":C,"message":M}` has the category `size`,
   `unsupported` or `internal`. A trap is a `WebAssembly.RuntimeError`, never a
   string.
+- The wasm32 export `instanceMemory()` is internal to the package and absent
+  from its published declarations. It returns the instance's
+  `WebAssembly.Memory`, which the package measures after each read.
+- The off-by-default `fault-injection` feature adds the internal export
+  `armTrap()`, which makes the next `read` or `catalog` trap with
+  `unreachable`, as a panic does. Only the package's test build enables it,
+  so the published module has no such export.
 
 [`src/transfer.rs`](src/transfer.rs) documents the transfer layout. It aligns
 every numeric array to 8 bytes, so JavaScript views leaves and offsets in place

@@ -1,20 +1,49 @@
 // Builds the package: rust/iris-js to WebAssembly, its JavaScript glue, and dist/.
+//
+// With --fault-injection it builds the test build instead: test-build/wasm/
+// holds the module and glue with iris-js's fault-injection feature, and
+// test-build/dist/ is a copy of dist/, so the package's code is unchanged but
+// loads the module that can force a trap. Run it after the package build.
 import { spawnSync, type SpawnSyncOptions } from "node:child_process";
-import { readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 
 const packageDirectory = fileURLToPath(new URL("..", import.meta.url));
 const rustDirectory = fileURLToPath(new URL("../../rust", import.meta.url));
-const wasmDirectory = fileURLToPath(new URL("../wasm", import.meta.url));
 const crateManifest = new URL("../../rust/iris-js/Cargo.toml", import.meta.url);
-const wasmModule = `${wasmDirectory}/iris_js_bg.wasm`;
 
 requireToolchain();
-generateGlue(buildCrate());
-optimize(wasmModule);
-writeInlineModule(wasmModule);
-compileTypeScript();
+if (process.argv.includes("--fault-injection")) {
+  buildTestBuild();
+} else {
+  buildPackage();
+}
+
+function buildPackage(): void {
+  const wasmDirectory = `${packageDirectory}/wasm`;
+  generateGlue(buildCrate([]), wasmDirectory);
+  optimize(`${wasmDirectory}/iris_js_bg.wasm`);
+  writeInlineModule(wasmDirectory);
+  compileTypeScript();
+}
+
+/**
+ * Its own Cargo target directory keeps the package's artifact cached. The
+ * module is not optimized, because no test measures its size.
+ */
+function buildTestBuild(): void {
+  const testBuild = `${packageDirectory}/test-build`;
+  const artifact = buildCrate([
+    "--features",
+    "fault-injection",
+    "--target-dir",
+    "target/fault-injection",
+  ]);
+  rmSync(testBuild, { recursive: true, force: true });
+  generateGlue(artifact, `${testBuild}/wasm`);
+  cpSync(`${packageDirectory}/dist`, `${testBuild}/dist`, { recursive: true });
+}
 
 function requireToolchain(): void {
   const version = /wasm-bindgen = "=([\d.]+)"/.exec(readFileSync(crateManifest, "utf8"))?.[1];
@@ -38,7 +67,7 @@ function requireToolchain(): void {
 }
 
 /** Builds the crate with the workspace's wasm profile and returns the .wasm path. */
-function buildCrate(): string {
+function buildCrate(options: readonly string[]): string {
   const messages = run(
     "cargo",
     [
@@ -52,6 +81,7 @@ function buildCrate(): string {
       "--profile",
       "wasm",
       "--message-format=json",
+      ...options,
     ],
     { cwd: rustDirectory },
   );
@@ -86,14 +116,18 @@ function wasmArtifact(message: unknown): string | undefined {
   );
 }
 
-/** The glue takes no default module path, so it never refers to import.meta.url. */
-function generateGlue(artifact: string): void {
+/**
+ * The glue takes no default module path, so it never refers to import.meta.url.
+ * Its reset function lets the package replace the instance from the stored module.
+ */
+function generateGlue(artifact: string, wasmDirectory: string): void {
   rmSync(wasmDirectory, { recursive: true, force: true });
   run("wasm-bindgen", [
     artifact,
     "--target",
     "web",
     "--omit-default-module-path",
+    "--experimental-reset-state-function",
     "--out-dir",
     wasmDirectory,
     "--out-name",
@@ -123,7 +157,8 @@ function optimize(binary: string): void {
 }
 
 /** Embeds the module as base64 for the gecode-iris/inline entry point. */
-function writeInlineModule(binary: string): void {
+function writeInlineModule(wasmDirectory: string): void {
+  const binary = `${wasmDirectory}/iris_js_bg.wasm`;
   const source = `export default "${readFileSync(binary).toString("base64")}";\n`;
   writeFileSync(`${wasmDirectory}/iris_js_inline.js`, source);
   writeFileSync(

@@ -39,7 +39,8 @@
   },
   "scripts": {
     "build": "node scripts/build.ts",
-    "test": "node --test \"test/**/*.test.ts\"",
+    "pretest": "node scripts/build.ts --fault-injection",
+    "test": "node --expose-gc --test \"test/**/*.test.ts\"",
     "test:types": "tsc -p tsconfig.json",
     "format": "oxfmt",
     "format:check": "oxfmt --check",

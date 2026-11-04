@@ -193,6 +193,16 @@ string, throws `TypeError` instead of being changed to U+FFFD. Using a disposed
 spec throws `TypeError`. A host failure throws `RangeError` when the data
 exceeds the transfer format's 32-bit limits, and `Error` otherwise.
 
+A trap in the WebAssembly module, which only a bug in the package can cause,
+throws `IrisInternalError`. It is a subclass of `Error`, not of `IrisError`, and
+its `cause` is the original `WebAssembly.RuntimeError`. The package then
+replaces the WebAssembly instance with a fresh one from the same compiled
+module, so later calls work, including calls on specs parsed before the trap.
+
+If creating the fresh instance fails, the call still throws its own error, or
+returns its result after a large read. The replacement stays pending and is
+retried before the next call, which throws the failure if the retry fails too.
+
 ### Memory
 
 `Data` is copied out of WebAssembly memory into JavaScript typed arrays, so it
@@ -206,6 +216,13 @@ with `using` or `spec[Symbol.dispose]()`. Calling `free()` is never required.
   process.stdout.write(spec.read(input).toDzn());
 } // the spec's memory is released here
 ```
+
+WebAssembly memory grows but never shrinks. When memory exceeds 64 MiB after
+a `read` or `catalog` call, successful or not, the package replaces the
+instance with a fresh one, which releases the old memory. The threshold is
+`MEMORY_THRESHOLD` in [`src/backend.ts`](src/backend.ts). A replacement is
+invisible to callers: each `Spec` keeps its text and origin, and parses them
+again in the new instance before its next call.
 
 ### Work budgets and deadlines
 
@@ -254,7 +271,13 @@ npm test
 npm run test:types
 ```
 
-`npm test` runs the `node:test` files in `test/` against the built package.
+`npm test` first builds the test build into the ignored `test-build/`
+directory: `node scripts/build.ts --fault-injection` builds `rust/iris-js` with
+its `fault-injection` feature, which adds the internal `armTrap` export, into
+`test-build/wasm/` and copies `dist/` beside it. The package code is the same,
+but it loads the module that can force a trap; the published module has no
+such export. `npm test` then runs the `node:test` files in `test/` against the
+built package.
 [`test/runtimes.test.ts`](test/runtimes.test.ts) runs each fixture in
 [`test/smoke/`](test/smoke/) in its own Node process: the Node entry from ESM
 and from `require()`, the inline entry, and the manual entry with
@@ -263,6 +286,15 @@ while the inline entry installs its module before the pending bytes arrive.
 Each reads the four-by-four case of
 [`formats/sudoku`](../formats/sudoku/README.md) and must print the case's
 expected JSON.
+[`test/resilience.test.ts`](test/resilience.test.ts) reads past the memory
+threshold with the published module and checks that specs parsed earlier keep
+working, that memory returns to a fresh instance's size, and that the old
+memory is garbage-collected; `npm test` runs Node with `--expose-gc` for it. It
+also checks that only the test build's module exports `armTrap`.
+[`test/traps.test.ts`](test/traps.test.ts) forces traps through the test build
+and makes instantiation fail to check that a failed replacement never hides a
+call's result or error. Both use the internal `instanceMemory` export of
+`rust/iris-js`, which the published declarations omit.
 `npm run test:types` type-checks the sources, the tests and
 [`test/types/api.ts`](test/types/api.ts) against the published declarations in
 `dist/`; each `@ts-expect-error` line in that file must report an error.
@@ -328,11 +360,14 @@ The Rust crate follows the workspace's rustfmt and Clippy settings.
   are the entry points of [Runtimes](#runtimes); each loads the module and
   re-exports the API.
 - `src/loading.ts` loads the module. Every loading path installs its instance
-  through one synchronous step, so only one instance is ever installed, and
-  its declarations name no glue type, so the public declarations never import
-  the glue.
-- `src/backend.ts` calls the glue's exports once a module is loaded and turns
-  failure envelopes into errors.
+  through one synchronous step, and a replacement swaps it synchronously
+  through the glue's reset function, so only one instance is ever live. Its
+  declarations name no glue type, so the public declarations never import the
+  glue.
+- `src/backend.ts` calls the glue's exports once a module is loaded, turns
+  failure envelopes into errors, replaces the instance after a trap or a large
+  read, and parses specs again in a new instance. A handle from a replaced
+  instance is never freed into the new one.
 - `src/transfer.ts` decodes the binary layout documented in
   [`rust/iris-js/src/transfer.rs`](../rust/iris-js/src/transfer.rs).
 - `src/spec.ts`, `src/data.ts` and `src/errors.ts` hold the classes.

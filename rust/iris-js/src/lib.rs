@@ -15,6 +15,12 @@
 //!
 //! The API is ordinary Rust on native targets, so it is tested without a
 //! JavaScript engine.
+//!
+//! The wasm32 export [`instance_memory`] is internal to the package and absent
+//! from its published declarations: it gives the instance's memory, which the
+//! package measures after each read. With the off-by-default `fault-injection`
+//! feature, the internal export `armTrap` lets the package's tests force the
+//! trap that a bug would cause; the published module never has it.
 pub mod transfer;
 
 use iris_core::{Data, Failure, HostError, Params, Spec};
@@ -38,6 +44,7 @@ impl SpecHandle {
 
     /// Reads one instance. `params` holds name/value pairs, flattened in caller order.
     pub fn read(&self, input: &[u8], origin: &str, params: Vec<String>) -> Result<Vec<u8>, String> {
+        trap_if_armed();
         let data = self.spec.read(input, origin, &to_params(params)?);
         encode(data.map_err(failure_envelope)?)
     }
@@ -49,6 +56,7 @@ impl SpecHandle {
         origin: &str,
         params: Vec<String>,
     ) -> Result<Vec<u8>, String> {
+        trap_if_armed();
         let data = self.spec.catalog(input, origin, &to_params(params)?);
         encode(data.map_err(failure_envelope)?)
     }
@@ -66,6 +74,31 @@ pub fn render_json(data: &[u8]) -> Result<String, String> {
 pub fn render_dzn(data: &[u8]) -> Result<String, String> {
     let document = decode(data)?.to_dzn().map_err(internal)?;
     String::from_utf8(document).map_err(internal)
+}
+
+/// Internal: the instance's `WebAssembly.Memory`.
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(js_name = instanceMemory)]
+pub fn instance_memory() -> wasm_bindgen::JsValue {
+    wasm_bindgen::memory()
+}
+
+#[cfg(all(target_arch = "wasm32", feature = "fault-injection"))]
+static TRAP_ARMED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Internal, for the package's tests: the next `read` or `catalog` traps with
+/// `unreachable`, as a panic does under `panic = "abort"`.
+#[cfg(all(target_arch = "wasm32", feature = "fault-injection"))]
+#[wasm_bindgen(js_name = armTrap)]
+pub fn arm_trap() {
+    TRAP_ARMED.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
+fn trap_if_armed() {
+    #[cfg(all(target_arch = "wasm32", feature = "fault-injection"))]
+    if TRAP_ARMED.swap(false, std::sync::atomic::Ordering::Relaxed) {
+        core::arch::wasm32::unreachable();
+    }
 }
 
 fn to_params(flattened: Vec<String>) -> Result<Params, String> {

@@ -6,7 +6,7 @@
     "suspicious": "error",
     "perf": "error"
   },
-  "ignorePatterns": ["dist/**", "wasm/**"],
+  "ignorePatterns": ["dist/**", "wasm/**", "test-build/**"],
   "overrides": [
     {
       "files": ["test/**/*.test.ts", "test/*-smoke.ts"],
