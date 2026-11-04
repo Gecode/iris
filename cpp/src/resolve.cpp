@@ -52,7 +52,7 @@ using Repeats = Seq<const Stmt *>;
 
 /// A definition of a name, with the repeats around it
 struct Definition {
-  std::string name;
+  String name;
   Repeats repeats;
 };
 
@@ -66,7 +66,7 @@ struct NamedRepeat {
 /// A name bound by a comprehension, with the repeat whose records it stands
 /// for (null for the elements of an array)
 struct Bound {
-  std::string name;
+  String name;
   const Stmt *records;
 };
 
@@ -112,7 +112,7 @@ bool whole_array(const Expr &e, std::size_t k) {
 class Resolver {
 public:
   /// Initialize for a reader spec from `origin`
-  explicit Resolver(const std::string &origin) : origin_(origin) {}
+  explicit Resolver(const String &origin) : origin_(origin) {}
   /// Resolve the expressions in `b`, the body of a reader spec
   void run(Block &b) {
     define(b);
@@ -122,7 +122,7 @@ public:
 
 private:
   /// Where the reader spec comes from
-  const std::string &origin_;
+  const String &origin_;
   /// All definitions of names
   Seq<Definition> definitions_;
   /// All repeats that name their records
@@ -134,11 +134,11 @@ private:
   /// The names bound by the comprehensions around the expression
   Seq<Bound> bound_;
 
-  [[noreturn]] void fail(ErrorCode code, std::string m) const {
-    fail_at(code, origin_, stmt_->line, std::move(m));
+  [[noreturn]] void fail(ErrorCode code, std::string_view m) const {
+    fail_at(code, origin_, stmt_->line, m);
   }
   /// Add a definition of `n`
-  void define(const std::string &n) {
+  void define(const String &n) {
     if (n.empty() || (n == "_"))
       return;
     definitions_.push_back(Definition{.name = n, .repeats = repeats_});
@@ -151,7 +151,7 @@ private:
   }
   /// Add the definitions and named repeats in `b`
   void define(const Block &b) {
-    for (const std::unique_ptr<Stmt> &s : b) {
+    for (const Node<Stmt> &s : b) {
       switch (s->kind) {
       case Stmt::Kind::Read:
       case Stmt::Kind::List:
@@ -191,13 +191,13 @@ private:
     }
   }
   /// Test whether `n` names the records of a repeat
-  [[nodiscard]] bool names_records(const std::string &n) const {
+  [[nodiscard]] bool names_records(const String &n) const {
     return std::ranges::any_of(lists_, [&n](const NamedRepeat &l) {
       return (l.repeat->list == n) || (l.repeat->each == n);
     });
   }
   /// Check that name `n` of the records of repeat `i` is not used otherwise
-  void check_name(const std::string &n, std::size_t i) const {
+  void check_name(const String &n, std::size_t i) const {
     const Stmt *r = lists_[i].repeat;
     if (n.empty())
       return;
@@ -221,31 +221,31 @@ private:
     }
   }
   /// Return the repeat whose list of records is called `n`, or null
-  [[nodiscard]] const NamedRepeat *find_list(const std::string &n) const {
+  [[nodiscard]] const NamedRepeat *find_list(const String &n) const {
     const auto l = std::ranges::find_if(lists_, [&n](const NamedRepeat &named) {
       return named.repeat->list == n;
     });
     return (l == lists_.end()) ? nullptr : &*l;
   }
   /// Return the repeat each of whose records is called `n`, or null
-  [[nodiscard]] const NamedRepeat *find_each(const std::string &n) const {
+  [[nodiscard]] const NamedRepeat *find_each(const String &n) const {
     const auto l = std::ranges::find_if(lists_, [&n](const NamedRepeat &named) {
       return named.repeat->each == n;
     });
     return (l == lists_.end()) ? nullptr : &*l;
   }
   /// Return the name of the records of repeat `r`, for messages
-  static const std::string &records_name(const Stmt *r) {
+  static const String &records_name(const Stmt *r) {
     return r->list.empty() ? r->each : r->list;
   }
   /// Test whether `n` is bound by a comprehension
-  [[nodiscard]] bool is_bound(const std::string &n) const {
+  [[nodiscard]] bool is_bound(const String &n) const {
     return std::ranges::contains(bound_, n, &Bound::name);
   }
   /// Return the list of records called `n` directly inside repeat `r`, or
   /// null
   [[nodiscard]] const NamedRepeat *nested_list(const Stmt *r,
-                                               const std::string &n) const {
+                                               const String &n) const {
     const NamedRepeat *m = find_list(n);
     if ((m == nullptr) || !std::ranges::contains(m->repeats, r))
       return nullptr;
@@ -260,8 +260,8 @@ private:
     return m;
   }
   /// Return the names that the records of repeat `r` have, for messages
-  [[nodiscard]] std::string fields(const Stmt *r) const {
-    Seq<std::string> f;
+  [[nodiscard]] String fields(const Stmt *r) const {
+    Seq<String> f;
     for (const Definition &d : definitions_)
       if (std::ranges::contains(d.repeats, r))
         f.push_back(d.name);
@@ -269,7 +269,7 @@ private:
       if (!l.repeats.empty() && (l.repeats.back() == r) &&
           !l.repeat->list.empty())
         f.push_back(l.repeat->list);
-    std::string s;
+    String s;
     for (auto i = f.begin(); i != f.end(); ++i)
       if (std::find(f.begin(), i, *i) == i)
         s += (s.empty() ? "" : ", ") + *i;
@@ -277,13 +277,11 @@ private:
   }
   /// Return an example of a field of a record of repeat `r`, through its
   /// list if `list`, for messages
-  [[nodiscard]] std::string example(const Stmt *r, bool list) const {
-    const std::string f = fields(r);
+  [[nodiscard]] String example(const Stmt *r, bool list) const {
+    const String f = fields(r);
     const std::size_t c = f.find(',');
-    const std::string x = (list || r->each.empty()) ? r->list + "[0]" : r->each;
-    return f.empty()
-               ? x
-               : x + "." + ((c == std::string::npos) ? f : f.substr(0, c));
+    const String x = (list || r->each.empty()) ? r->list + "[0]" : r->each;
+    return f.empty() ? x : x + "." + ((c == String::npos) ? f : f.substr(0, c));
   }
   /// Test whether definition `d` of a field of the records of repeat `r` is
   /// in a repeat around the statement inside `r`, so that its values for
@@ -293,7 +291,7 @@ private:
     return common_prefix(d.repeats, repeats_) > (at ? *at + 1 : 0);
   }
   /// Check that `f` is a field of the records of repeat `r`
-  void require_field(const Stmt *r, const std::string &f) const {
+  void require_field(const Stmt *r, const String &f) const {
     bool inside = false;
     bool outside = false;
     for (const Definition &d : definitions_)
@@ -302,11 +300,11 @@ private:
         outside = outside || !std::ranges::contains(d.repeats, r);
       }
     if (!inside) {
-      const std::string known = fields(r);
+      const String known = fields(r);
       fail(ErrorCode::SpecField,
            "the records of '" + records_name(r) + "' have no field '" + f +
                "'" +
-               (known.empty() ? std::string(" (they have none)")
+               (known.empty() ? String(" (they have none)")
                               : " (they have " + known + ")"));
     }
     if (outside)
@@ -337,7 +335,7 @@ private:
 
   /// Resolve the expressions of the statements in `b`
   void visit(Block &b) {
-    for (std::unique_ptr<Stmt> &s : b) {
+    for (Node<Stmt> &s : b) {
       statement(*s);
       const bool repeat = (s->kind == Stmt::Kind::Repeat);
       if (repeat)
@@ -357,7 +355,7 @@ private:
     pattern(s.pattern);
     for (Arm &a : s.arms)
       pattern(a.pattern);
-    for (std::unique_ptr<Expr> &d : s.dims)
+    for (Node<Expr> &d : s.dims)
       value(*d);
     if (s.expr)
       value(*s.expr);
@@ -425,7 +423,7 @@ private:
       call(e);
       break;
     default:
-      for (std::unique_ptr<Expr> &a : e.args)
+      for (Node<Expr> &a : e.args)
         value(*a);
       break;
     }
@@ -460,7 +458,7 @@ private:
     if (beyond(l.repeats).empty())
       return;
     // One list for each record of the repeat around it
-    const std::string &outer = l.repeats.back()->each;
+    const String &outer = l.repeats.back()->each;
     fail(ErrorCode::SpecRecordScope,
          "'" + e.s + "' is a list in each record of the repeat around it; " +
              (outer.empty() ? "name each of these records with 'each' and use "
@@ -492,7 +490,7 @@ private:
     Expr &base = *e.args[0];
     resolve(base, false);
     const Stmt *r = base.records;
-    const std::string &f = e.s;
+    const String &f = e.s;
     if (r == nullptr)
       fail(ErrorCode::SpecField,
            "only records have fields such as '." + f +
@@ -545,8 +543,7 @@ private:
    * These are the repeats inside `r` if not null, otherwise those not around
    * the statement visited.
    */
-  [[nodiscard]] const Stmt *outermost(const std::string &n,
-                                      const Stmt *r) const {
+  [[nodiscard]] const Stmt *outermost(const String &n, const Stmt *r) const {
     const Stmt *o = nullptr;
     bool found = false;
     for (const Definition &d : definitions_) {
@@ -601,7 +598,7 @@ private:
    * A record name is defined inside repeats that are not around the check,
    * and only there.
    */
-  std::optional<std::size_t> record(const std::string &n) {
+  std::optional<std::size_t> record(const String &n) {
     bool found = false;
     Repeats outside;
     for (const Definition &d : definitions_) {
@@ -623,8 +620,7 @@ private:
   /// Return the index of the record name for the values of `n` in the
   /// records of `rs` among those of the check visited, adding it if needed;
   /// `label` is its name in messages
-  std::size_t lift(const std::string &n, const Repeats &rs,
-                   const std::string &label) {
+  std::size_t lift(const String &n, const Repeats &rs, const String &label) {
     Seq<Record> &records = stmt_->records;
     for (std::size_t i = 0; i < records.size(); i++)
       if ((records[i].name == n) && (records[i].repeats.size() == rs.size()))
@@ -639,6 +635,6 @@ private:
 
 } // namespace
 
-void resolve(Block &b, const std::string &origin) { Resolver(origin).run(b); }
+void resolve(Block &b, const String &origin) { Resolver(origin).run(b); }
 
 } // namespace iris::detail

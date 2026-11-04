@@ -45,8 +45,8 @@
 
 namespace iris::detail {
 
-std::string quote(std::string_view s) {
-  std::string r = "'";
+String quote(std::string_view s) {
+  String r = "'";
   for (char c : s) {
     if (c == '\n')
       r += "\\n";
@@ -58,26 +58,28 @@ std::string quote(std::string_view s) {
   return r + "'";
 }
 
-Evaluator::Evaluator(const SpecImpl &s, std::string_view text,
-                     std::string origin)
+Evaluator::Evaluator(const SpecImpl &s, std::string_view text, String origin)
     : spec(s), in(text, std::move(origin)), budget(text.size()) {
   frames.emplace_back();
 }
 
 ReadSite Evaluator::site(const Place &at) const {
-  ReadSite r{
-      .input =
-          Location{.origin = in.origin, .line = at.line, .column = at.column()},
-      .spec = std::nullopt,
-      .context = std::nullopt};
+  ReadSite r{.input = Location{.origin = std::string(in.origin),
+                               .line = at.line,
+                               .column = at.column()},
+             .excerpt = in.excerpt(at.start),
+             .spec = std::nullopt,
+             .context = std::nullopt};
   if (spec_line > 0)
-    r.spec = Location{
-        .origin = spec.origin, .line = spec_line, .column = std::nullopt};
+    r.spec = Location{.origin = std::string(spec.origin),
+                      .line = spec_line,
+                      .column = std::nullopt};
   if (!context.empty()) {
     std::string c;
     for (std::size_t k = 0; k < context.size(); k++) {
       const Context &x = context[k];
-      c += (k > 0 ? " > " : "") + x.text;
+      c += k > 0 ? " > " : "";
+      c += x.text;
       if (x.iteration > 0) {
         c += " [" + std::to_string(x.iteration);
         if (x.iterations)
@@ -90,20 +92,20 @@ ReadSite Evaluator::site(const Place &at) const {
   return r;
 }
 
-Error Evaluator::located(ErrorCode code, std::string msg,
+Error Evaluator::located(ErrorCode code, std::string_view msg,
                          const Place &at) const {
-  return read_error(code, std::move(msg), site(at));
+  return read_error(code, msg, site(at));
 }
 
-void Evaluator::fail(ErrorCode code, std::string msg) const {
-  throw located(code, std::move(msg), in.here());
+void Evaluator::fail(ErrorCode code, std::string_view msg) const {
+  throw located(code, msg, in.here());
 }
 
-void Evaluator::fail(const ShapeError &e, const std::string &n) const {
+void Evaluator::fail(const ShapeError &e, const String &n) const {
   fail(e.code, "'" + n + "': " + e.msg);
 }
 
-void Evaluator::set(const std::string &n, Value &&v) {
+void Evaluator::set(const String &n, Value &&v) {
   Seq<Entry> &f = frames.back();
   for (Entry &e : f)
     if (e.name == n) {
@@ -160,7 +162,7 @@ Seq<std::size_t> Evaluator::record_path(std::size_t i) const {
           record_at->begin() + static_cast<std::ptrdiff_t>(n)};
 }
 
-const Value &Evaluator::starts(const Stmt *r, const std::string &n) {
+const Value &Evaluator::starts(const Stmt *r, const String &n) {
   const Value *v = lookup(record_starts(r->id));
   if (v == nullptr)
     fail(ErrorCode::NameUndefined, "'" + n + "' is not defined yet");
@@ -219,9 +221,8 @@ RecordRef Evaluator::records_of(const Expr &e) {
     std::size_t n = count_records(r);
     if ((k < 0) || std::cmp_greater_equal(k, n))
       fail(ErrorCode::IndexRange,
-           "index " + std::to_string(k) + " is out of range for '" +
-               r.repeat->list + "' (size " + std::to_string(n) +
-               ", indices start at 0)");
+           "index " + to_string(k) + " is out of range for '" + r.repeat->list +
+               "' (size " + to_string(n) + ", indices start at 0)");
     r.path.push_back(static_cast<std::size_t>(k));
     visit(1);
     return r;
@@ -251,7 +252,7 @@ const Value &Evaluator::field(const Expr &e, Value &tmp) {
   return tmp;
 }
 
-std::int64_t Evaluator::integer(const Value &v, const std::string &op) {
+std::int64_t Evaluator::integer(const Value &v, const String &op) {
   if ((v.depth() > 0) || (v.type != ValueType::Int))
     fail(ErrorCode::IntegerType, "'" + op + "' needs integers");
   return v.ints[0];
@@ -411,7 +412,7 @@ bool Evaluator::compare(const Value &a, const Value &b, const Expr &e) {
 }
 
 Value Evaluator::call(const Expr &e) {
-  const std::string &f = e.s;
+  const String &f = e.s;
   if (f == "defined")
     return boolean(defined(*e.args[0]));
   if (((f == "count") || (f == "size")) && (e.args[0]->records != nullptr))
@@ -429,7 +430,7 @@ Value Evaluator::call(const Expr &e) {
   // min, max, and sum over all integers in all arguments
   bool any = false;
   std::int64_t r = 0;
-  for (const std::unique_ptr<Expr> &a : e.args) {
+  for (const Node<Expr> &a : e.args) {
     Value tmp(ValueType::Int);
     const Value &v = ref(*a, tmp);
     if ((v.type != ValueType::Int) && (v.leaves() > 0))
@@ -463,7 +464,7 @@ bool Evaluator::defined(const Expr &e) const {
 
 bool Evaluator::distinct(const Expr &e) {
   Seq<std::int64_t> x;
-  for (const std::unique_ptr<Expr> &a : e.args) {
+  for (const Node<Expr> &a : e.args) {
     Value tmp(ValueType::Int);
     const Value &v = ref(*a, tmp);
     if ((v.type != ValueType::Int) && (v.leaves() > 0))
@@ -475,7 +476,7 @@ bool Evaluator::distinct(const Expr &e) {
   return std::ranges::adjacent_find(x) == x.end();
 }
 
-std::string Evaluator::indexed(const Expr &e) {
+String Evaluator::indexed(const Expr &e) {
   const Expr *a = e.args[0].get();
   bool nested = false;
   while (a->kind == Expr::Kind::Index) {
@@ -495,13 +496,12 @@ std::int64_t Evaluator::index(const Expr &e) {
   return i.ints[0];
 }
 
-std::string Evaluator::scalar_hint(const Expr &e) const {
+String Evaluator::scalar_hint(const Expr &e) const {
   if (!e.record)
     return "";
   const Record &r = checked->records[*e.record];
-  const std::string &l = r.repeats.back()->list;
-  std::string m =
-      ", which is one value of each record here; to index the records, ";
+  const String &l = r.repeats.back()->list;
+  String m = ", which is one value of each record here; to index the records, ";
   if (l.empty())
     return m +
            "name them, as in 'repeat n as nodes { each node ... }', and use "
@@ -520,14 +520,14 @@ Value Evaluator::subscript(const Expr &e) {
   std::int64_t k = index(*e.args[1]);
   if ((k < 0) || std::cmp_greater_equal(k, a.size()))
     fail(ErrorCode::IndexRange,
-         "index " + std::to_string(k) + " is out of range for " + indexed(e) +
-             " (size " + std::to_string(a.size()) + ", indices start at 0)");
+         "index " + to_string(k) + " is out of range for " + indexed(e) +
+             " (size " + to_string(a.size()) + ", indices start at 0)");
   Value r = a.element(static_cast<std::size_t>(k));
   visit(std::uint64_t{1} + r.leaves());
   return r;
 }
 
-std::string Evaluator::array_name(const Expr &a) {
+String Evaluator::array_name(const Expr &a) {
   if (a.kind == Expr::Kind::Name)
     return "'" + a.s + "'";
   if ((a.kind == Expr::Kind::Field) && (a.args[0]->kind == Expr::Kind::Name))
@@ -545,11 +545,11 @@ RecordRef Evaluator::element_records(const Expr &e, const Expr &a) {
 
 void Evaluator::explain(const Expr &e, const RecordRef &r, std::size_t i) {
   Witness w{.text = {}, .index = i, .pos = std::nullopt};
-  std::string n = std::to_string(i + 1);
+  String n = to_string(i + 1);
   if (e.elements == nullptr) {
     w.text = "element " + n + " of " + array_name(*e.args[0]);
   } else {
-    const std::string &l = e.elements->list;
+    const String &l = e.elements->list;
     w.text = "record " + n + " of " +
              (l.empty() ? array_name(*e.args[0]) : "'" + l + "'");
     w.pos = record_start(r, i);
@@ -558,7 +558,7 @@ void Evaluator::explain(const Expr &e, const RecordRef &r, std::size_t i) {
 }
 
 Value Evaluator::comprehension(const Expr &e) {
-  const std::string &f = e.s;
+  const String &f = e.s;
   const Expr &source = *e.args[0];
   Value ta(ValueType::Int);
   const Value *a = nullptr;
@@ -618,14 +618,14 @@ std::size_t Evaluator::count(const Expr &e, std::string_view what) {
   Value tmp(ValueType::Int);
   const Value &v = ref(e, tmp);
   if ((v.depth() > 0) || (v.type != ValueType::Int))
-    fail(ErrorCode::Count, std::string(what) + " must be an integer");
+    fail(ErrorCode::Count, String(what) + " must be an integer");
   std::int64_t c = v.ints[0];
   if (c < 0)
     fail(ErrorCode::Count,
-         std::string(what) + " is negative (" + std::to_string(c) + ")");
+         String(what) + " is negative (" + to_string(c) + ")");
   if (c > INT_MAX)
     fail(ErrorCode::Count,
-         std::string(what) + " is too large (" + std::to_string(c) + ")");
+         String(what) + " is too large (" + to_string(c) + ")");
   return static_cast<std::size_t>(c);
 }
 
@@ -713,14 +713,13 @@ Place Evaluator::place(std::optional<std::size_t> q) const {
   return (q && (*q <= in.pos)) ? in.place(*q) : in.here();
 }
 
-std::string Evaluator::record_text(const Record &r,
-                                   const Seq<std::size_t> &at) {
+String Evaluator::record_text(const Record &r, const Seq<std::size_t> &at) {
   bool named = true;
   for (const Stmt *x : r.repeats)
     named = named && !x->list.empty();
-  std::string m;
+  String m;
   for (std::size_t k = at.size(); k-- > 0;) {
-    m += "record " + std::to_string(at[k] + 1) + " of ";
+    m += "record " + to_string(at[k] + 1) + " of ";
     if (named)
       m += "'" + r.repeats[k]->list + "'" + (k > 0 ? " in " : "");
   }
@@ -730,7 +729,7 @@ std::string Evaluator::record_text(const Record &r,
 Error Evaluator::failure(const Stmt &s, std::optional<std::size_t> deepest,
                          const Seq<std::size_t> &at) {
   // The innermost record found is where the check failed
-  std::string m;
+  String m;
   std::optional<std::size_t> q;
   for (const Witness &w : why) {
     m += (m.empty() ? "" : " in ") + w.text;
@@ -749,7 +748,7 @@ Error Evaluator::failure(const Stmt &s, std::optional<std::size_t> deepest,
   Seq<std::size_t> path(at);
   for (std::size_t k = why.size(); k-- > 0;)
     path.push_back(why[k].index);
-  return check_error(std::move(m), site(place(q)), std::move(path));
+  return check_error(m, site(place(q)), path);
 }
 
 } // namespace iris::detail

@@ -5,10 +5,13 @@
 
 #include <cstdlib>
 #include <exception>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <source_location>
 #include <string>
 #include <string_view>
+#include <system_error>
 
 namespace {
 
@@ -88,11 +91,45 @@ void returns_errors_from_try_parse() {
   check(parsed.has_value() && (parsed->name() == "f"), "try_parse spec");
 }
 
+void loads_files() {
+  const std::filesystem::path directory =
+      std::filesystem::temp_directory_path() / "iris-spec-test";
+  std::filesystem::create_directories(directory);
+  const std::filesystem::path good = directory / "good.iris";
+  const std::filesystem::path bad = directory / "bad.iris";
+  std::ofstream(good, std::ios::binary) << "format loaded\nx: int\n";
+  std::ofstream(bad, std::ios::binary) << "x: int\na[2: int\n";
+  check(iris::Spec::load(good).name() == "loaded", "load");
+  check(iris::Spec::try_load(good).has_value(), "try_load");
+  const auto failed = iris::Spec::try_load(bad);
+  check(!failed && (failed.error().code() == iris::ErrorCode::SpecSyntax) &&
+            failed.error().spec_location() &&
+            (failed.error().spec_location()->origin == bad.string()) &&
+            (failed.error().spec_location()->line == 2),
+        "try_load error names the file");
+  try {
+    static_cast<void>(iris::Spec::load(bad));
+    check(false, "load throws");
+  } catch (const iris::Error &error) {
+    check(error.code() == iris::ErrorCode::SpecSyntax, "load error");
+  }
+  bool thrown = false;
+  try {
+    check(!iris::Spec::try_load(directory / "missing.iris"),
+          "no spec from a missing file");
+  } catch (const std::system_error &) {
+    thrown = true;
+  }
+  check(thrown, "missing spec file");
+  std::filesystem::remove_all(directory);
+}
+
 void shares_copies() {
   const iris::Spec spec = iris::Spec::parse("format shared");
   iris::Spec copy = iris::Spec::parse("format other");
   copy = spec;
-  check(&copy.name() == &spec.name(), "copies share the parsed spec");
+  check(copy.name().data() == spec.name().data(),
+        "copies share the parsed spec");
 }
 
 // The float rules of §4.5 hold with every standard library's from_chars;
@@ -116,6 +153,7 @@ int main() {
     reports_syntax_error();
     reports_invalid_utf8();
     returns_errors_from_try_parse();
+    loads_files();
     shares_copies();
     converts_float_literals();
   } catch (const std::exception &error) {

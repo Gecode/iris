@@ -78,7 +78,7 @@ Response execute_request(const Request &request) {
             .status = language_error_status};
   }
   if (request.output == Output::Dzn)
-    return {.output = data->dzn(), .status = 0};
+    return {.output = std::string(data->dzn()), .status = 0};
   return {.output = iris::driver::encode_data(*data), .status = 0};
 }
 

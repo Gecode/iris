@@ -331,7 +331,15 @@ std::span<const double> ValueRef::floats() const {
   return std::span<const double>(value_->floats).subspan(from, to - from);
 }
 
-Data::Data() : impl_(std::make_shared<const detail::DataImpl>()) {}
+namespace {
+
+/// The entries of Data without entries
+const detail::DataImpl no_entries;
+
+} // namespace
+
+// Shares no ownership, as no_entries is never destroyed early
+Data::Data() : impl_(std::shared_ptr<const detail::DataImpl>(), &no_entries) {}
 
 Data::Data(std::shared_ptr<const detail::DataImpl> impl)
     : impl_(std::move(impl)) {}
@@ -399,37 +407,66 @@ std::span<const double> Data::floats(std::string_view name,
  * Parameters
  */
 
-Params::Params() : impl_(std::make_shared<detail::ParamsImpl>()) {}
+Params::Params() : Params(*std::pmr::get_default_resource()) {}
 
-Params::Params(std::initializer_list<std::pair<std::string, std::string>> pairs)
-    : Params() {
+Params::Params(std::pmr::memory_resource &memory) : memory_(&memory) {}
+
+Params::Params(
+    std::initializer_list<std::pair<std::string_view, std::string_view>> pairs)
+    : Params(pairs, *std::pmr::get_default_resource()) {}
+
+Params::Params(
+    std::initializer_list<std::pair<std::string_view, std::string_view>> pairs,
+    std::pmr::memory_resource &memory)
+    : Params(memory) {
   for (const auto &[name, value] : pairs)
     set(name, value);
 }
 
-void Params::set(std::string name, std::string value) {
-  if (impl_.use_count() > 1)
-    impl_ = std::make_shared<detail::ParamsImpl>(*impl_);
-  for (std::size_t i = 0; i < impl_->names.size(); i++)
-    if (impl_->names[i] == name) {
-      impl_->values[i] = std::move(value);
+void Params::set(std::string_view name, std::string_view value) {
+  const detail::MemoryScope scope(*memory_);
+  // Copy both arguments before changing anything: they may point into
+  // this Params, and an allocation failure must leave it unchanged.
+  detail::String owned_name(name);
+  detail::String owned_value(value);
+  detail::ParamsImpl &values = own();
+  for (std::size_t i = 0; i < values.names.size(); i++)
+    if (values.names[i] == owned_name) {
+      values.values[i].swap(owned_value);
       return;
     }
-  impl_->names.push_back(std::move(name));
-  impl_->values.push_back(std::move(value));
+  values.names.reserve(values.names.size() + 1);
+  values.values.reserve(values.values.size() + 1);
+  // Neither push_back allocates after the reservations, and moving a
+  // string with an equal allocator does not throw.
+  values.names.push_back(std::move(owned_name));
+  values.values.push_back(std::move(owned_value));
 }
 
-std::size_t Params::size() const { return impl_->names.size(); }
+detail::ParamsImpl &Params::own() {
+  if (!impl_)
+    impl_ = detail::make_shared<detail::ParamsImpl>();
+  else if (impl_.use_count() > 1)
+    impl_ = detail::make_shared<detail::ParamsImpl>(*impl_);
+  return *impl_;
+}
+
+const detail::ParamsImpl &Params::values() const {
+  static const detail::ParamsImpl none;
+  return impl_ ? *impl_ : none;
+}
+
+std::size_t Params::size() const { return values().names.size(); }
 
 std::string_view Params::name(std::size_t i) const {
   if (i >= size())
     throw AccessError("parameter index " + std::to_string(i) +
                       " is out of range");
-  return impl_->names[i];
+  return values().names[i];
 }
 
 std::optional<std::string_view> Params::get(std::string_view name) const {
-  return impl_->get(name);
+  return values().get(name);
 }
 
 } // namespace iris

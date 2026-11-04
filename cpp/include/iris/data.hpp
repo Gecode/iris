@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <initializer_list>
 #include <memory>
+#include <memory_resource>
 #include <optional>
 #include <span>
 #include <stdexcept>
@@ -87,12 +88,13 @@ private:
  * The entries a read produces, in definition order (Specification §3.1)
  *
  * Copies share the entries, which never change, so they are cheap. The
+ * entries use the memory of the spec that read them (see Spec). The
  * accessors that take a name and a path return the part of the named entry
  * that the path selects; misuse throws AccessError.
  */
 class Data {
 public:
-  /// Data without entries
+  /// Data without entries, which allocates nothing
   Data();
 
   /// Return the number of entries
@@ -106,8 +108,9 @@ public:
 
   /// Return the entries as a MiniZinc data file (Specification appendix B):
   /// one assignment per entry, each ending with a newline, or nothing
-  /// without entries
-  [[nodiscard]] std::string dzn() const;
+  /// without entries. The text is allocated from the memory resource of the
+  /// spec that read the data.
+  [[nodiscard]] std::pmr::string dzn() const;
 
   [[nodiscard]] ValueRef at(std::string_view name,
                             std::span<const std::size_t> path = {}) const;

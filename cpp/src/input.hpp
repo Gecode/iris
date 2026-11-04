@@ -68,11 +68,11 @@ public:
   /// The text
   std::string_view text;
   /// Where the text comes from
-  std::string origin;
+  String origin;
   /// Comment line prefixes
-  Seq<std::string> comments;
+  Seq<String> comments;
   /// Prefixes of lines that end the data
-  Seq<std::string> stops;
+  Seq<String> stops;
   /// Current position
   std::size_t pos = 0;
   /// Current line (1-based)
@@ -81,7 +81,7 @@ public:
   std::size_t start = 0;
 
   /// Initialize for `t` from `o`
-  Input(std::string_view t, std::string o) : text(t), origin(std::move(o)) {
+  Input(std::string_view t, String o) : text(t), origin(std::move(o)) {
     for (std::size_t c = 0; c < kind_.size(); c++)
       kind_[c] = is_space(static_cast<char>(c)) ? CharKind::Separator
                                                 : CharKind::Plain;
@@ -156,9 +156,9 @@ public:
         return;
       bool comment = false;
       bool stop = false;
-      for (const std::string &c : comments)
+      for (const String &c : comments)
         comment = comment || starts_with(c);
-      for (const std::string &s : stops)
+      for (const String &s : stops)
         stop = stop || starts_with(s);
       if (comment) {
         to_eol();
@@ -247,14 +247,25 @@ public:
     go_back(p0);
     return t;
   }
-  /// Return the rest of the current line without trailing blanks
-  [[nodiscard]] std::string_view rest() const {
-    std::size_t q = text.find('\n', pos);
+  /// Return the line from position `s` on without trailing blanks
+  [[nodiscard]] std::string_view line_from(std::size_t s) const {
+    std::size_t q = text.find('\n', s);
     if (q == std::string_view::npos)
       q = text.size();
-    while ((q > pos) && is_blank(text[q - 1]))
+    while ((q > s) && is_blank(text[q - 1]))
       q--;
-    return text.substr(pos, q - pos);
+    return text.substr(s, q - s);
+  }
+  /// Return the rest of the current line without trailing blanks
+  [[nodiscard]] std::string_view rest() const { return line_from(pos); }
+  /// Return the line starting at `s` as an error shows it: without trailing
+  /// blanks, and cut after 100 bytes and then followed by `...`
+  [[nodiscard]] std::string excerpt(std::size_t s) const {
+    static constexpr std::size_t shown = 100;
+    const std::string_view content = line_from(s);
+    if (content.size() <= shown)
+      return std::string(content);
+    return std::string(content.substr(0, shown)) + "...";
   }
   /// Return the current place
   [[nodiscard]] Place here() const {

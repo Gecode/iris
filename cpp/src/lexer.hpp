@@ -36,21 +36,22 @@
 
 #pragma once
 
+#include "memory.hpp"
+
 #include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
-#include <vector>
 
 namespace iris::detail {
 
 /// Token of the reader-spec language
 struct Token {
   /// Kind of token
-  enum class Kind { Ident, Int, Float, String, Punct, End };
+  enum class Kind { Ident, Int, Float, Str, Punct, End };
   Kind kind = Kind::End;
   /// Text, or the characters of a string
-  std::string text;
+  String text;
   /// Value of an integer
   std::int64_t int_value = 0;
   /// Value of a float
@@ -75,7 +76,7 @@ inline bool is_gecode_name(std::string_view n) {
  *
  * Throws Error for a bad string, number, or character.
  */
-std::vector<Token> lex(std::string_view src, const std::string &origin,
-                       std::size_t line = 1);
+Seq<Token> lex(std::string_view src, const String &origin,
+               std::size_t line = 1);
 
 } // namespace iris::detail

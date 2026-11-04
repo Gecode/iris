@@ -69,7 +69,7 @@ std::size_t triangle_to(bool upper, bool diag, std::size_t n, std::size_t i) {
 }
 
 /// Return a description of what read type `t` reads, for messages
-std::string describe(ReadType t) {
+String describe(ReadType t) {
   switch (t) {
   case ReadType::Int:
     return "int";
@@ -113,11 +113,11 @@ struct Domain {
   /// The range
   Range range;
   /// Return a description of the values, for messages
-  [[nodiscard]] std::string describe() const {
-    std::string d = detail::describe(type.read);
+  [[nodiscard]] String describe() const {
+    String d = detail::describe(type.read);
     if (range.bounded())
-      d = "an int in " + (range.lo ? std::to_string(*range.lo) : "") + ".." +
-          (range.hi ? std::to_string(*range.hi) : "");
+      d = "an int in " + (range.lo ? to_string(*range.lo) : "") + ".." +
+          (range.hi ? to_string(*range.hi) : "");
     return type.name.empty() ? d : type.name + " (" + d + ")";
   }
 };
@@ -145,22 +145,22 @@ enum class Mode {
 /// What a catalog keeps of an instance
 struct Listing {
   /// The name, or empty
-  std::string name;
+  String name;
   /// The summary of the first rejection, or empty
-  std::string summary;
+  String summary;
 };
 
 /// Interpreter running a reader spec on an input
 class Interpreter : public Evaluator {
 public:
   /// Initialize to return `mode`
-  Interpreter(const SpecImpl &s, std::string_view text, std::string origin,
+  Interpreter(const SpecImpl &s, std::string_view text, String origin,
               const ParamsImpl &p, Mode mode)
       : Evaluator(s, text, std::move(origin)), params_(p), mode_(mode) {}
 
   /// Add the names of the param statements in `b` to `out`
-  static void declared_params(const Block &b, Seq<std::string> &out) {
-    for (const std::unique_ptr<Stmt> &s : b) {
+  static void declared_params(const Block &b, Seq<String> &out) {
+    for (const Node<Stmt> &s : b) {
       if (s->kind == Stmt::Kind::Param)
         out.push_back(s->name);
       if (s->kind == Stmt::Kind::Instances)
@@ -175,19 +175,16 @@ public:
   /// Run the reader spec and return the data, or the catalog
   DataImpl run() {
     // A misspelt parameter would otherwise be ignored silently
-    Seq<std::string> known;
+    Seq<String> known;
     declared_params(spec.body, known);
-    for (const std::string &n : params_.names)
+    for (const String &n : params_.names)
       if (std::ranges::find(known, n) == known.end())
         throw spec_error(ErrorCode::ParamUnknown,
                          "the spec has no parameter '" + n + "'", spec.origin);
     // The whole input must be valid UTF-8 (Specification §4.10)
     if (std::optional<std::size_t> bad = find_invalid_utf8(in.text)) {
       in.advance(*bad);
-      throw input_error(ErrorCode::Utf8, "input is not valid UTF-8",
-                        Location{.origin = in.origin,
-                                 .line = in.line,
-                                 .column = in.here().column()});
+      throw input_error(ErrorCode::Utf8, "input is not valid UTF-8", in);
     }
     exec(spec.body);
     spec_line = 0;
@@ -196,9 +193,7 @@ public:
       throw input_error(ErrorCode::TrailingInput,
                         "unexpected input after the end of the spec: " +
                             quote(in.rest()),
-                        Location{.origin = in.origin,
-                                 .line = in.line,
-                                 .column = in.here().column()});
+                        in);
     if (mode_ == Mode::Catalog)
       return catalog_data();
     DataImpl d;
@@ -235,7 +230,7 @@ private:
     return d;
   }
   /// Return the list of the `field` of each of `l`
-  static Value strings(const Seq<Listing> &l, std::string Listing::*field) {
+  static Value strings(const Seq<Listing> &l, String Listing::*field) {
     Value v;
     v.type = ValueType::String;
     for (const Listing &x : l)
@@ -258,7 +253,7 @@ private:
   /// Whether the parameter instance selects an instance
   bool select_ = false;
   /// The value of the parameter instance
-  std::string want_;
+  String want_;
   /// The number of the instance selected, unless selected by name
   std::optional<std::int64_t> number_;
   /// Number of the instance being read (0 if none)
@@ -268,7 +263,7 @@ private:
   /// The first rejection of the instance being read
   std::optional<Error> deferred_;
   /// The summary of that rejection, for a catalog
-  std::string deferred_summary_;
+  String deferred_summary_;
   /// Whether the selected instance has been read
   bool selected_ = false;
   /// The ranges of the named types, by type statement
@@ -321,7 +316,7 @@ private:
   }
 
   /// Fail for want of `what` at the end of the input or the token there
-  [[noreturn]] void expected(const std::string &what) {
+  [[noreturn]] void expected(const String &what) {
     if (!in.skip_to_data())
       fail(ErrorCode::ExpectedValue,
            "expected " + what + ", found end of input");
@@ -355,7 +350,7 @@ private:
     return false;
   }
   /// Read one value of `type`, described by `what`
-  Value scalar(ReadType type, const std::string &what) {
+  Value scalar(ReadType type, const String &what) {
     Value v(ValueType::Int);
     if (!scan(type, v))
       expected(what);
@@ -493,8 +488,8 @@ private:
    * The offset applies to the numbers read, not to the cells that only
    * exist after mirroring.
    */
-  Value layout(const Domain &d, std::size_t n, std::size_t m,
-               const std::string &f, std::int64_t o) {
+  Value layout(const Domain &d, std::size_t n, std::size_t m, const String &f,
+               std::int64_t o) {
     if (f == "FULL_MATRIX") {
       Value v = array(d, {n, m});
       offset(v, o);
@@ -643,7 +638,7 @@ private:
       c = l.size();
       return true;
     case Item::Kind::Var: {
-      std::string want = variable(it.text);
+      String want = variable(it.text);
       if (want.empty() || !l.substr(c).starts_with(want))
         return false;
       c += want.size();
@@ -673,14 +668,14 @@ private:
   }
 
   /// Return the value of variable `n` as text, for {$n} in a pattern
-  std::string variable(const std::string &n) {
+  String variable(const String &n) {
     const Value *v = lookup(n);
     if (v == nullptr)
       fail(ErrorCode::NameUndefined, "'" + n + "' is not defined yet");
     if ((v->depth() == 0) && (v->type == ValueType::String))
       return v->strings[0];
     if ((v->depth() == 0) && (v->type == ValueType::Int))
-      return std::to_string(v->ints[0]);
+      return to_string(v->ints[0]);
     fail(ErrorCode::PatternReference,
          "'" + n + "' must be a string or an integer");
   }
@@ -702,7 +697,7 @@ private:
   }
 
   void exec(const Block &b) {
-    for (const std::unique_ptr<Stmt> &s : b)
+    for (const Node<Stmt> &s : b)
       exec(*s);
   }
 
@@ -839,7 +834,7 @@ private:
       store(s, std::move(v));
     } else {
       Seq<std::size_t> dims;
-      for (const std::unique_ptr<Expr> &e : s.dims)
+      for (const Node<Expr> &e : s.dims)
         dims.push_back(count(*e, "array size"));
       if (s.type.read == ReadType::Symbol) {
         store(s, symbols(s.type, dims[0], dims[1]));
@@ -925,7 +920,7 @@ private:
       fail(ErrorCode::ListTerminator, "list terminator must be a single value");
     // Words end at the token spelling an integer terminator
     if ((s.type.read == ReadType::Word) && (stop.type == ValueType::Int))
-      stop = Value::string(std::to_string(stop.ints[0]));
+      stop = Value::string(to_string(stop.ints[0]));
     if ((s.type.read == ReadType::Word) && (stop.type == ValueType::Float))
       fail(ErrorCode::ListTerminator,
            "a list of words needs a string or integer terminator");
@@ -984,7 +979,7 @@ private:
   }
   /// expect "a" "b" ...: literal tokens
   void expect(const Stmt &s) {
-    for (const std::string &w : s.words) {
+    for (const String &w : s.words) {
       if (!in.skip_to_data())
         fail(ErrorCode::ExpectedToken,
              "expected " + quote(w) + ", found end of input");
@@ -1009,9 +1004,8 @@ private:
     Value v = scalar(ReadType::Int, describe(ReadType::Int));
     if (v.ints[0] != want) {
       in.pos = p0;
-      fail(ErrorCode::IndexMismatch, "expected index " + std::to_string(want) +
-                                         ", found " +
-                                         std::to_string(v.ints[0]));
+      fail(ErrorCode::IndexMismatch, "expected index " + to_string(want) +
+                                         ", found " + to_string(v.ints[0]));
     }
   }
 
@@ -1020,7 +1014,7 @@ private:
     if (!s.has_until || !in.skip_to_data())
       return false;
     std::string_view t = in.peek();
-    for (const std::string &w : s.words)
+    for (const String &w : s.words)
       if (t == w) {
         (void)in.token();
         if (!s.store.empty())
@@ -1030,8 +1024,8 @@ private:
     return false;
   }
   /// Describe the terminating tokens of `s`, for messages
-  static std::string until_text(const Stmt &s) {
-    std::string r;
+  static String until_text(const Stmt &s) {
+    String r;
     for (std::size_t k = 0; k < s.words.size(); k++)
       r += (k > 0 ? " or " : "") + quote(s.words[k]);
     return r;
@@ -1061,7 +1055,7 @@ private:
    * Reading stops, unless the instance may not be the selected one: then
    * the first rejection is recorded, and reading continues (see instances).
    */
-  void reject(Error e, std::string summary) {
+  void reject(Error e, String summary) {
     if (!may_be_skipped())
       throw std::move(e);
     if (!deferred_) {
@@ -1077,7 +1071,7 @@ private:
     if (!holds(s, e) && e)
       reject(std::move(*e),
              s.message.empty()
-                 ? "check on line " + std::to_string(s.line) + " of the spec"
+                 ? "check on line " + to_string(s.line) + " of the spec"
                  : s.message);
   }
 
@@ -1090,7 +1084,14 @@ private:
         Context{.text = "instance", .iteration = n, .iterations = {}});
     frames.emplace_back();
     instance_frame_ = frames.size() - 1;
-    exec(b);
+    try {
+      exec(b);
+    } catch (const Error &e) {
+      // The earlier rejection may explain the error
+      if (!deferred_)
+        throw;
+      throw after_rejection(e, deferred_summary_);
+    }
     Seq<Entry> f = std::move(frames.back());
     frames.pop_back();
     context.pop_back();
@@ -1099,13 +1100,13 @@ private:
   }
 
   /// Return the name of the instance in frame `f`, or empty
-  static std::string instance_name(const Seq<Entry> &f) {
+  static String instance_name(const Seq<Entry> &f) {
     for (const Entry &e : f)
       if ((e.name == "name") && (e.value.depth() == 0)) {
         if (e.value.type == ValueType::String)
           return e.value.strings[0];
         if (e.value.type == ValueType::Int)
-          return std::to_string(e.value.ints[0]);
+          return to_string(e.value.ints[0]);
       }
     return {};
   }
@@ -1172,10 +1173,10 @@ private:
     if (select_)
       fail(ErrorCode::InstanceNotFound,
            "there is no instance " + quote(want_) + " (the file has " +
-               std::to_string(n) + " instance" + (n == 1 ? "" : "s") + ")");
+               to_string(n) + " instance" + (n == 1 ? "" : "s") + ")");
     if (n > 1)
       fail(ErrorCode::InstanceSelection,
-           "the file has " + std::to_string(n) +
+           "the file has " + to_string(n) +
                " instances; select one with the parameter instance (a "
                "number from 1, or a name)");
   }
@@ -1268,7 +1269,7 @@ private:
   void sections(const Stmt &s) {
     // The line on which each arm matched, or 0
     Seq<std::size_t> seen(s.arms.size(), 0);
-    std::string end = "the end of the input";
+    String end = "the end of the input";
     Place end_at = in.here();
     for (;;) {
       spec_line = s.line;
@@ -1294,7 +1295,7 @@ private:
           in.to_eol();
           continue;
         }
-        std::string expected;
+        String expected;
         for (std::size_t k = 0; (k < s.arms.size()) && (k < 6); k++) {
           expected += (k > 0) ? ", \"" : "\"";
           expected += s.arms[k].pattern.source;
@@ -1307,10 +1308,10 @@ private:
       }
       const Arm &a = s.arms[*found];
       if (seen[*found] > 0) {
-        std::string m = "a second line matching \"" + a.pattern.source + "\"";
+        String m = "a second line matching \"" + a.pattern.source + "\"";
         reject(located(ErrorCode::SectionsRepeated,
-                       m + " (the first is on line " +
-                           std::to_string(seen[*found]) + ")",
+                       m + " (the first is on line " + to_string(seen[*found]) +
+                           ")",
                        at),
                m);
       } else {
@@ -1330,7 +1331,7 @@ private:
     }
     for (std::size_t k = 0; k < s.arms.size(); k++)
       if (!s.arms[k].optional && (seen[k] == 0)) {
-        std::string m = "expected a line matching \"";
+        String m = "expected a line matching \"";
         m += s.arms[k].pattern.source;
         m += "\" before ";
         m += end;
@@ -1357,10 +1358,9 @@ private:
         for (;;) {
           in.skip();
           if (in.pos >= in.text.size())
-            fail(ErrorCode::Symbol, "expected a symbol for row " +
-                                        std::to_string(i + 1) + ", column " +
-                                        std::to_string(j + 1) +
-                                        ", found end of input");
+            fail(ErrorCode::Symbol,
+                 "expected a symbol for row " + to_string(i + 1) + ", column " +
+                     to_string(j + 1) + ", found end of input");
           ch = in.text[in.pos];
           if (!t.strip.contains(ch))
             break;
@@ -1369,7 +1369,7 @@ private:
         std::size_t k = t.alphabet.find(ch);
         if (t.blank.contains(ch)) {
           g.ints.push_back(0);
-        } else if (k != std::string::npos) {
+        } else if (k != String::npos) {
           std::optional<std::int64_t> v =
               checked_add(static_cast<std::int64_t>(k), t.base);
           if (!v)
@@ -1377,9 +1377,9 @@ private:
                  "integer overflow in the value of a symbol");
           g.ints.push_back(*v);
         } else {
-          fail(ErrorCode::Symbol,
-               "unexpected symbol " + quote(std::string(1, ch)) +
-                   ", expected one of " + quote(t.alphabet + t.blank));
+          fail(ErrorCode::Symbol, "unexpected symbol " + quote(String(1, ch)) +
+                                      ", expected one of " +
+                                      quote(t.alphabet + t.blank));
         }
         in.advance(in.pos + 1);
       }
@@ -1391,14 +1391,14 @@ private:
 
 } // namespace
 
-DataImpl read(const SpecImpl &spec, std::string_view text, std::string origin,
+DataImpl read(const SpecImpl &spec, std::string_view text, String origin,
               const ParamsImpl &params) {
   Interpreter i(spec, text, std::move(origin), params, Mode::Read);
   return i.run();
 }
 
-DataImpl catalog(const SpecImpl &spec, std::string_view text,
-                 std::string origin, const ParamsImpl &params) {
+DataImpl catalog(const SpecImpl &spec, std::string_view text, String origin,
+                 const ParamsImpl &params) {
   Interpreter i(spec, text, std::move(origin), params, Mode::Catalog);
   return i.run();
 }

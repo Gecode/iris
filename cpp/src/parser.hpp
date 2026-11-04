@@ -46,7 +46,7 @@ namespace iris::detail {
 
 /// The format name and statements of a reader spec
 struct ParsedSpec {
-  std::string name;
+  String name;
   Block body;
 };
 
@@ -58,6 +58,6 @@ struct ParsedSpec {
  * Throws Error for the first parse-time error. Names are not resolved yet
  * (see resolve).
  */
-ParsedSpec parse_tokens(std::vector<Token> tokens, const std::string &origin);
+ParsedSpec parse_tokens(Seq<Token> tokens, const String &origin);
 
 } // namespace iris::detail

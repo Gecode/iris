@@ -55,14 +55,11 @@
 
 namespace iris::detail {
 
-/// String leaf of a value
-using String = std::string;
-
 /// Error about the shape or type of a value, located by the caller
 struct ShapeError {
   ErrorCode code;
   /// Message
-  std::string msg;
+  String msg;
 };
 
 /**
@@ -89,7 +86,10 @@ public:
   Seq<String> strings;
 
   /// The empty integer list
-  Value() : type(ValueType::Int), levels{{0, 0}} {}
+  ///
+  /// The level is built in place, as an initializer list would allocate a
+  /// copy through the allocator, which compilers cannot elide.
+  Value() : type(ValueType::Int) { levels.emplace_back(2, 0); }
   /// Scalar of type `t` whose leaf is still to be added
   explicit Value(ValueType t) : type(t) {}
   /// Integer scalar
@@ -225,7 +225,7 @@ private:
 
 /// A named value
 struct Entry {
-  std::string name;
+  String name;
   Value value;
 };
 
@@ -244,8 +244,8 @@ struct DataImpl {
 
 /// Implementation of Params
 struct ParamsImpl {
-  Seq<std::string> names;
-  Seq<std::string> values;
+  Seq<String> names;
+  Seq<String> values;
   /// Return the value of `name`, or nothing if it is not set
   [[nodiscard]] std::optional<std::string_view>
   get(std::string_view name) const {

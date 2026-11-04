@@ -1,27 +1,50 @@
 #include <iris/error.hpp>
 
+#include <algorithm>
+#include <cstddef>
+#include <optional>
+#include <string>
 #include <utility>
 
 namespace iris {
 
 namespace {
 
-/// Render Gecode's diagnostic envelope around `message`, located at the
-/// input location if there is one, otherwise at the reader-spec location.
-std::string envelope(const std::string &message,
-                     const std::optional<Location> &input_location,
-                     const std::optional<Location> &spec_location) {
-  const std::optional<Location> &primary =
-      input_location ? input_location : spec_location;
-  if (!primary)
-    return message;
-  std::string text = primary->origin;
-  if (primary->line) {
-    text += ':' + std::to_string(*primary->line);
-    if (primary->column)
-      text += ':' + std::to_string(*primary->column);
+/// Return `origin:line:column`, without the parts `at` lacks
+std::string position(const Location &at) {
+  std::string text = at.origin;
+  if (at.line) {
+    text += ':' + std::to_string(*at.line);
+    if (at.column)
+      text += ':' + std::to_string(*at.column);
   }
-  return text + ": " + message;
+  return text;
+}
+
+/// Render Gecode's diagnostic of the error `message` with `details`
+/// (Specification §11.1)
+std::string diagnostic(const std::string &message,
+                       const ErrorDetails &details) {
+  const std::optional<Location> &primary =
+      details.input_location ? details.input_location : details.spec_location;
+  std::string text = primary ? position(*primary) + ": " + message : message;
+  if (const std::optional<Location> &at = details.input_location) {
+    const std::size_t line = at->line.value_or(1);
+    const std::size_t column = at->column.value_or(1);
+    const std::string number = std::to_string(line);
+    text += '\n' +
+            std::string(6 - std::min<std::size_t>(6, number.size()), ' ') +
+            number + " | " + details.excerpt.value_or("");
+    text += "\n       | " + std::string(column - 1, ' ') + '^';
+  }
+  if (details.context)
+    text += "\n  while reading: " + *details.context;
+  if (details.input_location && details.spec_location)
+    text += "\n  spec: " + position(*details.spec_location);
+  if (details.earlier_rejection)
+    text += "\n  after an earlier error in the instance: " +
+            *details.earlier_rejection;
+  return text;
 }
 
 } // namespace
@@ -162,15 +185,8 @@ std::string_view code_name(ErrorCode code) {
   std::unreachable();
 }
 
-Error::Error(ErrorCode code, std::string message,
-             std::optional<Location> input_location,
-             std::optional<Location> spec_location,
-             std::optional<std::string> context,
-             std::optional<std::vector<std::size_t>> record_path)
-    : std::runtime_error(envelope(message, input_location, spec_location)),
-      code_(code), message_(std::move(message)),
-      input_location_(std::move(input_location)),
-      spec_location_(std::move(spec_location)), context_(std::move(context)),
-      record_path_(std::move(record_path)) {}
+Error::Error(ErrorCode code, std::string message, ErrorDetails details)
+    : std::runtime_error(diagnostic(message, details)), code_(code),
+      message_(std::move(message)), details_(std::move(details)) {}
 
 } // namespace iris

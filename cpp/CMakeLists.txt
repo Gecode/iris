@@ -5,6 +5,8 @@ project(iris VERSION 0.1.0 LANGUAGES CXX)
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 option(IRIS_BUILD_TESTS "Build the conformance driver and the tests" ${PROJECT_IS_TOP_LEVEL})
+option(IRIS_INSTALL "Generate the rules that install the library and its package"
+  ${PROJECT_IS_TOP_LEVEL})
 if(EXISTS "${PROJECT_SOURCE_DIR}/../conformance/cases")
   set(iris_has_conformance ON)
 else()
@@ -51,8 +53,38 @@ target_sources(iris
       include/iris/params.hpp
       include/iris/spec.hpp)
 target_compile_features(iris PUBLIC cxx_std_23)
-set_target_properties(iris PROPERTIES CXX_EXTENSIONS OFF)
+set_target_properties(iris PROPERTIES
+  CXX_EXTENSIONS OFF
+  EXPORT_NAME iris
+  VERSION ${PROJECT_VERSION}
+  SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
 iris_set_warnings(iris)
+
+# The package that find_package(iris) finds: the target iris::iris, and a
+# version file that accepts requests for the same minor version, as every
+# 0.x minor version may break the interface.
+if(IRIS_INSTALL)
+  include(GNUInstallDirs)
+  include(CMakePackageConfigHelpers)
+  set(iris_package_dir "${CMAKE_INSTALL_LIBDIR}/cmake/iris")
+  install(TARGETS iris EXPORT iris-targets
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    FILE_SET HEADERS DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+  install(EXPORT iris-targets
+    NAMESPACE iris::
+    DESTINATION "${iris_package_dir}")
+  configure_package_config_file(cmake/iris-config.cmake.in
+    "${PROJECT_BINARY_DIR}/iris-config.cmake"
+    INSTALL_DESTINATION "${iris_package_dir}")
+  write_basic_package_version_file("${PROJECT_BINARY_DIR}/iris-config-version.cmake"
+    COMPATIBILITY SameMinorVersion)
+  install(FILES
+    "${PROJECT_BINARY_DIR}/iris-config.cmake"
+    "${PROJECT_BINARY_DIR}/iris-config-version.cmake"
+    DESTINATION "${iris_package_dir}")
+endif()
 
 if(IRIS_BUILD_TESTS)
   add_executable(iris-driver driver/main.cpp driver/json.cpp)

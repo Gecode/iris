@@ -71,7 +71,7 @@ bool is_name(std::string_view s) {
 }
 
 /// Add the literal text `lit`, if any, as an item to `pat` and clear it
-void flush(Pattern &pat, std::string &lit) {
+void flush(Pattern &pat, String &lit) {
   if (lit.empty())
     return;
   Pattern::Item it(Pattern::Item::Kind::Lit);
@@ -98,19 +98,19 @@ bool starts_word(const Pattern::Item &it) {
 /// to be parsed
 struct CompiledPattern {
   Pattern pattern;
-  Seq<std::string> capture_types;
+  Seq<String> capture_types;
 };
 
 /// Compile line pattern `src` on line `line` of the reader spec from
 /// `origin`
-CompiledPattern compile(const std::string &src, const std::string &origin,
+CompiledPattern compile(const String &src, const String &origin,
                         std::size_t line) {
   using Item = Pattern::Item;
   CompiledPattern compiled;
   Pattern &pat = compiled.pattern;
   pat.source = src;
   std::size_t p = 0;
-  std::string lit;
+  String lit;
   while (p < src.size()) {
     const char c = src[p];
     if (is_blank(c)) {
@@ -121,10 +121,10 @@ CompiledPattern compile(const std::string &src, const std::string &origin,
     } else if (c == '{') {
       flush(pat, lit);
       const std::size_t q = src.find('}', p);
-      if (q == std::string::npos)
+      if (q == String::npos)
         fail_at(ErrorCode::SpecPattern, origin, line,
                 "unterminated capture in pattern \"" + src + "\"");
-      const std::string cap = src.substr(p + 1, q - p - 1);
+      const String cap = src.substr(p + 1, q - p - 1);
       p = q + 1;
       if (cap.starts_with('$')) {
         Item it(Item::Kind::Var);
@@ -143,11 +143,11 @@ CompiledPattern compile(const std::string &src, const std::string &origin,
                 "capture name '" + it.text + "' in pattern \"" + src +
                     "\" is not a name");
       compiled.capture_types.push_back(
-          (colon == std::string::npos) ? "word" : cap.substr(colon + 1));
+          (colon == String::npos) ? "word" : cap.substr(colon + 1));
       pat.items.push_back(std::move(it));
     } else if (std::string_view(src).substr(p).starts_with("...")) {
       flush(pat, lit);
-      if (src.find_first_not_of(" \t", p + 3) != std::string::npos)
+      if (src.find_first_not_of(" \t", p + 3) != String::npos)
         fail_at(ErrorCode::SpecPattern, origin, line,
                 "'...' must end the pattern \"" + src + "\"");
       pat.items.emplace_back(Item::Kind::Any);
@@ -169,13 +169,13 @@ CompiledPattern compile(const std::string &src, const std::string &origin,
 
 /// A name bound by a comprehension, at a line of the reader spec
 struct BoundName {
-  std::string name;
+  String name;
   std::size_t line;
 };
 
 /// A named type, defined by a type statement
 struct TypeName {
-  std::string name;
+  String name;
   const Stmt *def;
 };
 
@@ -189,7 +189,7 @@ struct BinaryOp {
 class Parser {
 public:
   /// Initialize for `tokens` of a reader spec from `origin`
-  Parser(std::vector<Token> tokens, const std::string &origin)
+  Parser(Seq<Token> tokens, const String &origin)
       : origin_(origin), toks_(std::move(tokens)) {}
 
   /// Parse the whole reader spec
@@ -199,7 +199,7 @@ public:
       if (keyword("format")) {
         next();
         if ((peek().kind != Token::Kind::Ident) &&
-            (peek().kind != Token::Kind::String))
+            (peek().kind != Token::Kind::Str))
           fail(ErrorCode::SpecSyntax,
                "expected a format name, found " + describe(peek()));
         s.name = next().text;
@@ -221,9 +221,9 @@ public:
 
 private:
   /// Where the reader spec comes from
-  const std::string &origin_;
+  const String &origin_;
   /// Tokens
-  std::vector<Token> toks_;
+  Seq<Token> toks_;
   /// Current position
   std::size_t p_ = 0;
   /// Nesting depth of blocks
@@ -237,7 +237,7 @@ private:
   /// Whether the statement being parsed may be each
   bool each_ok_ = false;
   /// Names bound by the comprehensions being parsed
-  Seq<std::string> bound_;
+  Seq<String> bound_;
   /// All names bound by comprehensions
   Seq<BoundName> bound_all_;
   /// The named types visible to the statement being parsed
@@ -252,7 +252,7 @@ private:
   void check_conflicts(const Block &body) const {
     Seq<Decl> names;
     declared(body, names);
-    const auto is_declared = [&names](const std::string &n) {
+    const auto is_declared = [&names](const String &n) {
       return std::ranges::any_of(names,
                                  [&n](const Decl &d) { return d.name == n; });
     };
@@ -276,13 +276,13 @@ private:
       p_++;
     return t;
   }
-  [[noreturn]] void fail(ErrorCode code, std::string m) const {
-    fail_at(code, origin_, peek().line, std::move(m));
+  [[noreturn]] void fail(ErrorCode code, std::string_view m) const {
+    fail_at(code, origin_, peek().line, m);
   }
-  static std::string describe(const Token &t) {
+  static String describe(const Token &t) {
     if (t.kind == Token::Kind::End)
       return "end of spec";
-    if (t.kind == Token::Kind::String)
+    if (t.kind == Token::Kind::Str)
       return "\"" + t.text + "\"";
     return "'" + t.text + "'";
   }
@@ -305,41 +305,41 @@ private:
   void expect_punct(std::string_view k) {
     if (!punct(k))
       fail(ErrorCode::SpecSyntax,
-           "expected '" + std::string(k) + "', found " + describe(peek()));
+           "expected '" + String(k) + "', found " + describe(peek()));
     next();
   }
   void expect_keyword(std::string_view k) {
     if (!keyword(k))
       fail(ErrorCode::SpecSyntax,
-           "expected '" + std::string(k) + "', found " + describe(peek()));
+           "expected '" + String(k) + "', found " + describe(peek()));
     next();
   }
-  std::string ident(std::string_view what) {
+  String ident(std::string_view what) {
     if (peek().kind != Token::Kind::Ident)
       fail(ErrorCode::SpecSyntax,
-           "expected " + std::string(what) + ", found " + describe(peek()));
+           "expected " + String(what) + ", found " + describe(peek()));
     return next().text;
   }
   /// A name that the spec defines, described by `what`
-  std::string new_name(std::string_view what) {
-    std::string n = ident(what);
+  String new_name(std::string_view what) {
+    String n = ident(what);
     if (is_gecode_name(n))
       fail(ErrorCode::SpecName, "'" + n +
                                     "' cannot be defined: names starting "
                                     "with '" +
-                                    std::string(gecode_prefix) +
+                                    String(gecode_prefix) +
                                     "' are Gecode constants");
     return n;
   }
-  std::string string(std::string_view what) {
-    if (peek().kind != Token::Kind::String)
-      fail(ErrorCode::SpecSyntax, "expected " + std::string(what) +
+  String string(std::string_view what) {
+    if (peek().kind != Token::Kind::Str)
+      fail(ErrorCode::SpecSyntax, "expected " + String(what) +
                                       " (a string), found " + describe(peek()));
     return next().text;
   }
   Pattern pattern() {
     const std::size_t line = peek().line;
-    const std::string s = string("a line pattern");
+    const String s = string("a line pattern");
     CompiledPattern compiled = compile(s, origin_, line);
     std::size_t k = 0;
     for (Pattern::Item &it : compiled.pattern.items)
@@ -352,9 +352,9 @@ private:
     return std::move(compiled.pattern);
   }
   /// Return the type `text` of a capture in a pattern on line `line`
-  Type capture_type(const std::string &text, std::size_t line) {
+  Type capture_type(const String &text, std::size_t line) {
     // Parse the text in place of the tokens of the spec
-    std::vector<Token> sub = lex(text, origin_, line);
+    Seq<Token> sub = lex(text, origin_, line);
     if (sub.size() == 1)
       fail_at(ErrorCode::SpecPattern, origin_, line,
               "a capture needs a type after ':'");
@@ -372,8 +372,7 @@ private:
   /// Increment nesting counter `n` for `what`, failing beyond the limit
   void enter(std::size_t &n, std::string_view what) {
     if (++n > max_nesting)
-      fail(ErrorCode::SpecNesting,
-           std::string(what) + " are nested too deeply");
+      fail(ErrorCode::SpecNesting, String(what) + " are nested too deeply");
   }
   Block block() {
     expect_punct("{");
@@ -392,7 +391,7 @@ private:
     depth_--;
     return b;
   }
-  static std::unique_ptr<Expr> integer(std::int64_t v) {
+  static Node<Expr> integer(std::int64_t v) {
     auto e = make_node<Expr>(Expr::Kind::Int);
     e->int_value = v;
     return e;
@@ -483,7 +482,7 @@ private:
     return (toks_[k].kind == Token::Kind::Punct) && (toks_[k].text == ":");
   }
 
-  std::unique_ptr<Stmt> statement() {
+  Node<Stmt> statement() {
     const Token &t = peek();
     each_ok_ = repeat_start_;
     repeat_start_ = false;
@@ -510,7 +509,7 @@ private:
   void words(Stmt &s) {
     s.words.push_back(string(s.kind == Stmt::Kind::Expect ? "a literal token"
                                                           : "a line prefix"));
-    while (peek().kind == Token::Kind::String)
+    while (peek().kind == Token::Kind::Str)
       s.words.push_back(next().text);
   }
   /// tokens and separators: a string of characters
@@ -521,8 +520,8 @@ private:
   /// ignore trailing
   void trailing(Stmt & /*s*/) { expect_keyword("trailing"); }
   /// A name for a value that is kept, so not _
-  std::string defined(std::string_view what) {
-    std::string n = new_name(what);
+  String defined(std::string_view what) {
+    String n = new_name(what);
     if (n == "_")
       fail(ErrorCode::SpecName, "'_' cannot be defined here");
     return n;
@@ -559,7 +558,7 @@ private:
       return false;
     case Token::Kind::Int:
     case Token::Kind::Float:
-    case Token::Kind::String:
+    case Token::Kind::Str:
       return true;
     }
     std::unreachable();
@@ -584,7 +583,7 @@ private:
   Type type() {
     Type t;
     if (peek().kind == Token::Kind::Ident) {
-      const std::string &n = peek().text;
+      const String &n = peek().text;
       if (const std::optional<ReadType> r = read_type(n)) {
         next();
         t.read = *r;
@@ -603,7 +602,7 @@ private:
       }
     }
     if (!punct("..") && !punct("..<")) {
-      std::unique_ptr<Expr> lo = expr();
+      Node<Expr> lo = expr();
       if (!punct("..") && !punct("..<")) {
         if (lo->kind == Expr::Kind::Name)
           fail(ErrorCode::SpecUnknownType, "unknown type '" + lo->s + "'");
@@ -728,7 +727,7 @@ private:
   void until(Stmt &s) {
     s.has_until = true;
     s.words.push_back(string("a terminating token"));
-    while (peek().kind == Token::Kind::String)
+    while (peek().kind == Token::Kind::Str)
       s.words.push_back(next().text);
     if (accept("store"))
       s.store = new_name("a name");
@@ -818,7 +817,7 @@ private:
   /// check e ["message"]
   void check(Stmt &s) {
     s.expr = expr();
-    if (peek().kind == Token::Kind::String)
+    if (peek().kind == Token::Kind::Str)
       s.message = next().text;
   }
 
@@ -826,7 +825,7 @@ private:
    * Expressions, by precedence climbing
    */
 
-  std::unique_ptr<Expr> expr() { return binary(0); }
+  Node<Expr> expr() { return binary(0); }
   /// Return the binary operator `t` with its precedence, or nothing if `t`
   /// is none
   static std::optional<BinaryOp> binary_op(const Token &t) {
@@ -858,8 +857,8 @@ private:
     return o->op;
   }
   /// Binary operators of at least precedence `min`, left-associative
-  std::unique_ptr<Expr> binary(int min) {
-    std::unique_ptr<Expr> lhs = unary();
+  Node<Expr> binary(int min) {
+    Node<Expr> lhs = unary();
     // Each operator adds a level above lhs
     std::size_t levels = 0;
     for (;;) {
@@ -878,9 +877,9 @@ private:
     nesting_ -= levels;
     return lhs;
   }
-  std::unique_ptr<Expr> unary() {
+  Node<Expr> unary() {
     enter(nesting_, "expressions");
-    std::unique_ptr<Expr> e;
+    Node<Expr> e;
     if (punct("-") || punct("!")) {
       e = make_node<Expr>(Expr::Kind::Unary);
       e->op = punct("-") ? Expr::Op::Neg : Expr::Op::Not;
@@ -894,8 +893,8 @@ private:
   }
   /// a ^ b, which binds tighter than unary operators and groups to the
   /// right; b is a unary expression, so 2^-1 is 2^(-1)
-  std::unique_ptr<Expr> power() {
-    std::unique_ptr<Expr> e = postfix();
+  Node<Expr> power() {
+    Node<Expr> e = postfix();
     if (!punct("^"))
       return e;
     auto x = make_node<Expr>(Expr::Kind::Binary);
@@ -906,8 +905,8 @@ private:
     return x;
   }
   /// Indices and fields a[i][j].f...
-  std::unique_ptr<Expr> postfix() {
-    std::unique_ptr<Expr> e = primary();
+  Node<Expr> postfix() {
+    Node<Expr> e = primary();
     // Each index or field adds a level above e
     std::size_t levels = 0;
     while (punct("[") || punct(".")) {
@@ -932,7 +931,7 @@ private:
   /// Check that call `e` on reader-spec line `line` names a function with
   /// suitable arguments
   void check_call(const Expr &e, std::size_t line) const {
-    const std::string &f = e.s;
+    const String &f = e.s;
     const std::size_t n = e.args.size();
     bool ok = false;
     if (f == "defined")
@@ -952,7 +951,7 @@ private:
               "wrong arguments for function '" + f + "'");
   }
   /// Return the value of the Gecode constant `n` on reader-spec line `line`
-  [[nodiscard]] std::int64_t gecode_constant(const std::string &n,
+  [[nodiscard]] std::int64_t gecode_constant(const String &n,
                                              std::size_t line) const {
     struct Constant {
       std::string_view name;
@@ -963,11 +962,11 @@ private:
         {"gecode.int_max", 2147483646},
         {"gecode.int_min", -2147483646},
     }};
-    std::string known;
+    String known;
     for (const Constant &c : constants) {
       if (n == c.name)
         return c.value;
-      known += (known.empty() ? "" : ", ") + std::string(c.name);
+      known += (known.empty() ? "" : ", ") + String(c.name);
     }
     fail_at(ErrorCode::SpecConstant, origin_, line,
             "unknown Gecode constant '" + n + "' (known: " + known + ")");
@@ -982,7 +981,7 @@ private:
     return (t.kind == Token::Kind::Ident) && (t.text == "in");
   }
   /// f(x in a: e), after "f("
-  std::unique_ptr<Expr> comprehension(const std::string &f) {
+  Node<Expr> comprehension(const String &f) {
     auto e = make_node<Expr>(Expr::Kind::Comprehension);
     e->s = f;
     BoundName b{.name = {}, .line = peek().line};
@@ -1004,7 +1003,7 @@ private:
     bound_all_.push_back(std::move(b));
     return e;
   }
-  std::unique_ptr<Expr> primary() {
+  Node<Expr> primary() {
     const Token &t = peek();
     if (t.kind == Token::Kind::Int)
       return integer(next().int_value);
@@ -1013,14 +1012,14 @@ private:
       e->float_value = next().float_value;
       return e;
     }
-    if (t.kind == Token::Kind::String) {
+    if (t.kind == Token::Kind::Str) {
       auto e = make_node<Expr>(Expr::Kind::Str);
       e->s = next().text;
       return e;
     }
     if (punct("(")) {
       next();
-      std::unique_ptr<Expr> e = expr();
+      Node<Expr> e = expr();
       expect_punct(")");
       return e;
     }
@@ -1030,7 +1029,7 @@ private:
     }
     if (t.kind == Token::Kind::Ident) {
       const std::size_t line = t.line;
-      std::string n = next().text;
+      String n = next().text;
       if (punct("(")) {
         next();
         if (at_comprehension(n))
@@ -1073,7 +1072,7 @@ ValueType value_type(ReadType t) {
 }
 
 /// Add name `n` with type `t` and depth `d` to `out`
-void declare(Seq<Decl> &out, const std::string &n, ValueType t, std::size_t d) {
+void declare(Seq<Decl> &out, const String &n, ValueType t, std::size_t d) {
   if (n.empty() || (n == "_"))
     return;
   if (std::ranges::contains(out, n, &Decl::name))
@@ -1091,7 +1090,7 @@ void declare(Seq<Decl> &out, const Pattern &p) {
 } // namespace
 
 void declared(const Block &b, Seq<Decl> &out) {
-  for (const std::unique_ptr<Stmt> &s : b) {
+  for (const Node<Stmt> &s : b) {
     switch (s->kind) {
     case Stmt::Kind::Read:
       declare(out, s->name, value_type(s->type.read), s->dims.size());
@@ -1138,7 +1137,7 @@ void declared(const Block &b, Seq<Decl> &out) {
   }
 }
 
-ParsedSpec parse_tokens(std::vector<Token> tokens, const std::string &origin) {
+ParsedSpec parse_tokens(Seq<Token> tokens, const String &origin) {
   return Parser(std::move(tokens), origin).parse();
 }
 

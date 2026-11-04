@@ -174,6 +174,46 @@ void returns_errors() {
   check(thrown, "missing file");
 }
 
+void shows_diagnostics() {
+  const iris::Spec spec = iris::Spec::parse("x: int", "spec.iris");
+  const auto failed = spec.try_read_text("\nabc \t\n", "input.txt");
+  check(!failed && (failed.error().excerpt() == "abc"), "excerpt");
+  if (!failed)
+    check(std::string_view(failed.error().what()) ==
+              "input.txt:2:1: " + failed.error().message() +
+                  "\n     2 | abc"
+                  "\n       | ^"
+                  "\n  while reading: x"
+                  "\n  spec: spec.iris:1",
+          "diagnostic");
+  const std::string long_line(120, 'y');
+  const auto cut = spec.try_read_text(long_line, "input.txt");
+  check(!cut && (cut.error().excerpt() == std::string(100, 'y') + "..."),
+        "excerpt cut after 100 bytes");
+
+  // An earlier rejection in the instance may explain the error
+  const iris::Spec instances = iris::Spec::parse(
+      "instances {name: word n: int check n > 0 \"positive\" m: int}",
+      "spec.iris");
+  const auto noted = instances.try_read_text("a 0 x\n", "input.txt",
+                                             iris::Params{{"instance", "b"}});
+  check(!noted && (noted.error().code() == iris::ErrorCode::ExpectedValue) &&
+            (noted.error().earlier_rejection() == "positive"),
+        "earlier rejection");
+  if (!noted)
+    check(
+        std::string_view(noted.error().what())
+            .ends_with("\n  after an earlier error in the instance: positive"),
+        "earlier rejection note");
+  // The rejected instance itself has no note
+  const auto selected = instances.try_read_text(
+      "a 0 1\n", "input.txt", iris::Params{{"instance", "a"}});
+  check(!selected &&
+            (selected.error().code() == iris::ErrorCode::CheckFailed) &&
+            !selected.error().earlier_rejection(),
+        "rejection without note");
+}
+
 void catalogs_instances() {
   const iris::Spec spec = iris::Spec::parse(
       "instances {name: word n: int check n > 0 \"positive\"}", "spec.iris");
@@ -282,7 +322,7 @@ void renders_floats_exactly() {
   for (const double f : values)
     input += shortest(f) + '\n';
   const std::string spec = "f[" + std::to_string(values.size()) + "]: float";
-  const std::string dzn = iris::Spec::parse(spec).read_text(input).dzn();
+  const std::pmr::string dzn = iris::Spec::parse(spec).read_text(input).dzn();
   // The leaves between "f = [" and "];\n"
   std::string_view rest = std::string_view(dzn).substr(5);
   for (const double f : values) {
@@ -323,7 +363,8 @@ void ignores_rounding_mode() {
       "h = 1.1;\n"
       "n = [0.5, 9007199254740992.0];\n";
   const iris::Data nearest = iris::Spec::parse(spec_text).read_text(input);
-  check(nearest.dzn() == expected, "dzn when rounding to nearest");
+  check(nearest.dzn() == std::string_view(expected),
+        "dzn when rounding to nearest");
   const std::string json = iris::driver::encode_data(nearest);
   check(iris::driver::encode_float(0.1) == "0.1", "JSON float");
   for (const auto &[mode, name] :
@@ -331,14 +372,14 @@ void ignores_rounding_mode() {
         std::pair{FE_TOWARDZERO, "toward zero"}}) {
     const RoundingMode rounding(mode);
     const std::string when = std::string(" when rounding ") + name;
-    check(nearest.dzn() == expected, "dzn" + when);
+    check(nearest.dzn() == std::string_view(expected), "dzn" + when);
     check(iris::driver::encode_data(nearest) == json, "JSON" + when);
     // Reading leaves the caller's environment, flags included, as it was
     std::feclearexcept(FE_ALL_EXCEPT);
     const iris::Data read = iris::Spec::parse(spec_text).read_text(input);
     check(std::fegetround() == mode, "rounding mode restored" + when);
     check(std::fetestexcept(FE_ALL_EXCEPT) == 0, "no flags raised" + when);
-    check(read.dzn() == expected, "dzn of data read" + when);
+    check(read.dzn() == std::string_view(expected), "dzn of data read" + when);
     check(iris::driver::encode_data(read) == json, "JSON of data read" + when);
     check(std::fegetround() == mode, "rounding mode kept" + when);
   }
@@ -386,6 +427,7 @@ int main() {
     rejects_misuse();
     passes_params();
     returns_errors();
+    shows_diagnostics();
     catalogs_instances();
     renders_dzn();
     renders_floats_exactly();

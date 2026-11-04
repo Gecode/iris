@@ -53,7 +53,7 @@
 namespace iris::detail {
 
 /// Return `s` in single quotes, with newlines and tabs escaped
-std::string quote(std::string_view s);
+String quote(std::string_view s);
 
 /**
  * Records or a list of records of a named repeat
@@ -72,7 +72,7 @@ struct RecordRef {
 /// 'jobs'", with the position of the record in the input if known
 struct Witness {
   /// The text
-  std::string text;
+  String text;
   /// The index of the element or record, from 0
   std::size_t index;
   /// The position, or nothing
@@ -83,7 +83,7 @@ struct Witness {
 class Binding {
 public:
   /// The name
-  const std::string &name;
+  const String &name;
   /// The value, unless a record
   const Value *value = nullptr;
   /// The record, if a record of a named repeat
@@ -91,7 +91,7 @@ public:
   /// The binding of the enclosing comprehension, or null
   const Binding *outer;
   /// Bind `n` inside the bindings starting at `b`
-  Binding(const Binding *&b, const std::string &n)
+  Binding(const Binding *&b, const String &n)
       : name(n), outer(b), innermost_(b) {
     innermost_ = this;
   }
@@ -110,7 +110,7 @@ private:
 /// A statement being executed, for errors
 struct Context {
   /// What is executed, such as a name
-  std::string text;
+  String text;
   /// The iteration of a repeat or instances statement, from 1, or 0
   std::size_t iteration = 0;
   /// The number of iterations, or nothing if unknown
@@ -126,7 +126,7 @@ struct Context {
 class Evaluator {
 public:
   /// Initialize for reader spec `s` and input `text` from `origin`
-  Evaluator(const SpecImpl &s, std::string_view text, std::string origin);
+  Evaluator(const SpecImpl &s, std::string_view text, String origin);
 
 protected:
   /// The reader spec
@@ -157,12 +157,12 @@ protected:
   /// the context
   [[nodiscard]] ReadSite site(const Place &at) const;
   /// Return the error `code` with message `msg` at `at`
-  [[nodiscard]] Error located(ErrorCode code, std::string msg,
+  [[nodiscard]] Error located(ErrorCode code, std::string_view msg,
                               const Place &at) const;
   /// Throw the error `code` with message `msg` at the current position
-  [[noreturn]] void fail(ErrorCode code, std::string msg) const;
+  [[noreturn]] void fail(ErrorCode code, std::string_view msg) const;
   /// Throw an error for the shape error `e` of the value of `n`
-  [[noreturn]] void fail(const ShapeError &e, const std::string &n) const;
+  [[noreturn]] void fail(const ShapeError &e, const String &n) const;
   /// Account for visiting `k` values in expressions, failing if that is
   /// too much work (Specification §10.3)
   void visit(std::uint64_t k) {
@@ -171,7 +171,7 @@ protected:
            "the expressions do too much work for the size of the input");
   }
   /// Define `n` as `v` in the innermost frame
-  void set(const std::string &n, Value &&v);
+  void set(const String &n, Value &&v);
   /// Return the value of `n`, or null if it is not defined
   [[nodiscard]] const Value *lookup(std::string_view n) const;
 
@@ -194,7 +194,7 @@ protected:
   [[nodiscard]] Seq<std::size_t> record_path(std::size_t i) const;
   /// Return the record starts of repeat `r`, failing for `n` if the repeat
   /// has not run yet
-  const Value &starts(const Stmt *r, const std::string &n);
+  const Value &starts(const Stmt *r, const String &n);
   /// Return the number of records in list `l`
   std::size_t count_records(const RecordRef &l);
   /// Return where record `i` of list `l` starts in the input, or nothing
@@ -209,7 +209,7 @@ protected:
    */
   const Value &field(const Expr &e, Value &tmp);
   /// Return the integer of single value `v`, or fail for `op`
-  std::int64_t integer(const Value &v, const std::string &op);
+  std::int64_t integer(const Value &v, const String &op);
   /// Test whether `e` passes on why it is false (see why)
   static bool explains(const Expr &e);
   /// Evaluate `e`, keeping why only if `e` explains it
@@ -235,7 +235,7 @@ protected:
   /// Test whether all integers in the arguments of call `e` differ
   bool distinct(const Expr &e);
   /// Describe the array of index expression `e`, for messages
-  static std::string indexed(const Expr &e);
+  static String indexed(const Expr &e);
   /// Return the value of index `e`
   std::int64_t index(const Expr &e);
   /**
@@ -244,11 +244,11 @@ protected:
    * A record name in a check is one record, so that indexing the records
    * needs their name.
    */
-  [[nodiscard]] std::string scalar_hint(const Expr &e) const;
+  [[nodiscard]] String scalar_hint(const Expr &e) const;
   /// a[i]: element i, counted from 0, of the outermost list of a
   Value subscript(const Expr &e);
   /// Describe array `a` of a comprehension, for messages
-  static std::string array_name(const Expr &a);
+  static String array_name(const Expr &a);
   /// Return the records that are the elements of array `a` of
   /// comprehension `e`, an array of values (see Expr::elements)
   RecordRef element_records(const Expr &e, const Expr &a);
@@ -296,7 +296,7 @@ protected:
   /// there is none or it is ahead
   [[nodiscard]] Place place(std::optional<std::size_t> q) const;
   /// Describe the records `at` of record name `r`, innermost first
-  static std::string record_text(const Record &r, const Seq<std::size_t> &at);
+  static String record_text(const Record &r, const Seq<std::size_t> &at);
   /// Return why check `s` fails for the records `at` of its record name
   /// `deepest`
   Error failure(const Stmt &s, std::optional<std::size_t> deepest,

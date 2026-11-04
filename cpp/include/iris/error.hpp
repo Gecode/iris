@@ -89,44 +89,71 @@ struct Location {
   std::optional<std::size_t> column;
 };
 
-/// A language error with the members of the canonical error document
-/// (Specification §3.7).
-///
-/// `what()` renders the diagnostic envelope `origin:line: message`, or
-/// `origin:line:column: message` when the primary location has a column.
+/// The parts of an Error besides its code and message, each absent unless
+/// the error has it
+struct ErrorDetails {
+  /// Where in the input the error is, for a read-time error
+  std::optional<Location> input_location = std::nullopt;
+  /// Where in the reader spec the error is: the statement that runs for a
+  /// read-time error
+  std::optional<Location> spec_location = std::nullopt;
+  /// The input line at the input location without trailing blanks, cut
+  /// after 100 bytes and then followed by `...`
+  std::optional<std::string> excerpt = std::nullopt;
+  /// The statements that run, outermost first and separated by ` > `, such
+  /// as `repeat [2 of 5] > list clause`
+  std::optional<std::string> context = std::nullopt;
+  /// The failed check's witness, outermost index first and counted from 0
+  std::optional<std::vector<std::size_t>> record_path = std::nullopt;
+  /// The summary of an earlier rejection in the same instance, which may
+  /// explain this error
+  std::optional<std::string> earlier_rejection = std::nullopt;
+};
+
+/**
+ * A language error with the members of the canonical error document
+ * (Specification §3.7), and everything its diagnostic shows
+ *
+ * `what()` renders the diagnostic of Specification §11.1: it starts with
+ * `origin:line:column: message`, or `origin:line: message` without a
+ * column. A read-time error goes on with the excerpt and a caret under the
+ * column, then `  while reading: ` and the context, `  spec: origin:line`
+ * for the statement, and `  after an earlier error in the instance: ` and
+ * the earlier rejection, each on a line of its own if the error has it.
+ */
 class Error : public std::runtime_error {
 public:
-  Error(ErrorCode code, std::string message,
-        std::optional<Location> input_location = std::nullopt,
-        std::optional<Location> spec_location = std::nullopt,
-        std::optional<std::string> context = std::nullopt,
-        std::optional<std::vector<std::size_t>> record_path = std::nullopt);
+  Error(ErrorCode code, std::string message, ErrorDetails details = {});
 
   [[nodiscard]] ErrorCode code() const { return code_; }
   [[nodiscard]] const std::string &message() const { return message_; }
+  [[nodiscard]] const ErrorDetails &details() const { return details_; }
   [[nodiscard]] const std::optional<Location> &input_location() const {
-    return input_location_;
+    return details_.input_location;
   }
   [[nodiscard]] const std::optional<Location> &spec_location() const {
-    return spec_location_;
+    return details_.spec_location;
+  }
+  [[nodiscard]] const std::optional<std::string> &excerpt() const {
+    return details_.excerpt;
   }
   [[nodiscard]] const std::optional<std::string> &context() const {
-    return context_;
+    return details_.context;
   }
   /// The failed check's witness, outermost index first and counted from 0,
   /// or no path for an error that is not a failed check.
   [[nodiscard]] const std::optional<std::vector<std::size_t>> &
   record_path() const {
-    return record_path_;
+    return details_.record_path;
+  }
+  [[nodiscard]] const std::optional<std::string> &earlier_rejection() const {
+    return details_.earlier_rejection;
   }
 
 private:
   ErrorCode code_;
   std::string message_;
-  std::optional<Location> input_location_;
-  std::optional<Location> spec_location_;
-  std::optional<std::string> context_;
-  std::optional<std::vector<std::size_t>> record_path_;
+  ErrorDetails details_;
 };
 
 } // namespace iris

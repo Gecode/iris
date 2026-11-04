@@ -56,6 +56,8 @@ namespace iris {
 
 namespace {
 
+using detail::String;
+using detail::to_string;
 using detail::Value;
 
 /**
@@ -169,7 +171,7 @@ private:
  * r / s and the gaps to the midpoints with its neighbours are plus / s and
  * minus / s, in units of that digit.
  */
-void append_float(std::string &out, double f) {
+void append_float(std::pmr::string &out, double f) {
   if (f == 0.0) {
     out += std::signbit(f) ? "-0.0" : "0.0";
     return;
@@ -278,7 +280,7 @@ void append_float(std::string &out, double f) {
     const int magnitude = std::abs(k);
     if (magnitude < 10)
       out += '0';
-    out += std::to_string(magnitude);
+    out += to_string(magnitude);
   } else if (k >= 0) {
     const auto integer = static_cast<std::size_t>(k) + 1;
     if (length <= integer) {
@@ -298,7 +300,7 @@ void append_float(std::string &out, double f) {
 }
 
 /// Append string `s` to `out` as a MiniZinc string (Specification §B.4)
-void append_string(std::string &out, std::string_view s) {
+void append_string(std::pmr::string &out, std::string_view s) {
   static constexpr std::string_view hex = "0123456789abcdef";
   out += '"';
   for (const char c : s) {
@@ -322,10 +324,10 @@ void append_string(std::string &out, std::string_view s) {
 }
 
 /// Append leaf `i` of `v` to `out` (Specification §B.2 to §B.4)
-void append_leaf(std::string &out, const Value &v, std::size_t i) {
+void append_leaf(std::pmr::string &out, const Value &v, std::size_t i) {
   switch (v.type) {
   case ValueType::Int:
-    out += std::to_string(v.ints[i]);
+    out += to_string(v.ints[i]);
     return;
   case ValueType::Float:
     append_float(out, v.floats[i]);
@@ -339,7 +341,7 @@ void append_leaf(std::string &out, const Value &v, std::size_t i) {
 
 /// Append the leaves of `v` from `from` to before `to` to `out`, separated
 /// by commas
-void append_leaves(std::string &out, const Value &v, std::size_t from,
+void append_leaves(std::pmr::string &out, const Value &v, std::size_t from,
                    std::size_t to) {
   for (std::size_t i = from; i < to; i++) {
     if (i > from)
@@ -350,7 +352,7 @@ void append_leaves(std::string &out, const Value &v, std::size_t from,
 
 /// Append name `n` to `out` as a MiniZinc identifier, quoted if it is not
 /// one (Specification §B.2)
-void append_name(std::string &out, const std::string &n) {
+void append_name(std::pmr::string &out, const String &n) {
   static constexpr std::array<std::string_view, 51> keywords = {
       "ann",        "annotation", "any",    "array",     "bool",     "case",
       "constraint", "default",    "diff",   "div",       "else",     "elseif",
@@ -395,7 +397,7 @@ bool rectangular(const Value &v) {
  * Depth 1 is a list and depth 2 a matrix, unless it is empty. Other depths
  * need MiniZinc's arrayNd with the extent of each level.
  */
-void append_rectangular(std::string &out, const Value &v) {
+void append_rectangular(std::pmr::string &out, const Value &v) {
   const std::size_t leaves = v.leaves();
   if (v.depth() == 1) {
     out += '[';
@@ -414,9 +416,9 @@ void append_rectangular(std::string &out, const Value &v) {
     out += " |]";
     return;
   }
-  out += "array" + std::to_string(v.depth()) + "d(";
+  out += "array" + to_string(v.depth()) + "d(";
   for (std::size_t level = 0; level < v.depth(); level++)
-    out += "1.." + std::to_string(extent(v, level)) + ", ";
+    out += "1.." + to_string(extent(v, level)) + ", ";
   out += '[';
   append_leaves(out, v, 0, leaves);
   out += "])";
@@ -429,7 +431,7 @@ void append_rectangular(std::string &out, const Value &v) {
  * An explicit stack of the lists being written, one per level, keeps deep
  * arrays off the call stack.
  */
-void append_tuples(std::string &out, const Value &v) {
+void append_tuples(std::pmr::string &out, const Value &v) {
   // A list being written: its children are from `from` to before `end`,
   // and `next` is the first child not yet written
   struct Open {
@@ -469,7 +471,7 @@ void append_tuples(std::string &out, const Value &v) {
 
 /// Append the comment with the MiniZinc type of the tuples of array `v`
 /// named `n` to `out` (Specification §B.6)
-void append_tuple_type(std::string &out, const std::string &n, const Value &v) {
+void append_tuple_type(std::pmr::string &out, const String &n, const Value &v) {
   out += "% ";
   out += n;
   out += ": ";
@@ -482,7 +484,7 @@ void append_tuple_type(std::string &out, const std::string &n, const Value &v) {
 }
 
 /// Append the assignment of entry `e` to `out` (Specification §B.8)
-void append_entry(std::string &out, const detail::Entry &e) {
+void append_entry(std::pmr::string &out, const detail::Entry &e) {
   const Value &v = e.value;
   // MiniZinc has array constructors up to array6d; other arrays are tuples
   const bool tuples = (v.depth() > 6) || !rectangular(v);
@@ -501,8 +503,10 @@ void append_entry(std::string &out, const detail::Entry &e) {
 
 } // namespace
 
-std::string Data::dzn() const {
-  std::string out;
+std::pmr::string Data::dzn() const {
+  std::pmr::memory_resource &memory = impl_->entries.get_allocator().memory();
+  const detail::MemoryScope scope(memory);
+  std::pmr::string out(&memory);
   for (const detail::Entry &e : impl_->entries)
     append_entry(out, e);
   return out;

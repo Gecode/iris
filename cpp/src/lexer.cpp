@@ -54,12 +54,12 @@ using namespace std::string_view_literals;
 class Lexer {
 public:
   /// Initialize for `src` from `origin`, which starts on line `line`
-  Lexer(std::string_view src, const std::string &origin, std::size_t line)
+  Lexer(std::string_view src, const String &origin, std::size_t line)
       : src_(src), origin_(origin), line_(line) {}
 
   /// Return the tokens of the whole spec, ending with a token of kind End
-  std::vector<Token> run() {
-    std::vector<Token> toks;
+  Seq<Token> run() {
+    Seq<Token> toks;
     while (skip_space()) {
       Token t;
       t.line = line_;
@@ -84,15 +84,15 @@ public:
 
 private:
   std::string_view src_;
-  const std::string &origin_;
+  const String &origin_;
   std::size_t line_;
   /// Current position
   std::size_t p_ = 0;
   /// Whether white space or a comment precedes the current position
   bool space_ = true;
 
-  [[noreturn]] void fail(ErrorCode code, std::string m) const {
-    fail_at(code, origin_, line_, std::move(m));
+  [[noreturn]] void fail(ErrorCode code, std::string_view m) const {
+    fail_at(code, origin_, line_, m);
   }
 
   /// Skip white space and comments, and return whether a token follows
@@ -133,7 +133,7 @@ private:
       fail(ErrorCode::SpecString, "unterminated string");
     default:
       fail(ErrorCode::SpecString,
-           "unknown escape '\\" + std::string(first_character(rest)) +
+           "unknown escape '\\" + String(first_character(rest)) +
                R"msg(' in string (use \n, \t, \\, or \"))msg");
     }
   }
@@ -158,7 +158,7 @@ private:
     if (p_ >= src_.size())
       fail(ErrorCode::SpecString, "unterminated string");
     p_++;
-    t.kind = Token::Kind::String;
+    t.kind = Token::Kind::Str;
   }
 
   /// An integer or a float
@@ -172,7 +172,7 @@ private:
     t.text = src_.substr(p_, q - p_);
     p_ = q;
     const bool is_float =
-        t.text.find_first_not_of("0123456789") != std::string::npos;
+        t.text.find_first_not_of("0123456789") != String::npos;
     t.kind = is_float ? Token::Kind::Float : Token::Kind::Int;
     if (is_float) {
       const std::optional<double> v = parse_float(t.text);
@@ -229,15 +229,14 @@ private:
       t.text = rest.substr(0, 1);
     else
       fail(ErrorCode::SpecCharacter,
-           "unexpected character '" + std::string(first_character(rest)) + "'");
+           "unexpected character '" + String(first_character(rest)) + "'");
     p_ += t.text.size();
   }
 };
 
 } // namespace
 
-std::vector<Token> lex(std::string_view src, const std::string &origin,
-                       std::size_t line) {
+Seq<Token> lex(std::string_view src, const String &origin, std::size_t line) {
   return Lexer(src, origin, line).run();
 }
 

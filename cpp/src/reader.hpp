@@ -50,7 +50,7 @@ namespace iris::detail {
  *
  * Throws Error for every language error.
  */
-DataImpl read(const SpecImpl &spec, std::string_view text, std::string origin,
+DataImpl read(const SpecImpl &spec, std::string_view text, String origin,
               const ParamsImpl &params);
 
 /**
@@ -60,7 +60,7 @@ DataImpl read(const SpecImpl &spec, std::string_view text, std::string origin,
  *
  * Throws Error for every language error.
  */
-DataImpl catalog(const SpecImpl &spec, std::string_view text,
-                 std::string origin, const ParamsImpl &params);
+DataImpl catalog(const SpecImpl &spec, std::string_view text, String origin,
+                 const ParamsImpl &params);
 
 } // namespace iris::detail

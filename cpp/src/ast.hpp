@@ -41,6 +41,8 @@
 
 #pragma once
 
+#include "memory.hpp"
+
 #include <iris/data.hpp>
 
 #include <cstddef>
@@ -52,16 +54,6 @@
 #include <vector>
 
 namespace iris::detail {
-
-/// Growable array
-template <class T> using Seq = std::vector<T>;
-
-/// Return a new syntax-tree node, constructed from `args`
-///
-/// Every node is allocated here.
-template <class T, class... Args> std::unique_ptr<T> make_node(Args &&...args) {
-  return std::make_unique<T>(std::forward<Args>(args)...);
-}
 
 using iris::ValueType;
 
@@ -118,9 +110,9 @@ struct Expr {
   /// Float literal
   double float_value = 0.0;
   /// String literal, name, operator, or function
-  std::string s;
+  String s;
   /// Name bound by a comprehension
-  std::string var;
+  String var;
   /// Index of a record name among the records of its check, if it is one
   std::optional<std::size_t> record;
   /// The repeat whose records or lists of records this is, or null
@@ -131,7 +123,7 @@ struct Expr {
   /// array, or null
   const Stmt *elements = nullptr;
   /// Operands or arguments
-  Seq<std::unique_ptr<Expr>> args;
+  Seq<Node<Expr>> args;
   /// Initialize with kind `k`
   explicit Expr(Kind k) : kind(k) {}
 };
@@ -145,13 +137,13 @@ struct Expr {
  */
 struct Record {
   /// The name of the values
-  std::string name;
+  String name;
   /// The name in messages: the name, or the list of records
-  std::string label;
+  String label;
   /// The repeats between the check and the definition, outermost first
   Seq<const Stmt *> repeats;
   /// Name of the record starts of the innermost of these repeats
-  std::string starts;
+  String starts;
 };
 
 /**
@@ -161,13 +153,9 @@ struct Record {
  * name, which is not a spec name, so that a failed check can point at a
  * record. Such names are not part of the data read.
  */
-inline std::string record_starts(std::size_t id) {
-  return "#" + std::to_string(id);
-}
+inline String record_starts(std::size_t id) { return "#" + to_string(id); }
 /// Test whether `n` is a name used internally (see record_starts)
-inline bool is_internal(const std::string &n) {
-  return !n.empty() && (n[0] == '#');
-}
+inline bool is_internal(const String &n) { return !n.empty() && (n[0] == '#'); }
 
 /// What a declaration or a capture reads
 enum class ReadType {
@@ -192,21 +180,21 @@ struct Type {
   /// What the type reads
   ReadType read = ReadType::Int;
   /// Lower bound of a range, or null
-  std::unique_ptr<Expr> lo;
+  Node<Expr> lo;
   /// Upper bound of a range, or null
-  std::unique_ptr<Expr> hi;
+  Node<Expr> hi;
   /// Whether the upper bound is excluded
   bool exclusive = false;
   /// The type statement defining a named type, or null
   const Stmt *named = nullptr;
   /// Name of a named type
-  std::string name;
+  String name;
   /// Symbols of an alphabet type
-  std::string alphabet;
+  String alphabet;
   /// Symbols that stand for 0
-  std::string blank;
+  String blank;
   /// Symbols to skip
-  std::string strip;
+  String strip;
   /// Value of the first symbol
   std::int64_t base = 1;
   /// Test whether the type has a range, possibly through its name
@@ -234,7 +222,7 @@ struct Pattern {
     enum class Kind { Lit, Space, Cap, Any, Var };
     Kind kind;
     /// Literal text, capture name, or variable name
-    std::string text;
+    String text;
     /// What a capture reads
     Type type;
     /// Whether a space item needs at least one blank
@@ -243,13 +231,13 @@ struct Pattern {
     explicit Item(Kind k) : kind(k) {}
   };
   /// Source text
-  std::string source;
+  String source;
   /// Items
   Seq<Item> items;
 };
 
 /// Sequence of statements
-using Block = Seq<std::unique_ptr<Stmt>>;
+using Block = Seq<Node<Stmt>>;
 
 /// Arm of a sections statement
 struct Arm {
@@ -296,27 +284,27 @@ struct Stmt {
   /// defines
   Type type;
   /// Name defined
-  std::string name;
+  String name;
   /// Characters for tokens and separators statements
-  std::string chars;
+  String chars;
   /// Message of a check statement
-  std::string message;
+  String message;
   /// Name for the terminating token found
-  std::string store;
+  String store;
   /// Name of the list of records of a repeat
-  std::string list;
+  String list;
   /// Name of each record of a repeat, inside and after it
-  std::string each;
+  String each;
   /// Array dimensions
-  Seq<std::unique_ptr<Expr>> dims;
+  Seq<Node<Expr>> dims;
   /// Count, condition, layout, value, or default
-  std::unique_ptr<Expr> expr;
+  Node<Expr> expr;
   /// List terminator
-  std::unique_ptr<Expr> sentinel;
+  Node<Expr> sentinel;
   /// Added to every number read
-  std::unique_ptr<Expr> offset;
+  Node<Expr> offset;
   /// Prefixes, literal tokens, or terminating tokens
-  Seq<std::string> words;
+  Seq<String> words;
   /// List ends at end of line
   bool until_eol = false;
   /// Repeat until end of input
@@ -344,7 +332,7 @@ struct Stmt {
 /// A name that a block may define, with the type and depth of its values
 struct Decl {
   /// Name
-  std::string name;
+  String name;
   /// Type of the leaves
   ValueType type;
   /// Depth
@@ -361,14 +349,16 @@ void declared(const Block &b, Seq<Decl> &out);
  * repeat (see Expr) and the record names of the checks (see Record), and
  * reports their misuse.
  */
-void resolve(Block &b, const std::string &origin);
+void resolve(Block &b, const String &origin);
 
 /// Implementation of Spec
 struct SpecImpl {
+  /// The resource that every operation with the spec allocates from
+  std::pmr::memory_resource *memory;
   /// Where the reader spec comes from
-  std::string origin;
+  String origin;
   /// Format name
-  std::string name;
+  String name;
   /// Statements
   Block body;
 };
