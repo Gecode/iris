@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -138,7 +139,7 @@ def test_params_pass_values_as_exact_strings() -> None:
         ([("n", "3")], "params must be a mapping"),
     ],
 )
-def test_params_must_map_str_to_str(params: object, message: str) -> None:
+def test_params_must_map_str_to_str(params: Any, message: str) -> None:
     spec = iris.Spec.parse("param n = 1\nm:int")
     with pytest.raises(TypeError, match=message):
         spec.read(b"1", params=params)

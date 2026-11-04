@@ -11,6 +11,9 @@ import gecode_iris as iris
 
 spec = iris.Spec.load("jobshop.iris")
 data = spec.read("jobshop1.txt", params={"instance": "la01"})
+data["n_jobs"]  # int
+data.ints("machine", 3)  # list[int]
+data.array("duration")  # numpy.ndarray if numpy is installed and rectangular
 print(data.to_json())
 ```
 
@@ -31,7 +34,27 @@ print(data.to_json())
   `{"instance": "la01"}` to select an instance.
 - `Data.to_json()` returns the canonical JSON document, ending in a newline,
   and `Data.to_dzn()` returns the dzn text of the Specification's appendix B.
-  python-002 adds element access.
+- `data.entries` is a tuple of `Entry` named tuples, `(name, value_type,
+  depth)`, in the order the names were defined. `value_type` is `"int"`,
+  `"float"` or `"string"`.
+- `data["name"]` returns an entry's value, copied into Python objects: an
+  `int`, `float` or `str` at depth 0, and nested lists at greater depths. The
+  type `Value` describes these. `"name" in data` tests for an entry, and
+  `data.to_dict()` returns every entry as a `dict` in entry order.
+- `data.ints(name, *path)` returns the integer row that `path` selects, as
+  `list[int]`. A negative index counts from the end of its row, as in a list.
+  The selection must have depth 1 and value type `int`.
+- `data.array(name, *path)` returns the array that `path` selects. When numpy
+  can be imported and the array is rectangular, the result is a writable
+  `numpy.ndarray` of `int64`, `float64` or `str_` elements, with one dimension
+  per level; otherwise it is the same nested lists as `data[name]`. numpy is
+  not a dependency of the package, and `array` imports it on each call. An
+  empty array has size 0 in every dimension, since an empty row does not
+  record the widths of its missing children.
+- Access errors are built-in exceptions: `KeyError` for an unknown entry,
+  `IndexError` for an index outside its row, and `TypeError` for a path
+  through a scalar, `array` on a scalar, or `ints` on a selection that is not
+  an integer row.
 - A language error raises `gecode_iris.Error`, with the attributes `code`,
   `message`, `line`, `column`, `path` (the record path as a tuple) and
   `origin`. The location is the input location when there is one, and
@@ -116,10 +139,38 @@ uvx ruff check
 uvx ty check
 ```
 
-ty cannot read the compiled `_native` module, and its type stubs arrive with
-python-002. Until then `[tool.ty.analysis]` allows that one import to stay
-unresolved: ty checks the Python sources and tests, and treats `Spec` and
-`Data` as unknown.
+The package ships `py.typed` and the stub `python/gecode_iris/_native.pyi`
+for the compiled module, so type checkers see `Spec` and `Data` with their
+full signatures. `tests/test_package.py` fails when the stub and the module
+declare different names. The stub names numpy's array type for
+`Data.array`; numpy is optional, so `[tool.ty.analysis]` lets ty pass
+without it, and treats that type as unknown. ty skips
+`tests/typecheck/data_misuse.py`, whose errors are intended.
+
+Run the test suite without numpy and with it. `--with` adds numpy for one
+run without installing it into `.venv`; the tests that need numpy are
+skipped in the first run:
+
+```sh
+uv run --no-sync pytest
+uv run --no-sync --with numpy pytest
+```
+
+pyright and mypy check the stubs through two files in `tests/typecheck/`.
+Both checkers must accept `data_usage.py`, which uses the documented API,
+and report an error on each line of `data_misuse.py` that ends in an
+`# error:` comment. numpy makes the `Data.array` types precise; without it,
+pyright's strict mode reports them as unknown:
+
+```sh
+uv run --no-sync --with numpy --with mypy mypy tests/typecheck/data_usage.py
+uv run --no-sync --with numpy --with pyright pyright tests/typecheck/data_usage.py
+uv run --no-sync --with numpy --with mypy mypy tests/typecheck/data_misuse.py
+uv run --no-sync --with numpy --with pyright pyright tests/typecheck/data_misuse.py
+```
+
+The last two commands exit with status 1. Each reports errors on every
+marked line and on no other line.
 
 Check the Rust crate from the repository root:
 

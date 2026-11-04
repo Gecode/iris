@@ -44,7 +44,20 @@ extend-select = ["B", "I", "UP"]
 [tool.ty.environment]
 python-version = "3.10"
 
-# ty cannot read the compiled extension, and its stubs arrive in python-002;
-# until then Spec and Data are unchecked and the pure-Python code is checked.
+[tool.ty.src]
+# Its errors are intended; pyright and mypy check that they are reported.
+exclude = ["tests/typecheck/data_misuse.py"]
+
+# numpy is optional, and the stubs name its array type. Without numpy the
+# check still passes, and ty treats that type as unknown.
 [tool.ty.analysis]
-allowed-unresolved-imports = ["gecode_iris._native"]
+allowed-unresolved-imports = ["numpy.typing"]
+
+# pyright and mypy check the stubs through tests/typecheck; README.md has the commands.
+[tool.pyright]
+pythonVersion = "3.10"
+typeCheckingMode = "strict"
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
