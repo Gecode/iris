@@ -13,6 +13,12 @@
       "rules": {
         "typescript/no-floating-promises": "off"
       }
+    },
+    {
+      "files": ["examples/deadline-worker.ts"],
+      "rules": {
+        "unicorn/require-post-message-target-origin": "off"
+      }
     }
   ]
 }

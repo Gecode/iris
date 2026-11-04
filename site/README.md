@@ -8,7 +8,7 @@ then shows executable format examples. The format library renders every
 format’s README, highlighted reader spec, and cases with their real output.
 The Language Specification is rendered directly from `spec/`, with versioned
 chapter pages and error-code links shared with the language server.
-The introduction, tutorial, guides, tools, Rust and Python pages use the same
+The introduction, tutorial, guides, tools, Rust, Python and TypeScript pages use the same
 shell, and so does the Python API reference that pdoc generates.
 The other implementations page identifies planned implementations.
 
@@ -188,10 +188,10 @@ collect its sources and command result, then render them with `CheckedExample`.
 
 `/using/python/` renders the examples in `python/examples` with their recorded
 output through the same `CheckedExample` markers, collected by
-`scripts/python-examples.mjs`. The collector requires every file in that
-directory to appear on the page, checks that the install commands still appear
-in `python/README.md`, and runs each `.sh` example with the Rust CLI to check
-its recording. The Python side runs every example against the built package
+`scripts/python-examples.mjs` with the shared `scripts/example-files.mjs`. The
+collector requires every file in that directory to appear on the page, checks
+that the install commands still appear in `python/README.md`, and runs each
+`.sh` example with the Rust CLI to check its recording. The Python side runs every example against the built package
 in `python/tests/test_examples.py`; see the
 [Python README](../python/README.md#guide-examples).
 
@@ -207,6 +207,17 @@ uv downloads Python 3.15 when it is not installed. The ignored
 with that output and requires the public classes, methods and attributes,
 including the stub signature of `Spec.read`. The
 [Python README](../python/README.md#api-reference) records why pdoc was chosen.
+
+## TypeScript guide
+
+`/using/typescript/` renders the examples in `typescript/examples` the same
+way, collected by `scripts/typescript-examples.mjs`. The collector requires
+every file in that directory to appear on the page and checks that the install
+commands and the Content-Security-Policy line still appear in
+`typescript/README.md`. The site build does not need the TypeScript package:
+`typescript/test/examples.test.ts`, part of `npm test` in `typescript/`,
+type-checks every example against the built package and runs the ones with a
+recorded output; see the [TypeScript README](../typescript/README.md#tests).
 
 ## Playground
 

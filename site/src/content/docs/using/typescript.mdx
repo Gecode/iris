@@ -1,0 +1,221 @@
+---
+title: TypeScript
+description: Read input with a reader spec from TypeScript or JavaScript in Node, browsers and edge runtimes with the gecode-iris package.
+editUrl: false
+prev: false
+next: false
+---
+import CheckedExample from '../../../components/docs/CheckedExample.astro';
+
+The `gecode-iris` npm package runs the Rust reference implementation of Iris,
+compiled to WebAssembly. Parsing, reading, errors, JSON and dzn all come from
+the Rust reader, so the package reads every input exactly as the
+[CLI](/tools/cli/) does. The package is ESM only, includes TypeScript
+declarations, and runs in Node 22.12 or newer, browsers, Cloudflare Workers and
+other edge runtimes.
+
+## Install the package
+
+npm publication is planned; the package is not published yet. Once it is,
+install it with:
+
+<CheckedExample id="typescript-install" />
+
+Until then, build the package from an Iris checkout, which needs stable Rust
+with the `wasm32-unknown-unknown` target and wasm-bindgen-cli 0.2.129; the
+[package README](https://github.com/Gecode/iris/blob/main/typescript/README.md#build)
+lists the setup. With your npm project beside a checkout named `iris`, run:
+
+<CheckedExample id="typescript-install-checkout" />
+
+npm links the checkout's package directory, so rebuild it after updating the
+checkout. Package versions and language versions are separate; the current
+package is 0.1.0 and implements Iris 0.1.
+
+## Parse a reader spec and read input
+
+The examples on this page are in
+[`typescript/examples`](https://github.com/Gecode/iris/tree/main/typescript/examples).
+A test type-checks every one against the built package, runs each one that
+Node can run, and compares its output. They read files from the format
+library, so run them from the root of an Iris checkout.
+
+<CheckedExample id="typescript-read" title="read.ts" />
+
+`Spec.parse` parses and checks a reader spec given as a string or a
+`Uint8Array`. The declaration reads `n`, then a row of `n` integers.
+`spec.read` reads input from a string or a `Uint8Array`; the origin names, such
+as `example.iris` and `input.txt`, appear in error messages. A `Spec` can read
+any number of inputs.
+
+## Choose a runtime
+
+Every entry point loads the WebAssembly module before an importing module
+runs, so `Spec.parse` works at the top level of your module, with no `await`
+and no setup call. The package's export conditions pick the entry point for
+your runtime.
+
+### Node
+
+In Node, `import` loads the package synchronously, as in the example above.
+`require()` works too, in Node 22.12 or newer:
+
+<CheckedExample id="typescript-require" title="require.cjs" />
+
+Deno and Bun use the same entry point through their `node` condition.
+
+### Browsers
+
+In a browser, the package fetches its `.wasm` file with top-level `await`, so
+your module's own top level runs once the module is loaded. This module reads
+a text area as the user types:
+
+<CheckedExample id="typescript-browser" title="browser.ts" />
+
+Vite and webpack 5 emit the `.wasm` file as an asset. With Vite's development
+server, exclude the package from dependency optimization with
+`optimizeDeps: { exclude: ["gecode-iris"] }`. With esbuild and other bundlers
+that do not copy the file, import `gecode-iris/inline` instead.
+
+A page with a strict Content-Security-Policy must allow WebAssembly
+compilation with `'wasm-unsafe-eval'`:
+
+<CheckedExample id="typescript-csp" />
+
+Without it, loading the package fails with a `CompileError`.
+
+### Cloudflare Workers and edge runtimes
+
+Wrangler resolves the package's `workerd` condition and uploads the `.wasm`
+file as a compiled module. This worker parses its spec once, at module scope,
+and reads each request body:
+
+<CheckedExample id="typescript-worker" title="worker.ts" />
+
+Other edge runtimes that resolve the `edge-light` condition use the same entry
+point.
+
+### Inline
+
+`gecode-iris/inline` embeds the module in JavaScript and compiles it
+synchronously, so it needs no file access, `fetch` or bundler support. It works
+wherever WebAssembly can be compiled from bytes, but not in workerd, and it is
+about a third larger than the `.wasm` file.
+
+<CheckedExample id="typescript-inline" title="inline.ts" />
+
+### Manual
+
+`gecode-iris/manual` loads nothing on import. Await `initialize` with a
+`WebAssembly.Module`, the module's bytes, a `Response`, a URL to fetch, or a
+promise of any of these, before the first `Spec.parse`. This example reads the
+`.wasm` file from the installed package:
+
+<CheckedExample id="typescript-manual" title="manual.ts" />
+
+Once a load has started, later calls to `initialize` return the same promise.
+
+## Read files, instances and parameters
+
+The package reads strings and bytes, not paths, so it runs where there is no
+file system. In Node, read the files with `node:fs` and pass the paths as
+origins:
+
+<CheckedExample id="typescript-files" title="files.ts" />
+
+`spec.catalog` lists the instances in an input as data. The `instance`
+parameter selects one instance during a read, by name or by its number,
+counting from 1. Parameter values are strings, as the
+[Specification](/specification/0.1/09-params-and-instances/) defines; pass
+`{ instance: "2" }`, not `{ instance: 2 }`. `params` also accepts an iterable
+of `[name, value]` pairs, such as a `Map`.
+
+## Access data
+
+`data.entries` lists the entries in the order the reader spec defines them,
+each with its name, value type and depth. `data.entry(name)` returns one entry,
+or `undefined`, and `data.has(name)` tests for it.
+
+<CheckedExample id="typescript-access" title="access.ts" />
+
+A path is an array of indices counted from 0. `data.size(name, path)` returns
+the length of the array that the path selects. `data.int`, `data.float` and
+`data.string` return a scalar, and `data.ints`, `data.floats` and
+`data.strings` return a row. `data.value(name, path)` returns a scalar or
+nested arrays, whose rows can have different lengths, and `data.toObject()`
+returns every entry. Each call returns a copy, and `Data` needs no freeing.
+
+An unknown entry or an index outside its array throws `RangeError`, and a
+selection of the wrong value type or depth throws `TypeError`.
+
+## 64-bit integers
+
+Iris integers are signed 64-bit, and a JavaScript `number` holds integers
+exactly only up to `Number.MAX_SAFE_INTEGER` (2<sup>53</sup> − 1). The
+accessors that return `number` throw `RangeError` for a larger value instead
+of rounding it. `data.bigInt`, `data.bigInts`, which returns a
+`BigInt64Array`, and the `{ bigint: true }` option of `value` and `toObject`
+are always exact. Floats are always `number`.
+
+<CheckedExample id="typescript-integers" title="integers.ts" />
+
+## JSON and dzn
+
+`data.toJSON()` returns the canonical JSON document and `data.toDzn()` the
+MiniZinc data of the [dzn appendix](/specification/0.1/appendix-b-dzn/). Both
+end in a newline.
+
+<CheckedExample id="typescript-output" title="output.ts" />
+
+`JSON.stringify(data)` calls `toJSON` and so encodes the document as one JSON
+string; use `data.toJSON()` directly.
+
+## Handle errors
+
+A language error throws `IrisError`, a subclass of `Error`. Its `code` is the
+stable [error code](/specification/0.1/errors/) and `message` the message
+without a location. `inputLocation` and `specLocation` are each
+`{ origin, line, column }` or `null`, and any of their fields can be `null`.
+`context` says what was being read, and `recordPath` gives the record indices
+of a failed check over records. `diagnostic` is the text that the CLI prints,
+and `error.toJSON()` returns the canonical error document.
+
+<CheckedExample id="typescript-errors" title="errors.ts" />
+
+Host failures throw built-in errors and have no error code. A string with a
+lone surrogate, a parameter value that is not a string, or a disposed spec
+throws `TypeError`. Data beyond the limits of the package's 32-bit transfer
+format throws `RangeError`, and other host failures throw `Error`.
+
+A trap in the WebAssembly module, which only a bug in the package can cause,
+throws `IrisInternalError`. It is not an `IrisError`, and its `cause` is the
+original `WebAssembly.RuntimeError`. The package replaces the WebAssembly
+instance after a trap, so later calls work, including calls on specs parsed
+earlier.
+
+## Budgets and deadlines
+
+The language's fixed [work budgets](/specification/0.1/10-work-budgets/)
+bound every read. A read that exhausts one throws `IrisError` with the code
+`E-BUDGET`. The package has no budget settings.
+
+<CheckedExample id="typescript-budget" title="budget.ts" />
+
+Calls into WebAssembly are synchronous and cannot be interrupted on their own
+thread. For a wall-clock deadline, read in a worker and terminate it when the
+deadline passes. In Node, use `node:worker_threads`; in a browser, use a Web
+Worker the same way.
+
+<CheckedExample id="typescript-deadline-worker" title="deadline-worker.ts" />
+
+<CheckedExample id="typescript-deadline" title="deadline.ts" />
+
+`readWithDeadline` starts `deadline-worker.ts` by its URL. Node 22.18 and
+newer run TypeScript directly; if you compile to JavaScript, point the URL at
+the compiled file.
+
+## Release memory early
+
+Only a `Spec` holds WebAssembly memory, and garbage collection releases it. To
+release it earlier, declare the spec with `using`, or call
+`spec[Symbol.dispose]()`. Calling `free()` is never required.

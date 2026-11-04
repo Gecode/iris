@@ -1,0 +1,13 @@
+E-EXPECTED-VALUE expected an int in -3..3, found '4'
+{
+  origin: 'formats/dimacs-cnf/cases/literal-out-of-range/input.txt',
+  line: 2,
+  column: 3
+}
+{ origin: 'formats/dimacs-cnf/dimacs-cnf.iris', line: 7, column: null }
+repeat [1 of 1] > clause null
+formats/dimacs-cnf/cases/literal-out-of-range/input.txt:2:3: expected an int in -3..3, found '4'
+     2 | 1 4 0
+       |   ^
+while reading: repeat [1 of 1] > clause
+spec: formats/dimacs-cnf/dimacs-cnf.iris:7

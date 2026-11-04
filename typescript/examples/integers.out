@@ -1,0 +1,4 @@
+entry 'big': integer 9007199254740993 is outside the safe range of number; use a bigint accessor
+9007199254740993n
+BigInt64Array(2) [ 1n, -9223372036854775808n ]
+{ big: 9007199254740993n, row: [ 1n, -9223372036854775808n ] }

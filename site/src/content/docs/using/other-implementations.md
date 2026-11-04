@@ -9,7 +9,9 @@ next: false
 Rust is the reference implementation. Use the [CLI](/tools/cli/) to read
 input into JSON or dzn, or embed the [Rust API](/using/rust/) in a host
 program. The [Python package](/using/python/) binds the Rust implementation
-and installs the same `iris` command.
+and installs the same `iris` command. The
+[TypeScript package](/using/typescript/) runs the Rust implementation as
+WebAssembly in Node, browsers and edge runtimes.
 
 ## Planned implementations
 

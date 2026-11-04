@@ -25,6 +25,28 @@ browsers, workerd (Cloudflare Workers) and other edge runtimes; see
 [Runtimes](#runtimes). The package is `private` until npm publication in
 milestone M7.
 
+## Install
+
+npm publication is planned for milestone M7. Once the package is published,
+install it with:
+
+```sh
+npm install gecode-iris
+```
+
+Until then, build it from a checkout as described in [Build](#build). In an npm
+project beside an Iris checkout named `iris`:
+
+```sh
+(cd ../iris/typescript && npm ci && npm run build)
+npm install ../iris/typescript
+```
+
+npm links the checkout's package directory, so rerun the build after updating
+the checkout. The site's
+[TypeScript guide](https://iris.gecode.dev/using/typescript/) shows these
+commands; its build checks that they still appear here.
+
 ## Build
 
 Building needs stable Rust with the `wasm32-unknown-unknown` target,
@@ -295,6 +317,16 @@ also checks that only the test build's module exports `armTrap`.
 and makes instantiation fail to check that a failed replacement never hides a
 call's result or error. Both use the internal `instanceMemory` export of
 `rust/iris-js`, which the published declarations omit.
+[`test/examples.test.ts`](test/examples.test.ts) checks the examples of the
+site's [TypeScript guide](https://iris.gecode.dev/using/typescript/), which
+live in [`examples/`](examples/). It type-checks all of them with
+[`examples/tsconfig.json`](examples/tsconfig.json) against `dist/`, and runs
+each one from the repository root and compares its output with the recorded
+`.out` file. Three examples are only type-checked: `browser.ts` needs a page,
+`worker.ts` needs workerd, and `deadline-worker.ts` runs inside `deadline.ts`.
+After changing an example, record its output from the repository root, for
+example with `node typescript/examples/read.ts > typescript/examples/read.out`.
+The site's build checks that the guide shows every file in `examples/`.
 `npm run test:types` type-checks the sources, the tests and
 [`test/types/api.ts`](test/types/api.ts) against the published declarations in
 `dist/`; each `@ts-expect-error` line in that file must report an error.
@@ -371,3 +403,4 @@ The Rust crate follows the workspace's rustfmt and Clippy settings.
 - `src/transfer.ts` decodes the binary layout documented in
   [`rust/iris-js/src/transfer.rs`](../rust/iris-js/src/transfer.rs).
 - `src/spec.ts`, `src/data.ts` and `src/errors.ts` hold the classes.
+- `examples/` holds the TypeScript guide's examples and their recorded output.
