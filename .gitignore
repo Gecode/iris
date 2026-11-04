@@ -9,6 +9,9 @@ node_modules/
 __pycache__/
 .venv/
 *.egg-info/
+# The extension that maturin develop builds into the source package
+/python/python/gecode_iris/*.so
+/python/python/gecode_iris/*.pyd
 
 # Gradle
 .gradle/

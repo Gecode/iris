@@ -1,0 +1,29 @@
+[package]
+name = "gecode-iris-python"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "MIT"
+description = "Python binding of the Iris reader"
+repository = "https://github.com/Gecode/iris"
+homepage = "https://iris.gecode.dev"
+publish = false
+
+# A workspace of its own, outside rust/; python/README.md explains why.
+[workspace]
+
+[lib]
+name = "_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+gecode-iris = { path = "../rust/gecode-iris" }
+# The abi3 feature sets the minimum Python version for the whole package.
+pyo3 = { version = "0.30.1", features = ["abi3-py310"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+unused_must_use = "deny"
+
+[lints.clippy]
+all = "warn"

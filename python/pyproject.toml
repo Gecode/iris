@@ -1,0 +1,50 @@
+[build-system]
+requires = ["maturin>=1.9.4,<2"]
+build-backend = "maturin"
+
+[project]
+name = "gecode-iris"
+description = "Read text instance files with the Iris language"
+readme = "README.md"
+license = "MIT"
+# Keep equal to pyo3's abi3-py3XX feature in Cargo.toml; tests/test_package.py checks.
+requires-python = ">=3.10"
+dynamic = ["version"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Rust",
+]
+
+[project.urls]
+Homepage = "https://iris.gecode.dev"
+Repository = "https://github.com/Gecode/iris"
+
+[dependency-groups]
+test = ["pytest>=8"]
+
+[tool.maturin]
+python-source = "python"
+module-name = "gecode_iris._native"
+locked = true
+# A development install leaves bytecode beside the sources.
+exclude = ["python/**/__pycache__/**"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--import-mode=importlib"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+src = ["python", "tests"]
+
+[tool.ruff.lint]
+extend-select = ["B", "I", "UP"]
+
+[tool.ty.environment]
+python-version = "3.10"
+
+# ty cannot read the compiled extension, and its stubs arrive in python-002;
+# until then Spec and Data are unchecked and the pure-Python code is checked.
+[tool.ty.analysis]
+allowed-unresolved-imports = ["gecode_iris._native"]
