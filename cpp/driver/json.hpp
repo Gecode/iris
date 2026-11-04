@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iris/data.hpp>
 #include <iris/error.hpp>
 
 #include <stdexcept>
@@ -26,6 +27,14 @@ ParamPairs decode_params(std::string_view json);
 /// Return `text` as a JSON string. Throws std::runtime_error if `text` is not
 /// valid UTF-8.
 std::string quote_json(std::string_view text);
+
+/// Return the canonical spelling of the finite float `x` (Specification
+/// §3.5)
+std::string encode_float(double x);
+
+/// Return the canonical data document for `data`, ending with a newline
+/// (Specification §3.3)
+std::string encode_data(const Data &data);
 
 /// Return the canonical error document for `error`, ending with a newline
 /// (Specification §3.7)

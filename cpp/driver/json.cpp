@@ -1,51 +1,82 @@
 #include "json.hpp"
 
+#include <array>
+#include <charconv>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <set>
+#include <system_error>
 
 namespace iris::driver {
 
 namespace {
 
+/// Return the length of the valid UTF-8 character at position `i` of `text`,
+/// or 0 if there is none
+std::size_t character_length(std::string_view text, std::size_t i) {
+  const auto first = static_cast<unsigned char>(text[i]);
+  if (first < 0x80)
+    return 1;
+  std::uint32_t scalar = 0;
+  std::size_t following = 0;
+  std::uint32_t minimum = 0;
+  if ((first >= 0xc2) && (first <= 0xdf)) {
+    scalar = first & 0x1fU;
+    following = 1;
+    minimum = 0x80;
+  } else if ((first >= 0xe0) && (first <= 0xef)) {
+    scalar = first & 0x0fU;
+    following = 2;
+    minimum = 0x800;
+  } else if ((first >= 0xf0) && (first <= 0xf4)) {
+    scalar = first & 0x07U;
+    following = 3;
+    minimum = 0x10000;
+  } else {
+    return 0;
+  }
+  if (text.size() - i <= following)
+    return 0;
+  for (std::size_t j = 1; j <= following; ++j) {
+    const auto c = static_cast<unsigned char>(text[i + j]);
+    if ((c & 0xc0U) != 0x80U)
+      return 0;
+    scalar = (scalar << 6U) | (c & 0x3fU);
+  }
+  if ((scalar < minimum) || (scalar > 0x10ffff) ||
+      ((scalar >= 0xd800) && (scalar <= 0xdfff)))
+    return 0;
+  return following + 1;
+}
+
 /// Test whether `text` is valid UTF-8
 bool valid_utf8(std::string_view text) {
   for (std::size_t i = 0; i < text.size();) {
-    const auto first = static_cast<unsigned char>(text[i++]);
-    if (first < 0x80)
-      continue;
-    std::uint32_t scalar = 0;
-    std::size_t following = 0;
-    std::uint32_t minimum = 0;
-    if ((first >= 0xc2) && (first <= 0xdf)) {
-      scalar = first & 0x1fU;
-      following = 1;
-      minimum = 0x80;
-    } else if ((first >= 0xe0) && (first <= 0xef)) {
-      scalar = first & 0x0fU;
-      following = 2;
-      minimum = 0x800;
-    } else if ((first >= 0xf0) && (first <= 0xf4)) {
-      scalar = first & 0x07U;
-      following = 3;
-      minimum = 0x10000;
-    } else {
+    const std::size_t n = character_length(text, i);
+    if (n == 0)
       return false;
-    }
-    for (std::size_t j = 0; j < following; ++j) {
-      if (i == text.size())
-        return false;
-      const auto c = static_cast<unsigned char>(text[i++]);
-      if ((c & 0xc0U) != 0x80U)
-        return false;
-      scalar = (scalar << 6U) | (c & 0x3fU);
-    }
-    if ((scalar < minimum) || (scalar > 0x10ffff) ||
-        ((scalar >= 0xd800) && (scalar <= 0xdfff)))
-      return false;
+    i += n;
   }
   return true;
+}
+
+/// Return `text` with each byte that does not start a valid UTF-8 character
+/// replaced by U+FFFD
+std::string repair_utf8(std::string_view text) {
+  std::string out;
+  for (std::size_t i = 0; i < text.size();) {
+    const std::size_t n = character_length(text, i);
+    if (n == 0) {
+      out += "\xef\xbf\xbd";
+      ++i;
+    } else {
+      out += text.substr(i, n);
+      i += n;
+    }
+  }
+  return out;
 }
 
 /// Append the UTF-8 encoding of Unicode scalar value `scalar` to `out`
@@ -219,12 +250,98 @@ std::string encode_location(const std::optional<Location> &location) {
   const auto number = [](const std::optional<std::size_t> &n) {
     return n ? std::to_string(*n) : std::string("null");
   };
-  return "{\"origin\":" + quote_json(location->origin) +
+  return "{\"origin\":" + quote_json(repair_utf8(location->origin)) +
          ",\"line\":" + number(location->line) +
          ",\"column\":" + number(location->column) + "}";
 }
 
+/// Append the JSON of `value` to `out`
+void append_value(std::string &out, const ValueRef &value) {
+  if (value.depth() == 0) {
+    switch (value.type()) {
+    case ValueType::Int:
+      out += std::to_string(value.integer());
+      return;
+    case ValueType::Float:
+      out += encode_float(value.number());
+      return;
+    case ValueType::String:
+      out += quote_json(value.text());
+      return;
+    }
+  }
+  out += '[';
+  for (std::size_t i = 0; i < value.size(); ++i) {
+    if (i > 0)
+      out += ',';
+    append_value(out, value[i]);
+  }
+  out += ']';
+}
+
 } // namespace
+
+std::string encode_float(double x) {
+  if (x == 0)
+    return std::signbit(x) ? "-0.0" : "0";
+  // The shortest digits that round-trip, as d.ddde[-]x
+  std::array<char, 64> buffer{};
+  const auto [end, ec] =
+      std::to_chars(buffer.data(), buffer.data() + buffer.size(), x,
+                    std::chars_format::scientific);
+  if (ec != std::errc())
+    throw std::runtime_error("cannot format a float");
+  const std::string_view text(buffer.data(), end);
+  const std::size_t e = text.find('e');
+  std::string_view mantissa = text.substr(0, e);
+  std::string sign;
+  if (mantissa.starts_with('-')) {
+    sign = "-";
+    mantissa.remove_prefix(1);
+  }
+  std::string digits;
+  for (const char c : mantissa)
+    if (c != '.')
+      digits += c;
+  std::string_view exponent_text = text.substr(e + 1);
+  if (exponent_text.starts_with('+'))
+    exponent_text.remove_prefix(1);
+  int exponent = 0;
+  std::from_chars(exponent_text.data(),
+                  exponent_text.data() + exponent_text.size(), exponent);
+  const auto n = static_cast<int>(digits.size());
+  std::string fixed;
+  if (exponent >= n - 1) {
+    const int zeros = exponent - n + 1;
+    fixed = digits + std::string(static_cast<std::size_t>(zeros), '0');
+  } else if (exponent >= 0) {
+    const auto point = static_cast<std::size_t>(exponent) + 1;
+    fixed = digits.substr(0, point) + "." + digits.substr(point);
+  } else {
+    const int zeros = -exponent - 1;
+    fixed = "0." + std::string(static_cast<std::size_t>(zeros), '0') + digits;
+  }
+  std::string scientific = digits.substr(0, 1);
+  if (n > 1)
+    scientific += "." + digits.substr(1);
+  scientific += "e" + std::to_string(exponent);
+  return sign + (scientific.size() < fixed.size() ? scientific : fixed);
+}
+
+std::string encode_data(const Data &data) {
+  std::string out = R"({"iris":"0.1","entries":[)";
+  for (std::size_t i = 0; i < data.size(); ++i) {
+    const ValueRef value = data.value(i);
+    if (i > 0)
+      out += ',';
+    out += "{\"name\":" + quote_json(data.name(i)) +
+           ",\"type\":" + quote_json(type_name(value.type())) +
+           ",\"depth\":" + std::to_string(value.depth()) + ",\"value\":";
+    append_value(out, value);
+    out += '}';
+  }
+  return out + "]}\n";
+}
 
 ParamPairs decode_params(std::string_view json) {
   return ParamsParser(json).parse();
@@ -254,11 +371,12 @@ std::string quote_json(std::string_view text) {
 std::string encode_error(const Error &error) {
   std::string out =
       "{\"code\":" + quote_json(code_name(error.code())) +
-      ",\"message\":" + quote_json(error.message()) +
+      ",\"message\":" + quote_json(repair_utf8(error.message())) +
       ",\"input_location\":" + encode_location(error.input_location()) +
       ",\"spec_location\":" + encode_location(error.spec_location()) +
       ",\"context\":" +
-      (error.context() ? quote_json(*error.context()) : std::string("null")) +
+      (error.context() ? quote_json(repair_utf8(*error.context()))
+                       : std::string("null")) +
       ",\"record_path\":";
   if (const auto &path = error.record_path()) {
     out += '[';

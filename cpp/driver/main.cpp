@@ -1,6 +1,6 @@
 // The conformance driver of the C++ library: it answers the requests of the
-// conformance runner (conformance/README.md). Only parse is implemented;
-// read, catalog, and dzn fail as host failures until the library reads.
+// conformance runner (conformance/README.md). It implements parse and read;
+// catalog and dzn fail as host failures until the library implements them.
 
 #include "json.hpp"
 
@@ -53,10 +53,22 @@ Response execute_request(const Request &request) {
     return {.output = iris::driver::encode_error(spec.error()),
             .status = language_error_status};
   }
-  if (request.operation != Operation::Parse)
+  if (request.operation == Operation::Parse)
+    return {.output = "{\"iris\":\"0.1\",\"parsed\":true}\n", .status = 0};
+  if (request.operation != Operation::Read)
     throw std::runtime_error(std::string(command_name(request.operation)) +
                              " is not implemented yet");
-  return {.output = "{\"iris\":\"0.1\",\"parsed\":true}\n", .status = 0};
+  iris::Params params;
+  for (const auto &[name, value] : request.params)
+    params.set(name, value);
+  const std::string input = read_binary_file(request.input_path);
+  const auto data = spec->try_read_text(input, request.input_path, params);
+  if (!data) {
+    std::cerr << data.error().what() << '\n';
+    return {.output = iris::driver::encode_error(data.error()),
+            .status = language_error_status};
+  }
+  return {.output = iris::driver::encode_data(*data), .status = 0};
 }
 
 std::string_view command_name(Operation operation) {

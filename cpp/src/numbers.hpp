@@ -84,4 +84,25 @@ std::optional<std::int64_t> parse_int(std::string_view t);
  */
 std::optional<double> parse_float(std::string_view t);
 
+/*
+ * Checked integer arithmetic (Specification §8.4): each function returns
+ * nothing if the exact result is not a signed 64-bit integer
+ */
+
+/// Return `x` + `y`
+std::optional<std::int64_t> checked_add(std::int64_t x, std::int64_t y);
+/// Return `x` - `y`
+std::optional<std::int64_t> checked_sub(std::int64_t x, std::int64_t y);
+/// Return `x` * `y`
+std::optional<std::int64_t> checked_mul(std::int64_t x, std::int64_t y);
+/// Return -`x`
+std::optional<std::int64_t> checked_neg(std::int64_t x);
+/// Return `x` / `y`, truncated towards zero, for `y` other than 0
+std::optional<std::int64_t> checked_div(std::int64_t x, std::int64_t y);
+/// Return the remainder of `x` / `y`, with the sign of `x`, for `y` other
+/// than 0
+std::optional<std::int64_t> checked_rem(std::int64_t x, std::int64_t y);
+/// Return `x` to the power of `y` >= 0
+std::optional<std::int64_t> checked_pow(std::int64_t x, std::int64_t y);
+
 } // namespace iris::detail

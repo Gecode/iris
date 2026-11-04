@@ -31,7 +31,7 @@
  *
  */
 
-// Ported from gecode/instance/spec.cpp at Gecode commit
+// Ported from gecode/instance/spec.cpp and eval.cpp at Gecode commit
 // 5e7bbd5c26b0702c6fd652356b2289da0710ac3c.
 
 #include "numbers.hpp"
@@ -39,6 +39,7 @@
 #include <algorithm>
 #include <charconv>
 #include <cmath>
+#include <limits>
 #include <system_error>
 
 namespace iris::detail {
@@ -96,6 +97,77 @@ std::optional<double> parse_float(std::string_view t) {
   if ((std::fpclassify(v) == FP_SUBNORMAL) || ((v == 0.0) && !is_exact_zero(t)))
     return std::nullopt;
   return v;
+}
+
+namespace {
+
+constexpr std::int64_t int_min = std::numeric_limits<std::int64_t>::min();
+constexpr std::int64_t int_max = std::numeric_limits<std::int64_t>::max();
+
+} // namespace
+
+std::optional<std::int64_t> checked_add(std::int64_t x, std::int64_t y) {
+  if (((y > 0) && (x > int_max - y)) || ((y < 0) && (x < int_min - y)))
+    return std::nullopt;
+  return x + y;
+}
+
+std::optional<std::int64_t> checked_sub(std::int64_t x, std::int64_t y) {
+  if (((y < 0) && (x > int_max + y)) || ((y > 0) && (x < int_min + y)))
+    return std::nullopt;
+  return x - y;
+}
+
+std::optional<std::int64_t> checked_mul(std::int64_t x, std::int64_t y) {
+  // Sign-aware bounds that never negate the minimum
+  bool ok = true;
+  if (x > 0)
+    ok = (y > 0) ? (x <= int_max / y) : (y >= int_min / x);
+  else if (x < 0)
+    ok = (y > 0) ? (x >= int_min / y) : ((y == 0) || (y >= int_max / x));
+  if (!ok)
+    return std::nullopt;
+  return x * y;
+}
+
+std::optional<std::int64_t> checked_neg(std::int64_t x) {
+  if (x == int_min)
+    return std::nullopt;
+  return -x;
+}
+
+std::optional<std::int64_t> checked_div(std::int64_t x, std::int64_t y) {
+  if ((x == int_min) && (y == -1))
+    return std::nullopt;
+  return x / y;
+}
+
+std::optional<std::int64_t> checked_rem(std::int64_t x, std::int64_t y) {
+  if ((x == int_min) && (y == -1))
+    return std::nullopt;
+  return x % y;
+}
+
+std::optional<std::int64_t> checked_pow(std::int64_t x, std::int64_t y) {
+  // Squaring the base only overflows if the result does, as the base is
+  // squared only while bits of the exponent remain
+  std::int64_t r = 1;
+  while (y > 0) {
+    if ((y & 1) != 0) {
+      const std::optional<std::int64_t> p = checked_mul(r, x);
+      if (!p)
+        return std::nullopt;
+      r = *p;
+    }
+    y >>= 1;
+    if (y > 0) {
+      const std::optional<std::int64_t> s = checked_mul(x, x);
+      if (!s)
+        return std::nullopt;
+      x = *s;
+    }
+  }
+  return r;
 }
 
 } // namespace iris::detail

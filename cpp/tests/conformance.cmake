@@ -1,12 +1,20 @@
 # Run the conformance cases of one operation through a driver.
 #
 #   cmake -DDRIVER=... -DREPOSITORY=... -DCARGO=... -DOPERATION=parse
-#         -P conformance.cmake
+#         [-DDEFERRED=FILE] [-DDEFERRED_TIMEOUT=SECONDS] -P conformance.cmake
 #
 # Discovers the cases in conformance/cases/0.1 and formats as the runner
 # does, selects those whose case.toml names OPERATION (read without one),
 # and runs them with the runner from rust/. Fails unless every selected
-# case passes.
+# case passes, except the cases listed in DEFERRED, which must fail.
+#
+# Each line of DEFERRED is a repository-relative case path and the section
+# of chapter 10 of the Specification whose work budget the case needs, such
+# as `conformance/cases/0.1/pinned/effort-sum-over 10.3`. Blank lines and
+# lines starting with `#` are ignored. A listed case must be a selected case
+# whose error.json has the code E-BUDGET. Listed cases run with the runner
+# timeout DEFERRED_TIMEOUT (2 seconds by default), so that a case that runs
+# away without its budget stops early.
 cmake_minimum_required(VERSION 3.28)
 
 foreach(variable IN ITEMS DRIVER REPOSITORY CARGO OPERATION)
@@ -14,7 +22,13 @@ foreach(variable IN ITEMS DRIVER REPOSITORY CARGO OPERATION)
     message(FATAL_ERROR "conformance.cmake needs -D${variable}=...")
   endif()
 endforeach()
+if(NOT DEFINED DEFERRED_TIMEOUT)
+  set(DEFERRED_TIMEOUT 2)
+endif()
 
+# The runner shows canonical absolute paths, so the cases are found below
+# the canonical repository path too.
+file(REAL_PATH "${REPOSITORY}" REPOSITORY)
 set(roots "${REPOSITORY}/conformance/cases/0.1" "${REPOSITORY}/formats")
 # The runner gets at most this many case directories per command line, to
 # stay below the command-length limit of Windows.
@@ -60,11 +74,16 @@ function(case_operation case result)
   set(${result} "${operation}" PARENT_SCOPE)
 endfunction()
 
+# The selected cases by repository-relative path, which names them in the
+# deferred list and in messages
 set(selected "")
 foreach(case IN LISTS cases)
+  if(case MATCHES ";")
+    message(FATAL_ERROR "a case path contains ';': ${case}")
+  endif()
   case_operation("${case}" operation)
   if(operation STREQUAL OPERATION)
-    file(RELATIVE_PATH path "${REPOSITORY}/rust" "${case}")
+    file(RELATIVE_PATH path "${REPOSITORY}" "${case}")
     list(APPEND selected "${path}")
   endif()
 endforeach()
@@ -74,42 +93,179 @@ if(count EQUAL 0)
   message(FATAL_ERROR "no ${OPERATION} cases among ${discovered} discovered")
 endif()
 
+# The deferred cases and their rules, in list order
+set(deferred "")
+set(deferred_rules "")
+if(DEFINED DEFERRED AND NOT DEFERRED STREQUAL "")
+  file(READ "${DEFERRED}" content)
+  if(content MATCHES ";")
+    message(FATAL_ERROR "${DEFERRED}: the list cannot contain ';'")
+  endif()
+  string(REPLACE "\r" "" content "${content}")
+  string(REPLACE "\n" ";" lines "${content}")
+  set(number 0)
+  foreach(line IN LISTS lines)
+    math(EXPR number "${number} + 1")
+    if(line MATCHES "^[ \t]*(#.*)?$")
+      continue()
+    endif()
+    if(NOT line MATCHES "^([^ \t#]+)[ \t]+(10\\.[1-6])[ \t]*$")
+      message(FATAL_ERROR "${DEFERRED}:${number}: expected a case path and "
+        "a rule from 10.1 to 10.6, found: ${line}")
+    endif()
+    set(path "${CMAKE_MATCH_1}")
+    set(rule "${CMAKE_MATCH_2}")
+    if(path IN_LIST deferred)
+      message(FATAL_ERROR "${DEFERRED}:${number}: ${path} is listed twice")
+    endif()
+    if(NOT path IN_LIST selected)
+      message(FATAL_ERROR "${DEFERRED}:${number}: ${path} is not a "
+        "${OPERATION} case")
+    endif()
+    set(code "")
+    if(EXISTS "${REPOSITORY}/${path}/error.json")
+      file(READ "${REPOSITORY}/${path}/error.json" document)
+      string(JSON code ERROR_VARIABLE json_error GET "${document}" code)
+    endif()
+    if(NOT code STREQUAL "E-BUDGET")
+      message(FATAL_ERROR "${DEFERRED}:${number}: ${path} does not expect "
+        "E-BUDGET, so no work budget makes it pass")
+    endif()
+    list(APPEND deferred "${path}")
+    list(APPEND deferred_rules "${rule}")
+  endforeach()
+endif()
+
+set(regular "")
+foreach(path IN LISTS selected)
+  if(NOT path IN_LIST deferred)
+    list(APPEND regular "${path}")
+  endif()
+endforeach()
+set(listed ${deferred})
+list(SORT listed)
+
 set(statuses total pass xfail fail xpass unrepresentable)
 foreach(status IN LISTS statuses)
   set(${status} 0)
 endforeach()
-set(failed_batches 0)
-foreach(start RANGE 0 ${count} ${batch_size})
-  if(start EQUAL count)
-    break()
-  endif()
-  list(SUBLIST selected ${start} ${batch_size} batch)
-  execute_process(
-    COMMAND "${CARGO}" run --quiet --locked -p iris-conformance --
-      run --driver "\"${DRIVER}\"" --version 0.1 ${batch}
-    WORKING_DIRECTORY "${REPOSITORY}/rust"
-    RESULT_VARIABLE exit_status
-    OUTPUT_VARIABLE output
-    ERROR_VARIABLE errors)
-  message("${output}${errors}")
-  if(NOT exit_status EQUAL 0)
-    math(EXPR failed_batches "${failed_batches} + 1")
-  endif()
-  if(output MATCHES "Summary: total=([0-9]+) pass=([0-9]+) xfail=([0-9]+) fail=([0-9]+) xpass=([0-9]+) unrepresentable=([0-9]+)")
-    set(group 1)
-    foreach(status IN LISTS statuses)
-      math(EXPR ${status} "${${status}} + ${CMAKE_MATCH_${group}}")
-      math(EXPR group "${group} + 1")
+# The status of each case run, by repository-relative path
+set(result_paths "")
+set(result_statuses "")
+set(problems "")
+
+# Run the cases `paths` in batches, with the runner options `options`.
+# Failed cases are tolerated, and checked afterwards, only if `may_fail`.
+function(run_batches paths may_fail options)
+  list(LENGTH paths n)
+  foreach(start RANGE 0 ${n} ${batch_size})
+    if(start EQUAL n)
+      break()
+    endif()
+    list(SUBLIST paths ${start} ${batch_size} batch)
+    list(TRANSFORM batch PREPEND "${REPOSITORY}/")
+    execute_process(
+      COMMAND "${CARGO}" run --quiet --locked -p iris-conformance --
+        run --driver "\"${DRIVER}\"" --version 0.1 ${options} ${batch}
+      WORKING_DIRECTORY "${REPOSITORY}/rust"
+      RESULT_VARIABLE exit_status
+      OUTPUT_VARIABLE output
+      ERROR_VARIABLE errors)
+    message("${output}${errors}")
+    # Status 1 reports failed cases, which are checked below
+    if(NOT exit_status EQUAL 0 AND NOT exit_status EQUAL 1)
+      message(FATAL_ERROR "the runner exited with status ${exit_status}")
+    endif()
+    if(exit_status EQUAL 1 AND NOT may_fail)
+      list(APPEND problems "the runner reported failed cases")
+    endif()
+    if(output MATCHES "Summary: total=([0-9]+) pass=([0-9]+) xfail=([0-9]+) fail=([0-9]+) xpass=([0-9]+) unrepresentable=([0-9]+)")
+      set(group 1)
+      foreach(status IN LISTS statuses)
+        math(EXPR ${status} "${${status}} + ${CMAKE_MATCH_${group}}")
+        set(${status} "${${status}}" PARENT_SCOPE)
+        math(EXPR group "${group} + 1")
+      endforeach()
+    else()
+      message(FATAL_ERROR "the runner printed no summary")
+    endif()
+    # A path with ';' splits its line, so the parts fail to match below.
+    string(REGEX MATCHALL "\n(PASS|FAIL|XFAIL|XPASS|UNREPRESENTABLE) [^\n]*"
+      lines "\n${output}")
+    foreach(line IN LISTS lines)
+      if(NOT line MATCHES "^\n(PASS|FAIL|XFAIL|XPASS|UNREPRESENTABLE) (.+)$")
+        message(FATAL_ERROR "unexpected status line: ${line}")
+      endif()
+      set(status "${CMAKE_MATCH_1}")
+      string(REGEX REPLACE "^//\\?/" "" path "${CMAKE_MATCH_2}")
+      string(LENGTH "${REPOSITORY}/" prefix_length)
+      string(SUBSTRING "${path}" 0 ${prefix_length} prefix)
+      if(NOT prefix STREQUAL "${REPOSITORY}/")
+        message(FATAL_ERROR "status line for a path outside the repository: "
+          "${path}")
+      endif()
+      string(SUBSTRING "${path}" ${prefix_length} -1 path)
+      if(NOT path IN_LIST paths)
+        message(FATAL_ERROR "status line for a case that was not run: ${path}")
+      endif()
+      if(path IN_LIST result_paths)
+        message(FATAL_ERROR "two status lines for ${path}")
+      endif()
+      list(APPEND result_paths "${path}")
+      list(APPEND result_statuses "${status}")
     endforeach()
+  endforeach()
+  set(result_paths "${result_paths}" PARENT_SCOPE)
+  set(result_statuses "${result_statuses}" PARENT_SCOPE)
+  set(problems "${problems}" PARENT_SCOPE)
+endfunction()
+
+run_batches("${regular}" FALSE "")
+run_batches("${listed}" TRUE "--timeout;${DEFERRED_TIMEOUT}")
+
+set(passed 0)
+foreach(path IN LISTS selected)
+  list(FIND result_paths "${path}" at)
+  if(at EQUAL -1)
+    list(APPEND problems "no status for ${path}")
+    continue()
+  endif()
+  list(GET result_statuses ${at} status)
+  if(path IN_LIST deferred)
+    if(status STREQUAL "PASS")
+      list(APPEND problems "${path} passes, so remove it from ${DEFERRED}")
+    endif()
+  elseif(status STREQUAL "PASS")
+    math(EXPR passed "${passed} + 1")
   else()
-    math(EXPR failed_batches "${failed_batches} + 1")
+    list(APPEND problems "${path}: ${status}, and it is not in the deferred list")
   endif()
 endforeach()
 
+list(LENGTH deferred deferred_count)
 message("Selected ${count} ${OPERATION} cases from ${discovered} discovered in "
   "conformance/cases/0.1 and formats")
+message("Passed ${passed}; deferred ${deferred_count}")
+foreach(rule IN ITEMS 10.1 10.2 10.3 10.4 10.5 10.6)
+  set(n 0)
+  foreach(r IN LISTS deferred_rules)
+    if(r STREQUAL rule)
+      math(EXPR n "${n} + 1")
+    endif()
+  endforeach()
+  if(n GREATER 0)
+    message("  ${rule}: ${n}")
+  endif()
+endforeach()
+foreach(path rule IN ZIP_LISTS deferred deferred_rules)
+  message("  deferred ${path} (${rule})")
+endforeach()
 message("Summary of all batches: total=${total} pass=${pass} xfail=${xfail} "
   "fail=${fail} xpass=${xpass} unrepresentable=${unrepresentable}")
-if(NOT failed_batches EQUAL 0 OR NOT total EQUAL count OR NOT pass EQUAL count)
-  message(FATAL_ERROR "${OPERATION} conformance failed")
+if(NOT total EQUAL count)
+  list(APPEND problems "the runner ran ${total} cases, not ${count}")
+endif()
+if(problems)
+  list(JOIN problems "\n  " text)
+  message(FATAL_ERROR "${OPERATION} conformance failed:\n  ${text}")
 endif()

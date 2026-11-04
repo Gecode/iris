@@ -41,6 +41,8 @@
 
 #pragma once
 
+#include <iris/data.hpp>
+
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -61,8 +63,7 @@ template <class T, class... Args> std::unique_ptr<T> make_node(Args &&...args) {
   return std::make_unique<T>(std::forward<Args>(args)...);
 }
 
-/// Type of the leaves of a value
-enum class ValueType { Int, Float, String };
+using iris::ValueType;
 
 struct Stmt;
 

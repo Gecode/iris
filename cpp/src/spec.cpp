@@ -39,11 +39,17 @@
 #include "ast.hpp"
 #include "lexer.hpp"
 #include "parser.hpp"
+#include "reader.hpp"
 #include "text.hpp"
+#include "value.hpp"
 
 #include <algorithm>
+#include <cerrno>
 #include <cstddef>
+#include <fstream>
+#include <iterator>
 #include <optional>
+#include <system_error>
 #include <utility>
 
 namespace iris {
@@ -66,6 +72,20 @@ void check_utf8(std::string_view text, const std::string &origin) {
                        .line = 1 + static_cast<std::size_t>(
                                        std::ranges::count(before, '\n')),
                        .column = 1 + *bad - line_start});
+}
+
+/// Return the bytes of the file at `path`; throws std::system_error if it
+/// cannot be read
+std::string read_file(const std::filesystem::path &path) {
+  std::ifstream file(path, std::ios::binary);
+  if (!file)
+    throw std::system_error(errno, std::generic_category(),
+                            "cannot open " + path.string());
+  std::string bytes{std::istreambuf_iterator<char>(file), {}};
+  if (file.bad())
+    throw std::system_error(errno, std::generic_category(),
+                            "cannot read " + path.string());
+  return bytes;
 }
 
 } // namespace
@@ -94,5 +114,30 @@ std::expected<Spec, Error> Spec::try_parse(std::string_view text,
 }
 
 const std::string &Spec::name() const { return impl_->name; }
+
+Data Spec::read(const std::filesystem::path &path, const Params &params) const {
+  return read_text(read_file(path), path.string(), params);
+}
+
+Data Spec::read_text(std::string_view text, std::string origin,
+                     const Params &params) const {
+  return Data(std::make_shared<const detail::DataImpl>(
+      detail::read(*impl_, text, std::move(origin), *params.impl_)));
+}
+
+std::expected<Data, Error> Spec::try_read(const std::filesystem::path &path,
+                                          const Params &params) const {
+  return try_read_text(read_file(path), path.string(), params);
+}
+
+std::expected<Data, Error> Spec::try_read_text(std::string_view text,
+                                               std::string origin,
+                                               const Params &params) const {
+  try {
+    return read_text(text, std::move(origin), params);
+  } catch (const Error &error) {
+    return std::unexpected(error);
+  }
+}
 
 } // namespace iris

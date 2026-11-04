@@ -30,10 +30,13 @@ add_library(iris)
 add_library(iris::iris ALIAS iris)
 target_sources(iris
   PRIVATE
+    src/data.cpp
     src/error.cpp
+    src/eval.cpp
     src/lexer.cpp
     src/numbers.cpp
     src/parser.cpp
+    src/reader.cpp
     src/resolve.cpp
     src/spec.cpp
     src/text.cpp
@@ -41,8 +44,10 @@ target_sources(iris
     FILE_SET HEADERS
     BASE_DIRS include
     FILES
+      include/iris/data.hpp
       include/iris/error.hpp
       include/iris/iris.hpp
+      include/iris/params.hpp
       include/iris/spec.hpp)
 target_compile_features(iris PUBLIC cxx_std_23)
 set_target_properties(iris PROPERTIES CXX_EXTENSIONS OFF)
