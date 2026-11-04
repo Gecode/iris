@@ -1,0 +1,20 @@
+[versions]
+spotless = "8.11.0"
+google-java-format = "2.0.0"
+errorprone = "2.52.0"
+errorprone-plugin = "5.2.0"
+nullaway = "0.14.3"
+nullaway-plugin = "3.3.0"
+jspecify = "1.0.1"
+junit = "5.14.4"
+
+[libraries]
+spotless-plugin = { module = "com.diffplug.spotless:spotless-plugin-gradle", version.ref = "spotless" }
+errorprone-plugin = { module = "net.ltgt.gradle:gradle-errorprone-plugin", version.ref = "errorprone-plugin" }
+nullaway-plugin = { module = "net.ltgt.gradle:gradle-nullaway-plugin", version.ref = "nullaway-plugin" }
+errorprone-core = { module = "com.google.errorprone:error_prone_core", version.ref = "errorprone" }
+nullaway = { module = "com.uber.nullaway:nullaway", version.ref = "nullaway" }
+jspecify = { module = "org.jspecify:jspecify", version.ref = "jspecify" }
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+junit-launcher = { module = "org.junit.platform:junit-platform-launcher" }
