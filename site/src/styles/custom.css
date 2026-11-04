@@ -191,6 +191,17 @@
   .iris-specification .expressive-code { @apply text-sm; }
   .iris-specification .expressive-code pre { @apply [contain:inline-size]; }
   .iris-specification .expressive-code code { overflow-wrap: normal; }
+  .iris-python-api { @apply leading-7; }
+  .iris-python-api :is(h2, h3) { @apply scroll-mt-24 font-mono font-medium leading-tight tracking-normal wrap-anywhere; }
+  .iris-python-api h2 { @apply mt-10 border-t border-iris-border pt-6 text-2xl; }
+  .iris-python-api h3 { @apply mt-8 text-lg; }
+  .iris-python-api .api-signature { @apply mt-3 overflow-x-auto border-s-3 border-iris-blue bg-iris-surface px-4 py-3 font-mono text-sm leading-6 text-iris-ink; }
+  .iris-python-api .api-signature :is(.def, .bp) { @apply text-iris-blue; }
+  .iris-python-api .api-signature .name { @apply font-semibold; }
+  .iris-python-api .signature.multiline :is(.param, .return-annotation) { @apply block; }
+  .iris-python-api .signature.multiline .param { @apply ps-6; }
+  .iris-python-api .docstring { @apply mt-3; }
+  .iris-python-api [id]:target { @apply outline-2 outline-offset-4 outline-iris-orange; }
   .expressive-code pre:focus-visible { outline-offset: -4px; }
 
   /* The stock page frame still owns offsets, the popover, and focus trapping. */

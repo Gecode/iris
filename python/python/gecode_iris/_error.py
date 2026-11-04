@@ -19,11 +19,17 @@ class Error(Exception):
     __module__ = "gecode_iris"
 
     code: str
+    """The stable error code, such as ``E-CHECK-FAILED``."""
     message: str
+    """The message, without location or excerpt."""
     line: int | None
+    """The line of the location, counting from 1."""
     column: int | None
+    """The byte column of the location, counting from 1."""
     path: tuple[int, ...] | None
+    """The record path of a failed check over records."""
     origin: str | None
+    """The input or reader spec origin of the location, such as its path."""
 
     def __init__(
         self,

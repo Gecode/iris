@@ -1,0 +1,7 @@
+E-EXPECTED-VALUE formats/dimacs-cnf/cases/literal-out-of-range/input.txt 2 3
+expected an int in -3..3, found '4'
+formats/dimacs-cnf/cases/literal-out-of-range/input.txt:2:3: expected an int in -3..3, found '4'
+     2 | 1 4 0
+       |   ^
+while reading: repeat [1 of 1] > clause
+spec: formats/dimacs-cnf/dimacs-cnf.iris:7

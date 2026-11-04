@@ -8,7 +8,10 @@ from gecode_iris._data import Entry, Value
 
 @final
 class Spec:
-    """A parsed and checked reader spec."""
+    """A parsed and checked reader spec.
+
+    One ``Spec`` can read any number of inputs, and threads can share it.
+    """
 
     @staticmethod
     def parse(text: str | bytes | bytearray, origin: str = "<string>") -> Spec:
@@ -38,7 +41,12 @@ class Spec:
 
 @final
 class Data:
-    """The data from one read or catalog."""
+    """The data from one read or catalog.
+
+    ``data[name]`` returns an entry's value and ``name in data`` tests for an
+    entry. Values are copied into Python objects on each access: an ``int``,
+    ``float`` or ``str`` at depth 0, and nested lists at greater depths.
+    """
 
     @property
     def entries(self) -> tuple[Entry, ...]:

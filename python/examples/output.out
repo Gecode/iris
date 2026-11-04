@@ -1,0 +1,5 @@
+vars = 3;
+clauses = 3;
+% clause: array[int] of tuple(array[int] of int)
+clause = [([1, -2],), ([2, 3, -1],), ([-3],)];
+{"iris":"0.1","entries":[{"name":"vars","type":"int","depth":0,"value":3},{"name":"clauses","type":"int","depth":0,"value":3},{"name":"clause","type":"int","depth":2,"value":[[1,-2],[2,3,-1],[-3]]}]}

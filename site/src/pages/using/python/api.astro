@@ -1,0 +1,17 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+// Generated during every build by scripts/prepare-python-api.mjs.
+import reference from '../../../generated/python-api.json';
+---
+<StarlightPage hasSidebar={true} headings={reference.headings} frontmatter={{
+  title: 'Python API reference',
+  description: 'Every public class, method and attribute of the gecode_iris Python package.',
+  editUrl: false, prev: false, next: false,
+}}>
+  <p class="max-w-[68ch]">
+    The public API of the <code>gecode_iris</code> package. pdoc {reference.pdoc} generates
+    it during each site build from the package's type stubs and docstrings.
+    The <a href="/using/python/">Python guide</a> shows the API in use.
+  </p>
+  <div class="iris-python-api min-w-0 max-w-[76ch]" data-python-api set:html={reference.html} />
+</StarlightPage>

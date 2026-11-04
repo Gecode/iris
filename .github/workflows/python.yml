@@ -36,12 +36,12 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: astral-sh/setup-uv@v7
-      # ty resolves pytest from .venv, and pyright and mypy need the package.
+      # ty resolves pytest and pdoc from .venv, and pyright and mypy need the package.
       - name: Set up development environment
         run: |
           uv venv --python 3.15
           uvx maturin@1.16.0 develop --uv
-          uv pip install --group test --group lint
+          uv pip install --group test --group lint --group docs
       - name: Check Python formatting
         run: uv run --no-sync ruff format --check
       - name: Lint Python
@@ -226,7 +226,7 @@ jobs:
           fi
           uv venv --python "${{ matrix.python }}" "$env"
           uv pip install --python "$scripts/python$exe" ../dist/*.whl --group test
-          { echo "PY=$scripts/python$exe"; echo "IRIS=$scripts/iris$exe"; } >> "$GITHUB_ENV"
+          { echo "PY=$scripts/python$exe"; echo "CLI=$scripts/iris$exe"; } >> "$GITHUB_ENV"
       - name: Run pytest
         if: ${{ !matrix.alpine }}
         working-directory: python
@@ -240,14 +240,14 @@ jobs:
       - name: Run console script
         if: ${{ !matrix.alpine }}
         run: |
-          "$IRIS" --version
-          "$IRIS" check formats/dimacs-cnf/dimacs-cnf.iris
+          "$CLI" --version
+          "$CLI" check formats/dimacs-cnf/dimacs-cnf.iris
       - name: Run conformance cases
         if: ${{ matrix.conformance && matrix.python == '3.15' }}
         run: |
           driver="\"$PY\" -I \"$GITHUB_WORKSPACE/python/tests/conformance_driver.py\""
-          "$IRIS" conformance "$driver" conformance/cases/0.1
-          "$IRIS" conformance "$driver" formats
+          "$CLI" conformance "$driver" conformance/cases/0.1
+          "$CLI" conformance "$driver" formats
       # JavaScript actions do not run in Alpine containers, so start one directly.
       - name: Test wheel in Alpine
         if: ${{ matrix.alpine }}

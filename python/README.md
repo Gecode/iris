@@ -17,6 +17,28 @@ data.array("duration")  # numpy.ndarray if numpy is installed and rectangular
 print(data.to_json())
 ```
 
+## Install
+
+PyPI publication is planned for milestone M7. Once the package is
+published, add it to a uv project, install it into an existing environment,
+or run the `iris` command without installing it:
+
+```sh
+uv add gecode-iris
+uv pip install gecode-iris
+uvx --from gecode-iris iris --help
+```
+
+Until then, build it from a checkout, which needs the Rust toolchain. In a uv
+project beside an Iris checkout named `iris`:
+
+```sh
+uv add ../iris/python
+```
+
+The site's [Python guide](https://iris.gecode.dev/using/python/) shows these
+commands; its build checks that they still appear here.
+
 ## API
 
 - `Spec.parse(text, origin="<string>")` parses a reader spec. A `str` is
@@ -139,7 +161,8 @@ The tools are uv for environments, interpreters, dependencies and running
 tools; maturin 1.16.0, through `uvx`, for the extension; ruff for linting and
 formatting; ty for type checking; and pyright and mypy for the stub checks.
 The `lint` dependency group in `pyproject.toml` pins the exact versions of
-ruff, ty, pyright and mypy, and CI installs the same group. ruff and ty are
+ruff, ty, pyright and mypy, and CI installs the same group. The `docs` group
+pins pdoc for the [API reference](#api-reference). ruff and ty are
 configured in `pyproject.toml`. The Rust crate needs the stable toolchain that `rust/`
 uses.
 
@@ -148,7 +171,7 @@ Set up a development environment in `python/`:
 ```sh
 uv venv --python 3.15
 uvx maturin@1.16.0 develop --uv
-uv pip install --group test --group lint
+uv pip install --group test --group lint --group docs
 uv run --no-sync pytest
 ```
 
@@ -159,7 +182,7 @@ conformance run. `--no-sync` keeps `uv run` from creating a `uv.lock` and
 reinstalling the package over the development build.
 
 Lint, format and type-check in `python/`, after the setup above, since ty
-resolves `pytest` from `.venv`:
+resolves `pytest` and `pdoc` from `.venv`:
 
 ```sh
 uv run --no-sync ruff format --check
@@ -223,6 +246,49 @@ uv pip install --python "$TMPDIR/iris-py3.10/bin/python" target/wheels/*.whl --g
 `tests/test_cli.py` then runs the `iris` script that the wheel installed into
 that environment.
 
+## Guide examples
+
+`examples/` holds the examples of the site's
+[Python guide](https://iris.gecode.dev/using/python/), each with its recorded
+standard output in a `.out` file. `tests/test_examples.py` runs every `.py`
+example with the installed package, and every `.sh` example, which is one
+`iris` command line, with the installed console script. Both run from the
+repository root, since the examples read files under `formats/`, and the test
+compares their output with the recording. An example whose first line is
+`# Needs numpy.` runs only when numpy can be imported, so run pytest with and
+without numpy as above.
+
+The site renders each file with its recorded output, and its build fails when
+a file in `examples/` does not appear in the guide or a `.sh` recording
+differs from the Rust CLI. After changing an example, run it from the
+repository root and update its `.out` file.
+
+## API reference
+
+The site hosts an API reference at
+[`/using/python/api/`](https://iris.gecode.dev/using/python/api/), generated
+from the stubs and docstrings by pdoc, which the `docs` group pins. pdoc was
+chosen over mkdocstrings because it is a library without a site generator:
+`docs/reference.py` renders the package into an HTML fragment with the
+templates in `docs/templates/`, and the Astro site places the fragment in a
+Starlight page with its own outline and Tailwind styles. mkdocstrings runs
+inside MkDocs, a second site with its own theme, navigation and build.
+
+pdoc imports the package and reads a `.pyi` stub only for the module it
+documents. `Spec` and `Data` come from `_native` but are documented in the
+package, so `reference.py` applies `_native.pyi` to them itself. It also names
+the `Value` and `NDArray` aliases in signatures instead of expanding them, and
+reads `Entry` and `Error` from the modules that define them, since the
+package sets their `__module__` to `gecode_iris`. The output does not depend
+on whether numpy is installed.
+
+`npm run build` in `site/` runs `site/scripts/prepare-python-api.mjs`, which
+builds a wheel with `uvx maturin@1.16.0 build`, installs it with the `docs`
+group into a temporary Python 3.15 environment, and runs `reference.py`. The
+output, `site/src/generated/python-api.json`, is an ignored build output. To
+render it from the development environment, run
+`uv run --no-sync python docs/reference.py OUTPUT.json` in `python/`.
+
 ## Conformance
 
 `tests/conformance_driver.py` is the conformance driver. It speaks the
@@ -260,10 +326,10 @@ uv build --wheel --out-dir "$TMPDIR/iris-sdist" dist/*.tar.gz
 changes to `python/`, `rust/`, `conformance/`, `formats/` and the workflow
 itself. It publishes nothing; publishing is milestone M7.
 
-- `lint` runs the formatter, linter and type checks above, the pyright and
-  mypy stub checks, and `cargo fmt` and `clippy` for the crate. For
-  `data_misuse.py` it compares the lines each checker reports with the lines
-  marked `# error:`.
+- `lint` installs the `test`, `lint` and `docs` groups and runs the
+  formatter, linter and type checks above, the pyright and mypy stub checks,
+  and `cargo fmt` and `clippy` for the crate. For `data_misuse.py` it
+  compares the lines each checker reports with the lines marked `# error:`.
 - `wheel` builds one abi3 wheel per platform with `PyO3/maturin-action` and
   maturin 1.16.0, using
   the committed `Cargo.lock`: manylinux and musllinux for x86_64 and aarch64,
@@ -275,3 +341,6 @@ itself. It publishes nothing; publishing is milestone M7.
   musllinux wheels run in an Alpine container. On Linux x86_64, macOS arm64
   and Windows, Python 3.15 also runs the conformance suite through the
   installed `iris conformance`, against `conformance/cases/0.1` and `formats`.
+
+The [site workflow](../.github/workflows/site.yml) also runs on changes to
+`python/`, since its build renders the API reference from the package.

@@ -1,18 +1,18 @@
 ---
 title: Other implementations
-description: The status of the Python binding, the C++ and Java implementations, and Gecode.
+description: The status of the C++ and Java implementations and of Gecode.
 editUrl: false
 prev: false
 next: false
 ---
 
-Rust is the reference implementation and the only one available today. Use
-the [CLI](/tools/cli/) to read input into JSON or dzn, or embed the
-[Rust API](/using/rust/) in a host program.
+Rust is the reference implementation. Use the [CLI](/tools/cli/) to read
+input into JSON or dzn, or embed the [Rust API](/using/rust/) in a host
+program. The [Python package](/using/python/) binds the Rust implementation
+and installs the same `iris` command.
 
 ## Planned implementations
 
-- **Python:** a binding to the Rust crate.
 - **C++:** a native implementation.
 - **Java and Kotlin:** a native Java implementation with a Kotlin module.
 

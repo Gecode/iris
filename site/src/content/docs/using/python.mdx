@@ -1,0 +1,116 @@
+---
+title: Python
+description: Read input with a reader spec from Python, access typed data, and run the iris command from the gecode-iris package.
+editUrl: false
+prev: false
+next: false
+---
+import CheckedExample from '../../../components/docs/CheckedExample.astro';
+
+The `gecode-iris` package binds the Rust reference implementation of Iris;
+import it as `gecode_iris`. Parsing, reading, errors, JSON and dzn all come
+from the Rust reader, so Python reads every input exactly as the
+[CLI](/tools/cli/) does. The package needs Python 3.10 or newer and includes
+type stubs. The [Python API reference](/using/python/api/) lists every public
+class and method.
+
+## Install the package
+
+PyPI publication is planned; the package is not published yet. Once it is, add
+it to a uv project, install it into an existing environment, or run the `iris`
+command without installing it:
+
+<CheckedExample id="python-install" />
+
+Until then, build the package from an Iris checkout, which needs the Rust
+toolchain. With your uv project beside a checkout named `iris`, run:
+
+<CheckedExample id="python-install-checkout" />
+
+Package versions and language versions are separate; the current package is
+0.1.0 and implements Iris 0.1. numpy is optional and never installed with the
+package.
+
+## Parse a reader spec and read input
+
+The examples on this page are in
+[`python/examples`](https://github.com/Gecode/iris/tree/main/python/examples),
+and a test runs each one against the built package and compares its output.
+They read files from the format library, so run them from the root of an
+Iris checkout.
+
+<CheckedExample id="python-read" title="read.py" />
+
+`Spec.parse` parses and checks a reader spec given as `str` or `bytes`. The
+declaration reads `n`, then a row of `n` integers. `spec.read` reads input
+bytes; the origin names, such as `example.iris` and `input.txt`, appear in
+error messages. A `Spec` can read any number of inputs, and threads can share
+it.
+
+## Read files, instances and parameters
+
+`Spec.load` reads a reader spec file. `spec.read` and `spec.catalog` take a
+path as `str` or `os.PathLike`; a `str` is always a path, never input text.
+
+<CheckedExample id="python-files" title="files.py" />
+
+`spec.catalog` lists the instances in a file as data. The `instance` parameter
+selects one instance during a read, by name or by its number, counting from
+1. Parameter values are strings, as the
+[Specification](/specification/0.1/09-params-and-instances/) defines; pass
+`{"instance": "2"}`, not `{"instance": 2}`.
+
+## Access data
+
+`data.entries` lists the entries in the order the reader spec defines them.
+`data[name]` returns an entry's value as Python objects: an `int`, `float` or
+`str` at depth 0, and nested lists at greater depths. Each access copies the
+value.
+
+<CheckedExample id="python-access" title="access.py" />
+
+`data.ints(name, *path)` returns the integer row that the index path selects.
+A negative index counts from the end of its row, as in a list. `data.to_dict()`
+returns every entry. An unknown name raises `KeyError`, an index outside its
+row raises `IndexError`, and a selection of the wrong type raises
+`TypeError`.
+
+When numpy is installed and an array is rectangular, `data.array(name, *path)`
+returns a `numpy.ndarray` of `int64`, `float64` or `str_` elements, with one
+dimension per level. Otherwise it returns the same nested lists as
+`data[name]`, so check the type before using numpy methods:
+
+<CheckedExample id="python-arrays" title="arrays.py" />
+
+## JSON and dzn
+
+`data.to_json()` returns the canonical JSON document and `data.to_dzn()` the
+MiniZinc data of the [dzn appendix](/specification/0.1/appendix-b-dzn/). Both
+end in a newline.
+
+<CheckedExample id="python-output" title="output.py" />
+
+## Handle errors
+
+A language error raises `gecode_iris.Error`. Its `code` is the stable
+[error code](/specification/0.1/errors/), and `line`, `column` and `origin` give
+the input location when there is one, and otherwise the reader spec location.
+Any of them can be `None`. `path` is the record path of a failed check over
+records. `str(error)` is the same diagnostic that the CLI prints, and
+`error.to_json()` returns the canonical error document.
+
+<CheckedExample id="python-errors" title="errors.py" />
+
+Host failures raise built-in exceptions and have no error code: a missing file
+raises `FileNotFoundError`, and other file access failures raise other
+`OSError` subclasses. Python types that the API does not accept, such as an
+integer parameter value, raise `TypeError`.
+
+## The iris command
+
+The package installs the `iris` command. It runs the same command line as the
+Rust `iris` binary, with the same options, output and exit statuses, so the
+[CLI guide](/tools/cli/) applies unchanged. In an environment with the package
+installed, from the root of an Iris checkout:
+
+<CheckedExample id="python-cli" />

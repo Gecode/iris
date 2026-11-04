@@ -7,6 +7,7 @@ on:
       - 'brand/**'
       - 'formats/**'
       - 'rust/**'
+      - 'python/**'
       - 'spec/**'
       - '.editorconfig'
       - 'LICENSE'
@@ -20,6 +21,7 @@ on:
       - 'brand/**'
       - 'formats/**'
       - 'rust/**'
+      - 'python/**'
       - 'spec/**'
       - '.editorconfig'
       - 'LICENSE'
@@ -76,9 +78,12 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             rust/target
-          key: site-cargo-${{ runner.os }}-${{ runner.arch }}-${{ steps.compiler.outputs.identity }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ hashFiles('rust/**/*.rs', 'rust/**/Cargo.toml', 'spec/0.1/grammar.ebnf', 'spec/0.1/errors.md') }}
+            python/target
+          key: site-cargo-${{ runner.os }}-${{ runner.arch }}-${{ steps.compiler.outputs.identity }}-${{ hashFiles('rust/Cargo.lock', 'python/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ hashFiles('rust/**/*.rs', 'rust/**/Cargo.toml', 'python/src/**/*.rs', 'python/Cargo.toml', 'spec/0.1/grammar.ebnf', 'spec/0.1/errors.md') }}
           restore-keys: |
-            site-cargo-${{ runner.os }}-${{ runner.arch }}-${{ steps.compiler.outputs.identity }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+            site-cargo-${{ runner.os }}-${{ runner.arch }}-${{ steps.compiler.outputs.identity }}-${{ hashFiles('rust/Cargo.lock', 'python/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+      # The build renders the Python API reference with maturin and pdoc through uv.
+      - uses: astral-sh/setup-uv@v7
       - name: Install SVG renderer
         run: sudo apt-get update && sudo apt-get install -y librsvg2-bin
       - run: npm ci

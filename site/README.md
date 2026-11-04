@@ -8,13 +8,15 @@ then shows executable format examples. The format library renders every
 format’s README, highlighted reader spec, and cases with their real output.
 The Language Specification is rendered directly from `spec/`, with versioned
 chapter pages and error-code links shared with the language server.
-The introduction, tutorial, guides, tools and Rust API pages use the same shell.
-Other language guides identify planned implementations.
+The introduction, tutorial, guides, tools, Rust and Python pages use the same
+shell, and so does the Python API reference that pdoc generates.
+The other implementations page identifies planned implementations.
 
 ## Build and check
 
-Use Node 22.12 or newer, npm, and the stable Rust toolchain. Asset preparation
-also requires `rsvg-convert`:
+Use Node 22.12 or newer, npm, the stable Rust toolchain, and
+[uv](https://docs.astral.sh/uv/), which builds the Python package for its API
+reference. Asset preparation also requires `rsvg-convert`:
 install `librsvg` with Homebrew or `librsvg2-bin` on Ubuntu.
 
 In this directory:
@@ -181,6 +183,30 @@ must emit no partial data. The same rendered-text markers cover all these
 pages, including diagnostics and the canonical error document in the errors
 guide. To add an example, register its required markers in `learningPages`,
 collect its sources and command result, then render them with `CheckedExample`.
+
+## Python guide and API reference
+
+`/using/python/` renders the examples in `python/examples` with their recorded
+output through the same `CheckedExample` markers, collected by
+`scripts/python-examples.mjs`. The collector requires every file in that
+directory to appear on the page, checks that the install commands still appear
+in `python/README.md`, and runs each `.sh` example with the Rust CLI to check
+its recording. The Python side runs every example against the built package
+in `python/tests/test_examples.py`; see the
+[Python README](../python/README.md#guide-examples).
+
+Every dev/build runs `scripts/prepare-python-api.mjs`. It builds a wheel from
+`python/` with `uvx maturin@1.16.0 build`, respecting `CARGO_TARGET_DIR`,
+installs it with the pinned pdoc of the `docs` dependency group into a
+temporary uv environment on Python 3.15, and runs `python/docs/reference.py`.
+uv downloads Python 3.15 when it is not installed. The ignored
+`src/generated/python-api.json` holds the HTML fragment and its outline;
+`src/pages/using/python/api.astro` places it in a Starlight page, and the
+`.iris-python-api` rules in `src/styles/custom.css` style pdoc's markup.
+`npm run check:python-api`, part of `npm run check`, compares the built page
+with that output and requires the public classes, methods and attributes,
+including the stub signature of `Spec.read`. The
+[Python README](../python/README.md#api-reference) records why pdoc was chosen.
 
 ## Playground
 

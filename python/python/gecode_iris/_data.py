@@ -13,8 +13,11 @@ class Entry(NamedTuple):
     """The name, value type and depth of one entry in ``Data``."""
 
     name: str
+    """The entry name."""
     value_type: Literal["int", "float", "string"]
+    """The type of the entry's scalars."""
     depth: int
+    """The number of array levels: 0 for a scalar, 1 for a row, and so on."""
 
 
 # The package exports this class, so pickles name it there.

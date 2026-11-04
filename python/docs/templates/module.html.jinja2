@@ -1,0 +1,37 @@
+{#
+The reference as a fragment of a site page. Top-level members get h2 headings
+and class members h3, which reference.py collects for the page outline.
+#}
+{% extends "default/module.html.jinja2" %}
+{% block content %}
+    {{ docstring(module) }}
+    {% for m in module.flattened_own_members if is_public(m) | trim %}
+        <section class="api-member">
+            <h2 id="{{ m.qualname }}">{{ m.qualname }}</h2>
+            {{ signature(m) }}
+            {{ docstring(m) }}
+            {% if m.kind == "class" %}
+                {% for c in m.own_members if c.kind != "class" and c.name != "__init__" and is_public(c) | trim %}
+                    <section class="api-member">
+                        <h3 id="{{ c.qualname }}">{{ c.qualname }}</h3>
+                        {{ signature(c) }}
+                        {{ docstring(c) }}
+                    </section>
+                {% endfor %}
+            {% endif %}
+        </section>
+    {% endfor %}
+    <section class="api-member">
+        <h2 id="iris-command">The iris command</h2>
+        {{ docstring(command) }}
+        {{ signature(command.get("main")) }}
+        {{ docstring(command.get("main")) }}
+    </section>
+{% endblock %}
+{% macro signature(doc) %}
+    <div class="api-signature">
+        {%- if doc.kind == "class" %}{{ class(doc) }}
+        {%- elif doc.kind == "function" %}{{ function(doc) }}
+        {%- else %}{{ variable(doc) }}{% endif -%}
+    </div>
+{% endmacro %}

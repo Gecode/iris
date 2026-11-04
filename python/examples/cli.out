@@ -1,0 +1,4 @@
+formats/dimacs-cnf/cases/three-variables/input.txt [dimacs-cnf]
+  vars: int 3
+  clauses: int 3
+  clause: int array 3 x 1..3
