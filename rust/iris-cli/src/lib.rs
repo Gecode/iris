@@ -1,5 +1,8 @@
-//! Shared byte-oriented parse/check boundary for the user CLI and test driver.
+//! The `iris` command line as a library, and the shared byte-oriented
+//! parse/check boundary for the user CLI and test driver.
+mod command;
 pub mod protocol;
+pub use command::run;
 use iris_sema::Analysis;
 pub use iris_sema::render_error;
 use iris_syntax::{LanguageVersion, Parse, ParseError};

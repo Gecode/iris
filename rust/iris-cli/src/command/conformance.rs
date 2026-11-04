@@ -1,6 +1,6 @@
 use clap::Args;
 use iris_conformance::RunOptions;
-use std::{path::PathBuf, process::ExitCode, time::Duration};
+use std::{path::PathBuf, time::Duration};
 
 #[derive(Args)]
 pub struct Arguments {
@@ -26,7 +26,7 @@ pub struct Arguments {
     timeout: Duration,
 }
 
-pub fn run(arguments: Arguments) -> ExitCode {
+pub fn run(arguments: Arguments) -> u8 {
     let options = RunOptions {
         driver: arguments.driver,
         driver_id: arguments.driver_id,
@@ -39,11 +39,11 @@ pub fn run(arguments: Arguments) -> ExitCode {
     match iris_conformance::run(&options) {
         Ok(report) => {
             print!("{}", report.render());
-            ExitCode::from(report.exit_code())
+            report.exit_code()
         }
         Err(error) => {
             eprintln!("iris conformance: {error}");
-            ExitCode::from(2)
+            2
         }
     }
 }

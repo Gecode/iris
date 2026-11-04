@@ -21,10 +21,14 @@ def test_requires_python_matches_the_abi3_floor() -> None:
 DUNDERS = {"__getitem__", "__contains__"}
 
 
+def stub_tree() -> ast.Module:
+    stub = files("gecode_iris") / "_native.pyi"
+    return ast.parse(stub.read_text(encoding="utf-8"))
+
+
 def stub_members() -> dict[str, set[str]]:
     """The classes in the extension's stub and the public members of each."""
-    stub = files("gecode_iris") / "_native.pyi"
-    tree = ast.parse(stub.read_text(encoding="utf-8"))
+    tree = stub_tree()
     return {
         node.name: {
             member.name
@@ -50,3 +54,15 @@ def test_the_stub_declares_every_public_name_of_the_extension() -> None:
         if isinstance(cls, type)
     }
     assert stub_members() == runtime
+
+
+def test_the_stub_declares_every_function_of_the_extension() -> None:
+    from gecode_iris import _native
+
+    declared = {node.name for node in stub_tree().body if isinstance(node, ast.FunctionDef)}
+    runtime = {
+        name
+        for name, value in vars(_native).items()
+        if callable(value) and not isinstance(value, type) and not name.startswith("_")
+    }
+    assert declared == runtime

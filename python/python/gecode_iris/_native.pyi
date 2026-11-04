@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from os import PathLike
 from typing import Any, final
 
@@ -66,3 +66,6 @@ class Data:
 
     def to_dzn(self) -> str:
         """The MiniZinc data text defined in the Specification's appendix B."""
+
+def run_cli(argv: Sequence[str]) -> int:
+    """Run the ``iris`` command line on ``argv``, program name first; return its exit status."""

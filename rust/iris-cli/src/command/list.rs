@@ -3,7 +3,6 @@ use iris_core::{Data, Spec};
 use std::{
     io::{self, Write},
     path::PathBuf,
-    process::ExitCode,
 };
 
 #[derive(Args)]
@@ -17,12 +16,12 @@ pub struct Arguments {
     #[arg(long)]
     dzn: bool,
 }
-pub fn run(arguments: Arguments) -> ExitCode {
+pub fn run(arguments: Arguments) -> u8 {
     match list(&arguments) {
-        Ok(()) => ExitCode::SUCCESS,
+        Ok(()) => 0,
         Err(error) => {
             eprintln!("{error}");
-            ExitCode::FAILURE
+            1
         }
     }
 }

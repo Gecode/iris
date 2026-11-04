@@ -15,6 +15,10 @@ classifiers = [
     "Programming Language :: Rust",
 ]
 
+[project.scripts]
+# Runs the Rust command line; gecode_iris._cli only forwards the process state.
+iris = "gecode_iris._cli:main"
+
 [project.urls]
 Homepage = "https://iris.gecode.dev"
 Repository = "https://github.com/Gecode/iris"

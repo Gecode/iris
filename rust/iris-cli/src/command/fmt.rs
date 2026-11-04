@@ -4,7 +4,6 @@ use std::{
     fs,
     io::{self, Read, Write},
     path::{Path, PathBuf},
-    process::ExitCode,
 };
 
 #[derive(clap::Args)]
@@ -23,13 +22,13 @@ pub struct Arguments {
     stdin_filepath: Option<PathBuf>,
 }
 
-pub fn run(arguments: Arguments) -> ExitCode {
+pub fn run(arguments: Arguments) -> u8 {
     let has_stdin = arguments.paths.iter().any(|path| path == Path::new("-"));
     if (has_stdin && arguments.paths.len() != 1)
         || (!has_stdin && arguments.stdin_filepath.is_some())
     {
         eprintln!("iris fmt: - must be the only operand; --stdin-filepath requires -");
-        return ExitCode::from(2);
+        return 2;
     }
     let mut stdout = io::stdout().lock();
     let mut success = true;
@@ -62,7 +61,7 @@ pub fn run(arguments: Arguments) -> ExitCode {
         eprintln!("iris fmt: {error}");
         success = false;
     }
-    ExitCode::from(u8::from(!success))
+    u8::from(!success)
 }
 
 fn format_path(path: &Path, arguments: &Arguments, stdout: &mut impl Write) -> bool {

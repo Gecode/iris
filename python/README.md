@@ -70,11 +70,31 @@ The reader releases the GIL, and one `Spec` can be shared between threads.
 The Rust `Spec` must stay on one thread, so the Python `Spec` keeps the spec
 source and parses it again for each read, which takes microseconds.
 
+## The `iris` command
+
+The package installs an `iris` console script, the same command as the Rust
+`iris` binary: `iris check`, `read`, `list`, `fmt`, `lsp` and `conformance`
+take the same options and produce the same output and exit statuses (2 for a
+usage error, 1 for a spec or instance error). Installing the package into an
+environment, or running `uvx --from gecode-iris iris`, is enough to use it
+without a Rust toolchain.
+
+The command line is the Rust library function `iris_cli::run`, which the
+extension exposes as `gecode_iris._native.run_cli(argv)`. The script,
+`gecode_iris._cli:main`, adds no command logic. It flushes Python's
+`sys.stdout` and `sys.stderr`, restores the default `SIGINT` handler so that
+Ctrl-C stops a long run such as `iris lsp`, and exits with the status that
+`run_cli(sys.argv)` returns. The Rust code reads and writes the process's
+standard streams directly, and help and usage messages take the program name
+from `sys.argv[0]`. `tests/test_cli.py` runs the installed script and compares
+its output with the Rust binary's recorded output.
+
 ## Layout
 
 `python/` is a Cargo workspace of its own, with its own `Cargo.lock`. Its
-crate, `gecode-iris-python`, depends on `rust/gecode-iris` by path and
-builds the extension module `gecode_iris._native`. The Python sources are in
+crate, `gecode-iris-python`, depends on `rust/gecode-iris` and
+`rust/iris-cli` by path and builds the extension module
+`gecode_iris._native`. The Python sources are in
 `python/python/gecode_iris`, in maturin's mixed layout, and the tests in
 `python/tests`.
 
@@ -97,6 +117,12 @@ refreshes the lockfile from the repository root:
 ```sh
 cargo update --manifest-path python/Cargo.toml --workspace
 ```
+
+That command keeps the versions already in the lockfile, but it picks the
+newest version of a crate that `python/Cargo.lock` does not list yet. Pin any
+such crate that `rust/Cargo.lock` also lists to that version, for example
+`cargo update --manifest-path python/Cargo.toml -p toml --precise
+1.1.8+spec-1.1.0`.
 
 ## Minimum Python version
 
@@ -191,6 +217,9 @@ uv venv --python 3.10 "$TMPDIR/iris-py3.10"
 uv pip install --python "$TMPDIR/iris-py3.10/bin/python" target/wheels/*.whl --group test
 "$TMPDIR/iris-py3.10/bin/python" -m pytest
 ```
+
+`tests/test_cli.py` then runs the `iris` script that the wheel installed into
+that environment.
 
 ## Conformance
 

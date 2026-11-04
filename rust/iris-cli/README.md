@@ -39,6 +39,15 @@ Usage errors exit 2; file acquisition and resource failures exit 1.
 `iris --version` reports the Cargo package version and supported language versions
 (currently `iris 0.1.0 (languages: 0.1)`).
 
+The command runs in the library: `iris_cli::run(args)` takes the process
+arguments, program name first, and returns the exit status as a `u8`. It
+writes to the process's standard output and error, flushes standard output
+before it returns, and never exits the process. Help and usage messages name
+the program from the first argument, as clap does. The `iris` binary only
+passes `std::env::args_os()` to it, and the Python package's `iris` console
+script calls it through the extension module (see the [Python
+README](../../python/README.md#the-iris-command)).
+
 ## Reading input
 
 `iris read SPEC FILE... [--summary|--json|--dzn] [--param NAME=VALUE]...`
