@@ -134,6 +134,11 @@ void shares_copies() {
 
 // The float rules of §4.5 hold with every standard library's from_chars;
 // no parse case covers them for reader-spec literals.
+void reports_a_string_that_ends_with_the_source() {
+  for (const std::string_view text : {"line \"ab", "line \"ab\\"})
+    check(parse_error(text).code() == iris::ErrorCode::SpecString, text);
+}
+
 void converts_float_literals() {
   check(iris::Spec::try_parse("let x=2.2250738585072013e-308").has_value(),
         "rounds to the smallest normal");
@@ -155,6 +160,7 @@ int main() {
     returns_errors_from_try_parse();
     loads_files();
     shares_copies();
+    reports_a_string_that_ends_with_the_source();
     converts_float_literals();
   } catch (const std::exception &error) {
     std::cerr << "unexpected exception: " << error.what() << '\n';

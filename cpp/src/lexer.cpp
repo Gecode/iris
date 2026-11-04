@@ -148,7 +148,7 @@ private:
         fail(ErrorCode::SpecString, "unterminated string");
       if (src_[p_] == '\\') {
         if (p_ + 1 >= src_.size())
-          break;
+          fail(ErrorCode::SpecString, "unterminated string");
         t.text += unescape(src_.substr(p_ + 1));
         p_ += 2;
       } else {
