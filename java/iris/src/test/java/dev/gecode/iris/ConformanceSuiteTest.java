@@ -2,7 +2,9 @@ package dev.gecode.iris;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -59,6 +61,29 @@ class ConformanceSuiteTest {
     assertEquals(
         Map.of(READ_CASE, true, other, false),
         ConformanceSuite.outcomes(report, List.of(READ_CASE, other)));
+  }
+
+  @Test
+  void readsAVerbatimPathFromTheRunner() {
+    assertEquals("\\\\?\\D:\\a\\case", ConformanceSuite.withNativeSeparators("//?/D:/a/case"));
+    assertEquals(
+        "\\\\?\\UNC\\host\\share\\case",
+        ConformanceSuite.withNativeSeparators("//?/UNC/host/share/case"));
+    assertEquals("/a/case", ConformanceSuite.withNativeSeparators("/a/case"));
+  }
+
+  @Test
+  void quotesTheDriverCommandForTheRunner() {
+    String command = ConformanceSuite.driverCommand(Path.of("it's", "java"), Path.of("home"));
+    assertTrue(command.startsWith("'it'\\''s" + File.separator + "java' '-XX:"), command);
+    assertTrue(
+        command.endsWith(
+            " '-cp' 'home"
+                + File.separator
+                + "lib"
+                + File.separator
+                + "*' 'dev.gecode.iris.driver.Main'"),
+        command);
   }
 
   @Test

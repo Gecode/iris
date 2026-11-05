@@ -21,7 +21,7 @@ val installedDriver = project(":iris-driver").layout.buildDirectory.dir("install
 
 tasks.withType<Test>().configureEach {
   dependsOn(":iris-driver:installDist")
-  systemProperty("iris.driver", installedDriver.get().file("bin/iris-driver").asFile.path)
+  systemProperty("iris.driverHome", installedDriver.get().asFile.path)
   systemProperty("iris.repository", repository.path)
   providers.gradleProperty("irisFloatValues").orNull?.let { systemProperty("iris.floatValues", it) }
   providers.gradleProperty("irisCli").orNull?.let { systemProperty("iris.cli", it) }

@@ -1,3 +1,4 @@
+import com.diffplug.spotless.LineEnding
 import net.ltgt.gradle.errorprone.errorprone
 import net.ltgt.gradle.nullaway.nullaway
 
@@ -41,5 +42,7 @@ tasks.withType<Test>().configureEach {
 }
 
 spotless {
+  // Git settings decide the default, which would ask for CRLF on Windows.
+  lineEndings = LineEnding.UNIX
   java { googleJavaFormat(libs.findVersion("google-java-format").get().requiredVersion) }
 }

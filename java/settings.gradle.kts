@@ -4,4 +4,4 @@ dependencyResolutionManagement { repositories { mavenCentral() } }
 
 rootProject.name = "iris-java"
 
-include("iris", "iris-driver", "iris-kotlin")
+include("iris", "iris-driver", "iris-jmh", "iris-kotlin")

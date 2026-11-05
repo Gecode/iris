@@ -49,6 +49,10 @@ final class Driver {
    * Refuses an argument that the JVM may have changed. It decodes arguments in the locale's
    * encoding before {@code main} runs, so only ASCII survives outside a UTF-8 locale. Changing the
    * locale for the JVM instead would break file names in the original encoding.
+   *
+   * <p>On Windows {@code java} reads its command line in the ANSI code page, whatever the console's
+   * code page is. Characters outside that code page have become other characters, often {@code ?},
+   * before this check sees them, so it only catches those inside the code page.
    */
   static void requireIntact(String argument, String encoding) {
     if (!UTF_8.name().equalsIgnoreCase(encoding) && !argument.chars().allMatch(c -> c < 0x80)) {
@@ -61,14 +65,14 @@ final class Driver {
   private record Response(String document, int status) {}
 
   private static Response respond(Request request) throws IOException {
-    byte[] source = Files.readAllBytes(Path.of(request.spec()));
+    byte[] source = readFile(request.spec());
     try {
       Spec spec = Spec.parse(source, request.spec());
       return switch (request.operation()) {
         case PARSE -> new Response(Json.PARSED, 0);
         case READ -> new Response(read(spec, request).toJson(), 0);
         case CATALOG -> {
-          byte[] input = Files.readAllBytes(Path.of(request.input()));
+          byte[] input = readFile(request.input());
           Data data = spec.catalog(input, request.input(), request.params());
           yield new Response(request.format() == Format.DZN ? data.toDzn() : data.toJson(), 0);
         }
@@ -79,8 +83,12 @@ final class Driver {
     }
   }
 
+  private static byte[] readFile(String path) throws IOException {
+    return Files.readAllBytes(Path.of(path));
+  }
+
   private static Data read(Spec spec, Request request) throws IOException {
-    byte[] input = Files.readAllBytes(Path.of(request.input()));
+    byte[] input = readFile(request.input());
     return spec.read(input, request.input(), request.params());
   }
 

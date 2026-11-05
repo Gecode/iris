@@ -35,7 +35,7 @@ class ConformanceTest {
         new ProcessBuilder(
             "/bin/sh",
             script.toString(),
-            System.getProperty("iris.driver"),
+            Path.of(System.getProperty("iris.driverHome"), "bin", "iris-driver").toString(),
             spec.toString(),
             input.toString());
     launcher.environment().put("LC_ALL", "C");

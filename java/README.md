@@ -55,7 +55,8 @@ covers tools that do not read `module-info`, such as those on the class path.
 | Path | Contents |
 |---|---|
 | `iris/` | The library. Only `dev.gecode.iris` is exported; `dev.gecode.iris.internal.syntax` holds the lexer, parser and resolver, and `dev.gecode.iris.internal.read` the reader. |
-| `iris-driver/` | The conformance driver, which is not published. It implements `parse`, `read`, `catalog` (`--format json|dzn`) and `dzn`. The JVM decodes arguments in the locale's encoding before `main` runs, so outside a UTF-8 locale the driver answers exit status 3 for non-ASCII `--params` instead of reading changed values; JSON escapes work in any locale. |
+| `iris-driver/` | The conformance driver, which is not published. It implements `parse`, `read`, `catalog` (`--format json|dzn`) and `dzn`. The JVM decodes arguments in the locale's encoding before `main` runs, so outside a UTF-8 locale the driver answers exit status 3 for non-ASCII `--params` instead of reading changed values; JSON escapes work in any locale. [Windows](#windows) has a narrower guarantee. |
+| `iris-jmh/` | The JMH benchmarks, which are not published. Nothing else depends on this module, so JMH stays out of `dev.gecode:iris`. |
 | `iris-kotlin/` | The Kotlin extensions, in the exported package `dev.gecode.iris.kotlin` of the module of that name. |
 | `build-logic/` | The convention plugins `iris.java-conventions`, shared by the modules, and `iris.kotlin-conventions`. |
 | `gradle/libs.versions.toml` | The pinned versions. |
@@ -96,6 +97,7 @@ fails rather than skips without `cargo`.
 ./gradlew :iris:test --tests dev.gecode.iris.BudgetLimitsTest
 ./gradlew :iris:test --tests dev.gecode.iris.FloatDifferentialTest
 ./gradlew :iris-kotlin:check  # the Kotlin tests, detekt and the dependency check
+./gradlew jmh            # the benchmarks, which take about 3 minutes
 ```
 
 `-Xlint:all -Werror` applies to main and test sources. Error Prone and NullAway
@@ -112,7 +114,7 @@ module descriptor, that public signatures name no internal type, and the error
 fields.
 
 `./gradlew conformance` selects every case in `conformance/cases/0.1` and
-`formats`, runs them with the installed driver through the Rust runner, and
+`formats`, runs them with the installed driver's classes through the Rust runner, and
 prints the counts per operation and the totals. It has no driver ID and no
 exemptions, and it fails on any failing case or an operation without cases.
 `./gradlew test` leaves it out and `./gradlew build` runs it once. Add `--rerun`
@@ -133,13 +135,111 @@ By hand from the root, after `./gradlew :iris-driver:installDist` in `java/`:
 (cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$PWD/../java/iris-driver/build/install/iris-driver/bin/iris-driver\"" ../conformance/cases/0.1)
 ```
 
-Run the same command with `../formats` for the format cases.
+Run the same command with `../formats` for the format cases. This form needs a
+Unix shell script; see [Windows](#windows).
+
+## Continuous integration
+
+[`java.yml`](../.github/workflows/java.yml) runs `./gradlew build` on Ubuntu,
+macOS and Windows with Temurin 27 and stable Rust. It runs when `java/`,
+`conformance/`, `formats/`, `rust/` or the workflow changes, and it uploads the test
+reports of a failed build. Lint it from the root:
+
+```sh
+/tmp/iris-zdev/actionlint .github/workflows/java.yml
+```
+
+### Windows
+
+As of 2026-11-05 no run of the workflow has been observed on any platform, so
+nothing below has run on Windows. It comes from reading the sources of the runner,
+the Rust standard library and the JDK launcher.
+
+- **Line endings.** The cases compare bytes, so the job sets `core.autocrlf` to
+  `false` before checkout, as `cpp.yml` and `python.yml` do. Spotless asks for LF
+  on every platform; by default it would ask for CRLF there.
+- **The driver command.** `ConformanceSuite` starts `java` with the installed
+  `lib/*` on the class path instead of `bin/iris-driver.bat`. Every `params.json`
+  ends in a newline, and Rust refuses to pass a newline to a batch file. So the by-hand
+  command above cannot use the batch launcher either. The conformance task runs
+  the same command on every platform, so what passes here is what runs there.
+- **Verbatim paths.** The runner canonicalizes paths, which gives `\\?\D:\...` on
+  Windows. `Path.of` reads that prefix on Java 27, for drives and UNC shares alike,
+  so the driver opens these paths as they are. The runner's report spells them with
+  forward slashes, and `ConformanceSuite` restores the backslashes.
+- **Symbolic links.** Each format case's `spec.iris` is a link, so the job needs a
+  Git that checks out links, as the Windows jobs of `cpp.yml` and `python.yml` do.
+- **Non-ASCII `--params`.** `java.exe` reads its command line in the ANSI code page,
+  and changing that takes a reboot. `chcp` sets only the console's code page and
+  `-Dfile.encoding` applies after the arguments are decoded, so neither helps. On a runner with code page 1252,
+  `sun.jnu.encoding` is `Cp1252`, and the driver refuses `é` with exit status 3.
+  It cannot see `😀`, which the code page has already turned into `??`, and the
+  value read is wrong. Either way such a case fails instead of passing. No
+  `params.json` in `conformance/cases/0.1` or `formats` has a non-ASCII byte, so the
+  suite does not reach this. A new case should spell such a value with JSON
+  escapes, which work everywhere. `theLauncherKeepsParamsOrRefusesThem` stays off on
+  Windows. The library is not affected: `Params` takes Java strings.
+
+## Benchmarks
+
+`./gradlew jmh` runs `ReadBenchmark`, in about 3 minutes, and writes
+`iris-jmh/build/results/jmh.json`. The benchmarks measure and do not gate:
+`./gradlew build` compiles `iris-jmh` and runs its tests, which read each input
+once and check that every format case that reads has a benchmark, but it runs no
+benchmark. `--args` replaces the JMH options:
+
+```sh
+./gradlew :iris-jmh:jmh --args="-f 1 -wi 1 -i 1 -p input=SUDOKU_FOUR_BY_FOUR"
+```
+
+`ReadBenchmark.read` measures one call of `Spec.read(byte[], String, Params)`,
+which includes the handoff to the `LargeStack` pool. The spec is parsed and the input
+is loaded in `@Setup`, so parsing and file access are not measured, and neither is
+writing JSON or dzn. The inputs are the format cases that read without an error.
+They are at most a few hundred bytes, so the numbers show the cost of a small read and
+say nothing about throughput on large files.
+
+Error Prone skips the classes that JMH generates, in `jmh_generated`, and only those;
+`-Xlint:-processing` applies to this module, as the JMH processor leaves the JSpecify
+annotations unclaimed. The default is one fork per input, and `-foe true` makes a
+failed benchmark fail the task. A first run with three forks exited 0 with no
+results, after JMH lost the link to its forks on this machine; the cause was not
+established.
+
+### Baseline
+
+This is a local measurement, not a CI result, taken on 2026-11-05.
+
+- **Machine:** Apple M1 Max, 10 cores, 64 GiB, macOS 27.0.1.
+- **JVM:** Homebrew OpenJDK 27.0.1.0.3, 64-Bit Server VM, default options (G1), with
+  JMH's compiler blackholes.
+- **JMH 1.37:** average time, one thread, one fork, 5 warmup iterations of 2 s,
+  10 measurement iterations of 1 s. `./gradlew jmh` ran five times, so each input
+  had five JVMs.
+
+The times are microseconds per read. Other jobs shared the machine, with load
+averages from 9 to 160, a Gradle build ran during some of the runs, and some runs
+took two or three times as long as others. Load, JVM variation and CPU state were
+not controlled. The lowest column is the minimum observed for each input under
+that load, not undisturbed performance, so a comparison with it is rough: rerun on
+a quiet machine before reading anything into a small difference.
+
+| Input | Bytes | Lowest | Runs 1 to 5 |
+|---|---:|---:|---|
+| `DIMACS_THREE_VARIABLES` | 66 | 9.0 | 9.5, 9.0, 19.9, 12.0, 17.4 |
+| `JOBSHOP_JSPLIB` | 119 | 15.7 | 15.7, 15.9, 37.3, 29.9, 15.7 |
+| `JOBSHOP_OR_LIBRARY` | 182 | 15.5 | 15.6, 15.5, 44.1, 18.6, 15.9 |
+| `NONOGRAM_FIVE_BY_FIVE` | 86 | 16.4 | 17.4, 16.9, 16.4, 42.2, 18.0 |
+| `SUDOKU_FOUR_BY_FOUR` | 37 | 8.3 | 8.5, 8.5, 8.5, 19.3, 8.3 |
+| `TSPLIB_EUC_2D_FIVE` | 164 | 15.5 | 15.5, 15.7, 40.1, 40.5, 15.6 |
+| `TSPLIB_EXPLICIT_FIVE` | 230 | 11.0 | 11.0, 20.8, 25.6, 25.7, 11.0 |
+| `TSPTW_THREE_NODES` | 70 | 10.1 | 10.1, 22.4, 10.1, 26.4, 10.8 |
 
 ## Pinned tools
 
 Gradle 9.8.2 (wrapper), Spotless 8.11.0 with google-java-format 2.0.0, Error
 Prone 2.52.0, NullAway 0.14.3, JSpecify 1.0.1, JUnit 5.14.4, Kotlin 2.4.21, ktfmt
-0.64 and detekt 2.0.0-alpha.6.
+0.64, detekt 2.0.0-alpha.6 and JMH 1.37.
 
 ### Java 27 gaps
 

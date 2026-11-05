@@ -2,6 +2,7 @@ package dev.gecode.iris;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -21,12 +22,16 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /** Selects conformance cases and runs them through the Rust runner, with the Java driver. */
 final class ConformanceSuite {
   private static final int BATCH_SIZE = 25;
   private static final int MAX_PARALLEL_BATCHES = 8;
-  private static final String DRIVER_JVM_OPTIONS = "-Xmx1g";
+  private static final String DRIVER_MAIN_CLASS = "dev.gecode.iris.driver.Main";
+  // The launcher's options from iris-driver/build.gradle.kts, and a heap for the largest cases.
+  private static final List<String> DRIVER_JVM_OPTIONS =
+      List.of("-XX:TieredStopAtLevel=1", "-XX:+UseSerialGC", "-XX:-UsePerfData", "-Xmx1g");
   private static final List<String> ROOTS = List.of("conformance/cases/0.1", "formats");
   private static final List<String> OPERATIONS = List.of("parse", "read", "catalog", "dzn");
   private static final Set<String> TOP_LEVEL_KEYS =
@@ -35,6 +40,7 @@ final class ConformanceSuite {
   private static final Pattern OPERATION =
       Pattern.compile("operation\\s*=\\s*\"(parse|read|catalog|dzn)\"\\s*(#.*)?");
   private static final Pattern OUTCOME = Pattern.compile("(PASS|FAIL) (.+)");
+  private static final String VERBATIM_PREFIX = "//?/";
 
   private final Path repository;
   private final String driver;
@@ -49,7 +55,30 @@ final class ConformanceSuite {
     // The runner reports a case by its real path.
     return new ConformanceSuite(
         Path.of(System.getProperty("iris.repository")).toRealPath(),
-        System.getProperty("iris.driver"));
+        driverCommand(
+            Path.of(System.getProperty("java.home"), "bin", "java"),
+            Path.of(System.getProperty("iris.driverHome"))));
+  }
+
+  /**
+   * Returns the runner's command for the driver installed in {@code driverHome}.
+   *
+   * <p>It starts {@code java} rather than the installed launcher, as Rust refuses to pass the
+   * newline that ends a {@code params.json} to the launcher's batch file on Windows. Each word is
+   * in single quotes: on Windows {@code ProcessBuilder} would drop double quotes around the
+   * command, and the runner would then read the backslashes of a path as escapes.
+   */
+  static String driverCommand(Path java, Path driverHome) {
+    List<String> words = new ArrayList<>();
+    words.add(java.toString());
+    words.addAll(DRIVER_JVM_OPTIONS);
+    words.addAll(List.of("-cp", driverHome.resolve("lib") + File.separator + "*"));
+    words.add(DRIVER_MAIN_CLASS);
+    return words.stream().map(ConformanceSuite::quoted).collect(Collectors.joining(" "));
+  }
+
+  private static String quoted(String word) {
+    return "'" + word.replace("'", "'\\''") + "'";
   }
 
   /**
@@ -94,11 +123,22 @@ final class ConformanceSuite {
         .lines()
         .map(OUTCOME::matcher)
         .filter(Matcher::matches)
-        .forEach(line -> outcomes.put(Path.of(line.group(2)), line.group(1).equals("PASS")));
+        .forEach(line ->
+            outcomes.put(
+                Path.of(withNativeSeparators(line.group(2))), line.group(1).equals("PASS")));
     if (!outcomes.keySet().equals(Set.copyOf(cases))) {
       throw new AssertionError("the runner did not report each case once:\n" + report);
     }
     return outcomes;
+  }
+
+  /**
+   * Returns a reported path that {@code Path} can read. On Windows the runner reports verbatim
+   * paths with forward slashes, and {@code Path} knows that prefix, for drives and UNC shares
+   * alike, only with backslashes.
+   */
+  static String withNativeSeparators(String reported) {
+    return reported.startsWith(VERBATIM_PREFIX) ? reported.replace('/', '\\') : reported;
   }
 
   /** Runs {@code selected} in batches. */
@@ -192,14 +232,12 @@ final class ConformanceSuite {
                 "--",
                 "run",
                 "--driver",
-                "\"" + driver + "\"",
+                driver,
                 "--version",
                 "0.1"));
     cases.forEach(directory -> command.add(directory.toString()));
     var builder = new ProcessBuilder(command);
     builder.directory(repository.resolve("rust").toFile());
-    builder.environment().put("JAVA_HOME", System.getProperty("java.home"));
-    builder.environment().put("JAVA_OPTS", DRIVER_JVM_OPTIONS);
     builder.redirectErrorStream(true);
     Process process = builder.start();
     String report = new String(process.getInputStream().readAllBytes(), UTF_8);

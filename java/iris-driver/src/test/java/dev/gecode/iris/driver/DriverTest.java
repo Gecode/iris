@@ -38,6 +38,11 @@ class DriverTest {
     return new Result(status, out.toString(UTF_8));
   }
 
+  /** Returns a path as a JSON document spells it. */
+  private static String escaped(String path) {
+    return path.replace("\\", "\\\\");
+  }
+
   @Test
   void answersAValidSpec() {
     assertEquals(new Result(0, "{\"iris\":\"0.1\",\"parsed\":true}\n"), run("parse", valid));
@@ -49,7 +54,7 @@ class DriverTest {
     String document =
         "{\"code\":\"E-SPEC-SYNTAX\",\"message\":\"unknown statement 'n'\",\"input_location\":null,"
             + "\"spec_location\":{\"origin\":\""
-            + invalid
+            + escaped(invalid)
             + "\",\"line\":3,\"column\":null},\"context\":null,\"record_path\":null}\n";
     assertEquals(new Result(1, document), run("parse", invalid));
   }
@@ -77,7 +82,7 @@ class DriverTest {
     Result result = run("read", valid, empty);
     assertEquals(1, result.status());
     assertEquals(true, result.document().startsWith("{\"code\":\"E-"), result.document());
-    assertEquals(true, result.document().contains("\"origin\":\"" + empty + "\""));
+    assertEquals(true, result.document().contains("\"origin\":\"" + escaped(empty) + "\""));
   }
 
   @Test
