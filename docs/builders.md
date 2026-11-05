@@ -12,10 +12,12 @@ type checker runs. It should not wait until data is read. Builders also
 bring the host language's abstraction to reader specs: a function can
 produce a fragment, and a loop can produce fields.
 
-None of these APIs exist yet. The code below is sketches, and the names in
-it are illustrative. The principles are the part to follow. Each
-implementation chooses final names in its own idiom, and its API guide on
-the site documents them. [PLAN.md §8.15](../PLAN.md#815-spec-builders)
+The Rust builder exists, as the `iris-build` crate re-exported by
+`gecode_iris::build`, and its section below is compiled as a test. The other
+languages' APIs do not exist yet: their code is sketches, and the names in it
+are illustrative. The principles are the part to follow. Each implementation
+chooses final names in its own idiom, and its API guide on the site documents
+them. [PLAN.md §8.15](../PLAN.md#815-spec-builders)
 gives the deliverables and the milestone.
 
 ## Principles
@@ -62,7 +64,8 @@ It serves two purposes:
   Iris itself.
 - After reading it is a key into the data. `data.get(handle)`, or the
   language's indexing form, returns the host type for that value type and
-  depth. It cannot fail on a name or a type.
+  depth. It cannot fail on a name or a type, unless the handle is stale
+  (see below) or Rust's `.ex()` asserted a scalar that was not one.
 
 The same handle types also serve typed views generated from text specs
 (see [Type safety for text specs](#type-safety-for-text-specs)). The typed
@@ -108,6 +111,44 @@ for `num`. Typed parameter handles also set parameters:
 [§9.2](../spec/0.1/09-params-and-instances.md#92-parameter-evaluation-and-conversion)
 expects.
 
+**Dynamic forms cover what static types refuse.** A valid spec can use a
+name before its definition, compare values of different types, or redefine a
+name with another type. A builder must be able to write all of them, so that
+every spec `iris check` accepts can be built. Four forms step outside the
+static types, in every language:
+
+- **A forward handle** names an entry before the statement that defines it.
+  Its type is declared when it is created. A later defining statement takes
+  the handle as its target, and so does a pattern, a `store`, or a capture.
+  A definition that agrees with the declared type binds the handle.
+  `build()` reports a forward handle that is never bound, and a definition
+  of another value type or depth when no binding always comes before it. A
+  later definition after such a binding is an explicit redefinition: it
+  returns a dynamic handle, and the forward handle may go stale, as below.
+  The builder certifies a binding only from what it knows. A value with no
+  static shape, such as a `.dynamic()` expression, an element access, or a
+  bare handle inside a repeat, cannot bind a statically typed forward handle;
+  declare a dynamic forward handle for it. A required forward handle needs at
+  least one binding that always executes.
+- **`.dynamic()`** turns an expression into one with no static type, which
+  every operator and statement accepts.
+- **Redefinition through a handle.** Any defining statement, not only `let`,
+  takes an existing handle as its target and returns a dynamic handle, since
+  the value type or depth may have changed. `handle.set(expr)` is the form
+  that keeps the type: a value of another type or depth is an error, at
+  compile time where the host's types encode depth.
+- **`undefined(name)`** gives a dynamic handle for a name deliberately left
+  undefined, as in `check !defined(zz)`. Defining that name is an error.
+  Forward handles stay strict: a forward handle that nothing binds is a
+  mistake, and `undefined` is how a program says it is not.
+
+**A redefinition can leave a stale handle.** In a language with static
+handles, the old handle keeps the type it was created with. If the
+redefinition kept the value type and depth, the old handle remains right,
+and the user can keep using it. If either changed, the old handle is stale:
+use the handle the redefinition returned. Reading through a stale handle
+fails as a mismatch between handle and data, not as a wrong value.
+
 ### 3. Catch statically what is cheap, and the rest at `build()`
 
 The host type system checks what it can express without contortions:
@@ -128,9 +169,22 @@ checks of their own, each reported at `build()` or earlier:
   through the existing handle (`handle.set(expr)`, printed as `let`).
 - **Printable text.** Some values have no spelling: a pattern literal
   containing `{` or `...`, an entry named `format` at the top level, a
-  definition named `_` or starting with `gecode.`, and the integer
-  -9223372036854775808. The builder rejects them early, or prints the
-  standard workaround: `(-9223372036854775807 - 1)` for the minimum integer.
+  definition starting with `gecode.`, a name that is not an identifier, a
+  non-finite float, a range with no upper bound directly
+  before a `format` statement (`x:0..` would take `format` as its bound),
+  and the integer -9223372036854775808. The builder rejects them early, or
+  prints the standard workaround: `(-9223372036854775807 - 1)` for the
+  minimum integer.
+- **The name `_`.** Its meaning depends on the construct, as the
+  Specification defines. A `let`, parameter, named type, or comprehension
+  binding cannot have it. A declaration, list, or capture named `_` keeps
+  nothing, so it is written `discard()` and gives no handle. `store _` does
+  keep an entry at the top level, and in an expression `_` is an ordinary
+  lookup, or the records of `as _`. So `forward("_")`, `undefined("_")`,
+  and the `as` and `each` names accept it, and only a `store` binds a
+  forward `_`. Inside a repeat that entry ends with its iteration: no
+  column collects it, so no array handle can read it, and a handle of
+  depth 0 reads it as absent afterwards.
 
 ### 4. Users choose entry names; the builder chooses internal names
 
@@ -314,8 +368,10 @@ it checks the spec when the program compiles. The macro is also planned to
 generate the same typed handles from the text, as described in
 [Type safety for text specs](#type-safety-for-text-specs).
 
+`rust/gecode-iris/tests/build_jobshop.rs` compiles this program.
+
 ```rust
-use gecode_iris::build::{distinct, gecode, lit, pattern, sum, word, SpecBuilder};
+use gecode_iris::build::{distinct, gecode, lit, pattern, sum, sum_over, word, SpecBuilder};
 
 let mut b = SpecBuilder::new("jobshop");
 b.comment(["#", "+++"]);
@@ -338,16 +394,43 @@ let (name, n_jobs, n_machines, machine, duration) = b.instances(|i| {
         })
     });
     i.check(distinct(job.get(machine))).message(MSG_DISTINCT);
-    i.check(sum(job, |j| sum(j.get(duration))).le(gecode::INT_MAX)).message(MSG_TOTAL);
+    i.check(sum_over(job, |j| sum(j.get(duration))).le(gecode::INT_MAX)).message(MSG_TOTAL);
     (name, n_jobs, n_machines, machine, duration)
 });
 let spec = b.build()?; // parses and checks the emitted text
 
-let data = spec.read_path("jobshop1.txt", &Params::instance("la01"))?;
+let mut params = Params::new();
+params.set("instance", "la01");
+let data = spec.read_path("jobshop1.txt", &params)?;
 let jobs: i64 = data.get(n_jobs);
 let first_job: &[i64] = data.get(machine).row(0);
 let label: Option<&str> = data.get(name);
 ```
+
+Rust has no overloading, so the comprehension is `sum_over`, beside the
+`sum` that takes arguments. A statement needs its scope, so principle 2's
+`handle.set(expr)` is `s.set(handle, expr)`. The dynamic forms:
+
+```rust
+let x: Field<Int> = s.forward("x"); // the annotation gives the type
+s.if_(defined(x), |t| {
+    t.let_("y", x + 1);             // use before the definition
+});
+s.read(x, int());                   // the first definition binds it
+let again: DynField = s.read(x, float()); // redefined: use the returned handle
+s.check(lit("1").dynamic().ne(1));
+let zz = s.undefined("zz");
+s.check(!defined(zz));
+let end: Field<Str> = s.forward("_"); // `store _` keeps an entry named `_`
+s.repeat_until("END").store(end);
+```
+
+`.ex()` turns a handle into a scalar expression, as a range bound requires.
+It only asserts that the value is a scalar, and nothing checks the assertion:
+on an array, `s.let_("v", a.ex())` returns a scalar-typed handle, and
+`s.set(x, a.ex())` compiles. A wrong assertion passes `build()` and reading.
+`data.try_get` then reports the mismatch and `data.get` panics, so it never
+yields a wrong value. Use `.ex()` only where the value is a scalar.
 
 ### C++
 
@@ -394,6 +477,17 @@ std::span<const std::int64_t> first_job = data.get(machine)[0];
 std::optional<std::string_view> label = data.get(name);
 ```
 
+The dynamic forms:
+
+```cpp
+auto x = s.forward<std::int64_t>("x");
+s.read(x, int_());                  // the first definition binds it
+auto again = s.read(x, float_());   // redefined: returns a dynamic handle
+auto mixed = (lit("1").dynamic() == 1);
+auto zz = s.undefined("zz");
+auto end = s.forward<std::string>("_"); // only a store binds it
+```
+
 ### Python
 
 `with` blocks match Python's own nesting, and names defined inside them
@@ -429,6 +523,17 @@ data = spec.read("jobshop1.txt", params={"instance": "la01"})
 data[n_jobs]   # int
 data[machine]  # list[list[int]]; data.array(machine) gives numpy
 data[name]     # str | None
+```
+
+The dynamic forms:
+
+```python
+x = b.forward("x", int)
+b.read(x, int_())  # the first definition binds it
+again = b.read(x, float_())  # redefined: returns a dynamic handle
+mixed = lit("1").dynamic() == 1
+zz = b.undefined("zz")
+end = b.forward("_", str)  # only a store binds it
 ```
 
 ### Kotlin
@@ -474,6 +579,17 @@ val data = jobshop.spec.read(path, params("instance" to "la01"))
 val jobs: Long = data[shop.nJobs]
 val firstJob: LongArray = data[shop.machine][0]
 val label: String? = data[shop.name]
+```
+
+The dynamic forms:
+
+```kotlin
+val x = forward<Int>("x")
+read(x, int())                      // the first definition binds it
+val again = read(x, float())        // redefined: returns a dynamic handle
+val mixed = lit("1").dynamic() eq 1
+val zz = undefined("zz")
+val end = forward<String>("_")      // only a store binds it
 ```
 
 ### Java
@@ -574,6 +690,17 @@ var reader = Jobshop.spec.reader(Shop.class, MethodHandles.lookup());
 Shop shop = reader.read(path, Params.of("instance", "la01"));
 ```
 
+The dynamic forms:
+
+```java
+var x = forward("x", Int.class);
+read(x, intType());                 // the first definition binds it
+var again = read(x, floatType());   // redefined: returns a dynamic handle
+var mixed = lit("1").dynamic().eq(1);
+var zz = undefined("zz");
+var end = forward("_", Str.class);  // only a store binds it
+```
+
 `import module` (JEP 511, final in Java 25) imports every package the
 module exports. Static members still need the static import of `Iris.*`.
 The site's Java examples can be compact source files (JEP 512, final in
@@ -640,6 +767,17 @@ shop.name;    // string | undefined
 Keys of the returned object are host names, and the entries keep their Iris
 names: `shop.nJobs` reads entry `n_jobs`.
 
+The dynamic forms:
+
+```ts
+const x = b.forward<number>("x");
+b.read(x, int()); // the first definition binds it
+const again = b.read(x, float()); // redefined: returns a dynamic handle
+const mixed = lit("1").dynamic().eq(1);
+const zz = b.undefined("zz");
+const end = b.forward<string>("_"); // only a store binds it
+```
+
 ## Type safety for text specs
 
 Many users will keep writing `.iris` text and still want typed access.
@@ -673,7 +811,7 @@ Each implementation's builder is tested in four ways:
 1. **Round trip over the corpus.** A generator in the Rust workspace,
    `iris gen builder --lang L SPEC`, prints builder code that reconstructs a
    reader spec. CI runs it on every reader spec in `conformance/cases/0.1`
-   and `formats` that `iris check` accepts, 916 conformance specs today. It
+   and `formats` that `iris check` accepts, 773 distinct files today. It
    runs the generated programs in each language and compares their output
    with the original, as syntax trees. Whitespace, comments, redundant
    parentheses, and generated record names do not count as differences.

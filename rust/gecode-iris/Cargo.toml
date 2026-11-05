@@ -17,6 +17,7 @@ publish = false
 workspace = true
 
 [dependencies]
+iris-build = { version = "0.1.0", path = "../iris-build" }
 iris-core = { version = "0.1.0", path = "../iris-core" }
 iris-macros = { version = "0.1.0", path = "../iris-macros" }
 

@@ -1,0 +1,16 @@
+error[E0271]: type mismatch resolving `<Expr<Str> as Operand>::Value == Int`
+ --> tests/build-ui/fail/set_with_other_type.rs:6:14
+  |
+6 |     b.set(x, lit("text"));
+  |       ---    ^^^^^^^^^^^ expected `Int`, found `Str`
+  |       |
+  |       required by a bound introduced by this call
+  |
+note: required by a bound in `gecode_iris::build::Scope::<D, O>::set`
+ --> $WORKSPACE/iris-build/src/scope.rs
+  |
+  |     pub fn set<V: ValueType, HD: Depth, HO, E>(&mut self, handle: Field<V, HD, HO>, value: E)
+  |            --- required by a bound in this associated function
+  |     where
+  |         E: Operand<Value = V>,
+  |                    ^^^^^^^^^ required by this bound in `Scope::<D, O>::set`

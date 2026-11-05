@@ -1,0 +1,14 @@
+error[E0277]: the trait bound `Record: Literal` is not satisfied
+ --> tests/build-ui/fail/record_used_as_field.rs:9:7
+  |
+9 |     b.let_("y", job);
+  |       ^^^^ the trait `Literal` is not implemented for `Record`
+  |
+  = help: the following other types implement trait `Literal`:
+            &str
+            f64
+            i32
+            i64
+            std::string::String
+            u32
+  = note: required for `Record` to implement `Operand`

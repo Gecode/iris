@@ -535,6 +535,55 @@ impl<'a> ValueRef<'a> {
             _ => Err(AccessError::ExpectedInt),
         }
     }
+    pub fn as_floats(self) -> Result<&'a [f64], AccessError> {
+        if self.depth() != 1 {
+            return Err(AccessError::ExpectedArray);
+        }
+        let range = self.children()?;
+        match &self.value.leaves {
+            LeafStorage::Float(v) => Ok(&v[range]),
+            _ => Err(AccessError::ExpectedFloat),
+        }
+    }
+    pub fn as_strs(self) -> Result<&'a [String], AccessError> {
+        if self.depth() != 1 {
+            return Err(AccessError::ExpectedArray);
+        }
+        let range = self.children()?;
+        match &self.value.leaves {
+            LeafStorage::String(v) => Ok(&v[range]),
+            _ => Err(AccessError::ExpectedString),
+        }
+    }
+    /// The number of rows of an array, or 0 for a scalar.
+    pub fn len(self) -> usize {
+        self.children().map_or(0, |range| range.len())
+    }
+    pub fn is_empty(self) -> bool {
+        self.len() == 0
+    }
+    /// The row at `index`, or `None` when this is a scalar or `index` is out of
+    /// bounds. Arrays of any depth are walked one level at a time.
+    pub fn get(self, index: usize) -> Option<Self> {
+        let range = self.children().ok()?;
+        (index < range.len()).then_some(Self {
+            value: self.value,
+            level: self.level + 1,
+            row: range.start + index,
+        })
+    }
+    /// The row at `index`, panicking like slice indexing when there is none.
+    pub fn row(self, index: usize) -> Self {
+        self.get(index).unwrap_or_else(|| {
+            panic!(
+                "row index {index} is out of bounds for a value of {} rows",
+                self.len()
+            )
+        })
+    }
+    pub fn rows(self) -> impl ExactSizeIterator<Item = Self> {
+        (0..self.len()).map(move |index| self.row(index))
+    }
     pub(crate) fn children(self) -> Result<std::ops::Range<usize>, AccessError> {
         let level = self
             .value

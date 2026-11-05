@@ -1,0 +1,5 @@
+error: `{x:int}` is not an interpolation; write `{name}`, and use `blank()`, `discard()`, `reference(x)` or `bind(x, type)` for other captures
+ --> tests/build-ui/fail/pattern_not_a_name.rs:4:22
+  |
+4 |     let _ = pattern!("{x:int}");
+  |                      ^^^^^^^^^

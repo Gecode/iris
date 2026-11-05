@@ -1,0 +1,28 @@
+error[E0277]: `set` keeps the handle's depth `D1`, but this value has depth `D0`
+ --> tests/build-ui/fail/set_from_handle_of_other_depth.rs:7:16
+  |
+7 |     b.set(row, n);
+  |       ---      ^ the trait `SameDepth<D1>` is not implemented for `D0`
+  |       |
+  |       required by a bound introduced by this call
+  |
+  = note: to change the shape, redefine the name with `let_(handle, value)`
+help: the trait `SameDepth<D1>` is not implemented for `D0`
+      but trait `SameDepth<DynDepth>` is implemented for it
+ --> $WORKSPACE/iris-build/src/expr.rs
+  |
+  |         impl SameDepth<DynDepth> for $depth {}
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+  | open_depths!(D0, D1, D2, D3, D4, D5, D6, D7, D8);
+  | ------------------------------------------------ in this macro invocation
+  = help: for that trait implementation, expected `DynDepth`, found `D1`
+note: required by a bound in `gecode_iris::build::Scope::<D, O>::set`
+ --> $WORKSPACE/iris-build/src/scope.rs
+  |
+  |     pub fn set<V: ValueType, HD: Depth, HO, E>(&mut self, handle: Field<V, HD, HO>, value: E)
+  |            --- required by a bound in this associated function
+...
+  |         E::DepthIn<D>: SameDepth<HD>,
+  |                        ^^^^^^^^^^^^^ required by this bound in `Scope::<D, O>::set`
+  = note: this error originates in the macro `open_depths` (in Nightly builds, run with -Z macro-backtrace for more info)

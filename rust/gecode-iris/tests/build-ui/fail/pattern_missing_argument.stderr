@@ -1,0 +1,5 @@
+error[E0425]: cannot find value `missing` in this scope
+ --> tests/build-ui/fail/pattern_missing_argument.rs:4:22
+  |
+4 |     let _ = pattern!("{missing}");
+  |                      ^^^^^^^^^^^ not found in this scope

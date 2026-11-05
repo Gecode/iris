@@ -1,0 +1,13 @@
+error[E0599]: the method `record` exists for struct `SpecBuilder`, but its trait bounds were not satisfied
+ --> tests/build-ui/fail/record_at_top_level.rs:5:15
+  |
+5 |     let _ = b.record();
+  |               ^^^^^^ private field, not a method
+  |
+ ::: $WORKSPACE/iris-core/src/handle.rs
+  |
+  | pub enum D0 {}
+  | ----------- doesn't satisfy `D0: Nested`
+  |
+  = note: the following trait bounds were not satisfied:
+          `D0: Nested`

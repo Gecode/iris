@@ -77,6 +77,12 @@ Whole-input UTF-8 validation follows unknown-parameter admission; consumed
 word/rest values are validated again after byte-wise tokenization.
 
 `Data::entries` preserves first-definition order through replacement.
+`Data::get` reads an entry through a typed `Handle` and returns its host type:
+`i64`, `&[i64]`, `Array` for deeper entries, `Option` for one that may be absent,
+or `ValueRef` where the depth is open. `Data::try_get` reports a handle that does
+not match the data. The `handle` module holds the markers these views are built
+from; [iris-build](../iris-build/README.md) creates the handles.
+
 Values store typed contiguous leaves and cumulative offsets for each array
 level, preserving ragged rows, empty arrays, value types, and depths.
 `Data::value(name, path)` selects a borrowed value; `int(name)` reads an

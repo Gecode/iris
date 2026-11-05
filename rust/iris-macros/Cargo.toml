@@ -24,4 +24,4 @@ iris-syntax = { version = "0.1.0", path = "../iris-syntax" }
 iris-sema = { version = "0.1.0", path = "../iris-sema" }
 proc-macro2 = "1.0"
 quote = "1.0"
-syn = { version = "3", default-features = false, features = ["parsing", "printing", "proc-macro"] }
+syn = { version = "3", default-features = false, features = ["full", "parsing", "printing", "proc-macro"] }

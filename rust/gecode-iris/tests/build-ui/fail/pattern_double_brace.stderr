@@ -1,0 +1,5 @@
+error: `{{` has no spelling: a pattern has no literal `{`
+ --> tests/build-ui/fail/pattern_double_brace.rs:4:22
+  |
+4 |     let _ = pattern!("a {{ b");
+  |                      ^^^^^^^^

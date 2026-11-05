@@ -34,6 +34,13 @@
 //! matching their variants must include a fallback arm.
 pub use iris_core::*;
 
+/// Build reader specs in Rust, with typed handles.
+///
+/// See the [`iris_build`] crate documentation.
+pub mod build {
+    pub use iris_build::*;
+}
+
 #[doc(hidden)]
 pub mod __private {
     pub use iris_macros::iris;

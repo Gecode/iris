@@ -1,0 +1,5 @@
+error[E0599]: no method named `store` found for struct `gecode_iris::build::Repeat<D, O>` in the current scope
+ --> tests/build-ui/fail/store_after_eof.rs:5:26
+  |
+5 |     b.repeat_until_eof().store("x");
+  |                          ^^^^^ method not found in `gecode_iris::build::Repeat<D0, Required>`

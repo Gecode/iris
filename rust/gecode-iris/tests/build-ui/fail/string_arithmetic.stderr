@@ -1,0 +1,13 @@
+error[E0369]: cannot add `{integer}` to `gecode_iris::build::Field<gecode_iris::build::Str>`
+ --> tests/build-ui/fail/string_arithmetic.rs:6:19
+  |
+6 |     b.let_("y", x + 1);
+  |                 - ^ - {integer}
+  |                 |
+  |                 gecode_iris::build::Field<gecode_iris::build::Str>
+  |
+note: `gecode_iris::build::Str` does not implement `Integral`
+ --> $WORKSPACE/iris-core/src/handle.rs
+  |
+  | pub enum Str {}
+  | ^^^^^^^^^^^^ `gecode_iris::build::Str` is defined in another crate

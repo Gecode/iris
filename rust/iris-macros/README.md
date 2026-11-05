@@ -25,6 +25,10 @@ An inline spec has the origin `iris!`. A file path is relative to the calling
 package's `CARGO_MANIFEST_DIR` and is its own origin. The expansion embeds the
 file with `include_bytes!`, so Cargo rebuilds the caller when the file changes.
 
+The crate also implements `pattern!`, which
+[iris-build](../iris-build/README.md) exports. It splits a line pattern literal
+into text and `{name}` interpolations, and expands to `Pattern` calls.
+
 On stable Rust the compiler marks the whole literal or file path. On nightly
 the macro marks the error's position inside a raw literal, or a cooked literal
 without escapes.

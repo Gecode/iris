@@ -22,11 +22,13 @@ with parse and resolution diagnostics (milestone M4b).
 provides the `iris!` macro, which checks a reader spec at compile time. Its
 package name is `gecode-iris`; Rust imports it as `gecode_iris`. The macro's
 implementation crate, [iris-macros](iris-macros/README.md), depends on
-`iris-syntax` and `iris-sema` but not on `iris-core`. All workspace
+`iris-syntax` and `iris-sema` but not on `iris-core`.
+[iris-build](iris-build/README.md), re-exported as `gecode_iris::build`, builds
+reader specs in Rust with typed handles. All workspace
 crates currently set `publish = false`; publication belongs to milestone M7.
 Package metadata and versioned internal dependencies are prepared without
 enabling publication. The planned crates.io order is `iris-syntax`, `iris-sema`,
-`iris-core`, `iris-macros`, `gecode-iris`, `iris-conformance`, `iris-lsp`, then
+`iris-core`, `iris-macros`, `iris-build`, `gecode-iris`, `iris-conformance`, `iris-lsp`, then
 `iris-cli`.
 The standalone `iris-conformance` runner can be published at any point before
 `iris-cli`; it has no implementation dependencies. The separate nightly fuzz
@@ -75,6 +77,8 @@ reading the work-budget cases in a debug build:
 cargo test --locked -p iris-macros
 cargo test --locked -p gecode-iris --test macro_errors
 cargo test --locked -p gecode-iris --test macro_corpus -- --nocapture
+cargo test --locked -p iris-build
+cargo test --locked -p gecode-iris --test build_jobshop --test build_corpus --test build_types
 ```
 
 For the MSRV checks, run `cargo +1.88.0 build --workspace --locked` and

@@ -3,6 +3,7 @@ mod cancellation;
 mod dzn;
 mod error;
 mod eval;
+pub mod handle;
 mod input;
 mod json;
 mod numeric;
@@ -12,6 +13,7 @@ mod value;
 
 pub use cancellation::{CancellationToken, ReadOptions};
 pub use error::{Error, ErrorCode, InputSpan, Location};
+pub use handle::Handle;
 use iris_sema::Analysis;
 pub use iris_syntax::LanguageVersion;
 use iris_syntax::{Parse, ParseError};
@@ -55,6 +57,11 @@ impl Spec {
     /// The reader spec's format name, if declared.
     pub fn format_name(&self) -> Option<String> {
         self.parsed.format_name()
+    }
+
+    /// The text this reader spec was parsed from.
+    pub fn source(&self) -> String {
+        self.parsed.syntax().to_string()
     }
 
     pub fn read(&self, input: &[u8], origin: &str, params: &Params) -> Result<Data, Failure> {
@@ -171,9 +178,12 @@ impl Params {
     pub fn new() -> Self {
         Self::default()
     }
-    pub fn set(&mut self, name: impl Into<String>, value: impl Into<String>) {
-        let name = name.into();
-        let value = value.into();
+    /// Set the parameter `name`, a string or a typed handle, to `value`, a
+    /// string or a number. Numbers are formatted as the conversion in the
+    /// Specification's section 9.2 expects.
+    pub fn set(&mut self, name: impl ParamName, value: impl ParamValue) {
+        let name = name.into_name();
+        let value = value.into_value();
         if let Some(&index) = self.positions.get(&name) {
             self.pairs[index].1 = value;
         } else {
@@ -188,6 +198,68 @@ impl Params {
     }
     pub fn pairs(&self) -> &[(String, String)] {
         &self.pairs
+    }
+}
+
+/// A parameter's name: a string, or a handle whose name is used.
+pub trait ParamName {
+    fn into_name(self) -> String;
+}
+impl ParamName for &str {
+    fn into_name(self) -> String {
+        self.into()
+    }
+}
+impl ParamName for String {
+    fn into_name(self) -> String {
+        self
+    }
+}
+impl ParamName for &String {
+    fn into_name(self) -> String {
+        self.clone()
+    }
+}
+impl<H: Handle> ParamName for H {
+    fn into_name(self) -> String {
+        self.name().into()
+    }
+}
+
+/// A parameter's value, kept as the exact string the caller supplies.
+pub trait ParamValue {
+    fn into_value(self) -> String;
+}
+impl ParamValue for &str {
+    fn into_value(self) -> String {
+        self.into()
+    }
+}
+impl ParamValue for String {
+    fn into_value(self) -> String {
+        self
+    }
+}
+impl ParamValue for &String {
+    fn into_value(self) -> String {
+        self.clone()
+    }
+}
+macro_rules! numeric_param_values {
+    ($($number:ty),*) => {$(
+        impl ParamValue for $number {
+            fn into_value(self) -> String {
+                self.to_string()
+            }
+        }
+    )*};
+}
+numeric_param_values!(i32, i64, u32, u64, usize);
+impl ParamValue for f64 {
+    /// Rust's shortest round-trip spelling, which section 9.2 converts back to
+    /// the same number.
+    fn into_value(self) -> String {
+        format!("{self:?}")
     }
 }
 

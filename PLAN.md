@@ -114,6 +114,7 @@ iris-core     reader, expression evaluator, data model, work budgets,
      │        JSON and dzn output
      ├── iris-cli    `iris` binary
      ├── iris-lsp    language server
+     ├── iris-build  spec builder with typed handles
      ├── iris-wasm   wasm-bindgen API for the playground
      ├── iris-js     wasm-bindgen binding for the TypeScript package
      └── (python/)   PyO3 binding
@@ -123,7 +124,9 @@ iris-core     reader, expression evaluator, data model, work budgets,
 binding do not carry it. The CLI, the LSP, and the WASM crate use it.
 `iris-macros` depends on `iris-syntax` and `iris-sema`, never on
 `iris-core`: it checks a spec at compile time, and the code it expands to
-calls the reader through `gecode-iris`.
+calls the reader through `gecode-iris`. `iris-build` depends on `iris-core`
+and `iris-macros`, for `pattern!`, and `gecode-iris` re-exports it as
+`gecode_iris::build`.
 
 The parser must be **lossless and error-tolerant** from the start. The LSP
 and formatter need a syntax tree for broken input, and the reader needs
@@ -360,8 +363,8 @@ reported upstream. Gecode itself needs no changes.
 ### 8.1 Rust (`rust/`)
 
 - Crates: `iris-syntax`, `iris-sema`, `iris-core`, `iris-cli`,
-  `iris-lsp`, `iris-wasm`, `iris-js`, `iris-macros` (after 0.1), and
-  `iris-lint` if built (§8.13), published
+  `iris-lsp`, `iris-wasm`, `iris-js`, `iris-macros` (after 0.1),
+  `iris-build` (§8.15), and `iris-lint` if built (§8.13), published
   under the umbrella crate `gecode-iris`.
 - API sketch:
   ```rust

@@ -1,0 +1,23 @@
+error[E0501]: cannot borrow `*s` as mutable because previous closure requires unique access
+ --> tests/build-ui/fail/outer_scope_capture.rs:4:5
+  |
+4 |       s.repeat(1, |_| {
+  |       ^ ------    --- closure construction occurs here
+  |       | |
+  |  _____| first borrow later used by call
+  | |
+5 | |         s.read("x", int());
+  | |         - first borrow occurs due to use of `*s` in closure
+6 | |     });
+  | |______^ second borrow occurs here
+
+error[E0500]: closure requires unique access to `*s` but it is already borrowed
+ --> tests/build-ui/fail/outer_scope_capture.rs:4:17
+  |
+4 |     s.repeat(1, |_| {
+  |     - ------    ^^^ closure construction occurs here
+  |     | |
+  |     | first borrow later used by call
+  |     borrow occurs here
+5 |         s.read("x", int());
+  |         - second borrow occurs due to use of `*s` in closure

@@ -1,0 +1,11 @@
+error[E0599]: no method named `row` found for reference `&[i64]` in the current scope
+ --> tests/build-ui/fail/no_row_at_depth_one.rs:9:27
+  |
+9 |     let _ = data.get(row).row(0);
+  |                           ^^^
+  |
+help: there is a method `borrow` with a similar name, but with different arguments
+ --> $RUST/core/src/borrow.rs
+  |
+  |     fn borrow(&self) -> &Borrowed;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

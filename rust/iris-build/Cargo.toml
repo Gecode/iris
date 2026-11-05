@@ -1,0 +1,24 @@
+[package]
+name = "iris-build"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Build Iris reader specs in Rust with typed handles"
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+documentation = "https://docs.rs/gecode-iris"
+keywords.workspace = true
+categories = ["parsing"]
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+iris-core = { version = "0.1.0", path = "../iris-core" }
+iris-macros = { version = "0.1.0", path = "../iris-macros" }
+
+[dev-dependencies]
+iris-syntax = { version = "0.1.0", path = "../iris-syntax" }

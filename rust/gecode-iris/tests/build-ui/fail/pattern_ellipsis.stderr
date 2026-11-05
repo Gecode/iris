@@ -1,0 +1,5 @@
+error: `...` has no spelling in a literal; use `rest_of_line()`
+ --> tests/build-ui/fail/pattern_ellipsis.rs:4:22
+  |
+4 |     let _ = pattern!("a ...");
+  |                      ^^^^^^^

@@ -1,0 +1,7 @@
+error[E0308]: mismatched types
+ --> tests/build-ui/fail/wrong_depth.rs:9:18
+  |
+9 |     let _: i64 = data.get(row);
+  |            ---   ^^^^^^^^^^^^^ expected `i64`, found `&[i64]`
+  |            |
+  |            expected due to this

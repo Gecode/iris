@@ -29,6 +29,17 @@ pub fn iris(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         .into()
 }
 
+/// Parse a line pattern literal and expand to `Pattern` calls.
+///
+/// The input is `[CRATE_PATH] "LITERAL", NAME = EXPR, ...`, where `CRATE_PATH`
+/// names the crate that provides `__private::Pattern`.
+#[proc_macro]
+pub fn pattern(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    expand_pattern(input.into())
+        .unwrap_or_else(syn::Error::into_compile_error)
+        .into()
+}
+
 fn expand_invocation(input: TokenStream) -> syn::Result<TokenStream> {
     let invocation: Invocation = syn::parse2(input)?;
     let spec = load(&invocation.source)?;
@@ -247,4 +258,108 @@ mod tests {
         assert_eq!(token_range(r#""ab""#, 2..2), Some(3..4));
         assert_eq!(token_range(r##"r#"ab"#"##, 5..9), Some(5..6));
     }
+}
+
+/// One `pattern!` call.
+struct PatternInvocation {
+    krate: TokenStream,
+    literal: LitStr,
+    arguments: Vec<(Ident, syn::Expr)>,
+}
+
+impl Parse for PatternInvocation {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let krate;
+        bracketed!(krate in input);
+        let krate = krate.parse()?;
+        let literal = input.parse()?;
+        let mut arguments = Vec::new();
+        while input.parse::<Option<Token![,]>>()?.is_some() && !input.is_empty() {
+            let name = input.parse()?;
+            input.parse::<Token![=]>()?;
+            arguments.push((name, input.parse()?));
+        }
+        Ok(Self {
+            krate,
+            literal,
+            arguments,
+        })
+    }
+}
+
+/// A piece of a pattern literal.
+#[derive(Debug, PartialEq, Eq)]
+enum PatternPiece {
+    Text(String),
+    Interpolation(String),
+}
+
+/// Split a literal into text and `{name}` interpolations.
+fn split_pattern(literal: &str) -> Result<Vec<PatternPiece>, String> {
+    if literal.contains("...") {
+        return Err("`...` has no spelling in a literal; use `rest_of_line()`".into());
+    }
+    let mut pieces = Vec::new();
+    let mut rest = literal;
+    while let Some(open) = rest.find('{') {
+        let (text, tail) = rest.split_at(open);
+        if !text.is_empty() {
+            pieces.push(PatternPiece::Text(text.into()));
+        }
+        let tail = &tail[1..];
+        if tail.starts_with('{') {
+            return Err("`{{` has no spelling: a pattern has no literal `{`".into());
+        }
+        let Some(close) = tail.find('}') else {
+            return Err("this `{` is not closed".into());
+        };
+        let name = &tail[..close];
+        if syn::parse_str::<Ident>(name).is_err() {
+            return Err(format!(
+                "`{{{name}}}` is not an interpolation; write `{{name}}`, and use \
+                 `blank()`, `discard()`, `reference(x)` or `bind(x, type)` for other captures"
+            ));
+        }
+        pieces.push(PatternPiece::Interpolation(name.into()));
+        rest = &tail[close + 1..];
+    }
+    if !rest.is_empty() {
+        pieces.push(PatternPiece::Text(rest.into()));
+    }
+    Ok(pieces)
+}
+
+fn expand_pattern(input: TokenStream) -> syn::Result<TokenStream> {
+    let PatternInvocation {
+        krate,
+        literal,
+        arguments,
+    } = syn::parse2(input)?;
+    let pieces = split_pattern(&literal.value())
+        .map_err(|message| syn::Error::new(literal.span(), message))?;
+    let mut calls = Vec::with_capacity(pieces.len());
+    let mut used = vec![false; arguments.len()];
+    for piece in pieces {
+        calls.push(match piece {
+            PatternPiece::Text(text) => quote!(.text(#text)),
+            PatternPiece::Interpolation(name) => {
+                let argument = arguments.iter().position(|(key, _)| *key == name);
+                if let Some(index) = argument {
+                    used[index] = true;
+                    let value = &arguments[index].1;
+                    quote!(.part(#value))
+                } else {
+                    let name = Ident::new(&name, literal.span());
+                    quote!(.part(#name))
+                }
+            }
+        });
+    }
+    if let Some(index) = used.iter().position(|used| !used) {
+        return Err(syn::Error::new(
+            arguments[index].0.span(),
+            "this argument is not used in the pattern",
+        ));
+    }
+    Ok(quote!(#krate::__private::Pattern::new() #(#calls)*))
 }
