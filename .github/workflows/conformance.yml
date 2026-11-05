@@ -110,11 +110,12 @@ jobs:
       - name: Build Rust workspace
         run: cargo "+${{ steps.msrv.outputs.version }}" build --workspace --locked
       # The compile-fail snapshots record stable's messages. Overwriting them
-      # here still requires each case to fail to compile.
+      # here still requires each case to fail to compile. The builder round
+      # trip lints with the current clippy, in the builder-round-trip job.
       - name: Test Rust workspace
         env:
           TRYBUILD: overwrite
-        run: cargo "+${{ steps.msrv.outputs.version }}" test --workspace --locked
+        run: cargo "+${{ steps.msrv.outputs.version }}" test --workspace --locked -- --skip accepted_specs_round_trip_through_the_rust_builder
       - name: Check browser crate on wasm32
         run: cargo "+${{ steps.msrv.outputs.version }}" check -p iris-wasm --target wasm32-unknown-unknown --locked
       - name: Check TypeScript binding crate on wasm32
