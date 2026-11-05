@@ -387,8 +387,7 @@ private:
   std::size_t outstanding_ = 0;
 };
 
-/// Params::set copies arguments that point into the same Params, and leaves
-/// the Params unchanged when an allocation fails
+/// Params::set copies arguments that point into the same Params
 void sets_params_safely() {
   iris::Params aliased{{"first", "1"}};
   for (int i = 0; i < 8; i++)
@@ -398,6 +397,10 @@ void sets_params_safely() {
   aliased.set("first", aliased.name(3));
   check(aliased.get("first") == "name2", "replace from the same Params");
 
+}
+
+/// Params::set leaves the Params unchanged when an allocation fails
+void keeps_params_on_failure() {
   // Long strings, so that every set allocates.
   const std::string key(64, 'k');
   const std::string value(64, 'v');
@@ -424,6 +427,14 @@ void sets_params_safely() {
     check(memory.outstanding() == 0, "memory after a failed set");
   }
 }
+
+/// Whether moving a container allocates, as it does in a debug MSVC build. It
+/// does so in a noexcept constructor, so a failing resource ends the program.
+#if defined(_ITERATOR_DEBUG_LEVEL) && (_ITERATOR_DEBUG_LEVEL > 0)
+constexpr bool moves_allocate = true;
+#else
+constexpr bool moves_allocate = false;
+#endif
 
 /// Report assertions and aborts on standard error. The debug C runtime on
 /// Windows shows them in a dialog, which waits forever without a desktop.
@@ -452,6 +463,8 @@ int main() {
     run("uses_default_resource", uses_default_resource);
     run("reads_on_threads", reads_on_threads);
     run("sets_params_safely", sets_params_safely);
+    if constexpr (!moves_allocate)
+      run("keeps_params_on_failure", keeps_params_on_failure);
   } catch (const std::exception &error) {
     std::cerr << "unexpected exception: " << error.what() << '\n';
     return EXIT_FAILURE;
