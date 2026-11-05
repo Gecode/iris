@@ -396,7 +396,6 @@ void sets_params_safely() {
         "set from a name of the same Params");
   aliased.set("first", aliased.name(3));
   check(aliased.get("first") == "name2", "replace from the same Params");
-
 }
 
 /// Params::set leaves the Params unchanged when an allocation fails
