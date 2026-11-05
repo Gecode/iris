@@ -42,7 +42,8 @@ M7 work. The dependency order is `gecode-iris-syntax`, `gecode-iris-sema`,
 The independent `gecode-iris-conformance` runner can go anywhere before `gecode-iris-cli`.
 The M5 browser crate `iris-wasm` stays unpublished and does not enter CLI
 archives. If enabled for publication later, it follows `gecode-iris-syntax`,
-`gecode-iris-sema` and `gecode-iris-core`. The nightly fuzz crate stays unpublished.
+`gecode-iris-sema` and `gecode-iris-core`. The `iris-driver` conformance driver and
+the nightly fuzz crate stay unpublished.
 
 The operational binary path is [Release binaries](rust/README.md#release-binaries):
 use its local cargo-dist checks before an authorized `rust-vVERSION` tag push.

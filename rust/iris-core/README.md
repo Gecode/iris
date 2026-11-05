@@ -190,7 +190,7 @@ From `rust/`:
 ```sh
 cargo test --locked -p gecode-iris-core
 cargo test --locked -p gecode-iris-core budget -- --nocapture
-cargo test --locked -p gecode-iris-cli --test read_conformance -- --nocapture
+cargo test --locked -p iris-driver --test read_conformance -- --nocapture
 ```
 
 Conformance is the main semantic coverage. A focused column-access test checks

@@ -5,8 +5,6 @@ name = "rust"
 description = "Iris reader spec tools and language server"
 repository = "https://github.com/Gecode/iris"
 homepage = "https://github.com/Gecode/iris"
-# iris-driver is a conformance tool, not part of the installed CLI.
-binaries = ["iris"]
 
 [dist]
 # Binary releases are independent of crates.io publication (publish = false).

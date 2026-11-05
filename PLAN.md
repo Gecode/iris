@@ -1076,7 +1076,8 @@ before M4e.
   plugin has the ID `dev.gecode.iris` and the name `Gecode Iris`, because an
   unrelated plugin is called Iris. The VS Code extension is `gecode.iris` and
   the Homebrew formula is `gecode/tap/iris`. `iris-driver` is a conformance
-  tool and stays out of `cargo install` and the release archives.
+  tool in its own unpublished crate, so it stays out of `cargo install` and
+  the release archives.
 - **Domain:** the project's domain is `gecode.dev`, and `dev.gecode` where
   reverse order is used. `gecode.org` is no longer the project's, so nothing
   here links to it or uses `org.gecode`.

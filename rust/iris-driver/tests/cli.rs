@@ -14,7 +14,7 @@ fn driver(args: &[&str]) -> Output {
         .unwrap()
 }
 fn check(args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_iris"))
+    Command::new(env!("CARGO_BIN_EXE_iris-cli-under-test"))
         .args(args)
         .output()
         .unwrap()
@@ -106,6 +106,18 @@ fn check_exit_and_caret() {
     let output = check(&["check", &format!("{path}.missing")]);
     assert_eq!(output.status.code(), Some(1));
     assert!(output.stdout.is_empty());
+}
+#[test]
+fn json_cli_matches_driver() {
+    let (dir, spec) = fixture(b"n:int row[n]:int");
+    let input = dir.path().join("input.txt");
+    std::fs::write(&input, "2 10 20").unwrap();
+    let input = input.to_str().unwrap();
+    let expected = driver(&["read", &spec, input]);
+    assert_eq!(expected.status.code(), Some(0));
+    let actual = check(&["read", &spec, input, "--json"]);
+    assert_eq!(actual.status.code(), Some(0));
+    assert_eq!(actual.stdout, expected.stdout);
 }
 #[test]
 fn driver_canonical_documents() {

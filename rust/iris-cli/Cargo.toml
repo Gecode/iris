@@ -8,7 +8,7 @@ description = "Command-line tools for reading instance files with Iris"
 repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
-documentation = "https://docs.rs/gecode-iris-cli"
+documentation = "https://docs.rs/iris-cli"
 keywords.workspace = true
 categories = ["command-line-utilities", "parsing"]
 publish = false
@@ -20,10 +20,6 @@ workspace = true
 [[bin]]
 name = "iris"
 path = "src/bin/iris.rs"
-
-[[bin]]
-name = "iris-driver"
-path = "src/bin/iris-driver.rs"
 
 [dependencies]
 gecode-iris-conformance = { version = "0.1.0", path = "../iris-conformance" }

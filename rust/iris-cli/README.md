@@ -1,12 +1,13 @@
 # gecode-iris-cli
 
-The `iris` command and Rust conformance driver, part of milestone M3 in
+The `iris` command, part of milestone M3 in
 [PLAN.md §8.1](../../PLAN.md#81-rust-rust) and the [§4.2
 layers](../../PLAN.md#42-the-rust-reference-implementation-is-layered). The
 user command checks and formats reader specs, reads inputs through
-[gecode-iris-core](../iris-core/README.md), and starts the language server. The driver
-implements parse-and-resolve, reading, catalog, and dzn output. Parse-only
-requests never execute expressions or parameter defaults.
+[gecode-iris-core](../iris-core/README.md), and starts the language server. The
+[conformance driver](../iris-driver/README.md), a separate crate, implements
+parse-and-resolve, reading, catalog, and dzn output. Parse-only requests never
+execute expressions or parameter defaults.
 
 From `rust/`:
 
@@ -23,12 +24,12 @@ cargo run --locked -p gecode-iris-cli -- list path/to/spec.iris path/to/input.tx
 cargo run --locked -p gecode-iris-cli -- fmt path/to/spec.iris
 cargo run --locked -p gecode-iris-cli -- fmt --check --diff path/to/directory
 cargo run --locked -p gecode-iris-cli -- gen builder --lang rust path/to/spec.iris
-cargo run --locked -p gecode-iris-cli --bin iris-driver -- parse path/to/spec.iris --version 0.1
+cargo run --locked -p iris-driver -- parse path/to/spec.iris --version 0.1
 cargo run --locked -p gecode-iris-cli -- conformance target/debug/iris-driver ../conformance/cases/0.1/smoke
 cargo test --locked -p gecode-iris-cli
 cargo test --locked -p gecode-iris-cli --test complete
 cargo test --locked -p gecode-iris-cli --test gen
-cargo test --locked -p gecode-iris-cli --test parse_conformance -- --nocapture
+cargo test --locked -p iris-driver --test parse_conformance -- --nocapture
 ```
 
 `iris check SPEC` prints `SPEC: ok`, optionally with the format name, and exits
@@ -240,7 +241,7 @@ roots through `iris-conformance run` against the built driver on every push
 and pull request, on Ubuntu and macOS, alongside the Gecode adapter runs.
 
 ```sh
-cargo test --locked -p gecode-iris-cli --test read_conformance -- --nocapture
+cargo test --locked -p iris-driver --test read_conformance -- --nocapture
 ```
 
 Read and catalog enforce [Specification §10's work budgets](../../spec/0.1/10-work-budgets.md):
@@ -276,7 +277,7 @@ mismatch. Build the pinned adapter from the repository root, then run from
 
 ```sh
 adapter=$(../conformance/adapters/gecode/build.sh)
-GECODE_ADAPTER="$adapter" cargo test --locked -p gecode-iris-cli --test scalar_differential -- --ignored --nocapture
+GECODE_ADAPTER="$adapter" cargo test --locked -p iris-driver --test scalar_differential -- --ignored --nocapture
 ```
 
 Checks execute immediately outside instances. False checks report a saved

@@ -475,6 +475,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "iris-driver"
+version = "0.1.0"
+dependencies = [
+ "gecode-iris-cli",
+ "gecode-iris-conformance",
+ "gecode-iris-core",
+ "gecode-iris-syntax",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "iris-js"
 version = "0.1.0"
 dependencies = [

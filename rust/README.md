@@ -34,8 +34,9 @@ enabling publication. The planned crates.io order is `gecode-iris-syntax`, `geco
 `gecode-iris-core`, `gecode-iris-macros`, `gecode-iris-build`, `gecode-iris-gen`, `gecode-iris`, `gecode-iris-conformance`,
 `gecode-iris-lsp`, then `gecode-iris-cli`.
 The standalone `gecode-iris-conformance` runner can be published at any point before
-`gecode-iris-cli`; it has no implementation dependencies. The separate nightly fuzz
-crate remains unpublished.
+`gecode-iris-cli`; it has no implementation dependencies. The
+[iris-driver](iris-driver/README.md) conformance driver and the separate nightly
+fuzz crate remain unpublished. Crate directories keep the short `iris-` names.
 [iris-wasm](iris-wasm/README.md) exposes the in-memory reader, checker and
 formatter to the browser playground (M5, PLAN.md §8.10). Its string-only API
 keeps canonical output and signed 64-bit integers exact. It stays unpublished;
@@ -172,7 +173,7 @@ Check a reader spec and run every parse-only conformance case:
 
 ```sh
 cargo run --locked -p gecode-iris-cli -- check path/to/spec.iris
-cargo test --locked -p gecode-iris-cli --test parse_conformance -- --nocapture
+cargo test --locked -p iris-driver --test parse_conformance -- --nocapture
 ```
 
 The parse integration test loads the whole version tree and selects parse
@@ -194,7 +195,7 @@ cargo run --locked -p gecode-iris-cli -- read path/to/spec.iris path/to/input.tx
 cargo run --locked -p gecode-iris-cli -- read path/to/spec.iris path/to/input.txt --json
 cargo run --locked -p gecode-iris-cli -- read path/to/spec.iris path/to/input.txt --dzn
 cargo run --locked -p gecode-iris-cli -- list path/to/spec.iris path/to/input.txt --dzn
-cargo test --locked -p gecode-iris-cli --test read_conformance -- --nocapture
+cargo test --locked -p iris-driver --test read_conformance -- --nocapture
 ```
 
 The read command defaults to `--summary`: each file has a header with its path

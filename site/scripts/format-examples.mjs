@@ -10,7 +10,7 @@ import { discoverFormatSources, repository, siteDirectory } from './format-sourc
 export { repository, siteDirectory };
 
 export function buildExampleTools() {
-  const build = run('cargo', ['build', '--locked', '--manifest-path', resolve(repository, 'rust/Cargo.toml'), '-p', 'gecode-iris-cli', '--bin', 'iris', '--bin', 'iris-driver', '--message-format=json'], { cwd: resolve(repository, 'rust') });
+  const build = run('cargo', ['build', '--locked', '--manifest-path', resolve(repository, 'rust/Cargo.toml'), '-p', 'gecode-iris-cli', '-p', 'iris-driver', '--bin', 'iris', '--bin', 'iris-driver', '--message-format=json'], { cwd: resolve(repository, 'rust') });
   if (build.status !== 0) throw new Error(`Cannot build Iris examples:\n${build.stderr}`);
   const artifacts = build.stdout.trim().split('\n').map(line => JSON.parse(line));
   const binary = name => {

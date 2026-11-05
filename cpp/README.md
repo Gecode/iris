@@ -277,7 +277,7 @@ conformance cases given as roots. Build the Rust driver in release mode and
 the sanitized driver, then from `rust/`:
 
 ```sh
-cargo build --release --locked -p gecode-iris-cli -p gecode-iris-conformance
+cargo build --release --locked -p iris-driver -p gecode-iris-conformance
 (cd ../cpp && cmake --preset asan && cmake --build --preset asan --target iris-driver)
 ASAN_OPTIONS=abort_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:abort_on_error=1 \
   target/release/iris-conformance differential \
