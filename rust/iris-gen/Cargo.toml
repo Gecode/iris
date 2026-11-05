@@ -8,10 +8,9 @@ description = "Generate spec builder programs from Iris reader specs"
 repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
-documentation = "https://docs.rs/iris-gen"
+documentation = "https://docs.rs/gecode-iris-gen"
 keywords.workspace = true
 categories = ["parsing"]
-publish = false
 
 [lints]
 workspace = true

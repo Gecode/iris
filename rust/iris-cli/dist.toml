@@ -7,6 +7,6 @@ repository = "https://github.com/Gecode/iris"
 homepage = "https://github.com/Gecode/iris"
 
 [dist]
-# Binary releases are independent of crates.io publication (publish = false).
+# Binary releases are independent of crates.io publication.
 dist = true
 display-name = "Iris"

@@ -27,16 +27,16 @@ implementation crate, [gecode-iris-macros](iris-macros/README.md), depends on
 reader specs in Rust with typed handles.
 [gecode-iris-gen](iris-gen/README.md) prints a builder program for a reader spec, which
 `iris gen builder` exposes; it depends on `gecode-iris-syntax` and `gecode-iris-sema` only.
-All workspace
-crates currently set `publish = false`; publication belongs to milestone M7.
-Package metadata and versioned internal dependencies are prepared without
-enabling publication. The planned crates.io order is `gecode-iris-syntax`, `gecode-iris-sema`,
-`gecode-iris-core`, `gecode-iris-macros`, `gecode-iris-build`, `gecode-iris-gen`, `gecode-iris`, `gecode-iris-conformance`,
-`gecode-iris-lsp`, then `gecode-iris-cli`.
-The standalone `gecode-iris-conformance` runner can be published at any point before
-`gecode-iris-cli`; it has no implementation dependencies. The
+The ten `gecode-iris` crates are ready for crates.io, and
+[RELEASING.md](../RELEASING.md#rust) holds the publication procedure. The order is
+`gecode-iris-syntax`, `gecode-iris-sema`, `gecode-iris-core`, `gecode-iris-macros`,
+`gecode-iris-build`, `gecode-iris-gen`, `gecode-iris`, `gecode-iris-conformance`,
+`gecode-iris-lsp`, then `gecode-iris-cli`. The standalone `gecode-iris-conformance`
+runner can be published at any point before `gecode-iris-cli`; it has no
+implementation dependencies. Each crate's `LICENSE` is a symbolic link to the
+repository's, which `cargo package` turns into a file. The
 [iris-driver](iris-driver/README.md) conformance driver and the separate nightly
-fuzz crate remain unpublished. Crate directories keep the short `iris-` names.
+fuzz crate stay unpublished. Crate directories keep the short `iris-` names.
 [iris-wasm](iris-wasm/README.md) exposes the in-memory reader, checker and
 formatter to the browser playground (M5, PLAN.md §8.10). Its string-only API
 keeps canonical output and signed 64-bit integers exact. It stays unpublished;
@@ -45,10 +45,10 @@ publication order. [iris-js](iris-js/README.md) is the unpublished
 WebAssembly boundary of the npm package in `typescript/` (M4f, PLAN.md §8.16).
 It parses a spec once into a handle, returns data in a binary layout that
 JavaScript copies, and renders JSON and dzn through gecode-iris-core on request.
-Later work may add `iris-lint`.
 [PLAN.md §4.2](../PLAN.md#42-the-rust-reference-implementation-is-layered)
 describes the layers; §8.1, §8.7, §8.12 and §8.13 describe the crates. Milestones
-M3, M4b, M4e and M6b cover the core/CLI, language server, formatter and linter.
+M3, M4b and M4e cover the core/CLI, language server and formatter. M6b decided on
+no linter for now.
 
 The minimum supported Rust version (MSRV) is **1.88**. The existing source uses
 let chains, which require Rust 1.88; the workspace builds and tests with 1.88.0.
@@ -362,7 +362,10 @@ dist generate --check --mode ci
 dist build --target aarch64-apple-darwin --tag rust-v0.1.0
 ```
 
-Replace the build target with the host's target triple. `dist plan` without a
+`dist plan --tag rust-vVERSION` must list one app, `rust`, with one `iris` binary
+per target. cargo-dist treats every publishable crate with a binary as an app, so
+`gecode-iris-conformance` sets `dist = false`, and a new crate with a binary needs the
+same. Replace the build target with the host's target triple. `dist plan` without a
 tag infers `vVERSION`; supply `--tag rust-vVERSION` to check the actual release
 URLs. Distribution artifacts go into `target/distrib/` at the repository root.
 `CARGO_TARGET_DIR` controls Cargo's compiled output separately. The `dist`

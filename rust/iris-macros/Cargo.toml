@@ -11,7 +11,6 @@ readme = "README.md"
 documentation = "https://docs.rs/gecode-iris"
 keywords.workspace = true
 categories = ["parsing"]
-publish = false
 
 [lib]
 proc-macro = true

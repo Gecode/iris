@@ -4,7 +4,7 @@
 
 ### Library
 
-- Add the unpublished `gecode-iris-gen` crate, which generates spec builder programs
+- Add the `gecode-iris-gen` crate, which generates spec builder programs
   from reader specs, with a Rust backend. `iris gen builder --lang rust SPEC`
   prints one.
 - Add `iris-conformance compare`, which compares two reader specs as syntax
@@ -68,6 +68,7 @@
   comparison.
 - Prepare cargo-dist CLI archives and installers for Linux, macOS, and Windows
   under `rust-v` tags. Homebrew publication remains disabled.
-- Prepare crate metadata and versioned internal dependencies for publication;
-  all crates remain unpublished with `publish = false`. Set the minimum
-  supported Rust version to 1.88 and document API stability.
+- Prepare the ten `gecode-iris` crates for crates.io, with metadata, versioned
+  internal dependencies and the license text. `iris-driver`, `iris-wasm`,
+  `iris-js` and the fuzz crate stay unpublished. Set the minimum supported Rust
+  version to 1.88 and document API stability.

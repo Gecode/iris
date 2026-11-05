@@ -8,10 +8,9 @@ description = "Language server for Iris reader specs"
 repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
-documentation = "https://docs.rs/iris-lsp"
+documentation = "https://docs.rs/gecode-iris-lsp"
 keywords.workspace = true
 categories = ["development-tools"]
-publish = false
 
 [lints]
 workspace = true

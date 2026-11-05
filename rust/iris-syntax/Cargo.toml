@@ -8,10 +8,9 @@ description = "Lossless parsing and formatting for the Iris reader language"
 repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
-documentation = "https://docs.rs/iris-syntax"
+documentation = "https://docs.rs/gecode-iris-syntax"
 keywords.workspace = true
 categories = ["parsing"]
-publish = false
 
 [package.metadata.docs.rs]
 all-features = true

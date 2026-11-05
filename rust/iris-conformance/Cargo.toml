@@ -8,10 +8,9 @@ description = "Language-neutral conformance runner for Iris implementations"
 repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
-documentation = "https://docs.rs/iris-conformance"
+documentation = "https://docs.rs/gecode-iris-conformance"
 keywords.workspace = true
 categories = ["development-tools::testing", "command-line-utilities"]
-publish = false
 
 # The runner keeps the short command name.
 [[bin]]
@@ -29,3 +28,8 @@ serde_json = { version = "1.0", features = ["raw_value", "float_roundtrip"] }
 shell-words = "1.1"
 tempfile = "3"
 toml = "1.1"
+
+# The runner is a library and a developer tool: `cargo install` provides it, and
+# binary releases carry only `iris`. Publishing no longer keeps it out of dist.
+[package.metadata.dist]
+dist = false

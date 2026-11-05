@@ -14,10 +14,13 @@ tags; [§11](PLAN.md#11-milestones) defines the release milestones.
 
 | Component | Tag | Current release support |
 |---|---|---|
-| Rust crates and CLI binaries | `rust-vVERSION` | cargo-dist workflow ready; crates.io publication planned for M7 |
-| Python | `python-vVERSION` | Planned: binding, wheels, source distribution, and registry publication |
+| Rust crates and CLI binaries | `rust-vVERSION` | Ready: crates package and build, and the cargo-dist workflow is in place; publication is by hand |
+| Python | `python-vVERSION` | CI builds and tests the wheels and source distribution; PyPI publication planned for M7 |
+| TypeScript | `typescript-vVERSION` | Package built and tested; still `private`, and npm publication planned for M7 |
 | Java and Kotlin | `java-vVERSION` | Native library and Kotlin module ready; Maven Central publication planned for M7 |
-| C++ | `cpp-vVERSION` | Planned: native library, CMake package, and distribution |
+| C++ | `cpp-vVERSION` | Native library and CMake package ready; distribution planned for M7 |
+| JetBrains plugin | `jetbrains-vVERSION` | Plugin built and verified; Marketplace publication planned for M7 |
+| VS Code extension | `vscode-vVERSION` | Not built yet |
 | Documentation site | No version tag; deploys from `main` | Deployment configured; production setup and live verification required |
 
 For the affected component, update its package versions, internal dependency
@@ -34,9 +37,7 @@ Build and publication commands belong in the component guides below.
 ## Rust
 
 Follow [rust/README.md](rust/README.md) for development checks, API stability,
-MSRV, and publication preparation. All workspace crates currently have
-`publish = false`; enabling crates.io publication and registry automation is
-M7 work. The dependency order is `gecode-iris-syntax`, `gecode-iris-sema`,
+MSRV, and publication preparation. The dependency order is `gecode-iris-syntax`, `gecode-iris-sema`,
 `gecode-iris-core`, `gecode-iris-macros`, `gecode-iris-build`, `gecode-iris-gen`,
 `gecode-iris`, `gecode-iris-conformance`, `gecode-iris-lsp`, then `gecode-iris-cli`.
 The independent `gecode-iris-conformance` runner can go anywhere before `gecode-iris-cli`.
@@ -44,6 +45,24 @@ The M5 browser crate `iris-wasm` stays unpublished and does not enter CLI
 archives. If enabled for publication later, it follows `gecode-iris-syntax`,
 `gecode-iris-sema` and `gecode-iris-core`. The `iris-driver` conformance driver and
 the nightly fuzz crate stay unpublished.
+
+Check a release from `rust/` on a clean checkout of the source commit. This
+packages every publishable crate and builds each from its archive, and uploads
+nothing:
+
+```sh
+cargo publish --dry-run --workspace --locked
+```
+
+An authorized publication runs the same command without `--dry-run`, after
+`cargo login` with a crates.io token. Cargo publishes in dependency order and
+waits for each crate to reach the index. crates.io limits how fast new crate names
+can be created, so the first publication can stop partway with a 429 response.
+Wait for the time it names, then publish the remaining crates with
+`cargo publish --locked -p NAME ...`, as in
+[Recover after partial publication](#recover-after-partial-publication).
+Registry automation can follow the first publication, because crates.io trusted
+publishing is configured on a crate that already exists.
 
 The operational binary path is [Release binaries](rust/README.md#release-binaries):
 use its local cargo-dist checks before an authorized `rust-vVERSION` tag push.
@@ -61,9 +80,11 @@ deploy automatically once the secrets are configured, so authorization for
 such a push must cover the deployment. A configured workflow or a local dry
 run does not establish that production is live.
 
-The [Python](python/README.md), [Java and Kotlin](java/README.md), and
-[C++](cpp/README.md) guides describe planned components. Before their first
-releases, add component changelogs and registry procedures.
+The [Python](python/README.md), [TypeScript](typescript/README.md),
+[Java and Kotlin](java/README.md), [C++](cpp/README.md) and
+[JetBrains](editors/jetbrains/README.md) guides describe components that have not
+been released. Before their first releases, add component changelogs and registry
+procedures.
 Python's procedure must cover checked wheels and a source distribution that
 builds without a sibling checkout. Their versions need not match Rust's.
 

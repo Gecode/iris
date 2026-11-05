@@ -8,10 +8,9 @@ description = "Command-line tools for reading instance files with Iris"
 repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
-documentation = "https://docs.rs/iris-cli"
+documentation = "https://docs.rs/gecode-iris-cli"
 keywords.workspace = true
 categories = ["command-line-utilities", "parsing"]
-publish = false
 default-run = "iris"
 
 [lints]
