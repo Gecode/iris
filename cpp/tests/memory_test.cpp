@@ -22,6 +22,7 @@
 #include <thread>
 
 #ifdef _WIN32
+#include <crtdbg.h>
 #include <malloc.h>
 #endif
 
@@ -424,14 +425,33 @@ void sets_params_safely() {
   }
 }
 
+/// Report assertions and aborts on standard error. The debug C runtime on
+/// Windows shows them in a dialog, which waits forever without a desktop.
+void report_failures_on_stderr() {
+#ifdef _WIN32
+  for (const int kind : {_CRT_WARN, _CRT_ERROR, _CRT_ASSERT}) {
+    _CrtSetReportMode(kind, _CRTDBG_MODE_FILE);
+    _CrtSetReportFile(kind, _CRTDBG_FILE_STDERR);
+  }
+  _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+#endif
+}
+
+/// Run `step`, naming it first so that a crash or a timeout shows where
+void run(std::string_view name, void (*step)()) {
+  std::cerr << name << '\n';
+  step();
+}
+
 int main() {
+  report_failures_on_stderr();
   try {
-    reads_with_resource();
-    reads_files_with_resource();
-    returns_memory_on_errors();
-    uses_default_resource();
-    reads_on_threads();
-    sets_params_safely();
+    run("reads_with_resource", reads_with_resource);
+    run("reads_files_with_resource", reads_files_with_resource);
+    run("returns_memory_on_errors", returns_memory_on_errors);
+    run("uses_default_resource", uses_default_resource);
+    run("reads_on_threads", reads_on_threads);
+    run("sets_params_safely", sets_params_safely);
   } catch (const std::exception &error) {
     std::cerr << "unexpected exception: " << error.what() << '\n';
     return EXIT_FAILURE;

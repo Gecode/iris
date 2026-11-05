@@ -29,6 +29,7 @@ target_link_libraries(iris-memory-test PRIVATE iris::iris Threads::Threads)
 set_target_properties(iris-memory-test PROPERTIES CXX_EXTENSIONS OFF)
 iris_set_warnings(iris-memory-test)
 add_test(NAME memory COMMAND iris-memory-test)
+set_tests_properties(memory PROPERTIES TIMEOUT 120)
 
 # Each public header compiles alone, and no public header names Gecode.
 get_target_property(iris_headers iris HEADER_SET)
