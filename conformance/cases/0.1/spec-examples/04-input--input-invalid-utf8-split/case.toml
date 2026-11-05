@@ -4,7 +4,7 @@ section = "spec/0.1/04-input.md"
 source = "spec:spec/0.1/04-input.md#input-invalid-utf8-split"
 
 [[known_failure]]
-driver = "gecode-6.5.0-5e7bbd5c26b0"
+driver = "gecode-6.5.0-599f977b7855"
 outcome = "unrepresentable"
 reason = "Gecode reads a non-UTF-8 word after byte-wise token splitting; the adapter cannot serialize it."
 difference = "spec/0.1/appendix-c-differences.md#c1-unicode-strings"

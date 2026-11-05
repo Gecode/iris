@@ -8,7 +8,7 @@ depot to open at time 0. Data contains `n`, `dist`, `ready`, and `due`.
 The format source is López-Ibáñez and Blum's
 [TSPTW instance format](https://lopez-ibanez.eu/tsptw-instances).
 The reader spec is copied verbatim from
-[Gecode's tsptw.cpp](https://github.com/Gecode/gecode/blob/5e7bbd5c26b0702c6fd652356b2289da0710ac3c/examples/tsptw.cpp#L126).
+[Gecode's tsptw.cpp](https://github.com/Gecode/gecode/blob/599f977b7855dba2a1a5f67db1892722372067d3/examples/tsptw.cpp#L126).
 
 - [three-nodes](cases/three-nodes/) has a depot and two customers, with
   asymmetric travel times and valid windows.

@@ -62,9 +62,9 @@ jobs:
               [[ -z "$pattern" || "$pattern" == \#* ]] || skips+=(--skip "$pattern")
             done < conformance/adapters/gecode/libstdcxx-skips.txt
           fi
-          (cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$adapter\"" --driver-id gecode-6.5.0-5e7bbd5c26b0 "${skips[@]}" ../conformance/cases/0.1)
+          (cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$adapter\"" --driver-id gecode-6.5.0-599f977b7855 "${skips[@]}" ../conformance/cases/0.1)
       - name: Run Gecode format cases
-        run: (cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$adapter\"" --driver-id gecode-6.5.0-5e7bbd5c26b0 ../formats)
+        run: (cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$adapter\"" --driver-id gecode-6.5.0-599f977b7855 ../formats)
       - name: Run Rust conformance cases
         run: (cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$PWD/target/debug/iris-driver\"" ../conformance/cases/0.1)
       - name: Run Rust format cases

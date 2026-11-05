@@ -7,7 +7,7 @@ for SATLIB-style tails. Data contains `vars`, `clauses`, and the ragged
 
 The format source is DIMACS, [Satisfiability: Suggested Format, §2.1](https://www.cs.ubc.ca/~babic/doc/dimacs_cnf.pdf).
 The reader spec is copied from
-[Gecode's sat.cpp](https://github.com/Gecode/gecode/blob/5e7bbd5c26b0702c6fd652356b2289da0710ac3c/examples/sat.cpp#L56).
+[Gecode's sat.cpp](https://github.com/Gecode/gecode/blob/599f977b7855dba2a1a5f67db1892722372067d3/examples/sat.cpp#L56).
 
 - [three-variables](cases/three-variables/) has three variables and three
   clauses of different lengths.

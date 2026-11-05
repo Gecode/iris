@@ -3,7 +3,7 @@
 The C++23 library `iris` parses and checks reader specs and reads data
 files with them. It is a native port of Gecode's implementation
 (`gecode/instance/spec.cpp`, `resolve.cpp`, `reader.cpp`, `eval.cpp`,
-`data.cpp` and `impl.hpp` at commit `5e7bbd5c26b0`) that does not depend on
+`data.cpp` and `impl.hpp` at commit `599f977b7855`) that does not depend on
 Gecode, built with CMake. It is designed so that Gecode 7 can adopt it.
 `PLAN.md` §8.4 describes the library; milestone M4c builds it. The
 [C++ guide](https://iris.gecode.dev/using/cpp/) on the site shows how to use

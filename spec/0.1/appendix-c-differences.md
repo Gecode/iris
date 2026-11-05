@@ -56,7 +56,7 @@ accumulation, and comparisons. Overflow MUST NOT change acceptance or the
 point of exhaustion.
 
 This is a temporary difference from the pinned reference commit
-`5e7bbd5c26b0702c6fd652356b2289da0710ac3c`, which has signed-overflow
+`599f977b7855dba2a1a5f67db1892722372067d3`, which has signed-overflow
 undefined behavior in budget arithmetic. In `gecode/instance/eval.cpp`,
 lines 360, 613, 676, and 770 compute `1 + leaves()` in `int` before passing
 the result to the wider charge function. `Value::leaves()` returns `int`
@@ -84,7 +84,7 @@ binary64 values spaced by 16, and their negatives. For example, the first
 positive value MUST render `99999999999999600.0`.
 
 This is a temporary difference from the pinned reference commit
-`5e7bbd5c26b0702c6fd652356b2289da0710ac3c`, which renders each of those
+`599f977b7855dba2a1a5f67db1892722372067d3`, which renders each of those
 float leaves as empty text. In `print_real` at
 `gecode/instance/data.cpp:427`, the calculation
 `floor(log10(abs(f))) + 1` rounds the logarithm to 17 and starts the

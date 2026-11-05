@@ -15,9 +15,8 @@ are separate: each package MUST state the language versions it supports.
 
 ## 1.2 Reference behavior
 
-While the Gecode `release-6.5.0` tag is unavailable, the reference is the
-Gecode commit `5e7bbd5c26b0702c6fd652356b2289da0710ac3c` on branch
-`feature/6.5.0`. The repository's [reference build script](../../scripts/README.md#build-the-gecode-reference)
+The reference is the Gecode `release-6.5.0` tag, commit
+`599f977b7855dba2a1a5f67db1892722372067d3`. The repository's [reference build script](../../scripts/README.md#build-the-gecode-reference)
 builds this pin independently of any other Gecode checkout.
 
 The pinned implementation's behavior takes precedence over its Doxygen

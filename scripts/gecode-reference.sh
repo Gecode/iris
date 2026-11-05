@@ -2,8 +2,8 @@
 set -euo pipefail
 
 gecode_repository=https://github.com/Gecode/gecode
-# Switch to the release-6.5.0 tag once it exists.
-gecode_sha=5e7bbd5c26b0702c6fd652356b2289da0710ac3c
+# The release-6.5.0 tag.
+gecode_sha=599f977b7855dba2a1a5f67db1892722372067d3
 
 repo_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cache_dir=${IRIS_CACHE_DIR:-"$repo_dir/.cache"}

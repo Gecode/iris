@@ -421,7 +421,7 @@ Measured 2026-11-02 on a MacBook Pro (MacBookPro18,4), Apple M1 Max,
 10 cores (8 performance, 2 efficiency), 64 GiB RAM, arm64 macOS 27.0.1
 (26A434). Rust 1.98.1 / LLVM 22.1.8, Apple Clang 21.0.0,
 Python 3.15.1, Hyperfine 2.0.0. Gecode reference pin:
-`5e7bbd5c26b0702c6fd652356b2289da0710ac3c`. Rust baseline:
+`599f977b7855dba2a1a5f67db1892722372067d3`. Rust baseline:
 `f540ed2a3942747c141c7634074570fb218a00b9`; final runs include the local
 rust-018 changes. Both use ordinary release builds.
 The generator produced 4,724,402 clauses and 100,000,054 bytes including the

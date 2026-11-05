@@ -383,11 +383,11 @@ fn add_example(
     }
     if let Some(known) = known_failure(&example.id) {
         metadata.push_str(&format!(
-            "\n[[known_failure]]\ndriver = \"gecode-6.5.0-5e7bbd5c26b0\"\noutcome = {:?}\n",
+            "\n[[known_failure]]\ndriver = \"gecode-6.5.0-599f977b7855\"\noutcome = {:?}\n",
             known.outcome
         ));
         if let Some((file, expected)) = known.alternate {
-            let expected_file = format!("known/gecode-6.5.0-5e7bbd5c26b0/{file}");
+            let expected_file = format!("known/gecode-6.5.0-599f977b7855/{file}");
             metadata.push_str(&format!("expected_file = {expected_file:?}\n"));
             files.insert(directory.join(expected_file), expected.as_bytes().to_vec());
         }

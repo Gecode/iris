@@ -14,7 +14,7 @@ part of milestone M2; its layout follows [§5](../PLAN.md#5-repository-layout).
 | [Nonogram](nonogram/) | A 5×5 X; a clue wider than the board. |
 
 Each `<format>/<format>.iris` contains `instance_spec` from the corresponding
-Gecode example at commit `5e7bbd5c26b0702c6fd652356b2289da0710ac3c`, formatted
+Gecode example at commit `599f977b7855dba2a1a5f67db1892722372067d3`, formatted
 with `iris fmt` according to the [formatting guide](../docs/formatting.md).
 Formatting changes only whitespace and line breaks. All six were extracted
 from C++ raw string literals without escape decoding; extraction was checked
@@ -51,7 +51,7 @@ From the repository root:
 eval "$(scripts/gecode-reference.sh --print-env)"
 adapter=$(conformance/adapters/gecode/build.sh)
 (cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$adapter\"" \
-  --driver-id gecode-6.5.0-5e7bbd5c26b0 ../formats)
+  --driver-id gecode-6.5.0-599f977b7855 ../formats)
 ```
 
 For a direct read with the reference tool:

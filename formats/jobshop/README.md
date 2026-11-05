@@ -12,7 +12,7 @@ and the format description at the start of
 [jobshop1.txt](https://people.brunel.ac.uk/~mastjjb/jeb/orlib/files/jobshop1.txt),
 also used by [JSPLIB](https://github.com/tamy0612/JSPLIB). The reader spec
 is copied verbatim from
-[Gecode's job-shop.cpp](https://github.com/Gecode/gecode/blob/5e7bbd5c26b0702c6fd652356b2289da0710ac3c/examples/job-shop.cpp#L94).
+[Gecode's job-shop.cpp](https://github.com/Gecode/gecode/blob/599f977b7855dba2a1a5f67db1892722372067d3/examples/job-shop.cpp#L94).
 
 - [or-library](cases/or-library/) has three jobs and three machines,
   a description, separators, and `instance handmade-or`. Its

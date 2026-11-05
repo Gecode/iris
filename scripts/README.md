@@ -63,7 +63,7 @@ to limit parallel compilation.
 
 The script shallow-fetches the pinned Gecode commit directly from GitHub.
 It does not use an existing Gecode checkout. The pin lives near the top of
-`gecode-reference.sh`; it will move to `release-6.5.0` when that tag exists.
+`gecode-reference.sh` and names the `release-6.5.0` tag's commit.
 
 By default, sources, build output, and installed files are stored under
 `<repo>/.cache/gecode/<sha>/{src,build,install}`. Set `IRIS_CACHE_DIR` to use

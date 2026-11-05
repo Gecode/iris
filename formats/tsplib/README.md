@@ -8,7 +8,7 @@ This is a TSP reader, not the complete family of TSPLIB problem formats.
 
 The format source is Gerhard Reinelt's [TSPLIB 95 documentation](https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/tsp/tsp95.pdf),
 particularly the specification and data parts. The reader spec is copied from
-[Gecode's tsp.cpp](https://github.com/Gecode/gecode/blob/5e7bbd5c26b0702c6fd652356b2289da0710ac3c/examples/tsp.cpp#L246).
+[Gecode's tsp.cpp](https://github.com/Gecode/gecode/blob/599f977b7855dba2a1a5f67db1892722372067d3/examples/tsp.cpp#L246).
 
 - [explicit-five](cases/explicit-five/) stores a symmetric 5×5
   `FULL_MATRIX` as the `weight` entry.

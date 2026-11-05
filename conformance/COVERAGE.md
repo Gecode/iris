@@ -12,7 +12,7 @@ M2. It uses the ordinary [case contract](README.md#case-files-and-discovery).
 The extractor continues to own `spec-examples/`; no generated case is edited.
 
 Every new runnable expectation was captured from the pinned reference
-`5e7bbd5c26b0702c6fd652356b2289da0710ac3c`, using `gecode-instance`
+`599f977b7855dba2a1a5f67db1892722372067d3`, using `gecode-instance`
 and the adapter. Successful reads were rendered through both tools and
 compared byte for byte before retaining the adapter's canonical JSON.
 Error codes and coordinates were checked against the raw reference

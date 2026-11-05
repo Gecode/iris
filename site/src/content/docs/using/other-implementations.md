@@ -24,9 +24,9 @@ holds the language-neutral cases that every implementation must pass.
 
 Gecode 6.5.0 reads Iris 0.1 through its own reader. Iris 0.1 is the Gecode
 6.5.0 language, apart from the
-[documented differences](/specification/0.1/appendix-c-differences/). Until
-the Gecode `release-6.5.0` tag exists, the reference is commit
-`5e7bbd5c26b0702c6fd652356b2289da0710ac3c`. Language versions are separate
+[documented differences](/specification/0.1/appendix-c-differences/). The
+reference is the Gecode `release-6.5.0` tag, commit
+`599f977b7855dba2a1a5f67db1892722372067d3`. Language versions are separate
 from package versions.
 
 Gecode 7 will use Iris 1.0. That integration is planned, without a release

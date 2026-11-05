@@ -202,7 +202,7 @@ fields must still be present.
 Select a stable driver ID with optional runner argument `--driver-id ID`, independent
 of executable name, installation path, and wrapper arguments. No new driver query
 command is needed. Without this option, no known-failure entries apply; normal failures
-remain failures. The reference ID is `gecode-6.5.0-5e7bbd5c26b0`, binding exemptions to
+remain failures. The reference ID is `gecode-6.5.0-599f977b7855`, binding exemptions to
 the pinned reference. A later changed pin gets a new ID and a review of its remaining
 discrepancies.
 
@@ -220,9 +220,9 @@ Example contract, not a real case to add in this task:
 
 ```toml
 [[known_failure]]
-driver = "gecode-6.5.0-5e7bbd5c26b0"
+driver = "gecode-6.5.0-599f977b7855"
 outcome = "dzn"
-expected_file = "known/gecode-6.5.0-5e7bbd5c26b0/output.dzn"
+expected_file = "known/gecode-6.5.0-599f977b7855/output.dzn"
 reason = "The pinned printer omits float leaves in the range documented in C.4."
 difference = "spec/0.1/appendix-c-differences.md#c4-dzn-floats-just-below-1e17"
 ```
@@ -244,7 +244,7 @@ For example:
 
 ```toml
 [[known_failure]]
-driver = "gecode-6.5.0-5e7bbd5c26b0"
+driver = "gecode-6.5.0-599f977b7855"
 outcome = "unrepresentable"
 reason = "Gecode reads a non-UTF-8 word after byte-wise token splitting; the adapter cannot serialize it."
 difference = "spec/0.1/appendix-c-differences.md#c1-unicode-strings"
@@ -332,7 +332,7 @@ Empty data cannot stand in for parse success.
 
 The extractor's `known_failure` function in
 [examples.rs](../rust/iris-conformance/src/examples.rs) owns six deliberate annotations
-and the five complete alternate expectations for `gecode-6.5.0-5e7bbd5c26b0`:
+and the five complete alternate expectations for `gecode-6.5.0-599f977b7855`:
 
 - `input-invalid-utf8-split`: the exact `unrepresentable` exception above, under
   [C.1](../spec/0.1/appendix-c-differences.md#c1-unicode-strings).
@@ -472,7 +472,7 @@ Build the adapter and run the real suite from the repository root:
 adapter=$(conformance/adapters/gecode/build.sh)
 ctest --test-dir "$(dirname "$adapter")" --output-on-failure
 (cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$adapter\"" \
-  --driver-id gecode-6.5.0-5e7bbd5c26b0 ../conformance/cases/0.1)
+  --driver-id gecode-6.5.0-599f977b7855 ../conformance/cases/0.1)
 ```
 
 The build prints the absolute executable path, so the driver works from the runner's

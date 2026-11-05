@@ -3,7 +3,7 @@
 These six files are byte-for-byte copies of the Rust parser fixtures at
 [`rust/iris-syntax/tests/fixtures/gecode/`](../../../../../rust/iris-syntax/tests/fixtures/gecode/).
 They contain the `instance_spec` payloads from Gecode commit
-`5e7bbd5c26b0702c6fd652356b2289da0710ac3c`, the Iris 0.1 reference.
+`599f977b7855dba2a1a5f67db1892722372067d3`, the Iris 0.1 reference.
 The source paths and extraction instructions are in that directory's README.
 
 ## Upstream copyright and permission

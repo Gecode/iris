@@ -346,7 +346,7 @@ it reports a distinct adapter diagnostic.
 ## 11.7 Exclusions and source coverage
 
 This section is informative. The pin is
-`5e7bbd5c26b0702c6fd652356b2289da0710ac3c`. Sites are relative to its `src/`:
+`599f977b7855dba2a1a5f67db1892722372067d3`. Sites are relative to its `src/`:
 `s` = `gecode/instance/spec.cpp`, `r` = `gecode/instance/resolve.cpp`,
 `e` = `gecode/instance/eval.cpp`, `i` = `gecode/instance/reader.cpp`,
 `d` = `gecode/instance/data.cpp`, `h` = `gecode/instance/impl.hpp`.

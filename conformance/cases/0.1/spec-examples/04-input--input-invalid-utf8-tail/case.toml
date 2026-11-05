@@ -4,8 +4,8 @@ section = "spec/0.1/04-input.md"
 source = "spec:spec/0.1/04-input.md#input-invalid-utf8-tail"
 
 [[known_failure]]
-driver = "gecode-6.5.0-5e7bbd5c26b0"
+driver = "gecode-6.5.0-599f977b7855"
 outcome = "data"
-expected_file = "known/gecode-6.5.0-5e7bbd5c26b0/expected.json"
+expected_file = "known/gecode-6.5.0-599f977b7855/expected.json"
 reason = "Gecode does not validate UTF-8 in comments or ignored trailing input and reads x = 7."
 difference = "spec/0.1/appendix-c-differences.md#c1-unicode-strings"

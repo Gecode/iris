@@ -2,10 +2,10 @@
 
 This convention belongs to the conformance suite in [PLAN.md §7](../PLAN.md#7-conformance-suite),
 milestone M2. Use the [case and driver contract](README.md) for every ported case.
-The reference is Gecode commit `5e7bbd5c26b0702c6fd652356b2289da0710ac3c`.
+The reference is Gecode commit `599f977b7855dba2a1a5f67db1892722372067d3`.
 
 1. Read `test/instance.cpp` at that pin with
-   `git -C /Users/zayenz/gecode/gecode show 5e7bbd5c26b0702c6fd652356b2289da0710ac3c:test/instance.cpp`.
+   `git -C /Users/zayenz/gecode/gecode show 599f977b7855dba2a1a5f67db1892722372067d3:test/instance.cpp`.
    Never change or build that checkout. Record the pin and assigned source lines.
 2. Enumerate every source test group and distinct execution, including loop
    iterations, helper calls, and trailing fails/rejects returns outside `CHECK`.
@@ -160,7 +160,7 @@ exclusive-bound underflow uses `E-INTEGER-OVERFLOW`, and malformed captures use
 the adapter's full location document. Parse columns are null; the plain false
 check in `control-3` has path `[]`; every other error has a null path.
 
-Validation against `gecode-6.5.0-5e7bbd5c26b0`, including the 15 unchanged smoke
+Validation against `gecode-6.5.0-599f977b7855`, including the 15 unchanged smoke
 cases: `Summary: total=99 pass=99 xfail=0 fail=0 xpass=0` (exit 0).
 
 ## Batch 2 review: lines 387–615
@@ -221,7 +221,7 @@ All errors retain the adapter's full location document with case-relative
 origins and null record paths. The unknown parameter has null reader-spec
 line/column; all parse columns are null.
 
-Validation against `gecode-6.5.0-5e7bbd5c26b0`, including batch 1 and the
+Validation against `gecode-6.5.0-599f977b7855`, including batch 1 and the
 15 unchanged smoke cases:
 `Summary: total=181 pass=181 xfail=0 fail=0 xpass=0` (exit 0).
 
@@ -302,7 +302,7 @@ All errors retain complete adapter documents with case-relative origins.
 All record paths are null: the repeat conversion errors and budget
 failures are hard errors, not false checks with record witnesses.
 Parse columns are null. Validation against
-`gecode-6.5.0-5e7bbd5c26b0`, including batches 1 and 2 and the 15 unchanged
+`gecode-6.5.0-599f977b7855`, including batches 1 and 2 and the 15 unchanged
 smoke cases:
 `Summary: total=226 pass=226 xfail=0 fail=0 xpass=0` (exit 0).
 
@@ -376,7 +376,7 @@ The canonical adapter correctly omits it under §11.1, leaving the hard error
 primary. Catalog cases retain exact summary strings as data, including the
 replaced first instance name `"x"` after a repeated sections line.
 
-Validation against `gecode-6.5.0-5e7bbd5c26b0`, including all four batches and
+Validation against `gecode-6.5.0-599f977b7855`, including all four batches and
 the 15 unchanged smoke cases:
 `Summary: total=339 pass=339 xfail=0 fail=0 xpass=0` (exit 0).
 

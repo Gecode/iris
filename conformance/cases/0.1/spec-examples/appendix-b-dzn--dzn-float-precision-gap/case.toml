@@ -4,8 +4,8 @@ section = "spec/0.1/appendix-b-dzn.md"
 source = "spec:spec/0.1/appendix-b-dzn.md#dzn-float-precision-gap"
 
 [[known_failure]]
-driver = "gecode-6.5.0-5e7bbd5c26b0"
+driver = "gecode-6.5.0-599f977b7855"
 outcome = "dzn"
-expected_file = "known/gecode-6.5.0-5e7bbd5c26b0/expected.dzn"
+expected_file = "known/gecode-6.5.0-599f977b7855/expected.dzn"
 reason = "The pinned Gecode printer emits empty text for the three float leaves in the C.4 interval."
 difference = "spec/0.1/appendix-c-differences.md#c4-dzn-floats-just-below-1e17"

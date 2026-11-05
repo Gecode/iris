@@ -4,8 +4,8 @@ section = "spec/0.1/05-reader-specs.md"
 source = "spec:spec/0.1/05-reader-specs.md#reader-invalid-utf8-string"
 
 [[known_failure]]
-driver = "gecode-6.5.0-5e7bbd5c26b0"
+driver = "gecode-6.5.0-599f977b7855"
 outcome = "parse"
-expected_file = "known/gecode-6.5.0-5e7bbd5c26b0/expected.json"
+expected_file = "known/gecode-6.5.0-599f977b7855/expected.json"
 reason = "Gecode accepts invalid UTF-8 inside reader-spec strings and comments during parsing."
 difference = "spec/0.1/appendix-c-differences.md#c2-reader-spec-source"

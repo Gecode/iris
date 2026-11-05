@@ -10,7 +10,7 @@ The format source is Steven Simpson's
 [puzzle-file format](https://stevocity.me.uk/nonogram/fmt2), also available
 through [webpbn's export tool](https://webpbn.com/export.cgi). The reader
 spec is copied from
-[Gecode's nonogram.cpp](https://github.com/Gecode/gecode/blob/5e7bbd5c26b0702c6fd652356b2289da0710ac3c/examples/nonogram.cpp#L61).
+[Gecode's nonogram.cpp](https://github.com/Gecode/gecode/blob/599f977b7855dba2a1a5f67db1892722372067d3/examples/nonogram.cpp#L61).
 It requires explicit `width` and `height` lines rather than the full
 format's dimension aliases `columns N` and `rows N`.
 

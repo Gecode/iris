@@ -4,7 +4,7 @@ This appendix indexes the details identified in
 [PLAN.md §6.2](../../PLAN.md#62-what-the-doxygen-text-leaves-open).
 The normative decisions are in the linked chapters and
 [appendix C](appendix-c-differences.md). The reference pin is
-`5e7bbd5c26b0702c6fd652356b2289da0710ac3c`, as defined in
+`599f977b7855dba2a1a5f67db1892722372067d3`, as defined in
 [§1.2](01-introduction.md#12-reference-behavior).
 
 Each example link names an exact `id` from an extractable `iris example`

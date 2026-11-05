@@ -32,7 +32,7 @@
  */
 
 // Ported from gecode/instance/spec.cpp at Gecode commit
-// 5e7bbd5c26b0702c6fd652356b2289da0710ac3c.
+// 599f977b7855dba2a1a5f67db1892722372067d3.
 
 #include <iris/spec.hpp>
 

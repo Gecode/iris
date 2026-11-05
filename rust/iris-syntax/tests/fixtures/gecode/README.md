@@ -1,7 +1,7 @@
 # Gecode example reader specs
 
 These are byte-for-byte `instance_spec` raw-string payloads from Gecode commit
-`5e7bbd5c26b0702c6fd652356b2289da0710ac3c`, the Iris 0.1 reference.
+`599f977b7855dba2a1a5f67db1892722372067d3`, the Iris 0.1 reference.
 
 | Fixture | Upstream source | Bytes |
 |---|---|---:|
