@@ -108,7 +108,11 @@ jobs:
       # rust/rust-toolchain.toml selects stable, so name the toolchain explicitly.
       - name: Build Rust workspace
         run: cargo "+${{ steps.msrv.outputs.version }}" build --workspace --locked
+      # The compile-fail snapshots record stable's messages. Overwriting them
+      # here still requires each case to fail to compile.
       - name: Test Rust workspace
+        env:
+          TRYBUILD: overwrite
         run: cargo "+${{ steps.msrv.outputs.version }}" test --workspace --locked
       - name: Check browser crate on wasm32
         run: cargo "+${{ steps.msrv.outputs.version }}" check -p iris-wasm --target wasm32-unknown-unknown --locked
