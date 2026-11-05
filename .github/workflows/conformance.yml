@@ -106,6 +106,7 @@ jobs:
         with:
           toolchain: ${{ steps.msrv.outputs.version }}
           targets: wasm32-unknown-unknown
+          components: rustfmt
       # rust/rust-toolchain.toml selects stable, so name the toolchain explicitly.
       - name: Build Rust workspace
         run: cargo "+${{ steps.msrv.outputs.version }}" build --workspace --locked
