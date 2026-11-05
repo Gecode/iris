@@ -4,6 +4,12 @@
 
 ### Library
 
+- Add the unpublished `iris-gen` crate, which generates spec builder programs
+  from reader specs, with a Rust backend. `iris gen builder --lang rust SPEC`
+  prints one.
+- Add `iris-conformance compare`, which compares two reader specs as syntax
+  trees, and a test that round-trips every accepted reader spec of the
+  conformance cases and format library through the Rust builder.
 - Add the unpublished `iris-wasm` browser boundary for reading, checking and
   formatting, with exact integer table values and bounded output previews.
 - Add streaming `Data::write_json`; preserve `to_json` and its canonical bytes.

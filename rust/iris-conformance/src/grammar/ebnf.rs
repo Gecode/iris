@@ -37,6 +37,11 @@ impl Grammar {
         Ok(grammar)
     }
 
+    #[cfg(test)]
+    pub fn rule_names(&self) -> impl Iterator<Item = &str> {
+        self.rules.keys().map(String::as_str)
+    }
+
     pub fn rule(&self, name: &str) -> Result<&Expr, String> {
         self.rules
             .get(name)

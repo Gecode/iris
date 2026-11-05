@@ -6,11 +6,14 @@ mod source;
 use std::fmt::Write;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 use crate::canonical::Outcome;
 use crate::case::{self, Case};
 use ebnf::Grammar;
+pub(crate) use recognize::TreeEvent;
 use recognize::{Failure, Recognizer};
+pub(crate) use source::{Token, TokenKind};
 
 // A copy of spec/0.1/grammar.ebnf; tests/embedded.rs keeps it in step.
 const GRAMMAR: &str = include_str!("../../embedded/0.1/grammar.ebnf");
@@ -110,6 +113,30 @@ pub fn check_grammar(roots: &[PathBuf]) -> Result<GrammarReport, String> {
         }
     }
     Ok(report)
+}
+
+/// The concrete syntax of `bytes`, from the recognizer `check_grammar` uses, or
+/// why the embedded grammar rejects them.
+pub(crate) fn syntax_tree(bytes: &[u8]) -> Result<Vec<TreeEvent<'static>>, String> {
+    static EMBEDDED: OnceLock<Result<Grammar, String>> = OnceLock::new();
+    let grammar = EMBEDDED
+        .get_or_init(|| Grammar::parse(GRAMMAR))
+        .as_ref()
+        .map_err(Clone::clone)?;
+    Recognizer::tree(grammar, bytes).map_err(|failure| match failure {
+        Failure::Rejected(rejection) => rejection.to_string(),
+        Failure::Configuration(message) => message,
+        Failure::Mismatch => unreachable!("recognition reports a mismatch as a rejection"),
+    })
+}
+
+#[cfg(test)]
+pub(crate) fn embedded_rule_names() -> Vec<String> {
+    Grammar::parse(GRAMMAR)
+        .expect("the embedded grammar parses")
+        .rule_names()
+        .map(String::from)
+        .collect()
 }
 
 fn expects_acceptance(outcome: &Outcome) -> bool {

@@ -22,10 +22,12 @@ cargo run --locked -p iris-cli -- list path/to/spec.iris path/to/input.txt
 cargo run --locked -p iris-cli -- list path/to/spec.iris path/to/input.txt --dzn
 cargo run --locked -p iris-cli -- fmt path/to/spec.iris
 cargo run --locked -p iris-cli -- fmt --check --diff path/to/directory
+cargo run --locked -p iris-cli -- gen builder --lang rust path/to/spec.iris
 cargo run --locked -p iris-cli --bin iris-driver -- parse path/to/spec.iris --version 0.1
 cargo run --locked -p iris-cli -- conformance target/debug/iris-driver ../conformance/cases/0.1/smoke
 cargo test --locked -p iris-cli
 cargo test --locked -p iris-cli --test complete
+cargo test --locked -p iris-cli --test gen
 cargo test --locked -p iris-cli --test parse_conformance -- --nocapture
 ```
 
@@ -162,6 +164,35 @@ dependencies. This avoids maintaining a configuration parser or diff algorithm.
 CLI tests use temporary directories with a `root = true` boundary that
 supplies no properties unless a test sets them; configuration above the
 temporary directory cannot affect results.
+
+## Generating builders
+
+`iris gen builder --lang LANGUAGE SPEC` prints a program that builds the reader
+spec with the spec builder of that language, through
+[iris-gen](../iris-gen/README.md). Rust is the only language so far. The program
+is a complete file: its `builder` function returns the `SpecBuilder`, and its
+`main` prints the spec's source.
+
+A spec that `iris check` rejects exits 1 with the same message on standard error
+and nothing on standard output. A file that cannot be read also exits 1, and an
+unknown language or a missing `--lang` is a usage error with exit 2.
+`tests/fixtures/jobshop-builder.rs` records the output for the jobshop format;
+after an intended change to the generated code, write the new output there.
+
+The round trip checks what the programs do, from `rust/`:
+
+```sh
+cargo test --locked -p gecode-iris --test builder_round_trip -- --nocapture
+```
+
+It generates a builder for every `.iris` file in `conformance/cases/0.1` and
+`formats`, then formats, lints, compiles and runs them, and compares each printed
+spec with its original. Its last line gives the counts. `compared` is the files
+that `iris check` accepts and `skipped` is the files that it rejects, so the two
+add up to the whole corpus; nothing else is skipped. `extra` is the specs beyond
+the corpus, which go through the same steps: the layout forms at several widths
+and the operands of `clippy::eq_op`. The limit specs of Specification §5.12 run
+too, outside all of these counts.
 
 ## Conformance driver
 

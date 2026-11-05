@@ -114,3 +114,14 @@ jobs:
         run: cargo "+${{ steps.msrv.outputs.version }}" check -p iris-wasm --target wasm32-unknown-unknown --locked
       - name: Check TypeScript binding crate on wasm32
         run: cargo "+${{ steps.msrv.outputs.version }}" check -p iris-js --target wasm32-unknown-unknown --locked
+
+  builder-round-trip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Round-trip accepted reader specs through the Rust builder
+        working-directory: rust
+        run: cargo test --locked -p gecode-iris --test builder_round_trip -- --nocapture

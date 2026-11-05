@@ -24,12 +24,15 @@ package name is `gecode-iris`; Rust imports it as `gecode_iris`. The macro's
 implementation crate, [iris-macros](iris-macros/README.md), depends on
 `iris-syntax` and `iris-sema` but not on `iris-core`.
 [iris-build](iris-build/README.md), re-exported as `gecode_iris::build`, builds
-reader specs in Rust with typed handles. All workspace
+reader specs in Rust with typed handles.
+[iris-gen](iris-gen/README.md) prints a builder program for a reader spec, which
+`iris gen builder` exposes; it depends on `iris-syntax` and `iris-sema` only.
+All workspace
 crates currently set `publish = false`; publication belongs to milestone M7.
 Package metadata and versioned internal dependencies are prepared without
 enabling publication. The planned crates.io order is `iris-syntax`, `iris-sema`,
-`iris-core`, `iris-macros`, `iris-build`, `gecode-iris`, `iris-conformance`, `iris-lsp`, then
-`iris-cli`.
+`iris-core`, `iris-macros`, `iris-build`, `iris-gen`, `gecode-iris`, `iris-conformance`,
+`iris-lsp`, then `iris-cli`.
 The standalone `iris-conformance` runner can be published at any point before
 `iris-cli`; it has no implementation dependencies. The separate nightly fuzz
 crate remains unpublished.
@@ -80,6 +83,31 @@ cargo test --locked -p gecode-iris --test macro_corpus -- --nocapture
 cargo test --locked -p iris-build
 cargo test --locked -p gecode-iris --test build_jobshop --test build_corpus --test build_types
 ```
+
+The builder generator and its round trip, from `rust/`:
+
+```sh
+cargo run --locked -p iris-cli -- gen builder --lang rust path/to/spec.iris
+cargo test --locked -p iris-gen
+cargo test --locked -p iris-cli --test gen
+cargo test --locked -p iris-conformance compare
+cargo run --locked -p iris-conformance -- compare left.iris right.iris
+cargo test --locked -p gecode-iris --test builder_round_trip -- --nocapture
+```
+
+The round trip generates a builder for every `.iris` file in
+`conformance/cases/0.1` and `formats` that `iris check` accepts, compiles and
+lints the programs as one project, runs them, and compares each printed spec with
+its original. It prints the compared and skipped counts; a skip is a file that
+`iris check` rejects, and nothing else. Its extra count is the layout and
+`clippy::eq_op` specs of `iris-gen/tests`, and the limit specs of Specification
+§5.12 run in the same project, outside all three counts.
+
+`cargo test -p iris-gen` includes the width sweep in `tests/rust_layout.rs`: every
+layout form, with names and strings of every length past the 60 and 100 column
+limits, at several depths, must pass `rustfmt --check`. It runs one `rustfmt` per
+worker over all the programs, and a failure prints the diffs and names the form,
+depth and length in the file name.
 
 For the MSRV checks, run `cargo +1.88.0 build --workspace --locked` and
 `cargo +1.88.0 test --workspace --locked`.

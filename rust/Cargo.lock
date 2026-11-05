@@ -309,8 +309,10 @@ name = "gecode-iris"
 version = "0.1.0"
 dependencies = [
  "iris-build",
+ "iris-cli",
  "iris-conformance",
  "iris-core",
+ "iris-gen",
  "iris-macros",
  "serde_json",
  "trybuild",
@@ -388,6 +390,7 @@ dependencies = [
  "clap",
  "iris-conformance",
  "iris-core",
+ "iris-gen",
  "iris-lsp",
  "iris-sema",
  "iris-syntax",
@@ -421,6 +424,14 @@ dependencies = [
  "ryu",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "iris-gen"
+version = "0.1.0"
+dependencies = [
+ "iris-sema",
+ "iris-syntax",
 ]
 
 [[package]]

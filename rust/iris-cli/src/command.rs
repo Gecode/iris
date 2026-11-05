@@ -8,6 +8,7 @@ use std::{
 };
 mod conformance;
 mod fmt;
+mod generate;
 mod list;
 mod read;
 #[derive(Parser)]
@@ -30,6 +31,8 @@ enum Command {
     Check { spec: PathBuf },
     /// Format reader specs in place, or preview changes.
     Fmt(fmt::Arguments),
+    /// Generate code from a reader spec.
+    Gen(generate::Arguments),
     /// Serve the Iris language server over stdio.
     Lsp,
     /// Run conformance cases against an implementation driver.
@@ -67,6 +70,7 @@ fn dispatch(command: Command) -> u8 {
         Command::List(arguments) => list::run(arguments),
         Command::Check { spec } => check(spec),
         Command::Fmt(arguments) => fmt::run(arguments),
+        Command::Gen(arguments) => generate::run(arguments),
         Command::Lsp => match iris_lsp::run_stdio() {
             Ok(()) => 0,
             Err(error) => {

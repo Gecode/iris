@@ -401,6 +401,13 @@ CLI, grammar configuration, case-loading, IO or zero-selection error. Counts are
 case, including cases that share a reader spec. The checker uses no driver-specific
 known-failure handling.
 
+## Comparing reader specs
+
+`iris-conformance compare LEFT RIGHT` compares two reader specs as syntax trees,
+through the same recognizer as the grammar check. A language adding a builder
+generator uses it to round-trip the corpus; see the [iris-conformance
+README](../rust/iris-conformance/README.md#comparing-reader-specs).
+
 ## Running cases
 
 From `rust/`:

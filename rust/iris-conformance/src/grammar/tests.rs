@@ -274,3 +274,124 @@ fn operational_counters_admit_exactly_the_specification_boundaries() {
         )
     ));
 }
+
+fn tree(source: &str) -> Vec<TreeEvent<'static>> {
+    syntax_tree(source.as_bytes()).expect("the source is recognized")
+}
+
+fn token_texts(tree: &[TreeEvent<'_>]) -> Vec<String> {
+    tree.iter()
+        .filter_map(|event| match event {
+            TreeEvent::Token(token) => Some(token.text.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+fn opened<'t>(tree: &'t [TreeEvent<'_>]) -> Vec<&'t str> {
+    tree.iter()
+        .filter_map(|event| match event {
+            TreeEvent::Open(rule) => Some(*rule),
+            _ => None,
+        })
+        .collect()
+}
+
+fn assert_balanced(tree: &[TreeEvent<'_>]) {
+    let mut depth = 0_usize;
+    for event in tree {
+        match event {
+            TreeEvent::Open(_) => depth += 1,
+            TreeEvent::Close => depth = depth.checked_sub(1).expect("a Close matches an Open"),
+            TreeEvent::Token(_) => assert!(depth > 0, "a token is inside a rule"),
+        }
+    }
+    assert_eq!(depth, 0);
+}
+
+#[test]
+fn a_tree_holds_every_token_in_rules() {
+    let tree = tree("let x = (1 + y)");
+    assert_balanced(&tree);
+    assert_eq!(
+        token_texts(&tree),
+        ["let", "x", "=", "(", "1", "+", "y", ")"]
+    );
+    let rules = opened(&tree);
+    assert_eq!(rules[0], "reader_spec");
+    assert!(rules.contains(&"let_stmt"));
+    assert!(rules.contains(&"additive"));
+}
+
+#[test]
+fn backtracking_truncates_the_tree() {
+    // The first range alternative reads `1` and fails at `..<`, and `starts`
+    // tries the operators that never follow; neither leaves anything behind.
+    let tree = tree("a:1..<2 b:1..2 c:..3");
+    assert_balanced(&tree);
+    assert_eq!(
+        token_texts(&tree),
+        [
+            "a", ":", "1", "..<", "2", "b", ":", "1", "..", "2", "c", ":", "..", "3"
+        ]
+    );
+}
+
+#[test]
+fn a_failed_block_alternative_leaves_no_type_or_rule() {
+    let tree = tree("type t=int if a { x:t } else if b { y:t }");
+    assert_balanced(&tree);
+    let rules = opened(&tree);
+    assert_eq!(rules.iter().filter(|r| **r == "if_stmt").count(), 2);
+    assert_eq!(rules.iter().filter(|r| **r == "type_stmt").count(), 1);
+}
+
+#[test]
+fn patterns_are_in_the_tree_with_capture_types_in_place() {
+    let tree = tree(r#"line "a {x:0..2} {_} ... ""#);
+    assert_balanced(&tree);
+    assert_eq!(
+        token_texts(&tree),
+        [
+            "line", "a", " ", "{", "x", ":", "0", "..", "2", "}", " ", "{", "_", "}", " ", "...",
+            " "
+        ]
+    );
+    let rules = opened(&tree);
+    let capture_type = rules
+        .iter()
+        .position(|rule| *rule == "capture_type")
+        .expect("the capture has a type");
+    assert_eq!(rules[capture_type + 1], "type");
+}
+
+#[test]
+fn several_capture_types_keep_their_order_and_lines() {
+    let tree = tree("\n\nline \"{a:int}{b:word}\"");
+    assert_balanced(&tree);
+    let texts = token_texts(&tree);
+    let int = texts.iter().position(|text| text == "int").unwrap();
+    let word = texts.iter().position(|text| text == "word").unwrap();
+    assert!(int < word);
+    assert!(tree.iter().all(|event| match event {
+        TreeEvent::Token(token) => token.line == 3,
+        _ => true,
+    }));
+}
+
+#[test]
+fn tree_rejections_are_the_recognizers() {
+    let error = syntax_tree(b"let").expect_err("the statement is incomplete");
+    assert!(error.contains("tokens / "), "{error}");
+}
+
+#[test]
+fn corpus_trees_are_balanced() {
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let cases = case::discover(&[repository.join("formats")], None).unwrap();
+    assert!(!cases.is_empty());
+    for path in cases {
+        let case = Case::load(&path, "0.1").unwrap();
+        assert_balanced(&syntax_tree(&fs::read(&case.spec).unwrap()).unwrap());
+    }
+}

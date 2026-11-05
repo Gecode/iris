@@ -20,6 +20,28 @@ lists the codes in the first column of `spec/0.1/errors.md`, one per line.
 `tests/embedded.rs` fails when either differs from the Specification; after a
 change to those files, update the copies to match.
 
+## Comparing reader specs
+
+`compare` tells whether two reader specs are the same program. It is how the
+[builder round trip](../README.md) checks what a generated builder prints:
+
+```sh
+cargo run --locked -p iris-conformance -- compare left.iris right.iris
+cargo run --locked -p iris-conformance -- compare --manifest pairs.tsv
+```
+
+Both sides go through the recognizer of the embedded formal grammar, so the
+comparison needs no implementation crate. It ignores only what cannot change a
+spec's meaning: layout, comments, redundant parentheses, the spelling of numbers,
+strings and format names, the names of records and comprehension variables, and
+an `each` or `as` that nothing uses. A reference must still reach the same
+repeat or variable on both sides, so renaming is ignored and retargeting is not.
+
+A manifest has one `ORIGINAL TAB PRINTED` line per pair, or `ORIGINAL` alone for
+a skip, and a summary reports the compared and skipped counts. The command exits
+0 when the sides agree, 1 on a difference, and 2 when a spec cannot be read or
+recognized.
+
 ## Differential runs
 
 `differential` compares two or more drivers on generated cases. It needs

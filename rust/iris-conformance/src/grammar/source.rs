@@ -5,7 +5,7 @@ use super::ebnf::Grammar;
 use super::recognize::{Failure, Recognizer, Rejection, Result};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub(super) enum TokenKind {
+pub(crate) enum TokenKind {
     Ident,
     Int,
     Float,
@@ -13,8 +13,8 @@ pub(super) enum TokenKind {
     Punct,
 }
 
-#[derive(Debug)]
-pub(super) struct Token {
+#[derive(Clone, Debug)]
+pub(crate) struct Token {
     pub kind: TokenKind,
     pub text: String,
     pub span: Range<usize>,

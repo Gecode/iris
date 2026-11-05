@@ -37,7 +37,7 @@ Follow [rust/README.md](rust/README.md) for development checks, API stability,
 MSRV, and publication preparation. All workspace crates currently have
 `publish = false`; enabling crates.io publication and registry automation is
 M7 work. The dependency order is `iris-syntax`, `iris-sema`, `iris-core`,
-`gecode-iris`, `iris-conformance`, `iris-lsp`, then `iris-cli`.
+`iris-gen`, `gecode-iris`, `iris-conformance`, `iris-lsp`, then `iris-cli`.
 The independent `iris-conformance` runner can go anywhere before `iris-cli`.
 The M5 browser crate `iris-wasm` stays unpublished and does not enter CLI
 archives. If enabled for publication later, it follows `iris-syntax`,

@@ -13,7 +13,7 @@ use std::{fmt, sync::Arc};
 pub use checks::{ParseCheck, ParseCheckKind};
 pub use diagnostic::{Diagnostic, DiagnosticCode, DiagnosticPhase, SourceLocation};
 pub use format::{FormatEdit, FormatError, FormatOptions, RangeFormat, format, format_range};
-pub use rowan::{TextRange, TextSize};
+pub use rowan::{TextRange, TextSize, WalkEvent};
 pub use syntax::{IrisLanguage, SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

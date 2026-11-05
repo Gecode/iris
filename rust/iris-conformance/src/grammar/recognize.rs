@@ -98,17 +98,32 @@ enum Input<'a> {
 struct Capture {
     start: usize,
     end: usize,
+    /// Length of the tree log at this capture's type, where its tree belongs.
+    tree: usize,
 }
 
-pub(super) struct Recognizer<'a> {
-    grammar: &'a Grammar,
-    input: Input<'a>,
+/// One step of a recognized reader spec's concrete syntax. A tree is the
+/// balanced, flat log of these, so reading one never needs recursion.
+#[derive(Clone, Debug)]
+pub(crate) enum TreeEvent<'g> {
+    Open(&'g str),
+    Close,
+    Token(Token),
+}
+
+/// `'g` borrows the grammar, whose rule names outlive `'i`, the input.
+pub(super) struct Recognizer<'g, 'i> {
+    grammar: &'g Grammar,
+    input: Input<'i>,
     state: State,
     /// Shared with pattern sub-recognizers, which see the same visible types.
     types: Rc<RefCell<TypeTable>>,
     emitted: Vec<Token>,
     captures: Vec<Capture>,
-    active: Vec<(&'a str, usize)>,
+    /// The tokens and patterns recognized so far; empty in the source layer,
+    /// whose tokens are the result rather than a tree.
+    tree: Vec<TreeEvent<'g>>,
+    active: Vec<(&'g str, usize)>,
     best: Option<Rejection>,
     /// Byte offsets of every LF in source text, so line lookups stay logarithmic.
     newlines: Vec<usize>,
@@ -118,37 +133,43 @@ struct Checkpoint {
     state: State,
     emitted: usize,
     captures: usize,
+    tree: usize,
 }
 
-enum Frame<'a> {
-    Eval(&'a Expr),
-    EnterRule(&'a str),
+enum Frame<'g> {
+    Eval(&'g Expr),
+    EnterRule(&'g str),
     ExitRule {
-        name: &'a str,
+        name: &'g str,
         saved: State,
     },
     Sequence {
-        children: &'a [Expr],
+        children: &'g [Expr],
         next: usize,
     },
     Choice {
-        children: &'a [Expr],
+        children: &'g [Expr],
         next: usize,
         saved: Checkpoint,
     },
     Optional(Checkpoint),
     Repeat {
-        child: &'a Expr,
+        child: &'g Expr,
         saved: Checkpoint,
     },
     Chain {
-        body: &'a Expr,
+        body: &'g Expr,
         continuing: bool,
     },
 }
 
-impl<'a> Recognizer<'a> {
-    pub fn recognize(grammar: &'a Grammar, bytes: &[u8]) -> Result<()> {
+impl<'g, 'i> Recognizer<'g, 'i> {
+    pub fn recognize(grammar: &'g Grammar, bytes: &[u8]) -> Result<()> {
+        Recognizer::tree(grammar, bytes).map(drop)
+    }
+
+    /// Recognizes `bytes` and returns their concrete syntax.
+    pub fn tree(grammar: &'g Grammar, bytes: &[u8]) -> Result<Vec<TreeEvent<'g>>> {
         let tokens = source::lex(grammar, bytes, 1)?;
         let text = std::str::from_utf8(bytes).expect("lexer validated UTF-8");
         let input = Input::Tokens {
@@ -157,10 +178,11 @@ impl<'a> Recognizer<'a> {
             end_offset: text.len(),
         };
         let mut recognizer = Recognizer::new(grammar, input);
-        recognizer.complete("reader_spec")
+        recognizer.complete("reader_spec")?;
+        Ok(recognizer.tree)
     }
 
-    fn new(grammar: &'a Grammar, input: Input<'a>) -> Self {
+    fn new(grammar: &'g Grammar, input: Input<'i>) -> Self {
         let limit = match input {
             Input::Source(text) | Input::Pattern { text, .. } => text.len(),
             Input::Tokens { tokens, .. } => tokens.len(),
@@ -186,6 +208,7 @@ impl<'a> Recognizer<'a> {
             types: Rc::default(),
             emitted: Vec::new(),
             captures: Vec::new(),
+            tree: Vec::new(),
             active: Vec::new(),
             best: None,
             newlines,
@@ -198,8 +221,8 @@ impl<'a> Recognizer<'a> {
     }
 
     pub(super) fn lex_source(
-        grammar: &'a Grammar,
-        text: &'a str,
+        grammar: &'g Grammar,
+        text: &'i str,
         line: usize,
     ) -> Result<Vec<Token>> {
         let mut recognizer = Self::new(grammar, Input::Source(text));
@@ -210,7 +233,7 @@ impl<'a> Recognizer<'a> {
         Ok(recognizer.emitted)
     }
 
-    fn complete(&mut self, rule: &'a str) -> Result<()> {
+    fn complete(&mut self, rule: &'g str) -> Result<()> {
         let result = self.evaluate(Frame::EnterRule(rule));
         match result {
             Ok(()) if self.state.at == self.state.limit => Ok(()),
@@ -262,7 +285,7 @@ impl<'a> Recognizer<'a> {
 
     // Grammar calls can exceed the host stack at legal language boundaries.
     // Continuations live here instead; there is no source-size/depth surrogate.
-    fn evaluate(&mut self, initial: Frame<'a>) -> Result<()> {
+    fn evaluate(&mut self, initial: Frame<'g>) -> Result<()> {
         let mut frames = vec![initial];
         let mut result = Ok(());
         while let Some(frame) = frames.pop() {
@@ -381,6 +404,7 @@ impl<'a> Recognizer<'a> {
                     }
                     let saved = self.state.clone();
                     self.active.push((name, self.state.at));
+                    self.log(TreeEvent::Open(name));
                     frames.push(Frame::ExitRule { name, saved });
                     result = Ok(());
                     match self.input {
@@ -426,6 +450,7 @@ impl<'a> Recognizer<'a> {
                         result = self.finish_rule(name, saved.at);
                     }
                     self.active.pop();
+                    self.log(TreeEvent::Close);
                     self.state.blocks = saved.blocks;
                     self.state.expressions = saved.expressions;
                     self.state.limit = saved.limit;
@@ -479,6 +504,27 @@ impl<'a> Recognizer<'a> {
             state: self.state.clone(),
             emitted: self.emitted.len(),
             captures: self.captures.len(),
+            tree: self.tree.len(),
+        }
+    }
+
+    /// Appends to the tree of the token and pattern layers.
+    fn log(&mut self, event: TreeEvent<'g>) {
+        if !matches!(self.input, Input::Source(_)) {
+            self.tree.push(event);
+        }
+    }
+
+    /// Logs a pattern-layer terminal of `length` bytes at the current position.
+    fn log_pattern_text(&mut self, length: usize) {
+        if let Input::Pattern { text, source_line } = self.input {
+            let span = self.state.at..self.state.at + length;
+            self.tree.push(TreeEvent::Token(Token {
+                kind: TokenKind::Punct,
+                text: text[span.clone()].into(),
+                span,
+                line: source_line,
+            }));
         }
     }
 
@@ -487,6 +533,7 @@ impl<'a> Recognizer<'a> {
         self.state = saved.state;
         self.emitted.truncate(saved.emitted);
         self.captures.truncate(saved.captures);
+        self.tree.truncate(saved.tree);
     }
 
     fn source_rule_end(&mut self, name: &str, text: &str, start: usize) -> Result<()> {
@@ -556,6 +603,10 @@ impl<'a> Recognizer<'a> {
         };
         match length {
             Some(length) => {
+                if let Some(token) = self.token(self.state.at) {
+                    self.log(TreeEvent::Token(token.clone()));
+                }
+                self.log_pattern_text(length);
                 self.state.at += length;
                 Ok(())
             }
@@ -569,7 +620,7 @@ impl<'a> Recognizer<'a> {
         ))
     }
 
-    fn starts(&mut self, expr: &'a Expr) -> Result<bool> {
+    fn starts(&mut self, expr: &'g Expr) -> Result<bool> {
         match expr {
             Expr::Sequence(children) => self.starts(&children[0]),
             Expr::Choice(children) => {
@@ -656,6 +707,7 @@ impl<'a> Recognizer<'a> {
                 self.captures.push(Capture {
                     start: self.state.at,
                     end: self.state.at + end,
+                    tree: self.tree.len(),
                 });
                 self.state.at += end;
                 return Ok(());
@@ -667,7 +719,9 @@ impl<'a> Recognizer<'a> {
             }
         };
         if matches {
-            self.state.at += character.unwrap().len_utf8();
+            let length = character.unwrap().len_utf8();
+            self.log_pattern_text(length);
+            self.state.at += length;
             Ok(())
         } else {
             self.mismatch(name)
@@ -684,11 +738,13 @@ impl<'a> Recognizer<'a> {
             _ => None,
         };
         if let Some(kind) = kind {
-            return if token.is_some_and(|t| t.kind == kind) {
-                self.state.at += 1;
-                Ok(())
-            } else {
-                self.mismatch(name)
+            return match token.filter(|t| t.kind == kind) {
+                Some(token) => {
+                    self.log(TreeEvent::Token(token.clone()));
+                    self.state.at += 1;
+                    Ok(())
+                }
+                None => self.mismatch(name),
             };
         }
         let at = self.state.at;
@@ -741,7 +797,7 @@ impl<'a> Recognizer<'a> {
         if matches { Ok(()) } else { self.mismatch(name) }
     }
 
-    fn token(&self, at: usize) -> Option<&'a Token> {
+    fn token(&self, at: usize) -> Option<&'i Token> {
         match self.input {
             Input::Tokens { tokens, .. } => tokens.get(at),
             _ => None,
@@ -887,6 +943,7 @@ impl<'a> Recognizer<'a> {
         // First validate all structure, collecting capture slices. Only then
         // re-lex and recognize their types, in capture order (§7.2).
         pattern.complete("decoded_pattern")?;
+        let mut copied = 0;
         for capture in &pattern.captures {
             let text = &token.text[capture.start..capture.end];
             let tokens = source::lex(self.grammar, text.as_bytes(), token.line)
@@ -915,7 +972,12 @@ impl<'a> Recognizer<'a> {
             types
                 .complete("type")
                 .map_err(|error| pattern.capture_error(error, capture.start))?;
+            self.tree
+                .extend_from_slice(&pattern.tree[copied..capture.tree]);
+            self.tree.append(&mut types.tree);
+            copied = capture.tree;
         }
+        self.tree.extend_from_slice(&pattern.tree[copied..]);
         self.state.at += 1;
         Ok(())
     }

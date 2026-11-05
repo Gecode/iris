@@ -109,6 +109,7 @@ iris-sema     name resolution, scopes, record names, types and shapes,
      │        diagnostics with codes
      ├── iris-lint   lints and their fixes, if built (§8.13)
      ├── iris-macros the `iris!` proc macro, used through gecode-iris
+     ├── iris-gen    generates spec builder programs from reader specs
      │
 iris-core     reader, expression evaluator, data model, work budgets,
      │        JSON and dzn output
@@ -126,7 +127,9 @@ binding do not carry it. The CLI, the LSP, and the WASM crate use it.
 `iris-core`: it checks a spec at compile time, and the code it expands to
 calls the reader through `gecode-iris`. `iris-build` depends on `iris-core`
 and `iris-macros`, for `pattern!`, and `gecode-iris` re-exports it as
-`gecode_iris::build`.
+`gecode_iris::build`. `iris-gen` depends on `iris-syntax` and `iris-sema` only:
+it lowers a checked spec to a language-independent program, and each language
+adds a backend that renders it. The CLI uses it for `iris gen builder`.
 
 The parser must be **lossless and error-tolerant** from the start. The LSP
 and formatter need a syntax tree for broken input, and the reader needs
@@ -364,7 +367,7 @@ reported upstream. Gecode itself needs no changes.
 
 - Crates: `iris-syntax`, `iris-sema`, `iris-core`, `iris-cli`,
   `iris-lsp`, `iris-wasm`, `iris-js`, `iris-macros` (after 0.1),
-  `iris-build` (§8.15), and `iris-lint` if built (§8.13), published
+  `iris-build` (§8.15), `iris-gen`, and `iris-lint` if built (§8.13), published
   under the umbrella crate `gecode-iris`.
 - API sketch:
   ```rust
