@@ -1,4 +1,4 @@
-package org.gecode.iris
+package dev.gecode.iris
 
 import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.Service

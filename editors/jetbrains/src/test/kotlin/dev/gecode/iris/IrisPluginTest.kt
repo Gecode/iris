@@ -1,4 +1,4 @@
-package org.gecode.iris
+package dev.gecode.iris
 
 import com.intellij.codeInsight.daemon.impl.HighlightInfo
 import com.intellij.notification.Notification
@@ -172,7 +172,7 @@ class IrisPluginTest : BasePlatformTestCase() {
             assertTrue("TextMate assigns attributes to format", highlighter.getTokenHighlights(requireNotNull(lexer.tokenType)).isNotEmpty())
             val firstServer = serverManager.getServersForProvider(IrisLspSupportProvider::class.java).single()
             diagnosticFile.set(null)
-            val action = requireNotNull(ActionManager.getInstance().getAction("org.gecode.iris.RestartLsp"))
+            val action = requireNotNull(ActionManager.getInstance().getAction("dev.gecode.iris.RestartLsp"))
             val context = SimpleDataContext.getSimpleContext(CommonDataKeys.PROJECT, project)
             val event = AnActionEvent.createFromAnAction(action, null, "test", context)
             action.actionPerformed(event)

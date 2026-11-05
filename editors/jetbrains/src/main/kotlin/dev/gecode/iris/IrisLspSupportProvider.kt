@@ -1,4 +1,4 @@
-package org.gecode.iris
+package dev.gecode.iris
 
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.openapi.project.Project

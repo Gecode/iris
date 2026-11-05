@@ -1,4 +1,4 @@
-package org.gecode.iris
+package dev.gecode.iris
 
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction

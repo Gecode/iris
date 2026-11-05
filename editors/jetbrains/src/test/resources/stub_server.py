@@ -43,7 +43,7 @@ def publish_diagnostic(document: dict[str, Any]) -> None:
                         },
                         "severity": 2,
                         "code": "iris-stub",
-                        "codeDescription": {"href": "https://www.gecode.org/"},
+                        "codeDescription": {"href": "https://www.gecode.dev/"},
                         "source": "iris-stub",
                         "message": "Iris stub diagnostic",
                     }

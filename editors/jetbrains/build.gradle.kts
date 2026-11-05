@@ -7,7 +7,7 @@ plugins {
     id("org.jetbrains.intellij.platform") version "2.19.0"
 }
 
-group = "org.gecode.iris"
+group = "dev.gecode.iris"
 version = "0.1.0-SNAPSHOT"
 
 repositories {
@@ -79,7 +79,7 @@ tasks.test {
     }
     if (executable == null) {
         logger.lifecycle("SKIPPED testDimacsFormatWithRealServer: IRIS_TEST_EXECUTABLE is unset; build iris to run it")
-        filter { excludeTestsMatching("org.gecode.iris.IrisPluginTest.testDimacsFormatWithRealServer") }
+        filter { excludeTestsMatching("dev.gecode.iris.IrisPluginTest.testDimacsFormatWithRealServer") }
     } else {
         systemProperty("iris.executable", executable)
     }

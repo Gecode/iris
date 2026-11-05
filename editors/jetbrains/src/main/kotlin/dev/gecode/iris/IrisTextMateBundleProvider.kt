@@ -1,4 +1,4 @@
-package org.gecode.iris
+package dev.gecode.iris
 
 import com.intellij.openapi.extensions.PluginAware
 import com.intellij.openapi.extensions.PluginDescriptor

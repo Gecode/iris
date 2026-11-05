@@ -1,4 +1,4 @@
-package org.gecode.iris
+package dev.gecode.iris
 
 import com.intellij.notification.Notification
 import com.intellij.notification.NotificationAction

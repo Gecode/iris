@@ -1,4 +1,4 @@
-package org.gecode.iris
+package dev.gecode.iris
 
 import com.intellij.lang.Language
 import com.intellij.openapi.fileTypes.LanguageFileType

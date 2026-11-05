@@ -1,26 +1,26 @@
 <idea-plugin>
-    <id>org.gecode.iris</id>
-    <name>Iris</name>
-    <vendor url="https://www.gecode.org/">Gecode</vendor>
+    <id>dev.gecode.iris</id>
+    <name>Gecode Iris</name>
+    <vendor url="https://www.gecode.dev/">Gecode</vendor>
     <description>TextMate highlighting and the Iris language server.</description>
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.lsp</depends>
     <depends>org.jetbrains.plugins.textmate</depends>
     <extensions defaultExtensionNs="com.intellij">
         <fileType name="Iris" language="Iris" extensions="iris"
-                  implementationClass="org.gecode.iris.IrisFileType" fieldName="INSTANCE"/>
-        <projectConfigurable id="org.gecode.iris.settings" displayName="Iris"
-                             parentId="language" instance="org.gecode.iris.IrisLspConfigurable"/>
-        <textmate.bundleProvider implementation="org.gecode.iris.IrisTextMateBundleProvider"/>
+                  implementationClass="dev.gecode.iris.IrisFileType" fieldName="INSTANCE"/>
+        <projectConfigurable id="dev.gecode.iris.settings" displayName="Iris"
+                             parentId="language" instance="dev.gecode.iris.IrisLspConfigurable"/>
+        <textmate.bundleProvider implementation="dev.gecode.iris.IrisTextMateBundleProvider"/>
         <lang.syntaxHighlighterFactory language="Iris"
             implementationClass="org.jetbrains.plugins.textmate.language.syntax.highlighting.TextMateSyntaxHighlighterFactory"/>
         <editorHighlighterProvider filetype="Iris"
             implementationClass="org.jetbrains.plugins.textmate.language.syntax.highlighting.TextMateEditorHighlighterProvider"/>
         <notificationGroup id="Iris language server" displayType="BALLOON"/>
-        <platform.lsp.serverSupportProvider implementation="org.gecode.iris.IrisLspSupportProvider"/>
+        <platform.lsp.serverSupportProvider implementation="dev.gecode.iris.IrisLspSupportProvider"/>
     </extensions>
     <actions>
-        <action id="org.gecode.iris.RestartLsp" class="org.gecode.iris.IrisRestartLspAction"
+        <action id="dev.gecode.iris.RestartLsp" class="dev.gecode.iris.IrisRestartLspAction"
                 text="Restart Iris Language Server" description="Restart iris lsp for this project"/>
     </actions>
 </idea-plugin>

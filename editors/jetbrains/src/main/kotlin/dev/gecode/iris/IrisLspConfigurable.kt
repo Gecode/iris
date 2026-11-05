@@ -1,4 +1,4 @@
-package org.gecode.iris
+package dev.gecode.iris
 
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.project.Project
