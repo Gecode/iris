@@ -122,11 +122,16 @@ class DriverTest {
         "{\"a\":\"1\"} x",
         "{\"a\":\"1\",}",
         "{\"a\":\"\\q\"}",
-        "{\"a\":\"\\u００４１\"}",
-        "{\"a\":\"\\u٠٠٤١\"}",
       })
   void rejectsMalformedParams(String params) {
     assertEquals(new Result(2, ""), run("read", valid, input, "--params", params));
+  }
+
+  /** Parses directly, as the command line of a non-UTF-8 platform cannot carry these digits. */
+  @ParameterizedTest
+  @ValueSource(strings = {"{\"a\":\"\\u００４１\"}", "{\"a\":\"\\u٠٠٤١\"}"})
+  void rejectsEscapesWithNonAsciiDigits(String params) {
+    assertThrows(IllegalArgumentException.class, () -> Json.params(params));
   }
 
   @Test

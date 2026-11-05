@@ -28,7 +28,9 @@ def script() -> str:
     """Return the path of the installed console script."""
     path = shutil.which("iris", path=sysconfig.get_path("scripts"))
     assert path is not None, "the iris console script is not installed"
-    return path
+    # which() takes Windows suffixes from PATHEXT, in capitals, and the launcher
+    # strips only a lowercase ".exe" from sys.argv[0].
+    return str(Path(path).with_suffix(Path(path).suffix.lower()))
 
 
 def iris(*args: str, stdin: bytes = b"") -> subprocess.CompletedProcess[bytes]:
