@@ -1,5 +1,4 @@
 [toolchain]
 channel = "stable"
 profile = "minimal"
-# The compile-fail snapshots quote the standard library, which needs rust-src.
-components = ["rustfmt", "clippy", "rust-src"]
+components = ["rustfmt", "clippy"]
