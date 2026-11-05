@@ -1,7 +1,6 @@
 {
   "name": "gecode-iris",
   "version": "0.1.0",
-  "private": true,
   "description": "Read text instance files with Iris reader specs, through the Rust reader compiled to WebAssembly",
   "homepage": "https://iris.gecode.dev",
   "license": "MIT",

@@ -1,7 +1,11 @@
 name: TypeScript
 
 on:
+  # Branches only: a release tag runs this through its release workflow.
+  workflow_call:
   push:
+    branches:
+      - '**'
     paths:
       - 'typescript/**'
       - 'rust/**'
@@ -108,3 +112,14 @@ jobs:
       - name: Test iris-js
         working-directory: rust
         run: cargo test --locked -p iris-js
+      - name: Pack the package
+        if: matrix.os == 'ubuntu-latest' && matrix.node == '26'
+        run: |
+          mkdir "$RUNNER_TEMP/package"
+          npm pack --pack-destination "$RUNNER_TEMP/package"
+      - uses: actions/upload-artifact@v7
+        if: matrix.os == 'ubuntu-latest' && matrix.node == '26'
+        with:
+          name: npm-package
+          path: ${{ runner.temp }}/package/*.tgz
+          if-no-files-found: error

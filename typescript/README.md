@@ -22,8 +22,7 @@ process.stdout.write(data.toJSON());
 
 The package is ESM only and needs Node 22.12 or later. It runs in Node,
 browsers, workerd (Cloudflare Workers) and other edge runtimes; see
-[Runtimes](#runtimes). The package is `private` until npm publication in
-milestone M7.
+[Runtimes](#runtimes).
 
 ## Install
 

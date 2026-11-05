@@ -324,7 +324,9 @@ uv build --wheel --out-dir "$TMPDIR/iris-sdist" dist/*.tar.gz
 
 [`.github/workflows/python.yml`](../.github/workflows/python.yml) runs on
 changes to `python/`, `rust/`, `conformance/`, `formats/` and the workflow
-itself. It publishes nothing; publishing is milestone M7.
+itself. It publishes nothing. For a `python-vVERSION` tag,
+[`python-release.yml`](../.github/workflows/python-release.yml) runs it and uploads
+what it built; see [RELEASING.md](../RELEASING.md#python).
 
 - `lint` installs the `test`, `lint` and `docs` groups and runs the
   formatter, linter and type checks above, the pyright and mypy stub checks,

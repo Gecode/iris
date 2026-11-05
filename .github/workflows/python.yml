@@ -1,7 +1,11 @@
 name: Python
 
 on:
+  # Branches only: a release tag runs this through its release workflow.
+  workflow_call:
   push:
+    branches:
+      - '**'
     paths:
       - 'python/**'
       - 'rust/**'

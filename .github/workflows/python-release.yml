@@ -1,0 +1,46 @@
+name: Python release
+
+# Runs the whole Python workflow for a python-vVERSION tag, then uploads the wheels
+# and source distribution it tested. See RELEASING.md.
+on:
+  push:
+    tags:
+      - 'python-v*'
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Check tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check the tag names the package version
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' python/Cargo.toml | head -n 1)
+          test "$GITHUB_REF_NAME" = "python-v$version"
+
+  build:
+    name: Build and test
+    needs: version
+    uses: ./.github/workflows/python.yml
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: wheel-*
+          path: dist
+          merge-multiple: true
+      - uses: actions/download-artifact@v7
+        with:
+          name: sdist
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1

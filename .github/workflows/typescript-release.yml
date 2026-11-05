@@ -1,0 +1,48 @@
+name: TypeScript release
+
+# Runs the whole TypeScript workflow for a typescript-vVERSION tag, then uploads the
+# package it packed. See RELEASING.md.
+on:
+  push:
+    tags:
+      - 'typescript-v*'
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Check tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check the tag names the package version
+        run: |
+          version=$(sed -n 's/^  "version": "\(.*\)",$/\1/p' typescript/package.json | head -n 1)
+          test "$GITHUB_REF_NAME" = "typescript-v$version"
+
+  build:
+    name: Build and test
+    needs: version
+    uses: ./.github/workflows/typescript.yml
+
+  publish:
+    name: Publish to npm
+    needs: build
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '26'
+          registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@v7
+        with:
+          name: npm-package
+          path: package
+      - name: Publish with provenance
+        run: npm publish package/gecode-iris-*.tgz --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

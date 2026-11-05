@@ -15,8 +15,8 @@ tags; [§11](PLAN.md#11-milestones) defines the release milestones.
 | Component | Tag | Current release support |
 |---|---|---|
 | Rust crates and CLI binaries | `rust-vVERSION` | Ready: crates package and build, and the cargo-dist workflow is in place; publication is by hand |
-| Python | `python-vVERSION` | CI builds and tests the wheels and source distribution; PyPI publication planned for M7 |
-| TypeScript | `typescript-vVERSION` | Package built and tested; still `private`, and npm publication planned for M7 |
+| Python | `python-vVERSION` | Ready: the release workflow needs the PyPI setup below |
+| TypeScript | `typescript-vVERSION` | Ready: the release workflow needs the npm setup below |
 | Java and Kotlin | `java-vVERSION` | Native library and Kotlin module ready; Maven Central publication planned for M7 |
 | C++ | `cpp-vVERSION` | Native library and CMake package ready; distribution planned for M7 |
 | JetBrains plugin | `jetbrains-vVERSION` | Plugin built and verified; Marketplace publication planned for M7 |
@@ -72,6 +72,35 @@ GitHub release. [dist-workspace.toml](dist-workspace.toml) owns the target and
 installer selection. Homebrew formula generation is enabled; publishing to
 the not-yet-created tap is disabled.
 
+## Python
+
+An authorized `python-vVERSION` tag starts the
+[release workflow](.github/workflows/python-release.yml). It checks that the tag
+names the version in `python/Cargo.toml`, runs the whole
+[Python workflow](.github/workflows/python.yml) (lint, every wheel, the source
+distribution, conformance) and uploads those exact files to PyPI, through trusted
+publishing with no stored token.
+
+Set this up once before the first tag. On PyPI, add a pending trusted publisher
+for project `gecode-iris`, owner `Gecode`, repository `iris`, workflow
+`python-release.yml` and environment `pypi`. On GitHub, create the `pypi`
+environment and add a required reviewer, so that a tag alone cannot publish.
+
+## TypeScript
+
+An authorized `typescript-vVERSION` tag starts the
+[release workflow](.github/workflows/typescript-release.yml). It checks that the
+tag names the version in `typescript/package.json`, runs the whole
+[TypeScript workflow](.github/workflows/typescript.yml) and publishes the tarball
+that workflow packed, with provenance.
+
+npm trusted publishing is configured on a package that already exists, so the
+first release uses a token. Set this up once before the first tag: create the
+`npm` environment on GitHub with a required reviewer, and give it an `NPM_TOKEN`
+secret, a granular access token that can publish new packages. After the first
+release, configure a trusted publisher for `typescript-release.yml` and delete the
+token.
+
 ## Documentation and future packages
 
 Follow [site/PUBLISHING.md](site/PUBLISHING.md) for production setup, deployment
@@ -80,13 +109,10 @@ deploy automatically once the secrets are configured, so authorization for
 such a push must cover the deployment. A configured workflow or a local dry
 run does not establish that production is live.
 
-The [Python](python/README.md), [TypeScript](typescript/README.md),
-[Java and Kotlin](java/README.md), [C++](cpp/README.md) and
+The [Java and Kotlin](java/README.md), [C++](cpp/README.md) and
 [JetBrains](editors/jetbrains/README.md) guides describe components that have not
 been released. Before their first releases, add component changelogs and registry
-procedures.
-Python's procedure must cover checked wheels and a source distribution that
-builds without a sibling checkout. Their versions need not match Rust's.
+procedures. Their versions need not match Rust's.
 
 ## Recover after partial publication
 
