@@ -1,4 +1,4 @@
-use gecode_iris_syntax::{Diagnostic, DiagnosticCode, SourceLocation, TextRange};
+use gecode_iris_syntax::{Diagnostic, DiagnosticCode, SourceLocation, TextRange, TextSize};
 use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -32,6 +32,9 @@ pub struct Error {
     pub message: String,
     pub location: SourceLocation,
     pub range: TextRange,
+    /// Where the statement this error belongs to starts, when that is known.
+    /// `range` can lie past it.
+    pub owner: Option<TextSize>,
 }
 impl From<&Diagnostic> for Error {
     fn from(diagnostic: &Diagnostic) -> Self {
@@ -40,6 +43,7 @@ impl From<&Diagnostic> for Error {
             message: diagnostic.message.clone(),
             location: diagnostic.location.clone(),
             range: diagnostic.range,
+            owner: None,
         }
     }
 }

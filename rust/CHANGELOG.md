@@ -28,6 +28,12 @@
 - Add `gecode_iris::build`, the spec builder of the new `gecode-iris-build` crate. It
   builds any Iris 0.1 reader spec from typed handles, prints deterministic text
   and parses it with `Spec::parse`; `pattern!` writes line patterns.
+- Point builder errors at the caller's code. Every statement of
+  `gecode_iris::build` records its call site with `#[track_caller]`, and
+  `BuildError` shows the language code and message, the line of emitted text and
+  the call site. `Error::call_site` gives the call site of a failure while
+  reading a built spec, through the new `CallSites` map; a spec parsed from text
+  has none, and its errors are unchanged.
 - Add typed access: `Data::get` and `Data::try_get` read through a `Handle`, and
   `ValueRef` gains `as_floats`, `as_strs`, `len`, `is_empty`, `get`, `row` and
   `rows`. `Spec::source` returns the text of a spec, and `Params::set` accepts a

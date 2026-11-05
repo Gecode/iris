@@ -6,6 +6,7 @@ use gecode_iris_core::handle::{
 use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
+use std::panic::Location;
 use std::rc::Rc;
 
 use crate::check::check_bindings;
@@ -15,7 +16,7 @@ use crate::expr::{
 };
 use crate::field::{BuilderId, DynField, Field, Forward, Shape};
 use crate::pattern::{CaptureType, Pattern};
-use crate::print::print;
+use crate::print::{Printed, print};
 use crate::statement::{
     ArmOptions, Definition, NameState, ROOT_BLOCK, Record, RepeatCount, SectionClause, State, Stmt,
     Strings, Target, store_definition,
@@ -55,6 +56,7 @@ pub struct Scope<D = D0, O = Required> {
     marker: PhantomData<fn() -> (D, O)>,
 }
 
+#[track_caller]
 fn enter<D, O, R>(
     state: &Shared,
     record: Option<usize>,
@@ -73,11 +75,13 @@ fn enter<D, O, R>(
 }
 
 impl<D: Depth, O: Presence> Scope<D, O> {
+    #[track_caller]
     fn push(&mut self, stmt: Stmt) -> usize {
         self.state.borrow_mut().push(self.block, stmt)
     }
 
     /// Resolve `target`, build its statement, and return its handle.
+    #[track_caller]
     fn define<T: Target, V, HD, HO>(
         &mut self,
         target: T,
@@ -92,6 +96,7 @@ impl<D: Depth, O: Presence> Scope<D, O> {
     }
 
     /// `x: type`, reading a value into `target`.
+    #[track_caller]
     pub fn read<T: Target, R: IntoDeclared>(&mut self, target: T, ty: R) -> ReadOut<T, R, D, O> {
         let declared = ty.into_declared();
         let levels = Some(declared.dimensions.len());
@@ -104,6 +109,7 @@ impl<D: Depth, O: Presence> Scope<D, O> {
     }
 
     /// `list x: type until end`.
+    #[track_caller]
     pub fn list<T: Target, V: ValueType>(
         &mut self,
         target: T,
@@ -118,6 +124,7 @@ impl<D: Depth, O: Presence> Scope<D, O> {
     }
 
     /// `let x = value`.
+    #[track_caller]
     pub fn let_<T: Target, E: Operand>(
         &mut self,
         target: T,
@@ -138,6 +145,7 @@ impl<D: Depth, O: Presence> Scope<D, O> {
     /// The value must have the handle's value type and, where its type says,
     /// its depth. To change either, use [`let_`](Self::let_) with the handle as
     /// the target, which returns a [`DynField`].
+    #[track_caller]
     pub fn set<V: ValueType, HD: Depth, HO, E>(&mut self, handle: Field<V, HD, HO>, value: E)
     where
         E: Operand<Value = V>,
@@ -153,6 +161,7 @@ impl<D: Depth, O: Presence> Scope<D, O> {
     }
 
     /// `param p`. The caller decides its type.
+    #[track_caller]
     pub fn param<T: Target>(&mut self, target: T) -> T::Out<Dyn, DynDepth, O> {
         self.define(target, Dyn::TAG, None, |definition| Stmt::Param {
             definition,
@@ -161,6 +170,7 @@ impl<D: Depth, O: Presence> Scope<D, O> {
     }
 
     /// `param p = default`.
+    #[track_caller]
     pub fn param_default<T: Target, E: Operand>(
         &mut self,
         target: T,
@@ -175,6 +185,7 @@ impl<D: Depth, O: Presence> Scope<D, O> {
     }
 
     /// `check condition`. Add a message with [`Check::message`].
+    #[track_caller]
     pub fn check<E: Operand>(&mut self, condition: E) -> Check {
         let condition = condition.into_expr().ops;
         let stmt = self.push(Stmt::Check {
@@ -188,36 +199,43 @@ impl<D: Depth, O: Presence> Scope<D, O> {
     }
 
     /// `expect "text"...`.
+    #[track_caller]
     pub fn expect(&mut self, words: impl Strings) {
         self.push(Stmt::Expect(words.into_strings()));
     }
 
     /// `line "pattern"`.
+    #[track_caller]
     pub fn line(&mut self, pattern: impl Into<Pattern>) {
         self.push(Stmt::Line(pattern.into()));
     }
 
     /// `find "pattern"`.
+    #[track_caller]
     pub fn find(&mut self, pattern: impl Into<Pattern>) {
         self.push(Stmt::Find(pattern.into()));
     }
 
     /// `skip line`.
+    #[track_caller]
     pub fn skip_line(&mut self) {
         self.push(Stmt::SkipLine);
     }
 
     /// `skip count lines`.
+    #[track_caller]
     pub fn skip_lines<E: Operand>(&mut self, count: E) {
         self.push(Stmt::SkipLines(count.into_expr().ops));
     }
 
     /// `index position`.
+    #[track_caller]
     pub fn index<E: Operand>(&mut self, position: E) {
         self.push(Stmt::Index(position.into_expr().ops));
     }
 
     /// `type name = type`, usable wherever a type is.
+    #[track_caller]
     pub fn define_type<R: IntoDeclared<Dims = D0>>(
         &mut self,
         name: &str,
@@ -235,6 +253,7 @@ impl<D: Depth, O: Presence> Scope<D, O> {
         NamedType::new(name, declaration)
     }
 
+    #[track_caller]
     fn open_repeat(&mut self, count: RepeatCount) -> (usize, usize) {
         let mut state = self.state.borrow_mut();
         let record = state.new_record();
@@ -245,6 +264,7 @@ impl<D: Depth, O: Presence> Scope<D, O> {
     }
 
     /// `repeat count { ... }`.
+    #[track_caller]
     pub fn repeat<E: Operand, R>(
         &mut self,
         count: E,
@@ -254,9 +274,10 @@ impl<D: Depth, O: Presence> Scope<D, O> {
         enter(&self.state, Some(record), f)
     }
 
+    #[track_caller]
     fn repeat_guard(&mut self, count: RepeatCount) -> Repeat<D, O> {
         let (stmt, record) = self.open_repeat(count);
-        self.state.borrow_mut().stmts.push(Stmt::Close);
+        self.state.borrow_mut().push_close();
         Repeat {
             state: Rc::clone(&self.state),
             close: stmt + 1,
@@ -266,11 +287,13 @@ impl<D: Depth, O: Presence> Scope<D, O> {
     }
 
     /// `repeat until eof`. Give it a block with [`Repeat::body`].
+    #[track_caller]
     pub fn repeat_until_eof(&mut self) -> Repeat<D, O> {
         self.repeat_guard(RepeatCount::UntilEof)
     }
 
     /// `repeat until "text"...`. Give it a block with [`RepeatUntil::body`].
+    #[track_caller]
     pub fn repeat_until(&mut self, terminators: impl Strings) -> RepeatUntil<D, O> {
         RepeatUntil(self.repeat_guard(RepeatCount::Until {
             terminators: terminators.into_strings(),
@@ -279,9 +302,10 @@ impl<D: Depth, O: Presence> Scope<D, O> {
     }
 
     /// `sections`. Give it arms with [`Sections::body`].
+    #[track_caller]
     pub fn sections(&mut self) -> Sections<D, O> {
         let stmt = self.push(Stmt::Sections(Vec::new()));
-        self.state.borrow_mut().stmts.push(Stmt::Close);
+        self.state.borrow_mut().push_close();
         Sections {
             state: Rc::clone(&self.state),
             stmt,
@@ -291,6 +315,7 @@ impl<D: Depth, O: Presence> Scope<D, O> {
     }
 
     /// `if condition { ... }`, returning a guard for its `else`.
+    #[track_caller]
     pub fn if_<E: Operand, R>(
         &mut self,
         condition: E,
@@ -302,12 +327,14 @@ impl<D: Depth, O: Presence> Scope<D, O> {
     }
 
     /// A handle for a pattern to bind, at this scope's depth and presence.
+    #[track_caller]
     pub fn capture<T: CaptureType>(&mut self, name: &str, ty: T) -> Field<T::Value, D, O> {
         let (name, owner) = self.declare_capture::<T, O>(name, ty);
         Field::new(name, owner)
     }
 
     /// [`Scope::capture`] for an optional arm or a conditional block.
+    #[track_caller]
     pub fn optional_capture<T: CaptureType>(
         &mut self,
         name: &str,
@@ -317,6 +344,7 @@ impl<D: Depth, O: Presence> Scope<D, O> {
         Field::new(name, owner)
     }
 
+    #[track_caller]
     fn declare_capture<T: CaptureType, P: Presence>(
         &mut self,
         name: &str,
@@ -349,6 +377,7 @@ impl<D: Depth, O: Presence> Scope<D, O> {
     /// `forward("_")` is the handle of the entry that `store _` keeps. Only
     /// `store` defines it, and inside a repeat its value lasts for the
     /// iteration, so it reaches the data only from outside every repeat.
+    #[track_caller]
     pub fn forward<H: Forward>(&mut self, name: &str) -> H {
         let mut state = self.state.borrow_mut();
         let name = state.spelled_name(name);
@@ -358,6 +387,7 @@ impl<D: Depth, O: Presence> Scope<D, O> {
 
     /// A handle for a name deliberately left undefined, as in
     /// `check !defined(name)`. Defining it fails `build()`.
+    #[track_caller]
     pub fn undefined(&mut self, name: &str) -> DynField {
         let mut state = self.state.borrow_mut();
         let name = state.spelled_name(name);
@@ -367,6 +397,7 @@ impl<D: Depth, O: Presence> Scope<D, O> {
 
     /// The record of a repeat that comes later in the text, printed with the
     /// names given here. Bind it with [`Scope::record_as`].
+    #[track_caller]
     pub fn forward_record(&mut self, each: &str, list: &str) -> Record {
         let mut state = self.state.borrow_mut();
         let (each, list) = (state.spelled_name(each), state.spelled_name(list));
@@ -374,7 +405,7 @@ impl<D: Depth, O: Presence> Scope<D, O> {
         let record = &mut state.records[id];
         record.each = Some(each);
         record.list = Some(list);
-        record.forward = true;
+        record.forward = Some(Location::caller());
         Record {
             id,
             owner: state.id,
@@ -396,6 +427,7 @@ impl<D: Nested, O: Presence> Scope<D, O> {
     }
 
     /// Print this repeat's `each` name as `name`, which may be `_`.
+    #[track_caller]
     pub fn each_name(&mut self, name: &str) {
         let mut state = self.state.borrow_mut();
         let name = state.spelled_name(name);
@@ -404,6 +436,7 @@ impl<D: Nested, O: Presence> Scope<D, O> {
     }
 
     /// Print this repeat's `as` name as `name`, which may be `_`.
+    #[track_caller]
     pub fn as_name(&mut self, name: &str) {
         let mut state = self.state.borrow_mut();
         let name = state.spelled_name(name);
@@ -412,10 +445,14 @@ impl<D: Nested, O: Presence> Scope<D, O> {
     }
 
     /// Bind this repeat to a record from [`Scope::forward_record`].
+    #[track_caller]
     pub fn record_as(&mut self, record: Record) {
         let mut state = self.state.borrow_mut();
-        state.check_record(record.reference());
-        let forward = state.records.get(record.id).filter(|info| info.forward);
+        state.check_record(record.reference(), Location::caller());
+        let forward = state
+            .records
+            .get(record.id)
+            .filter(|info| info.forward.is_some());
         if forward.is_none_or(|info| info.bound) {
             state.report(
                 IssueKind::Binding,
@@ -438,6 +475,7 @@ pub struct Check {
 
 impl Check {
     /// The message of a failed check.
+    #[track_caller]
     pub fn message(self, text: impl Into<String>) {
         let mut state = self.state.borrow_mut();
         state.check_last(self.stmt);
@@ -458,6 +496,7 @@ pub struct Repeat<D, O> {
 
 impl<D: Depth, O> Repeat<D, O> {
     /// The repeat's block.
+    #[track_caller]
     pub fn body<R>(self, f: impl FnOnce(&mut Scope<D::Next, O>) -> R) -> R {
         self.state.borrow_mut().reopen(self.close);
         enter(&self.state, Some(self.record), f)
@@ -471,6 +510,7 @@ pub struct RepeatUntil<D, O>(Repeat<D, O>);
 impl<D: Depth, O> RepeatUntil<D, O> {
     /// `store x`, keeping the terminator that ended the repeat. To read it,
     /// pass a handle from [`Scope::forward`].
+    #[track_caller]
     pub fn store<T: Target>(self, target: T) -> Self {
         {
             let mut state = self.0.state.borrow_mut();
@@ -488,6 +528,7 @@ impl<D: Depth, O> RepeatUntil<D, O> {
     }
 
     /// The repeat's block.
+    #[track_caller]
     pub fn body<R>(self, f: impl FnOnce(&mut Scope<D::Next, O>) -> R) -> R {
         self.0.body(f)
     }
@@ -503,6 +544,7 @@ pub struct Sections<D, O> {
 }
 
 impl<D, O> Sections<D, O> {
+    #[track_caller]
     fn add(self, clause: SectionClause) -> Self {
         {
             let mut state = self.state.borrow_mut();
@@ -515,6 +557,7 @@ impl<D, O> Sections<D, O> {
     }
 
     /// `until "text"...`.
+    #[track_caller]
     pub fn until(self, terminators: impl Strings) -> Self {
         self.add(SectionClause::Until {
             terminators: terminators.into_strings(),
@@ -523,12 +566,14 @@ impl<D, O> Sections<D, O> {
     }
 
     /// `skip other`.
+    #[track_caller]
     pub fn skip_other(self) -> Self {
         self.add(SectionClause::SkipOther)
     }
 
     /// `store x` on the preceding `until`. To read it, pass a handle from
     /// [`Scope::forward`].
+    #[track_caller]
     pub fn store<T: Target>(self, target: T) -> Self {
         {
             let mut state = self.state.borrow_mut();
@@ -548,6 +593,7 @@ impl<D, O> Sections<D, O> {
     }
 
     /// The block of arms.
+    #[track_caller]
     pub fn body<R>(self, f: impl FnOnce(&mut Arms<D, O>) -> R) -> R {
         let mut state = self.state.borrow_mut();
         state.reopen(self.stmt + 1);
@@ -576,6 +622,7 @@ pub struct Arms<D = D0, O = Required> {
 
 impl<D, O> Arms<D, O> {
     /// An arm with this pattern.
+    #[track_caller]
     pub fn arm(&mut self, pattern: impl Into<Pattern>) -> Arm<D, O> {
         let stmt = self.state.borrow_mut().push(
             self.block,
@@ -603,6 +650,7 @@ pub struct Arm<D, O> {
 }
 
 impl<D, O> Arm<D, O> {
+    #[track_caller]
     fn update(&self, change: impl FnOnce(&mut ArmOptions)) {
         let mut state = self.state.borrow_mut();
         state.check_last(self.stmt);
@@ -612,6 +660,7 @@ impl<D, O> Arm<D, O> {
     }
 
     /// `optional`: the arm need not match, so what it defines may be absent.
+    #[track_caller]
     pub fn optional(self) -> Arm<D, Maybe> {
         self.update(|options| options.optional = true);
         Arm {
@@ -623,12 +672,14 @@ impl<D, O> Arm<D, O> {
     }
 
     /// `last`: sections end after this arm.
+    #[track_caller]
     pub fn last(self) -> Self {
         self.update(|options| options.last = true);
         self
     }
 
     /// The arm's block.
+    #[track_caller]
     pub fn body<R>(self, f: impl FnOnce(&mut Scope<D, O>) -> R) -> R {
         self.update(|options| options.body = true);
         enter(&self.state, self.record, f)
@@ -659,6 +710,7 @@ impl<D: Depth, O: Presence, R> If<D, O, R> {
         }
     }
 
+    #[track_caller]
     fn continuation(&self, stmt: Stmt) {
         let mut state = self.state.borrow_mut();
         state.check_last(self.close);
@@ -666,6 +718,7 @@ impl<D: Depth, O: Presence, R> If<D, O, R> {
     }
 
     /// `else { ... }`.
+    #[track_caller]
     pub fn else_<R2>(self, f: impl FnOnce(&mut Scope<D, Maybe>) -> R2) -> (R, R2) {
         self.continuation(Stmt::Else);
         let otherwise = enter(&self.state, self.record, f);
@@ -673,6 +726,7 @@ impl<D: Depth, O: Presence, R> If<D, O, R> {
     }
 
     /// `else if condition { ... }`.
+    #[track_caller]
     pub fn else_if<E: Operand, R2>(
         self,
         condition: E,
@@ -690,6 +744,7 @@ impl<D: Depth, O: Presence, R> If<D, O, R> {
 
     /// `else if:type`: the else branch is a declaration of the name `if`, which
     /// the target must have.
+    #[track_caller]
     pub fn else_read_if<T: Target, Ty: IntoDeclared>(
         self,
         target: T,
@@ -746,6 +801,7 @@ impl DerefMut for SpecBuilder {
 
 impl SpecBuilder {
     /// A builder for a spec with the format name `format`.
+    #[track_caller]
     pub fn new(format: impl Into<String>) -> Self {
         let mut builder = Self::unnamed();
         builder.format(format);
@@ -765,36 +821,43 @@ impl SpecBuilder {
     }
 
     /// `format name`, a further name of this format.
+    #[track_caller]
     pub fn format(&mut self, name: impl Into<String>) {
         self.push(Stmt::Format(name.into()));
     }
 
     /// `comment "text"...`.
+    #[track_caller]
     pub fn comment(&mut self, markers: impl Strings) {
         self.push(Stmt::Comment(markers.into_strings()));
     }
 
     /// `stop "text"...`.
+    #[track_caller]
     pub fn stop(&mut self, markers: impl Strings) {
         self.push(Stmt::Stop(markers.into_strings()));
     }
 
     /// `tokens "characters"`.
+    #[track_caller]
     pub fn tokens(&mut self, characters: impl Into<String>) {
         self.push(Stmt::Tokens(characters.into()));
     }
 
     /// `separators "characters"`.
+    #[track_caller]
     pub fn separators(&mut self, characters: impl Into<String>) {
         self.push(Stmt::Separators(characters.into()));
     }
 
     /// `ignore trailing`.
+    #[track_caller]
     pub fn ignore_trailing(&mut self) {
         self.push(Stmt::IgnoreTrailing);
     }
 
     /// `instances { ... }`.
+    #[track_caller]
     pub fn instances<R>(&mut self, f: impl FnOnce(&mut Scope) -> R) -> R {
         self.push(Stmt::Instances);
         enter(&self.scope.state, None, f)
@@ -802,6 +865,10 @@ impl SpecBuilder {
 
     /// The text this builder emits, without parsing it.
     pub fn source(&self) -> Result<String, BuildError> {
+        Ok(self.printed()?.text)
+    }
+
+    fn printed(&self) -> Result<Printed, BuildError> {
         let state = self.scope.state.borrow();
         if let Some(issue) = &state.issue {
             return Err(issue.clone().into());
@@ -811,10 +878,13 @@ impl SpecBuilder {
     }
 
     /// Print the text and parse it with [`Spec::parse`]. The spec is an
-    /// ordinary one, and [`Spec::source`] gives the text.
+    /// ordinary one, and [`Spec::source`] gives the text. It also holds the
+    /// call site of each statement, so that a failure while reading names one.
     pub fn build(self) -> Result<Spec, BuildError> {
-        let text = self.source()?;
-        Spec::parse(text.as_bytes(), ORIGIN)
-            .map_err(|failure| BuildError::from_failure(failure, text))
+        let Printed { text, sites } = self.printed()?;
+        match Spec::parse(text.as_bytes(), ORIGIN) {
+            Ok(spec) => Ok(spec.with_call_sites(sites)),
+            Err(failure) => Err(BuildError::from_failure(failure, text, &sites)),
+        }
     }
 }

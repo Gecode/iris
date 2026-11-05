@@ -7,7 +7,9 @@ use crate::{
 use gecode_iris_sema::{
     DefinitionId, DefinitionKind, ReferenceId, RepeatId, Resolution, SemanticModel,
 };
-use gecode_iris_syntax::{DecodedString, SyntaxKind as K, SyntaxNode, SyntaxToken, TextRange};
+use gecode_iris_syntax::{
+    DecodedString, SyntaxKind as K, SyntaxNode, SyntaxToken, TextRange, TextSize,
+};
 use std::{collections::HashMap, sync::Arc};
 
 const BASE_BUDGET: u128 = 1 << 20;
@@ -340,6 +342,10 @@ pub(crate) struct Interpreter<'s, 'i> {
     pub frames: Vec<Frame>,
     types: HashMap<DefinitionId, EvaluatedType>,
     pub(crate) statement: Option<(usize, TextRange)>,
+    /// Where the statement that errors now belong to starts, when that is not
+    /// the selected one. A repeat keeps its last body statement selected while
+    /// it collects a row, and a section arm reports as its `sections`.
+    owner: Option<TextSize>,
     pub(crate) context: Option<Name>,
     pub repeats: Vec<RepeatState>,
     pub records: RecordLists,
@@ -369,6 +375,7 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             frames: vec![Frame::default()],
             types: HashMap::new(),
             statement: None,
+            owner: None,
             context: None,
             repeats: vec![],
             records: RecordLists::default(),
@@ -747,6 +754,7 @@ impl<'s, 'i> Interpreter<'s, 'i> {
             None,
         );
         error.details.context = context;
+        error.details.owner = self.owner;
         Ok(error)
     }
     pub(crate) fn execution_context(

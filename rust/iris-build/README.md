@@ -35,6 +35,14 @@ binding, and leaves the rest to `Spec::parse`. The statements are one flat list
 and expressions are flat postfix operations, so printing and dropping never
 recurse. The text matches `iris fmt` with no line limit.
 
+Every statement method takes `#[track_caller]` and records its call site as a
+`&'static Location`. `build()` keeps a sorted map from statement offsets in the
+text to call sites, in the `BuildError` and in the returned `Spec`. An error shows
+its language code and message, the line of emitted text, and the call site, and
+a failure while reading, such as `E-CHECK-FAILED`, names the call site too. A
+helper function of yours needs `#[track_caller]` to pass on its caller;
+[docs/builders.md](../../docs/builders.md#rust) lists where tracking stops.
+
 Handles are `Copy` and outlive their builder, so the crate interns names as
 `&'static str`. Every distinct name supplied stays allocated for the life of the
 process, including the names of dropped builders. A host that generates names

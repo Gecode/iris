@@ -56,6 +56,8 @@ struct Parser<'a> {
     builder: GreenNodeBuilder<'static>,
     diagnostics: Vec<Diagnostic>,
     checks: Vec<ParseCheck>,
+    /// Where the statement or section arm being parsed starts.
+    owner: TextSize,
     block_depth: usize,
     expression_depth: usize,
     // Declaration order supports scope rollback; counts retain shadowed names.
@@ -92,6 +94,7 @@ pub(crate) fn parse(
         builder: GreenNodeBuilder::new(),
         diagnostics: lexed.diagnostics,
         checks: Vec::new(),
+        owner: TextSize::new(0),
         block_depth: 0,
         expression_depth: 0,
         type_names: Vec::new(),
@@ -126,6 +129,7 @@ impl Parser<'_> {
         self.checks.push(ParseCheck {
             kind,
             target,
+            owner: self.owner,
             range: text_range(range.start, range.end),
             location: SourceLocation {
                 origin: self.origin.clone(),
@@ -133,6 +137,14 @@ impl Parser<'_> {
                 column: None,
             },
         });
+    }
+    /// Parse what starts at the current token, which owns the checks in it.
+    fn owning<T>(&mut self, parse: impl FnOnce(&mut Self) -> T) -> T {
+        let start = self.raw_position();
+        let outer = std::mem::replace(&mut self.owner, start);
+        let result = parse(self);
+        self.owner = outer;
+        result
     }
     fn start(&mut self, kind: K) {
         self.builder.start_node(kind.into());
@@ -369,14 +381,16 @@ impl Parser<'_> {
         };
         self.trivia();
         self.start(kind);
-        let result = if top && self.instances_seen && kind != K::Format {
-            self.fail(
-                C::Placement,
-                "'instances' must be the last statement of the spec",
-            )
-        } else {
-            self.statement_contents(kind, top, first_in_repeat)
-        };
+        let result = self.owning(|parser| {
+            if top && parser.instances_seen && kind != K::Format {
+                parser.fail(
+                    C::Placement,
+                    "'instances' must be the last statement of the spec",
+                )
+            } else {
+                parser.statement_contents(kind, top, first_in_repeat)
+            }
+        });
         if result.is_err() {
             self.recover_statement(before, top);
         }
@@ -665,15 +679,15 @@ impl Parser<'_> {
         while !self.eof() && !self.at("}") {
             self.trivia();
             self.start(K::Arm);
-            let result: PResult = (|| {
-                self.pattern()?;
-                self.eat("optional");
-                self.eat("last");
-                if self.at("{") {
-                    self.block(false)?;
+            let result: PResult = self.owning(|parser| {
+                parser.pattern()?;
+                parser.eat("optional");
+                parser.eat("last");
+                if parser.at("{") {
+                    parser.block(false)?;
                 }
                 Ok(())
-            })();
+            });
             if result.is_err() {
                 self.start(K::Error);
                 while !self.eof() && !self.at("}") && self.kind() != Some(K::String) {

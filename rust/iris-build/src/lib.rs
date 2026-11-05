@@ -28,6 +28,14 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
+//! # Errors
+//!
+//! Every statement records the line that called it. A [`BuildError`] shows the
+//! language error code and message, the line of emitted text, and that
+//! [call site](BuildError::call_site). A failure while reading the built spec
+//! gives one through [`Error::call_site`](gecode_iris_core::Error::call_site). A helper
+//! function needs `#[track_caller]` to record its caller instead of itself.
+//!
 //! # Dynamic forms
 //!
 //! Every spec that `iris check` accepts can be built, including the ones

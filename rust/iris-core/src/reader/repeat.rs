@@ -209,6 +209,7 @@ impl Interpreter<'_, '_> {
         output: Option<crate::value::EntryId>,
     ) -> Result<(), Failure> {
         let repeat = self.repeats.last().expect("active iteration");
+        self.owner = Some(repeat.site.range.start());
         if repeat.before == Some(self.input.position().offset) {
             if !matches!(repeat.mode, Mode::Count(_)) {
                 return Err(self.error(

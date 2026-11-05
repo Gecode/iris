@@ -95,6 +95,7 @@ impl Interpreter<'_, '_> {
     }
     pub(super) fn finish_input(&mut self) -> Result<(), Failure> {
         self.statement = None;
+        self.owner = None;
         self.context = None;
         if !self.selected && !self.input.settings.ignore_trailing {
             self.input.skip_to_data()?;

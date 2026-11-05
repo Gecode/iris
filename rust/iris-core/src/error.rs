@@ -1,5 +1,6 @@
+use crate::call_site::CallSite;
 use crate::input::{Input, Position};
-use gecode_iris_syntax::TextRange;
+use gecode_iris_syntax::{TextRange, TextSize};
 use serde::Serialize;
 use std::{fmt, ops::Range};
 
@@ -133,7 +134,11 @@ pub(crate) struct Details {
     pub record_path: Option<Vec<usize>>,
     pub input_span: Option<InputSpan>,
     pub spec_span: Option<TextRange>,
+    /// Where the statement this error belongs to starts, when `spec_span` does
+    /// not show it: the span can lie past that statement.
+    pub owner: Option<TextSize>,
     pub excerpt: Option<String>,
+    pub call_site: Option<CallSite>,
 }
 impl Error {
     fn new(code: ErrorCode, message: impl Into<String>) -> Self {
@@ -148,7 +153,9 @@ impl Error {
                 record_path: None,
                 input_span: None,
                 spec_span: None,
+                owner: None,
                 excerpt: None,
+                call_site: None,
             }),
         }
     }
@@ -160,6 +167,7 @@ impl Error {
             column: error.location.column,
         });
         result.details.spec_span = Some(error.range);
+        result.details.owner = error.owner;
         result
     }
     pub(crate) fn unknown_param(name: &str, origin: &str) -> Self {
@@ -227,6 +235,10 @@ impl Error {
     pub fn spec_span(&self) -> Option<TextRange> {
         self.details.spec_span
     }
+    /// The host code that wrote the statement, for a spec from a builder.
+    pub fn call_site(&self) -> Option<CallSite> {
+        self.details.call_site
+    }
     pub(crate) fn set_input_end(&mut self, end: usize) {
         if let Some(span) = &mut self.details.input_span {
             span.bytes.end = end;
@@ -277,6 +289,9 @@ impl fmt::Display for Error {
             if let Some(line) = location.line {
                 write!(f, ":{line}")?;
             }
+        }
+        if let Some(site) = self.details.call_site {
+            write!(f, "\ncall site: {}", safe_text(&site.to_string()))?;
         }
         if let Some(summary) = &self.details.earlier_rejection {
             write!(

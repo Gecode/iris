@@ -225,6 +225,7 @@ fn is_statement(kind: K) -> bool {
 impl Interpreter<'_, '_> {
     pub(super) fn select_site(&mut self, site: Site) {
         self.statement = Some((site.line, site.range));
+        self.owner = None;
     }
     pub(super) fn execute_plan(&mut self, root: StatementId) -> Result<(), Failure> {
         let mut work = vec![Work::Statement(root)];

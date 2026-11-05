@@ -47,7 +47,10 @@ impl StatementChecks<'_> {
     }
     fn check_event(&mut self, event: &ParseCheck) -> Result {
         match event.kind {
-            C::Diagnostic(index) => Err(Error::from(&self.parsed.diagnostics()[index])),
+            C::Diagnostic(index) => Err(Error {
+                owner: Some(event.owner),
+                ..Error::from(&self.parsed.diagnostics()[index])
+            }),
             C::TypeDefinitionName => self.check_type_name(event),
             C::TypeUse => self.check_type_use(event),
             C::TypeDefinitionComplete => self.complete_type(event),
@@ -360,6 +363,7 @@ fn error(event: &ParseCheck, code: E, message: String) -> Error {
         message,
         location: event.location.clone(),
         range: event.range,
+        owner: Some(event.owner),
     }
 }
 pub(crate) fn line_of(parsed: &Parse, offset: TextSize) -> usize {
@@ -374,6 +378,7 @@ pub(crate) fn at_node(parsed: &Parse, node: &SyntaxNode, code: E, message: Strin
         code,
         message,
         range: node.text_range(),
+        owner: None,
         location: gecode_iris_syntax::SourceLocation {
             origin: parsed.origin().into(),
             line: line_of(parsed, node.text_range().start()),

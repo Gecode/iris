@@ -172,3 +172,18 @@ fn unclosed_blocks_report_missing_brace() {
         assert_eq!((result.location.line, result.location.column), (1, None));
     }
 }
+
+#[test]
+fn an_error_past_its_statement_keeps_its_range_and_names_its_owner() {
+    let error = error(b"x[2]: rest\ny: int\n");
+    assert_eq!(error.location.line, 2);
+    assert_eq!(usize::from(error.range.start()), 11);
+    assert_eq!(error.owner.map(usize::from), Some(0));
+}
+
+#[test]
+fn a_block_owns_what_follows_its_statements() {
+    let error = error(b"  repeat 1 {\n  x: int\n");
+    assert_eq!(error.message, "missing '}'");
+    assert_eq!(error.owner.map(usize::from), Some(2));
+}

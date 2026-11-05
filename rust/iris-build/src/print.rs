@@ -1,5 +1,6 @@
 //! The printer. It writes what `iris fmt` writes with no line limit, so the
 //! text a builder emits is already formatted.
+use gecode_iris_core::CallSites;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 
@@ -284,30 +285,45 @@ struct Printer<'a> {
     state: &'a State,
     names: Names,
     out: String,
+    sites: CallSites,
+    /// The index of the statement being printed.
+    current: usize,
     indent: usize,
     issue: Option<Issue>,
 }
 
+/// The emitted text, and where each of its statements came from.
+pub(crate) struct Printed {
+    pub text: String,
+    pub sites: CallSites,
+}
+
 /// Print the statements as text.
-pub(crate) fn print(state: &State) -> Result<String, Issue> {
+pub(crate) fn print(state: &State) -> Result<Printed, Issue> {
     let mut printer = Printer {
         state,
         names: Names::assign(state),
         out: String::new(),
+        sites: CallSites::new(),
+        current: 0,
         indent: 0,
         issue: None,
     };
     printer.statements();
     match printer.issue {
         Some(issue) => Err(issue),
-        None => Ok(printer.out),
+        None => Ok(Printed {
+            text: printer.out,
+            sites: printer.sites,
+        }),
     }
 }
 
 impl Printer<'_> {
     fn unprintable(&mut self, message: impl Into<String>) {
+        let site = self.state.sites[self.current];
         self.issue
-            .get_or_insert(Issue::new(IssueKind::Unprintable, message));
+            .get_or_insert(Issue::new(IssueKind::Unprintable, message, site));
     }
 
     fn start_line(&mut self) {
@@ -321,6 +337,8 @@ impl Printer<'_> {
         let mut index = 0;
         let mut continuing = false;
         while let Some(stmt) = stmts.get(index) {
+            self.current = index;
+            self.sites.push(self.out.len(), self.state.sites[index]);
             index += 1;
             if matches!(stmt, Stmt::Close) {
                 self.indent -= 1;
@@ -349,7 +367,9 @@ impl Printer<'_> {
             }
             let each = self.each_line(stmt);
             if each.is_none() && matches!(stmts.get(index), Some(Stmt::Close)) {
-                self.out.push_str(" {}");
+                self.out.push_str(" {");
+                self.sites.push(self.out.len(), self.state.sites[index]);
+                self.out.push('}');
                 index += 1;
                 continuing = self.after_close(stmts.get(index));
                 continue;

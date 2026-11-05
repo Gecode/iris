@@ -1,7 +1,9 @@
 //! The statement stream: one flat list in text order, with blocks marked by
 //! openers and [`Stmt::Close`], so that every pass is a loop over it.
+use gecode_iris_core::CallSite;
 use gecode_iris_core::handle::Str;
 use std::collections::{HashMap, HashSet};
+use std::panic::Location;
 
 use crate::error::{Issue, IssueKind};
 use crate::expr::{Name, Op, RecordRef, ValueTag, ValueType};
@@ -222,11 +224,18 @@ pub(crate) enum NameState {
 pub(crate) struct RecordInfo {
     pub each: Option<&'static str>,
     pub list: Option<&'static str>,
-    /// Made by `forward_record`, awaiting `record_as`.
-    pub forward: bool,
+    /// Where `forward_record` made it, awaiting `record_as`.
+    pub forward: Option<CallSite>,
     pub bound: bool,
     /// The forward record this repeat was bound to.
     pub link: Option<usize>,
+}
+
+/// A forward handle or capture, with the call that made it.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Declaration {
+    pub name: &'static str,
+    pub site: CallSite,
 }
 
 /// The builder's state, shared by its scopes and guards.
@@ -234,12 +243,15 @@ pub(crate) struct RecordInfo {
 pub(crate) struct State {
     pub id: BuilderId,
     pub stmts: Vec<Stmt>,
+    /// The call site of each statement in `stmts`. A `}` has the call that
+    /// wrote its block.
+    pub sites: Vec<CallSite>,
     /// The ids of the open blocks, innermost last.
     pub open: Vec<usize>,
     next_block: usize,
     pub names: HashMap<&'static str, NameState>,
     /// Forward handles and captures in creation order, for reporting.
-    pub declared: Vec<&'static str>,
+    pub declared: Vec<Declaration>,
     pub types: HashSet<&'static str>,
     pub records: Vec<RecordInfo>,
     pub issue: Option<Issue>,
@@ -252,6 +264,7 @@ impl State {
         Self {
             id: BuilderId::next(),
             stmts: Vec::new(),
+            sites: Vec::new(),
             open: vec![ROOT_BLOCK],
             next_block: ROOT_BLOCK + 1,
             names: HashMap::new(),
@@ -263,8 +276,15 @@ impl State {
     }
 
     /// Keep the first issue; the checks after it may only be its consequences.
+    #[track_caller]
     pub fn report(&mut self, kind: IssueKind, message: impl Into<String>) {
-        self.issue.get_or_insert(Issue::new(kind, message));
+        self.report_at(Location::caller(), kind, message);
+    }
+
+    /// [`State::report`] for a check behind a closure, which `#[track_caller]`
+    /// does not pass through.
+    fn report_at(&mut self, site: CallSite, kind: IssueKind, message: impl Into<String>) {
+        self.issue.get_or_insert(Issue::new(kind, message, site));
     }
 
     pub fn open_block(&mut self) -> usize {
@@ -274,11 +294,20 @@ impl State {
         block
     }
 
+    #[track_caller]
     pub fn close_block(&mut self) {
         self.open.pop();
-        self.stmts.push(Stmt::Close);
+        self.push_close();
     }
 
+    /// Append a `}`.
+    #[track_caller]
+    pub fn push_close(&mut self) {
+        self.stmts.push(Stmt::Close);
+        self.sites.push(Location::caller());
+    }
+
+    #[track_caller]
     pub fn check_innermost(&mut self, block: usize) {
         if self.open.last() != Some(&block) {
             self.report(
@@ -294,6 +323,7 @@ impl State {
     }
 
     /// Check that a guard's statement at `index` is still the last one.
+    #[track_caller]
     pub fn check_last(&mut self, index: usize) {
         if !self.is_last(index) {
             self.report(
@@ -305,67 +335,76 @@ impl State {
     }
 
     /// Remove the `}` at `index`, so that a block can take its body.
+    #[track_caller]
     pub fn reopen(&mut self, index: usize) {
         self.check_last(index);
         if self.is_last(index) {
             self.stmts.pop();
+            self.sites.pop();
         }
     }
 
-    pub fn check_owner(&mut self, owner: BuilderId, what: &str, name: &str) {
+    pub fn check_owner(&mut self, owner: BuilderId, what: &str, name: &str, site: CallSite) {
         if owner != self.id {
-            self.report(
+            self.report_at(
+                site,
                 IssueKind::Provenance,
                 format!("{what} `{name}` does not come from this builder"),
             );
         }
     }
 
-    pub fn check_record(&mut self, reference: RecordRef) {
+    pub fn check_record(&mut self, reference: RecordRef, site: CallSite) {
         if reference.owner != self.id {
-            self.report(
+            self.report_at(
+                site,
                 IssueKind::Provenance,
                 "a record handle does not come from this builder",
             );
         }
     }
 
-    fn check_ops(&mut self, ops: &[Op]) {
+    fn check_ops(&mut self, ops: &[Op], site: CallSite) {
         for op in ops {
             match op {
                 Op::Name(name) | Op::Member(name) => {
-                    self.check_owner(name.owner, "the handle", name.text);
+                    self.check_owner(name.owner, "the handle", name.text, site);
                 }
                 Op::Record(reference) | Op::RecordList(reference) | Op::ListMember(reference) => {
-                    self.check_record(*reference);
+                    self.check_record(*reference, site);
                 }
                 _ => {}
             }
         }
     }
 
-    fn check_mention(&mut self, mention: Mention<'_>) {
+    fn check_mention(&mut self, mention: Mention<'_>, site: CallSite) {
         match mention {
-            Mention::Ops(ops) => self.check_ops(ops),
-            Mention::Name(name) => self.check_owner(name.owner, "the handle", name.text),
+            Mention::Ops(ops) => self.check_ops(ops, site),
+            Mention::Name(name) => self.check_owner(name.owner, "the handle", name.text, site),
             Mention::Type(named) => {
-                self.check_owner(named.name.owner, "the type", named.name.text);
+                self.check_owner(named.name.owner, "the type", named.name.text, site);
             }
         }
     }
 
     /// Check the handles of a capture's type, which a pattern prints later.
+    #[track_caller]
     pub fn check_capture(&mut self, capture: &CaptureSpec) {
+        let site = Location::caller();
         if let CaptureSpec::Typed(declared) = capture {
-            mention_declared(declared, &mut |mention| self.check_mention(mention));
+            mention_declared(declared, &mut |mention| self.check_mention(mention, site));
         }
     }
 
     /// Check the handles of `stmt` and append it to the block `block`.
+    #[track_caller]
     pub fn push(&mut self, block: usize, stmt: Stmt) -> usize {
+        let site = Location::caller();
         self.check_innermost(block);
-        stmt.mentions(&mut |mention| self.check_mention(mention));
+        stmt.mentions(&mut |mention| self.check_mention(mention, site));
         self.stmts.push(stmt);
+        self.sites.push(site);
         self.stmts.len() - 1
     }
 
@@ -385,6 +424,7 @@ impl State {
     /// Check the name of a definition, and intern it. A declaration, list or
     /// capture named `_` stores nothing, and `let`, `param` and `type` reject
     /// `_`, so no definition gives a handle for it.
+    #[track_caller]
     pub fn definition_name(&mut self, name: &str) -> &'static str {
         if name == "_" {
             self.report(
@@ -398,6 +438,7 @@ impl State {
 
     /// Check a name that may be `_`, and intern it: a repeat's `each` or `as`
     /// name, a forward handle for `store`, or a name left undefined.
+    #[track_caller]
     pub fn spelled_name(&mut self, name: &str) -> &'static str {
         if name.starts_with("gecode.") {
             self.report(
@@ -414,6 +455,7 @@ impl State {
     }
 
     /// Resolve a definition's target.
+    #[track_caller]
     pub fn define(
         &mut self,
         target: TargetName,
@@ -437,7 +479,7 @@ impl State {
                 Some(name)
             }
             TargetName::Existing(name) => {
-                self.check_owner(name.owner, "the handle", name.text);
+                self.check_owner(name.owner, "the handle", name.text, Location::caller());
                 Some(name.text)
             }
         };
@@ -449,6 +491,7 @@ impl State {
     }
 
     /// Declare a checked name for a forward handle, a capture, or `undefined`.
+    #[track_caller]
     pub fn declare(&mut self, name: &'static str, state: NameState) -> &'static str {
         if self.names.contains_key(name) {
             self.report(
@@ -457,7 +500,10 @@ impl State {
             );
         }
         self.names.insert(name, state);
-        self.declared.push(name);
+        self.declared.push(Declaration {
+            name,
+            site: Location::caller(),
+        });
         name
     }
 }
@@ -604,6 +650,7 @@ impl Record {
 }
 
 /// The definition a terminator's `store` makes.
+#[track_caller]
 pub(crate) fn store_definition(state: &mut State, target: TargetName) -> Definition {
     if matches!(target, TargetName::Discard) {
         state.report(

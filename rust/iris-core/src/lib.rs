@@ -1,4 +1,5 @@
 //! Input reading, expression evaluation, and owned column data for Iris 0.1.
+mod call_site;
 mod cancellation;
 mod dzn;
 mod error;
@@ -11,6 +12,7 @@ mod reader;
 pub mod summary;
 mod value;
 
+pub use call_site::{CallSite, CallSites};
 pub use cancellation::{CancellationToken, ReadOptions};
 pub use error::{Error, ErrorCode, InputSpan, Location};
 use gecode_iris_sema::Analysis;
@@ -25,6 +27,7 @@ pub struct Spec {
     parsed: Parse,
     analysis: Analysis,
     index: reader::ModelIndex,
+    call_sites: CallSites,
 }
 impl Spec {
     pub fn parse(source: &[u8], origin: &str) -> Result<Self, Failure> {
@@ -54,7 +57,21 @@ impl Spec {
             parsed,
             analysis,
             index,
+            call_sites: CallSites::new(),
         })
+    }
+
+    /// Attach the host call sites of this spec's statements, so that a failure
+    /// while reading names them. A spec builder does this.
+    pub fn with_call_sites(mut self, call_sites: CallSites) -> Self {
+        self.call_sites = call_sites;
+        self
+    }
+
+    /// The host call sites of this spec's statements. A spec parsed from text
+    /// has none.
+    pub fn call_sites(&self) -> &CallSites {
+        &self.call_sites
     }
 
     /// The reader spec's format name, if declared.
@@ -87,7 +104,10 @@ impl Spec {
                 .with_params(params)?
                 .read()
         })();
-        Self::finish_read(result, options)
+        Self::finish_read(
+            result.map_err(|failure| self.call_sites.locate(failure)),
+            options,
+        )
     }
 
     fn finish_read(result: Result<Data, Failure>, options: &ReadOptions) -> Result<Data, Failure> {
@@ -104,9 +124,12 @@ impl Spec {
 
     /// Execute every instance and return its count, usable names, and rejections.
     pub fn catalog(&self, input: &[u8], origin: &str, params: &Params) -> Result<Data, Failure> {
-        reader::Interpreter::new(self, self.input(input, origin, params)?)?
-            .with_params(params)?
-            .catalog()
+        let result = (|| {
+            reader::Interpreter::new(self, self.input(input, origin, params)?)?
+                .with_params(params)?
+                .catalog()
+        })();
+        result.map_err(|failure| self.call_sites.locate(failure))
     }
 
     pub fn catalog_path(&self, path: impl AsRef<Path>, params: &Params) -> Result<Data, Failure> {

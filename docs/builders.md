@@ -432,6 +432,53 @@ on an array, `s.let_("v", a.ex())` returns a scalar-typed handle, and
 `data.try_get` then reports the mismatch and `data.get` panics, so it never
 yields a wrong value. Use `.ex()` only where the value is a scalar.
 
+Every statement method takes `#[track_caller]`, so each statement records the
+line that called it. A `BuildError` displays the language error code and
+message, the line of emitted text, and the call site:
+
+```text
+E-SPEC-PLACEMENT: builder.iris:2: 'instances' must be the last statement of the spec
+     2 | after: int
+call site: src/main.rs:12:7
+```
+
+`BuildError::failure` keeps the original failure, with its code and its
+location in the emitted text, and `BuildError::call_site` gives the call site.
+The builder's own checks report a call site too. The spec that `build()` returns
+keeps a sorted map from each statement's offset in the text to its call site, so
+a failure while reading gets one as well: `Error::call_site` returns it, and the
+rendered error ends with a `call site:` line. A failure that names no statement,
+such as `E-TRAILING-INPUT`, has no call site, and neither does a spec parsed
+from text. Catalog rejections are summaries in the data, so they have none.
+
+The call site is that of the statement the failure belongs to, which can differ
+from the emitted line. Some language errors sit on the token after their
+statement: `b.read("bad", rest().dim(2))` followed by `b.read("next", int())`
+shows the line `next: int`, as a text spec would, and names the call that read
+`bad`. In the same way, a repeat's own failures keep the location of its last
+body statement and name the repeat, and a section arm's failures keep the
+location of `sections` and name the arm.
+
+`#[track_caller]` reaches only so far:
+
+- A statement in a block closure records its own line, which is the line you
+  want. No closure is ever part of the chain.
+- A statement in a helper function records the line inside the helper. Put
+  `#[track_caller]` on the helper to record the helper's caller.
+- A statement method used as a function value, such as `Scope::skip_line` passed
+  to `for_each`, records its own definition in `gecode-iris-build`. Call it from a
+  closure instead.
+- `pattern!` writes no statement. It expands to a `Pattern` value, and the
+  `line`, `find` or `arm` that takes the value records the call site.
+- Expressions record nothing, so a failure in one has its statement's call site.
+- Guard methods such as `message` and `store` belong to the statement they
+  change, which keeps the call site of its opening call. A misused guard reports
+  the guard's own line. A `}` has the call site of the method that wrote the
+  block, which is `body` for a guard.
+
+No statement method is a trait method, so nothing on the statement path loses
+the attribute that way.
+
 ### C++
 
 C++ can overload every operator Iris has, and `pattern` checks its

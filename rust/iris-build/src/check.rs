@@ -1,5 +1,6 @@
 //! The binding check: one walk over the statements, which knows the depth and
 //! presence of each definition, so `.optional()` counts wherever it was called.
+use gecode_iris_core::CallSite;
 use std::collections::HashMap;
 
 use crate::error::{Issue, IssueKind};
@@ -7,7 +8,8 @@ use crate::expr::ValueTag;
 use crate::field::Shape;
 use crate::pattern::{CaptureSpec, Piece};
 use crate::statement::{
-    Definition, Mention, NameState, RepeatCount, SectionClause, State, Stmt, mention_declared,
+    Declaration, Definition, Mention, NameState, RepeatCount, SectionClause, State, Stmt,
+    mention_declared,
 };
 use crate::types::TypeRef;
 
@@ -31,6 +33,8 @@ struct Bound {
 /// A repeat's `store`, which runs when the repeat ends.
 #[derive(Debug, Clone, Copy)]
 struct PendingStore {
+    /// The repeat statement, which the store belongs to.
+    stmt: usize,
     repeat_block: usize,
     store: Definition,
     frame: Frame,
@@ -45,6 +49,8 @@ struct TypeDeclaration {
 
 struct Walk<'a> {
     state: &'a State,
+    /// The index of the statement being checked.
+    current: usize,
     bound: HashMap<&'static str, Bound>,
     frames: Vec<Frame>,
     next_block: usize,
@@ -55,8 +61,8 @@ struct Walk<'a> {
     types: HashMap<&'static str, Vec<TypeDeclaration>>,
 }
 
-fn fail<T>(message: String) -> Result<T, Issue> {
-    Err(Issue::new(IssueKind::Binding, message))
+fn fail_at<T>(site: CallSite, message: String) -> Result<T, Issue> {
+    Err(Issue::new(IssueKind::Binding, message, site))
 }
 
 fn is_open(frames: &[Frame], block: usize) -> bool {
@@ -84,6 +90,15 @@ fn describe(value: ValueTag, levels: Option<usize>, open: &str) -> String {
 }
 
 impl Walk<'_> {
+    fn site(&self) -> CallSite {
+        self.state.sites[self.current]
+    }
+
+    /// Fail the statement being checked.
+    fn fail<T>(&self, message: String) -> Result<T, Issue> {
+        fail_at(self.site(), message)
+    }
+
     /// `frame` with the number of a block of its own.
     fn own_block(&mut self, frame: Frame) -> Frame {
         self.next_block += 1;
@@ -128,7 +143,7 @@ impl Walk<'_> {
         frame: Frame,
     ) -> Result<(), Issue> {
         match self.state.names.get(name) {
-            Some(NameState::Undefined) => fail(format!(
+            Some(NameState::Undefined) => self.fail(format!(
                 "`{name}` comes from `undefined`, so nothing may define it; \
                  use `forward` for a name that is defined"
             )),
@@ -140,7 +155,7 @@ impl Walk<'_> {
                     // An explicit redefinition, which leaves the handle stale.
                     Ok(())
                 } else {
-                    fail(format!(
+                    self.fail(format!(
                         "the forward handle `{name}` is {}, but this definition is {}; \
                          declare it with the definition's type, or as a `DynField`",
                         describe(shape.value, shape.levels, "any"),
@@ -158,7 +173,7 @@ impl Walk<'_> {
             return Ok(());
         };
         if name == "_" {
-            return fail(
+            return self.fail(
                 "only `store` defines the entry named `_`: a declaration, a list or a \
                  capture discards it, and `let` and `param` reject it"
                     .to_owned(),
@@ -207,19 +222,19 @@ impl Walk<'_> {
     fn capture(&mut self, name: &'static str, frame: Frame) -> Result<(), Issue> {
         let state = self.state;
         let Some(NameState::Capture { spec, shape }) = state.names.get(name) else {
-            return fail(format!(
+            return self.fail(format!(
                 "`{name}` is not a capture; use `bind` to define it in a pattern, \
                  or `reference` to match its value"
             ));
         };
         if self.record_binding(name, frame) > 1 {
-            return fail(format!(
+            return self.fail(format!(
                 "the capture `{name}` is bound twice; a capture belongs to one pattern, \
                  so use `reference` to match its value again"
             ));
         }
         if shape.levels.is_some_and(|levels| levels != frame.depth) {
-            return fail(format!(
+            return self.fail(format!(
                 "the capture `{name}` is bound in a different scope: create it with \
                  `capture` in the scope of the pattern"
             ));
@@ -230,7 +245,7 @@ impl Walk<'_> {
             } else {
                 "optional_capture"
             };
-            return fail(format!(
+            return self.fail(format!(
                 "the capture `{name}` is bound where its presence differs: use `{form}`"
             ));
         }
@@ -254,6 +269,7 @@ impl Walk<'_> {
 
     /// A statement uses the named type `named`, which must be the one visible.
     fn type_use(&mut self, named: TypeRef) -> Result<(), Issue> {
+        let site = self.site();
         let declarations = self.types.entry(named.name.text).or_default();
         while declarations
             .last()
@@ -270,44 +286,53 @@ impl Walk<'_> {
                      is not the one visible here",
                     named.name.text
                 ),
+                site,
             )),
         }
     }
 
     fn finish(&self) -> Result<(), Issue> {
-        for name in &self.state.declared {
+        for &Declaration { name, site } in &self.state.declared {
             let bound = self.bound.get(name).copied().unwrap_or_default();
             match &self.state.names[name] {
                 NameState::Capture { .. } if bound.count == 0 => {
-                    return fail(format!(
-                        "the capture `{name}` is never bound; add it to a pattern"
-                    ));
+                    return fail_at(
+                        site,
+                        format!("the capture `{name}` is never bound; add it to a pattern"),
+                    );
                 }
                 NameState::Forward(_) if bound.count == 0 => {
-                    return fail(format!(
-                        "the forward handle `{name}` is never bound; define it, \
-                         or use `undefined` for a name left undefined"
-                    ));
+                    return fail_at(
+                        site,
+                        format!(
+                            "the forward handle `{name}` is never bound; define it, \
+                             or use `undefined` for a name left undefined"
+                        ),
+                    );
                 }
                 NameState::Forward(shape) if shape.required && !bound.required => {
-                    return fail(format!(
-                        "the forward handle `{name}` is required, but every definition \
-                         may not execute; declare it with `Maybe`"
-                    ));
+                    return fail_at(
+                        site,
+                        format!(
+                            "the forward handle `{name}` is required, but every definition \
+                             may not execute; declare it with `Maybe`"
+                        ),
+                    );
                 }
                 _ => {}
             }
         }
-        let unbound = self
-            .state
-            .records
-            .iter()
-            .find(|record| record.forward && !record.bound);
-        if let Some(record) = unbound {
-            let name = record.each.unwrap_or_default();
-            return fail(format!(
-                "the forward record `{name}` is never bound; use `record_as` in its repeat"
-            ));
+        for record in &self.state.records {
+            if let (Some(site), false) = (record.forward, record.bound) {
+                let name = record.each.unwrap_or_default();
+                return fail_at(
+                    site,
+                    format!(
+                        "the forward record `{name}` is never bound; \
+                         use `record_as` in its repeat"
+                    ),
+                );
+            }
         }
         Ok(())
     }
@@ -362,6 +387,7 @@ impl Walk<'_> {
                 let closed = self.frames.pop().expect("a close ends an open block");
                 let ended = |pending: &mut PendingStore| pending.repeat_block == closed.block;
                 if let Some(pending) = self.stores.pop_if(ended) {
+                    self.current = pending.stmt;
                     self.store(pending.store, pending.frame)?;
                 }
             }
@@ -375,6 +401,7 @@ impl Walk<'_> {
                 } = count
                 {
                     self.stores.push(PendingStore {
+                        stmt: self.current,
                         repeat_block,
                         store: *store,
                         frame,
@@ -411,6 +438,7 @@ impl Walk<'_> {
 pub(crate) fn check_bindings(state: &State) -> Result<(), Issue> {
     let mut walk = Walk {
         state,
+        current: 0,
         bound: HashMap::new(),
         frames: vec![Frame {
             block: 0,
@@ -422,6 +450,7 @@ pub(crate) fn check_bindings(state: &State) -> Result<(), Issue> {
         types: HashMap::new(),
     };
     for (index, stmt) in state.stmts.iter().enumerate() {
+        walk.current = index;
         let frame = *walk.frames.last().expect("the root frame stays open");
         let mut result = Ok(());
         stmt.mentions(&mut |mention| walk.mention(mention, &mut result));

@@ -89,6 +89,7 @@ impl Interpreter<'_, '_> {
         }
         let line = self.input.remaining_line()?.expect("data remains");
         for (index, arm) in sections.arms.iter().enumerate() {
+            self.owner = Some(arm.pattern.start());
             let pattern = &self.spec.index.patterns[&arm.pattern];
             if let Some(captures) = self.match_pattern(pattern, &line)? {
                 if let Some(first) = self.sections.last().expect("active sections").seen[index] {
@@ -124,6 +125,7 @@ impl Interpreter<'_, '_> {
                 return Ok(());
             }
         }
+        self.owner = None;
         if sections.skip_other {
             self.input.consume_line(&line)?;
             work.push(Work::SectionsNext);
@@ -200,6 +202,7 @@ impl Interpreter<'_, '_> {
         let sections = &self.spec.index.sections[&state.descriptor];
         for (arm, seen) in sections.arms.iter().zip(&state.seen) {
             if !arm.optional && seen.is_none() {
+                self.owner = Some(arm.pattern.start());
                 let error = self.language_error_at(
                     ErrorCode::LineMatch,
                     self.input.control.text_message(&[

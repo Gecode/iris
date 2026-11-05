@@ -1,6 +1,6 @@
 //! Structural resolution in Specification §11.2 operand order.
 use crate::{Error, ErrorCode as E, check::at_node, model::*, syntax::*};
-use gecode_iris_syntax::{Parse, SyntaxKind as K, SyntaxNode};
+use gecode_iris_syntax::{Parse, SyntaxKind as K, SyntaxNode, TextSize};
 type Result<T = ()> = std::result::Result<T, Error>;
 
 pub(crate) fn resolve(parsed: &Parse, model: &mut SemanticModel, index: &SyntaxIndex) -> Result {
@@ -10,6 +10,7 @@ pub(crate) fn resolve(parsed: &Parse, model: &mut SemanticModel, index: &SyntaxI
         model,
         index,
         statement: parsed.syntax(),
+        arm: None,
         repeats: vec![],
         bound: vec![],
         dependencies: vec![],
@@ -70,13 +71,18 @@ struct Resolver<'a> {
     index: &'a SyntaxIndex,
     model: &'a mut SemanticModel,
     statement: SyntaxNode,
+    /// Where the section arm being resolved starts.
+    arm: Option<TextSize>,
     repeats: Vec<RepeatId>,
     bound: Vec<(DefinitionId, Denotation)>,
     dependencies: Vec<LiftDependency>,
 }
 impl Resolver<'_> {
     fn fail<T>(&self, code: E, message: String) -> Result<T> {
-        Err(at_node(self.parsed, &self.statement, code, message))
+        Err(Error {
+            owner: self.arm,
+            ..at_node(self.parsed, &self.statement, code, message)
+        })
     }
     fn visit(&mut self, container: &SyntaxNode) -> Result {
         for statement in container.children() {
@@ -119,9 +125,11 @@ impl Resolver<'_> {
             self.resolve_pattern_bounds(&pattern)?;
         }
         for arm in statement.children().filter(|n| n.kind() == K::Arm) {
+            self.arm = Some(arm.text_range().start());
             for pattern in arm.children().filter(|n| n.kind() == K::Pattern) {
                 self.resolve_pattern_bounds(&pattern)?;
             }
+            self.arm = None;
         }
         for dimension in statement.children().filter(|n| n.kind() == K::Dimension) {
             for expression in expressions(&dimension) {

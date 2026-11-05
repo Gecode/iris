@@ -135,6 +135,7 @@ impl Parser<'_> {
             self.checks.push(crate::ParseCheck {
                 kind: Check::Diagnostic(self.diagnostics.len()),
                 target: diagnostic.range.start(),
+                owner: self.owner,
                 range: diagnostic.range,
                 location: diagnostic.location.clone(),
             });
