@@ -729,18 +729,21 @@ Gecode's examples, the skill evals, or a user report); the Specification
 cannot make it an error; and it gives no false warnings on the format
 library. Candidates and the specs that show them are collected in
 `docs/lint-candidates.md` while the format library and the skill evals
-are written. When those are done we decide (§12, open question 3):
+are written. The decision follows the count of useful lints:
 
-- No useful lints: no linter. Drop `iris-lint`, `iris lint`, and lint
-  suppressions from this plan.
+- No useful lints: no linter.
 - One or two: report them as warnings from `iris check` and the LSP, in
   `gecode-iris-sema`, without a separate crate or command.
 - More: build the linter as described below.
 
+**Decided at M6b: no linter for now (§12).** The file held no candidates.
+The skill evals are not finished, so they and user reports can still add
+candidates, and the count above reopens the decision.
+
 A candidate that points at confusing 0.1 behavior may belong in
 `docs/1.0-ideas.md` instead, so that 1.0 removes the trap.
 
-The rest of this section describes the linter if we build it.
+The rest of this section describes the linter if the decision reopens.
 
 - **Errors and lints are different things.** An error (§4.4) makes a spec
   invalid; it has a code, is normative, and is tested by the conformance
@@ -1021,7 +1024,7 @@ Dependencies flow downward. Work in the same row can run in parallel.
 | M4f | TypeScript | The npm package `gecode-iris` over `rust/iris-js` (§8.16), Node driver, browser and Workers packaging, site guide | 100% conformance through the Node driver; the package loads in Node (ESM and `require()`), a browser, and `workerd`; the published declarations type-check |
 | M5 | Site and playground | Starlight site, the Specification rendered, guides, WASM playground, format pages | Deployed at `iris.gecode.dev` |
 | M6 | Skill | `skill/iris`, evals | The eval set passes, for example 8 of 10 formats read correctly on the first attempt |
-| M6b | Lint decision | Review `docs/lint-candidates.md` (§8.13, §12 open question 3), then build what the decision calls for | The decision is recorded in §12; any lints that ship have tests, fixes where possible, and site pages. Not required for M7 |
+| M6b | Lint decision | Review `docs/lint-candidates.md` (§8.13, §12), then build what the decision calls for | The decision is recorded in §12; any lints that ship have tests, fixes where possible, and site pages. Not required for M7 |
 | M7 | 0.1.0 release | The 0.1 Specification frozen; Rust, Python, TypeScript, Java and Kotlin, C++, the VS Code extension, and the JetBrains plugin published as 0.1.0; announcement | Those registries and marketplaces have 0.1.0, and the docs are live |
 | M7a | Remaining tooling | Tree-sitter and the Zed extension (finishing M4b), the skill's evals (finishing M6) | Those packages are published, and the skill's eval set passes. Not required for M7; follows it in 0.x package releases |
 | M7b | Spec builders | Builders in every implementation (§8.15), `iris gen`, the round-trip generator and comparison, a builder page in each API guide | Every checked conformance and format spec round-trips through each language's builder, and every format has an idiomatic builder whose cases pass. Not required for M7; ships in 0.x package releases |
@@ -1130,6 +1133,11 @@ before M4e.
   16 s run, so a map would gain almost nothing. Mapping the file itself
   would need `unsafe` code, and a file changed during a read could crash
   the process. Revisit if a profile shows acquisition mattering.
+- **No linter for now:** decided at M6b on 2026-11-05, by the rule in §8.13,
+  because `docs/lint-candidates.md` held no candidates. `iris lint`,
+  `iris-lint` and lint suppressions are not built, and 0.1.0 ships without
+  them. Revisit if candidates that meet the rule appear, from the skill
+  evals or from users.
 
 ### Open
 
@@ -1137,6 +1145,3 @@ before M4e.
    compatible by default, with breaking changes listed and handled by
    `iris migrate`.
 2. **Python floor.** *Recommendation:* 3.10+ with `abi3`.
-3. **Whether to build a linter.** Decided at M6b from the evidence in
-   `docs/lint-candidates.md`, by the rule in §8.13. *Recommendation:* no
-   linter unless at least three candidates meet that rule.
