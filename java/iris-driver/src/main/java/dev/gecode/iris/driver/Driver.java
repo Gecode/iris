@@ -3,6 +3,7 @@ package dev.gecode.iris.driver;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import dev.gecode.iris.IrisException;
+import dev.gecode.iris.Params;
 import dev.gecode.iris.Spec;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -37,9 +38,21 @@ final class Driver {
     } catch (Misuse e) {
       err.println("iris-driver: " + e.getMessage());
       return MISUSE;
-    } catch (IOException | RuntimeException e) {
+    } catch (IOException | RuntimeException | OutOfMemoryError e) {
       err.println("iris-driver: " + e);
       return HOST_FAILURE;
+    }
+  }
+
+  /**
+   * Refuses an argument that the JVM may have changed. It decodes arguments in the locale's
+   * encoding before {@code main} runs, so only ASCII survives outside a UTF-8 locale. Changing the
+   * locale for the JVM instead would break file names in the original encoding.
+   */
+  static void requireIntact(String argument, String encoding) {
+    if (!UTF_8.name().equalsIgnoreCase(encoding) && !argument.chars().allMatch(c -> c < 0x80)) {
+      throw new IllegalStateException(
+          "non-ASCII --params needs a UTF-8 locale or JSON escapes; this one uses " + encoding);
     }
   }
 
@@ -49,15 +62,20 @@ final class Driver {
   private static Response respond(Request request) throws IOException {
     byte[] source = Files.readAllBytes(Path.of(request.spec()));
     try {
-      Spec.parse(source, request.spec());
+      Spec spec = Spec.parse(source, request.spec());
+      return switch (request.operation()) {
+        case PARSE -> new Response(Json.PARSED, 0);
+        case READ -> {
+          byte[] input = Files.readAllBytes(Path.of(request.input()));
+          yield new Response(spec.read(input, request.input(), request.params()).toJson(), 0);
+        }
+        case CATALOG, DZN ->
+            throw new UnsupportedOperationException(
+                "the operation " + request.operation() + " is not implemented");
+      };
     } catch (IrisException e) {
-      return new Response(Json.error(e.error()), LANGUAGE_ERROR);
+      return new Response(e.error().toJson(), LANGUAGE_ERROR);
     }
-    if (request.operation() != Operation.PARSE) {
-      throw new UnsupportedOperationException(
-          "the operation " + request.operation() + " is not implemented");
-    }
-    return new Response(Json.PARSED, 0);
   }
 
   /** The operations of the protocol. */
@@ -77,8 +95,15 @@ final class Driver {
     }
   }
 
-  /** A valid request, with what its execution needs so far. */
-  private record Request(Operation operation, String spec) {
+  /**
+   * A valid request.
+   *
+   * @param operation the operation
+   * @param spec the path of the reader spec
+   * @param input the path of the input, which is empty for a parse
+   * @param params the parameters
+   */
+  private record Request(Operation operation, String spec, String input, Params params) {
     private static final String USAGE =
         "usage: iris-driver parse|read|catalog|dzn SPEC [INPUT] "
             + "[--params JSON] [--version 0.1] [--format json|dzn]";
@@ -97,8 +122,24 @@ final class Driver {
           throw new Misuse("missing path before " + path);
         }
       }
-      checkOptions(operation, List.of(args).subList(positionals, args.length));
-      return new Request(operation, args[1]);
+      List<String> options = List.of(args).subList(positionals, args.length);
+      checkOptions(operation, options);
+      String input = operation == Operation.PARSE ? "" : args[2];
+      return new Request(operation, args[1], input, params(options));
+    }
+
+    private static Params params(List<String> options) {
+      int option = options.indexOf("--params");
+      if (option < 0) {
+        return Params.of();
+      }
+      String json = options.get(option + 1);
+      requireIntact(json, System.getProperty("sun.jnu.encoding"));
+      try {
+        return Params.of(Json.params(json));
+      } catch (IllegalArgumentException e) {
+        throw new Misuse(e.getMessage());
+      }
     }
 
     private static Operation operation(String command) {

@@ -20,12 +20,18 @@ public final class Ast {
    * @param body the statements
    * @param bindings the comprehension bindings, in the order the comprehensions were completed
    * @param types the named types, in definition order
+   * @param sites how many record-bearing expressions there are (see {@link Expr})
+   * @param checks how many check statements there are
+   * @param repeats how many repeat statements there are
    */
   public record Program(
       @Nullable String format,
       List<Stmt> body,
       List<Binding> bindings,
-      List<Stmt.TypeDefinition> types) {}
+      List<Stmt.TypeDefinition> types,
+      int sites,
+      int checks,
+      int repeats) {}
 
   /**
    * A name bound by a comprehension.
@@ -44,6 +50,10 @@ public final class Ast {
    * the tree. A walk therefore loops over {@link #leftSpine} and recurses into the other operands.
    * The generated {@code equals}, {@code hashCode} and {@code toString} recurse into both, so they
    * are not for the trees of arbitrary reader specs.
+   *
+   * <p>Names, indices, fields and comprehensions can denote or range over records. They carry a
+   * {@code site}, a number unique in the reader spec, by which {@link Resolution} says what each of
+   * them resolved to.
    */
   public sealed interface Expr {
     /** Returns this expression and its chain of left operands, the leftmost first. */
@@ -81,7 +91,7 @@ public final class Ast {
     record StringLiteral(String value) implements Expr {}
 
     /** A name. */
-    record Name(String name) implements Expr {}
+    record Name(String name, int site) implements Expr {}
 
     /** A unary operator applied to its operand. */
     record Unary(UnaryOperator operator, Expr operand) implements Expr {}
@@ -93,13 +103,14 @@ public final class Ast {
     record Call(Function function, List<Expr> arguments) implements Expr {}
 
     /** An index expression {@code base[index]}. */
-    record Index(Expr base, Expr index) implements Expr {}
+    record Index(Expr base, Expr index, int site) implements Expr {}
 
     /** A field selection {@code base.name}. */
-    record Field(Expr base, String name) implements Expr {}
+    record Field(Expr base, String name, int site) implements Expr {}
 
     /** A comprehension {@code function(binding in domain: body)}. */
-    record Comprehension(ComprehensionFunction function, String binding, Expr domain, Expr body)
+    record Comprehension(
+        ComprehensionFunction function, String binding, Expr domain, Expr body, int site)
         implements Expr {}
   }
 
@@ -156,7 +167,7 @@ public final class Ast {
     SYMBOL;
 
     /** Tests whether this kind reads numbers. */
-    boolean isNumeric() {
+    public boolean isNumeric() {
       return this == INT || this == FLOAT || this == NUM;
     }
   }
@@ -382,8 +393,15 @@ public final class Ast {
     /** {@code let name = value}. */
     record Let(int line, String name, Expr value) implements Stmt {}
 
-    /** {@code check condition ["message"]}. */
-    record Check(int line, Expr condition, @Nullable String message) implements Stmt {}
+    /**
+     * {@code check condition ["message"]}.
+     *
+     * @param id the number of the check in source order
+     * @param line the line of the statement
+     * @param condition what must hold
+     * @param message the text for a failure, or null if it has none
+     */
+    record Check(int id, int line, Expr condition, @Nullable String message) implements Stmt {}
 
     /**
      * {@code type name = type}.

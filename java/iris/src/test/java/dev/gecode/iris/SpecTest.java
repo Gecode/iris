@@ -64,7 +64,7 @@ class SpecTest {
   @Test
   void acceptsTextThatEncodesToTheSameBytes() {
     String source = "# \uD83D\uDE00 å\nline \"{a:int}\"\n";
-    assertEquals(Spec.parse(source).program, Spec.parse(source.getBytes(UTF_8)).program);
+    assertEquals(Spec.parse(source).program(), Spec.parse(source.getBytes(UTF_8)).program());
   }
 
   @Test
@@ -75,10 +75,10 @@ class SpecTest {
 
   @Test
   void readsFormatNames() {
-    assertEquals("dimacs-cnf", Spec.parse("format dimacs-cnf").program.format());
-    assertEquals("a.b-1", Spec.parse("format a.b-1").program.format());
-    assertEquals("two words", Spec.parse("format \"two words\"").program.format());
-    assertEquals("b", Spec.parse("format a\nformat b").program.format());
+    assertEquals("dimacs-cnf", Spec.parse("format dimacs-cnf").format());
+    assertEquals("a.b-1", Spec.parse("format a.b-1").format());
+    assertEquals("two words", Spec.parse("format \"two words\"").format());
+    assertEquals("b", Spec.parse("format a\nformat b").format());
   }
 
   @Test
@@ -111,14 +111,14 @@ class SpecTest {
 
   @Test
   void limitsTheBlockCounter() {
-    assertFalse(Spec.parse(blocks(256, "")).program.body().isEmpty());
+    assertFalse(Spec.parse(blocks(256, "")).program().body().isEmpty());
     assertEquals(ErrorCode.SPEC_NESTING, errorOf(blocks(257, "")).code());
   }
 
   @Test
   void limitsTheExpressionCounter() {
     String legal = "(".repeat(255) + "1" + ")".repeat(255);
-    assertFalse(Spec.parse("let a = " + legal).program.body().isEmpty());
+    assertFalse(Spec.parse("let a = " + legal).program().body().isEmpty());
     assertEquals(ErrorCode.SPEC_NESTING, errorOf("let a = (" + legal + ")").code());
   }
 
@@ -165,7 +165,7 @@ class SpecTest {
 
   @Test
   void aPlainChainStopsAtTheExpressionCounter() {
-    assertFalse(Spec.parse("let a = 1" + "+1".repeat(255)).program.body().isEmpty());
+    assertFalse(Spec.parse("let a = 1" + "+1".repeat(255)).program().body().isEmpty());
     assertEquals(ErrorCode.SPEC_NESTING, errorOf("let a = 1" + "+1".repeat(256)).code());
   }
 
@@ -179,7 +179,7 @@ class SpecTest {
   void leftSpineStartsAtTheLeftmostOperand() {
     var let = (Stmt.Let) parsed("let a = b[1].c + 2").body().getFirst();
     List<Expr> spine = let.value().leftSpine();
-    assertEquals(new Expr.Name("b"), spine.getFirst());
+    assertEquals(new Expr.Name("b", 0), spine.getFirst());
     assertEquals(let.value(), spine.getLast());
     assertEquals(4, spine.size());
   }
@@ -188,7 +188,7 @@ class SpecTest {
   void resolvingALeftSpineFitsOnASmallStack() throws InterruptedException {
     for (String step : List.of("+1", "*2", "[0]", "+min(1)")) {
       Ast.Program program = parsed("let a = " + leftNested("1", step));
-      assertNull(onSmallStack(() -> Resolver.check(program, null)), step);
+      assertNull(onSmallStack(() -> Resolver.resolve(program, null)), step);
     }
   }
 
@@ -259,7 +259,7 @@ class SpecTest {
   @Test
   void namedTypesAreVisibleInTheirBlockOnly() {
     assertEquals(ErrorCode.SPEC_UNKNOWN_TYPE, errorOf("if 1 {\ntype t = int\n}\na: t").code());
-    Ast.Program program = Spec.parse("if 1 {\ntype t = int\n}\ntype t = float").program;
+    Ast.Program program = Spec.parse("if 1 {\ntype t = int\n}\ntype t = float").program();
     assertEquals(List.of(0, 1), program.types().stream().map(Stmt.TypeDefinition::id).toList());
     assertEquals(
         ErrorCode.SPEC_NAME_CONFLICT, errorOf("type t = int\nif 1 {\ntype t = int\n}").code());

@@ -152,15 +152,16 @@ public final class Lexer {
     String candidate = new String(source, position, numberEnd() - position, US_ASCII);
     int range = candidate.indexOf("..");
     String text = range < 0 ? candidate : candidate.substring(0, range);
+    int start = position;
     position += text.length();
     if (text.chars().allMatch(Lexer::isDigit)) {
-      OptionalLong value = integerValue(text);
+      OptionalLong value = Numbers.parseInteger(source, start, position);
       if (value.isEmpty()) {
         throw failure(ErrorCode.SPEC_NUMBER, "bad number " + text);
       }
       return new Token(Token.Kind.INTEGER, text, value.getAsLong(), 0.0, line, glued);
     }
-    OptionalDouble value = floatValue(text);
+    OptionalDouble value = Numbers.parseFloat(source, start, position);
     if (value.isEmpty()) {
       throw failure(ErrorCode.SPEC_NUMBER, "bad number " + text);
     }
@@ -186,35 +187,6 @@ public final class Lexer {
 
   private static boolean isExponentMarker(byte c) {
     return c == 'e' || c == 'E';
-  }
-
-  private static OptionalLong integerValue(String digits) {
-    try {
-      return OptionalLong.of(Long.parseLong(digits));
-    } catch (NumberFormatException e) {
-      return OptionalLong.empty();
-    }
-  }
-
-  /**
-   * Returns the value of the float {@code text}, or nothing if it is malformed or overflows, or if
-   * a nonzero value rounds to a subnormal or to zero (§4.5).
-   */
-  private static OptionalDouble floatValue(String text) {
-    double value;
-    try {
-      value = Double.parseDouble(text);
-    } catch (NumberFormatException e) {
-      return OptionalDouble.empty();
-    }
-    boolean underflows = value < Double.MIN_NORMAL && !hasZeroSignificand(text);
-    return Double.isInfinite(value) || underflows
-        ? OptionalDouble.empty()
-        : OptionalDouble.of(value);
-  }
-
-  private static boolean hasZeroSignificand(String text) {
-    return text.chars().takeWhile(c -> c != 'e' && c != 'E').allMatch(c -> c == '0' || c == '.');
   }
 
   private Token name(boolean glued) {

@@ -1,80 +1,140 @@
 package dev.gecode.iris.driver;
 
-import dev.gecode.iris.IrisError;
-import dev.gecode.iris.Location;
-import java.util.List;
-import java.util.stream.Collectors;
-import org.jspecify.annotations.Nullable;
+import java.util.LinkedHashMap;
+import java.util.SequencedMap;
 
-/** Encodes the documents of the driver protocol in canonical JSON (§3.7). */
+/** The JSON of the driver protocol: the document of a parse and the decoder of parameters. */
 final class Json {
   /** The document of a successful parse. */
   static final String PARSED = "{\"iris\":\"0.1\",\"parsed\":true}\n";
 
-  private Json() {}
+  private final String text;
+  private int position = 0;
 
-  /** Returns the canonical error document of {@code error}. */
-  static String error(IrisError error) {
-    return "{\"code\":"
-        + string(error.code().code())
-        + ",\"message\":"
-        + string(error.message())
-        + ",\"input_location\":"
-        + location(error.inputLocation())
-        + ",\"spec_location\":"
-        + location(error.specLocation())
-        + ",\"context\":"
-        + nullableString(error.context())
-        + ",\"record_path\":"
-        + path(error.recordPath())
-        + "}\n";
+  private Json(String text) {
+    this.text = text;
   }
 
-  private static String location(@Nullable Location location) {
-    if (location == null) {
-      return "null";
+  /**
+   * Decodes {@code text}, a JSON object of strings, keeping its order.
+   *
+   * @throws IllegalArgumentException for anything else, such as a repeated key, a value that is not
+   *     a string, or an unpaired surrogate
+   */
+  static SequencedMap<String, String> params(String text) {
+    Json json = new Json(text);
+    SequencedMap<String, String> params = json.object();
+    json.skipSpace();
+    if (json.position != text.length()) {
+      throw json.invalid("content after the object");
     }
-    return "{\"origin\":"
-        + nullableString(location.origin())
-        + ",\"line\":"
-        + location.line()
-        + ",\"column\":"
-        + location.column()
-        + "}";
+    return params;
   }
 
-  private static String path(@Nullable List<Integer> path) {
-    if (path == null) {
-      return "null";
+  private IllegalArgumentException invalid(String problem) {
+    return new IllegalArgumentException("invalid params: " + problem + " at index " + position);
+  }
+
+  private void skipSpace() {
+    while (position < text.length() && " \t\r\n".indexOf(text.charAt(position)) >= 0) {
+      position++;
     }
-    return path.stream().map(String::valueOf).collect(Collectors.joining(",", "[", "]"));
   }
 
-  private static String nullableString(@Nullable String text) {
-    return text == null ? "null" : string(text);
+  private boolean accept(char wanted) {
+    skipSpace();
+    if (position < text.length() && text.charAt(position) == wanted) {
+      position++;
+      return true;
+    }
+    return false;
   }
 
-  /** Encodes {@code text}, leaving non-ASCII characters as they are (§3.6). */
-  private static String string(String text) {
-    var encoded = new StringBuilder("\"");
-    text.chars().forEach(c -> appendCharacter(encoded, c));
-    return encoded.append('"').toString();
+  private void expect(char wanted) {
+    if (!accept(wanted)) {
+      throw invalid("expected '" + wanted + "'");
+    }
   }
 
-  private static void appendCharacter(StringBuilder encoded, int c) {
-    switch (c) {
-      case '"' -> encoded.append("\\\"");
-      case '\\' -> encoded.append("\\\\");
-      case '\n' -> encoded.append("\\n");
-      case '\r' -> encoded.append("\\r");
-      case '\t' -> encoded.append("\\t");
-      default -> {
-        if (c < 0x20) {
-          encoded.append(String.format("\\u%04x", c));
-        } else {
-          encoded.append((char) c);
-        }
+  private SequencedMap<String, String> object() {
+    SequencedMap<String, String> entries = new LinkedHashMap<>();
+    expect('{');
+    if (accept('}')) {
+      return entries;
+    }
+    do {
+      skipSpace();
+      String name = string();
+      expect(':');
+      skipSpace();
+      if (entries.putIfAbsent(name, string()) != null) {
+        throw invalid("repeated key");
       }
+    } while (accept(','));
+    expect('}');
+    return entries;
+  }
+
+  private String string() {
+    expect('"');
+    StringBuilder decoded = new StringBuilder();
+    while (true) {
+      if (position == text.length()) {
+        throw invalid("unterminated string");
+      }
+      char c = text.charAt(position++);
+      if (c == '"') {
+        requireText(decoded);
+        return decoded.toString();
+      }
+      if (c < 0x20) {
+        throw invalid("control character in a string");
+      }
+      decoded.append(c == '\\' ? escape() : c);
+    }
+  }
+
+  private char escape() {
+    if (position == text.length()) {
+      throw invalid("unterminated escape");
+    }
+    char c = text.charAt(position++);
+    return switch (c) {
+      case '"', '\\', '/' -> c;
+      case 'b' -> '\b';
+      case 'f' -> '\f';
+      case 'n' -> '\n';
+      case 'r' -> '\r';
+      case 't' -> '\t';
+      case 'u' -> codeUnit();
+      default -> throw invalid("unknown escape");
+    };
+  }
+
+  private char codeUnit() {
+    if (position + 4 > text.length()) {
+      throw invalid("short unicode escape");
+    }
+    int unit = 0;
+    for (int k = 0; k < 4; k++) {
+      char digit = text.charAt(position++);
+      // Character.digit alone also accepts digits outside ASCII, which JSON does not.
+      if (digit >= 0x80 || Character.digit(digit, 16) < 0) {
+        throw invalid("bad unicode escape");
+      }
+      unit = unit * 16 + Character.digit(digit, 16);
+    }
+    return (char) unit;
+  }
+
+  private void requireText(CharSequence decoded) {
+    int index = 0;
+    while (index < decoded.length()) {
+      int codePoint = Character.codePointAt(decoded, index);
+      if (codePoint >= Character.MIN_SURROGATE && codePoint <= Character.MAX_SURROGATE) {
+        throw invalid("unpaired surrogate in a string");
+      }
+      index += Character.charCount(codePoint);
     }
   }
 }

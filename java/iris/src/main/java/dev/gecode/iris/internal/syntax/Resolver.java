@@ -13,6 +13,7 @@ import dev.gecode.iris.internal.syntax.Ast.ReadingType;
 import dev.gecode.iris.internal.syntax.Ast.RepeatCount;
 import dev.gecode.iris.internal.syntax.Ast.Stmt;
 import dev.gecode.iris.internal.syntax.Ast.Terminators;
+import dev.gecode.iris.internal.syntax.Resolution.CheckRecord;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -52,16 +53,23 @@ public final class Resolver {
   /** The record names of the check visited. */
   private final List<CheckRecord> checkRecords = new ArrayList<>();
 
+  private final Resolution resolution;
   private int line = 0;
   private boolean inCheck = false;
 
-  private Resolver(@Nullable String origin) {
+  private Resolver(Program program, @Nullable String origin) {
     this.origin = origin;
+    this.resolution = new Resolution(program);
   }
 
-  /** Checks {@code program}, the parsed reader spec from {@code origin}. */
-  public static void check(Program program, @Nullable String origin) {
-    new Resolver(origin).run(program);
+  /**
+   * Checks {@code program}, the parsed reader spec from {@code origin}, and returns what its
+   * expressions refer to.
+   */
+  public static Resolution resolve(Program program, @Nullable String origin) {
+    var resolver = new Resolver(program, origin);
+    resolver.run(program);
+    return resolver.resolution;
   }
 
   /** A definition of a name, with the repeats around it, outermost first. */
@@ -80,15 +88,6 @@ public final class Resolver {
    * @param isList whether it is a list of records, rather than a record
    */
   private record Records(Stmt.Repeat repeat, boolean isList) {}
-
-  /**
-   * A record name of a check.
-   *
-   * @param name identifies the values of the record name
-   * @param label the name in messages
-   * @param repeats the repeats the check ranges over, outermost first
-   */
-  private record CheckRecord(String name, String label, List<Stmt.Repeat> repeats) {}
 
   private void run(Program program) {
     define(program.body());
@@ -290,6 +289,7 @@ public final class Resolver {
       case Stmt.Check s -> {
         value(s.condition());
         checkChain();
+        resolution.setCheckRecords(s.id(), List.copyOf(checkRecords));
       }
       case Stmt.Repeat s -> visitRepeat(s);
       case Stmt.Sections s -> {
@@ -404,7 +404,7 @@ public final class Resolver {
   /** Resolves {@code expression}, a whole array if {@code whole}, and returns its records. */
   private @Nullable Records resolve(Expr expression, boolean whole) {
     if (expression instanceof Expr.Name name) {
-      return name(name.name(), whole);
+      return name(name, whole);
     }
     Records records = null;
     for (Expr node : expression.leftSpine()) {
@@ -416,7 +416,7 @@ public final class Resolver {
   /** Resolves {@code node}, whose left operand, if it has one, has the records {@code left}. */
   private @Nullable Records resolveOver(@Nullable Records left, Expr node) {
     return switch (node) {
-      case Expr.Name e -> name(e.name(), false);
+      case Expr.Name e -> name(e, false);
       case Expr.Field e -> field(e, left);
       case Expr.Index e -> index(e, left);
       case Expr.Comprehension e -> comprehension(e);
@@ -434,25 +434,33 @@ public final class Resolver {
     };
   }
 
-  private @Nullable Records name(String name, boolean whole) {
+  private @Nullable Records name(Expr.Name expression, boolean whole) {
+    String name = expression.name();
+    int site = expression.site();
     for (Bound binding : bound.reversed()) {
       if (binding.name().equals(name)) {
         Stmt.Repeat repeat = binding.records();
-        return repeat == null ? null : new Records(repeat, false);
+        return repeat == null ? null : denoted(site, new Records(repeat, false));
       }
     }
     NamedRepeat list = lists.get(name);
     if (list != null) {
-      return listName(name, list);
+      return denoted(site, listName(name, list));
     }
     NamedRepeat each = eachNames.get(name);
     if (each != null) {
-      return eachName(name, each);
+      return denoted(site, eachName(site, name, each));
     }
     if (inCheck && !whole) {
-      liftDefinitions(name);
+      resolution.setCheckRecord(site, liftDefinitions(name));
     }
     return null;
+  }
+
+  /** Records that the expression at {@code site} denotes {@code records}. */
+  private Records denoted(int site, Records records) {
+    resolution.setRecords(site, records.repeat(), records.isList());
+    return records;
   }
 
   /** Returns the repeats of {@code enclosing} that are not around the statement visited. */
@@ -494,7 +502,7 @@ public final class Resolver {
    * Resolves a name of each record. Inside the repeat, it is the current record. Elsewhere, a check
    * ranges over the records.
    */
-  private Records eachName(String name, NamedRepeat named) {
+  private Records eachName(int site, String name, NamedRepeat named) {
     Stmt.Repeat repeat = named.repeat();
     if (!repeats.contains(repeat)) {
       if (!inCheck) {
@@ -507,16 +515,19 @@ public final class Resolver {
       }
       List<Stmt.Repeat> ranged = new ArrayList<>(beyond(named.repeats()));
       ranged.add(repeat);
-      lift("#" + repeat.id(), name, ranged);
+      resolution.setCheckRecord(site, lift(Resolution.startsName(repeat), name, ranged));
     }
     return new Records(repeat, false);
   }
 
-  /** Makes {@code name} a record name of the check, if it is defined inside other repeats. */
-  private void liftDefinitions(String name) {
+  /**
+   * Makes {@code name} a record name of the check, if it is defined inside other repeats, and
+   * returns its index among the record names of the check, or -1 if it is not one.
+   */
+  private int liftDefinitions(String name) {
     List<Definition> nameDefinitions = definitionsByName.getOrDefault(name, List.of());
     if (nameDefinitions.isEmpty()) {
-      return;
+      return -1;
     }
     List<Stmt.Repeat> outside = beyond(nameDefinitions.getFirst().repeats());
     for (Definition definition : nameDefinitions) {
@@ -529,18 +540,19 @@ public final class Resolver {
                 + " here cannot range over its records");
       }
     }
-    if (!outside.isEmpty()) {
-      lift(name, name, outside);
-    }
+    return outside.isEmpty() ? -1 : lift(name, name, outside);
   }
 
-  private void lift(String name, String label, List<Stmt.Repeat> ranged) {
-    for (CheckRecord record : checkRecords) {
+  /** Returns the index of the record name for the values of {@code name}, adding it if needed. */
+  private int lift(String name, String label, List<Stmt.Repeat> ranged) {
+    for (int k = 0; k < checkRecords.size(); k++) {
+      CheckRecord record = checkRecords.get(k);
       if (record.name().equals(name) && record.repeats().size() == ranged.size()) {
-        return;
+        return k;
       }
     }
     checkRecords.add(new CheckRecord(name, label, List.copyOf(ranged)));
+    return checkRecords.size() - 1;
   }
 
   private @Nullable Records field(Expr.Field field, @Nullable Records base) {
@@ -576,7 +588,7 @@ public final class Resolver {
     }
     NamedRepeat nested = nestedList(repeat, name);
     if (nested != null) {
-      return new Records(nested.repeat(), true);
+      return denoted(field.site(), new Records(nested.repeat(), true));
     }
     requireField(repeat, name);
     return null;
@@ -664,7 +676,7 @@ public final class Resolver {
               + example(base.repeat(), false)
               + "'");
     }
-    return new Records(base.repeat(), false);
+    return denoted(index.site(), new Records(base.repeat(), false));
   }
 
   private @Nullable Records comprehension(Expr.Comprehension comprehension) {
@@ -682,10 +694,49 @@ public final class Resolver {
               + recordsName(domain.repeat())
               + "' is not a list; use one of its fields");
     }
+    resolution.setElements(comprehension.site(), elements(comprehension.domain(), domain));
     bound.add(new Bound(binding, domain == null ? null : domain.repeat()));
     value(comprehension.body());
     bound.removeLast();
     return null;
+  }
+
+  /** Returns the repeat whose records are the elements of {@code domain}, or null. */
+  private Stmt.@Nullable Repeat elements(Expr domain, @Nullable Records records) {
+    if (records != null) {
+      return records.repeat();
+    }
+    return switch (domain) {
+      case Expr.Field field -> outermost(field.name(), resolution.denotedRepeat(field.base()));
+      case Expr.Name name -> isBound(name.name()) ? null : outermost(name.name(), null);
+      default -> null;
+    };
+  }
+
+  private boolean isBound(String name) {
+    return bound.stream().anyMatch(binding -> binding.name().equals(name));
+  }
+
+  /**
+   * Returns the outermost repeat whose records are the rows of {@code name}, or null. These are the
+   * repeats inside {@code around} if it is not null, and otherwise those not around the statement
+   * visited.
+   */
+  private Stmt.@Nullable Repeat outermost(String name, Stmt.@Nullable Repeat around) {
+    Stmt.Repeat outermost = null;
+    boolean isFirst = true;
+    for (Definition definition : definitionsByName.getOrDefault(name, List.of())) {
+      List<Stmt.Repeat> enclosing = definition.repeats();
+      int inside =
+          around == null ? commonPrefix(enclosing, repeats) : enclosing.indexOf(around) + 1;
+      Stmt.Repeat repeat = inside < enclosing.size() ? enclosing.get(inside) : null;
+      if (!isFirst && !Objects.equals(repeat, outermost)) {
+        return null;
+      }
+      outermost = repeat;
+      isFirst = false;
+    }
+    return outermost;
   }
 
   /**

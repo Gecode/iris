@@ -2,6 +2,7 @@ package dev.gecode.iris.driver;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -18,11 +19,13 @@ class DriverTest {
   @TempDir Path directory;
   private String valid = "";
   private String invalid = "";
+  private String input = "";
 
   @BeforeEach
   void writeSpecs() throws IOException {
     valid = Files.writeString(directory.resolve("valid.iris"), "n: int\n").toString();
     invalid = Files.writeString(directory.resolve("invalid.iris"), "\n\nn int\n").toString();
+    input = Files.writeString(directory.resolve("input"), "5\n").toString();
   }
 
   /** The exit status of a request and what it wrote to standard output. */
@@ -60,10 +63,76 @@ class DriverTest {
     assertEquals(true, document.contains("\\\"{\\t\\\"å\\\"\\\""));
   }
 
+  @Test
+  void writesTheDataDocument() {
+    String document =
+        "{\"iris\":\"0.1\",\"entries\":[{\"name\":\"n\",\"type\":\"int\",\"depth\":0,"
+            + "\"value\":5}]}\n";
+    assertEquals(new Result(0, document), run("read", valid, input));
+  }
+
+  @Test
+  void writesTheErrorDocumentOfARead() throws IOException {
+    String empty = Files.writeString(directory.resolve("empty"), "").toString();
+    Result result = run("read", valid, empty);
+    assertEquals(1, result.status());
+    assertEquals(true, result.document().startsWith("{\"code\":\"E-"), result.document());
+    assertEquals(true, result.document().contains("\"origin\":\"" + empty + "\""));
+  }
+
+  @Test
+  void passesParamsInOrder() throws IOException {
+    Path spec = directory.resolve("params.iris");
+    Files.writeString(spec, "param k = 1\nn: int\nlet s = n + k\n");
+    String path = spec.toString();
+    assertEquals(true, run("read", path, input).document().contains("\"value\":6"));
+    Result given = run("read", path, input, "--params", "{\"k\":\"\\u0037\"}");
+    assertEquals(true, given.document().contains("\"value\":12"), given.document());
+    String unknown = "{\"z\":\"1\",\"a\":\"2\"}";
+    Result rejected = run("read", path, input, "--params", unknown);
+    assertEquals(1, rejected.status());
+    assertEquals(true, rejected.document().contains("E-PARAM-UNKNOWN"));
+    assertEquals(true, rejected.document().contains("'z'"), rejected.document());
+  }
+
+  @Test
+  void refusesParamsThatTheLocaleCannotCarry() {
+    Driver.requireIntact("{\"p\":\"é\"}", "UTF-8");
+    Driver.requireIntact("{\"p\":\"\\u00e9\"}", "ANSI_X3.4-1968");
+    assertThrows(
+        IllegalStateException.class, () -> Driver.requireIntact("{\"p\":\"é\"}", "ANSI_X3.4-1968"));
+    assertThrows(
+        IllegalStateException.class, () -> Driver.requireIntact("{\"p\":\"é\"}", "ISO-8859-1"));
+  }
+
   @ParameterizedTest
-  @ValueSource(strings = {"read", "catalog", "dzn"})
+  @ValueSource(
+      strings = {
+        "",
+        "[]",
+        "{\"a\":1}",
+        "{\"a\":\"1\",\"a\":\"2\"}",
+        "{\"a\":\"\\ud83d\"}",
+        "{\"a\":\"\\ude00\\ud83d\"}",
+        "{\"a\":\"1\"} x",
+        "{\"a\":\"1\",}",
+        "{\"a\":\"\\q\"}",
+        "{\"a\":\"\\u００４１\"}",
+        "{\"a\":\"\\u٠٠٤١\"}",
+      })
+  void rejectsMalformedParams(String params) {
+    assertEquals(new Result(2, ""), run("read", valid, input, "--params", params));
+  }
+
+  @Test
+  void reportsAnUnreadableInputAsAHostFailure() {
+    assertEquals(new Result(3, ""), run("read", valid, directory.resolve("missing").toString()));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"catalog", "dzn"})
   void reportsAnUnimplementedOperationAsAHostFailure(String operation) {
-    assertEquals(new Result(3, ""), run(operation, valid, "input-that-does-not-exist"));
+    assertEquals(new Result(3, ""), run(operation, valid, input));
   }
 
   @ParameterizedTest

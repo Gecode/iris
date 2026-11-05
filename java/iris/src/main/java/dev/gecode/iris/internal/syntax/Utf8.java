@@ -12,9 +12,18 @@ public final class Utf8 {
    * values above U+10FFFF are ill-formed.
    */
   public static int firstInvalid(byte[] text) {
-    int offset = 0;
-    while (offset < text.length) {
-      int length = sequenceLength(text, offset);
+    return firstInvalid(text, 0, text.length);
+  }
+
+  /**
+   * Returns the offset in {@code text} of the first ill-formed subsequence of the bytes from {@code
+   * from} up to {@code to}, or -1 if they are valid. A sequence cut off at {@code to} is
+   * ill-formed.
+   */
+  public static int firstInvalid(byte[] text, int from, int to) {
+    int offset = from;
+    while (offset < to) {
+      int length = sequenceLength(text, offset, to);
       if (length == 0) {
         return offset;
       }
@@ -45,6 +54,10 @@ public final class Utf8 {
 
   /** Returns the length of the well-formed sequence at {@code offset}, or 0 if there is none. */
   static int sequenceLength(byte[] text, int offset) {
+    return sequenceLength(text, offset, text.length);
+  }
+
+  private static int sequenceLength(byte[] text, int offset, int end) {
     int first = text[offset] & 0xff;
     if (first < 0x80) {
       return 1;
@@ -53,7 +66,7 @@ public final class Utf8 {
       return 0;
     }
     int length = first < 0xe0 ? 2 : first < 0xf0 ? 3 : 4;
-    if (offset + length > text.length) {
+    if (offset + length > end) {
       return 0;
     }
     // The second byte's range excludes overlong forms, surrogates and values above U+10FFFF.

@@ -6,7 +6,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 
-/** Thrown for an error in a reader spec. */
+/** Thrown for an error in a reader spec, or in an input that a reader spec reads. */
 public final class IrisException extends RuntimeException {
   @Serial private static final long serialVersionUID = 1L;
 
@@ -32,9 +32,13 @@ public final class IrisException extends RuntimeException {
     return error.code();
   }
 
-  /** Renders {@code origin:line: message}, without the parts the error lacks (§11.1). */
+  /**
+   * Renders {@code origin:line:column: message}, at the location in the input if there is one,
+   * without the parts the error lacks (§11.1).
+   */
   private static String diagnostic(IrisError error) {
-    @Nullable Location location = error.specLocation();
+    @Nullable Location input = error.inputLocation();
+    @Nullable Location location = input == null ? error.specLocation() : input;
     if (location == null) {
       return error.message();
     }

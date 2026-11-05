@@ -1,7 +1,11 @@
 package dev.gecode.iris.internal.syntax;
 
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 
@@ -17,7 +21,26 @@ import org.jspecify.annotations.Nullable;
 public final class LargeStack {
   private static final long SIZE = 4L * 1024 * 1024;
 
+  /**
+   * Keeps threads between calls, as starting one takes longer than a small read. Idle threads end
+   * soon, and being daemons they never keep a JVM alive. Calls never wait for each other.
+   */
+  private static final Executor THREADS =
+      new ThreadPoolExecutor(
+          0,
+          Integer.MAX_VALUE,
+          10,
+          TimeUnit.SECONDS,
+          new SynchronousQueue<>(),
+          LargeStack::newThread);
+
   private LargeStack() {}
+
+  private static Thread newThread(Runnable work) {
+    var thread = new Thread(null, work, "iris-large-stack", SIZE);
+    thread.setDaemon(true);
+    return thread;
+  }
 
   /**
    * Returns the result of {@code work}, which runs to completion even if the caller is interrupted.
@@ -25,7 +48,7 @@ public final class LargeStack {
    */
   public static <T> T call(Supplier<T> work) {
     var task = new FutureTask<>(work::get);
-    new Thread(null, task, "iris-large-stack", SIZE).start();
+    THREADS.execute(task);
     boolean interrupted = false;
     try {
       while (true) {
@@ -50,7 +73,7 @@ public final class LargeStack {
       throw exception;
     }
     if (failure instanceof StackOverflowError) {
-      return new IllegalStateException("the JVM stack is too small for this reader spec", failure);
+      return new IllegalStateException("the JVM stack is too small for this work", failure);
     }
     if (failure instanceof Error error) {
       throw error;

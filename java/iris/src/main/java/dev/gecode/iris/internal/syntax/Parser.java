@@ -92,6 +92,8 @@ public final class Parser {
 
   private int expressionDepth = 0;
   private int repeatsParsed = 0;
+  private int checksParsed = 0;
+  private int sites = 0;
 
   /** Whether the next statement is the first of the body of a repeat. */
   private boolean atRepeatStart = false;
@@ -134,7 +136,13 @@ public final class Parser {
       }
     }
     return new Program(
-        format, List.copyOf(body), List.copyOf(completedBindings), List.copyOf(definedTypes));
+        format,
+        List.copyOf(body),
+        List.copyOf(completedBindings),
+        List.copyOf(definedTypes),
+        sites,
+        checksParsed,
+        repeatsParsed);
   }
 
   /** {@code format name}, whose words can be joined by glued {@code -} or {@code .} (§5.9). */
@@ -596,7 +604,7 @@ public final class Parser {
   private Stmt check(int line) {
     Expr condition = expression();
     String message = peek().kind() == Token.Kind.STRING ? next().text() : null;
-    return new Stmt.Check(line, condition, message);
+    return new Stmt.Check(checksParsed++, line, condition, message);
   }
 
   /*
@@ -806,11 +814,11 @@ public final class Parser {
       enterExpression();
       held++;
       if (isField) {
-        expression = new Expr.Field(expression, identifier("a field name"));
+        expression = new Expr.Field(expression, identifier("a field name"), sites++);
       } else {
         Expr index = expression(0);
         expectPunctuation("]");
-        expression = new Expr.Index(expression, index);
+        expression = new Expr.Index(expression, index, sites++);
       }
     }
     expressionDepth -= held;
@@ -854,7 +862,7 @@ public final class Parser {
 
   private Expr nameOrCall(Token name) {
     if (!atPunctuation("(")) {
-      return new Expr.Name(name.text());
+      return new Expr.Name(name.text(), sites++);
     }
     next();
     ComprehensionFunction function = comprehensionFunction(name.text());
@@ -901,7 +909,7 @@ public final class Parser {
     enclosingBindings.removeLast();
     expectPunctuation(")");
     completedBindings.add(new Binding(binding, line));
-    return new Expr.Comprehension(function, binding, domain, body);
+    return new Expr.Comprehension(function, binding, domain, body, sites++);
   }
 
   /** The rest of an ordinary call, after the opening parenthesis. */
