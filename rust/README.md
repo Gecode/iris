@@ -1,49 +1,49 @@
 # rust
 
-The Cargo workspace contains the standalone `iris-conformance` runner
+The Cargo workspace contains the standalone `gecode-iris-conformance` runner
 (milestone M2), and four implementation crates for Iris 0.1 (milestone M3):
-[iris-syntax](iris-syntax/README.md) owns source validation, the lossless
-parser, and formatting; [iris-sema](iris-sema/README.md) owns parse-time
+[gecode-iris-syntax](iris-syntax/README.md) owns source validation, the lossless
+parser, and formatting; [gecode-iris-sema](iris-sema/README.md) owns parse-time
 validity, resolution, and conservative value facts;
-[iris-core](iris-core/README.md) reads scalar and array input, executes
+[gecode-iris-core](iris-core/README.md) reads scalar and array input, executes
 repeats, index statements, line operations and sections, evaluates expressions,
 and owns column data, canonical JSON, and dzn output;
-[iris-cli](iris-cli/README.md) provides `iris check SPEC`, `iris read SPEC
+[gecode-iris-cli](iris-cli/README.md) provides `iris check SPEC`, `iris read SPEC
 FILE... [--summary|--json|--dzn] [--param NAME=VALUE]`, `iris list SPEC FILE...`,
 `iris fmt PATH...`, `iris conformance DRIVER [ROOTS...]`, `iris --version`, and
 the `iris-driver parse|read|catalog|dzn` conformance commands.
 The runner uses the [conformance protocol](../conformance/README.md) and has no
 dependency on implementation crates.
 
-[iris-lsp](iris-lsp/README.md) provides `iris lsp`, the stdio language server
+[gecode-iris-lsp](iris-lsp/README.md) provides `iris lsp`, the stdio language server
 with parse and resolution diagnostics (milestone M4b).
 
-[gecode-iris](gecode-iris/README.md) re-exports the public `iris-core` API and
+[gecode-iris](gecode-iris/README.md) re-exports the public `gecode-iris-core` API and
 provides the `iris!` macro, which checks a reader spec at compile time. Its
 package name is `gecode-iris`; Rust imports it as `gecode_iris`. The macro's
-implementation crate, [iris-macros](iris-macros/README.md), depends on
-`iris-syntax` and `iris-sema` but not on `iris-core`.
-[iris-build](iris-build/README.md), re-exported as `gecode_iris::build`, builds
+implementation crate, [gecode-iris-macros](iris-macros/README.md), depends on
+`gecode-iris-syntax` and `gecode-iris-sema` but not on `gecode-iris-core`.
+[gecode-iris-build](iris-build/README.md), re-exported as `gecode_iris::build`, builds
 reader specs in Rust with typed handles.
-[iris-gen](iris-gen/README.md) prints a builder program for a reader spec, which
-`iris gen builder` exposes; it depends on `iris-syntax` and `iris-sema` only.
+[gecode-iris-gen](iris-gen/README.md) prints a builder program for a reader spec, which
+`iris gen builder` exposes; it depends on `gecode-iris-syntax` and `gecode-iris-sema` only.
 All workspace
 crates currently set `publish = false`; publication belongs to milestone M7.
 Package metadata and versioned internal dependencies are prepared without
-enabling publication. The planned crates.io order is `iris-syntax`, `iris-sema`,
-`iris-core`, `iris-macros`, `iris-build`, `iris-gen`, `gecode-iris`, `iris-conformance`,
-`iris-lsp`, then `iris-cli`.
-The standalone `iris-conformance` runner can be published at any point before
-`iris-cli`; it has no implementation dependencies. The separate nightly fuzz
+enabling publication. The planned crates.io order is `gecode-iris-syntax`, `gecode-iris-sema`,
+`gecode-iris-core`, `gecode-iris-macros`, `gecode-iris-build`, `gecode-iris-gen`, `gecode-iris`, `gecode-iris-conformance`,
+`gecode-iris-lsp`, then `gecode-iris-cli`.
+The standalone `gecode-iris-conformance` runner can be published at any point before
+`gecode-iris-cli`; it has no implementation dependencies. The separate nightly fuzz
 crate remains unpublished.
 [iris-wasm](iris-wasm/README.md) exposes the in-memory reader, checker and
 formatter to the browser playground (M5, PLAN.md §8.10). Its string-only API
 keeps canonical output and signed 64-bit integers exact. It stays unpublished;
-if enabled later, it follows `iris-syntax`, `iris-sema` and `iris-core` in
+if enabled later, it follows `gecode-iris-syntax`, `gecode-iris-sema` and `gecode-iris-core` in
 publication order. [iris-js](iris-js/README.md) is the unpublished
 WebAssembly boundary of the npm package in `typescript/` (M4f, PLAN.md §8.16).
 It parses a spec once into a handle, returns data in a binary layout that
-JavaScript copies, and renders JSON and dzn through iris-core on request.
+JavaScript copies, and renders JSON and dzn through gecode-iris-core on request.
 Later work may add `iris-lint`.
 [PLAN.md §4.2](../PLAN.md#42-the-rust-reference-implementation-is-layered)
 describes the layers; §8.1, §8.7, §8.12 and §8.13 describe the crates. Milestones
@@ -65,9 +65,9 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
-cargo test --locked -p iris-syntax --features editorconfig
+cargo test --locked -p gecode-iris-syntax --features editorconfig
 cargo test --locked -p gecode-iris --doc
-cargo test --locked -p iris-cli --test complete
+cargo test --locked -p gecode-iris-cli --test complete
 ```
 
 The `iris!` macro has its own checks. `macro_errors` compares compile errors
@@ -77,21 +77,21 @@ compares its reads with `Spec::parse`. It takes about two minutes, mostly
 reading the work-budget cases in a debug build:
 
 ```sh
-cargo test --locked -p iris-macros
+cargo test --locked -p gecode-iris-macros
 cargo test --locked -p gecode-iris --test macro_errors
 cargo test --locked -p gecode-iris --test macro_corpus -- --nocapture
-cargo test --locked -p iris-build
+cargo test --locked -p gecode-iris-build
 cargo test --locked -p gecode-iris --test build_jobshop --test build_corpus --test build_types
 ```
 
 The builder generator and its round trip, from `rust/`:
 
 ```sh
-cargo run --locked -p iris-cli -- gen builder --lang rust path/to/spec.iris
-cargo test --locked -p iris-gen
-cargo test --locked -p iris-cli --test gen
+cargo run --locked -p gecode-iris-cli -- gen builder --lang rust path/to/spec.iris
+cargo test --locked -p gecode-iris-gen
+cargo test --locked -p gecode-iris-cli --test gen
 cargo test --locked -p iris-conformance compare
-cargo run --locked -p iris-conformance -- compare left.iris right.iris
+cargo run --locked -p gecode-iris-conformance -- compare left.iris right.iris
 cargo test --locked -p gecode-iris --test builder_round_trip -- --nocapture
 ```
 
@@ -103,7 +103,7 @@ its original. It prints the compared and skipped counts; a skip is a file that
 `clippy::eq_op` specs of `iris-gen/tests`, and the limit specs of Specification
 §5.12 run in the same project, outside all three counts.
 
-`cargo test -p iris-gen` includes the width sweep in `tests/rust_layout.rs`: every
+`cargo test -p gecode-iris-gen` includes the width sweep in `tests/rust_layout.rs`: every
 layout form, with names and strings of every length past the 60 and 100 column
 limits, at several depths, must pass `rustfmt --check`. It runs one `rustfmt` per
 worker over all the programs, and a failure prints the diffs and names the form,
@@ -160,7 +160,7 @@ explains these types. Its public error enums `Failure`, `HostError`, and
 Check reconstruction of every valid-UTF-8 reader spec in the repository:
 
 ```sh
-cargo test --locked -p iris-syntax repository_losslessness -- --nocapture
+cargo test --locked -p gecode-iris-syntax repository_losslessness -- --nocapture
 ```
 
 The parser tests also cover the six pinned Gecode reader specs, embedded pattern
@@ -171,8 +171,8 @@ regeneration.
 Check a reader spec and run every parse-only conformance case:
 
 ```sh
-cargo run --locked -p iris-cli -- check path/to/spec.iris
-cargo test --locked -p iris-cli --test parse_conformance -- --nocapture
+cargo run --locked -p gecode-iris-cli -- check path/to/spec.iris
+cargo test --locked -p gecode-iris-cli --test parse_conformance -- --nocapture
 ```
 
 The parse integration test loads the whole version tree and selects parse
@@ -189,12 +189,12 @@ Rendering dzn consumes no language work budget.
 Read input and run the full conformance test:
 
 ```sh
-cargo run --locked -p iris-cli -- read path/to/spec.iris path/to/input.txt
-cargo run --locked -p iris-cli -- read path/to/spec.iris path/to/input.txt --summary
-cargo run --locked -p iris-cli -- read path/to/spec.iris path/to/input.txt --json
-cargo run --locked -p iris-cli -- read path/to/spec.iris path/to/input.txt --dzn
-cargo run --locked -p iris-cli -- list path/to/spec.iris path/to/input.txt --dzn
-cargo test --locked -p iris-cli --test read_conformance -- --nocapture
+cargo run --locked -p gecode-iris-cli -- read path/to/spec.iris path/to/input.txt
+cargo run --locked -p gecode-iris-cli -- read path/to/spec.iris path/to/input.txt --summary
+cargo run --locked -p gecode-iris-cli -- read path/to/spec.iris path/to/input.txt --json
+cargo run --locked -p gecode-iris-cli -- read path/to/spec.iris path/to/input.txt --dzn
+cargo run --locked -p gecode-iris-cli -- list path/to/spec.iris path/to/input.txt --dzn
+cargo test --locked -p gecode-iris-cli --test read_conformance -- --nocapture
 ```
 
 The read command defaults to `--summary`: each file has a header with its path
@@ -221,10 +221,10 @@ transport failures exit 1 and invalid arguments exit 2.
 Format reader specs in place, preview changes, or format standard input:
 
 ```sh
-cargo run --locked -p iris-cli -- fmt path/to/spec.iris path/to/directory
-cargo run --locked -p iris-cli -- fmt --check --diff path/to/directory
-cat path/to/spec.iris | cargo run --locked -p iris-cli -- fmt --stdin-filepath path/to/spec.iris -
-cargo test --locked -p iris-cli --test fmt
+cargo run --locked -p gecode-iris-cli -- fmt path/to/spec.iris path/to/directory
+cargo run --locked -p gecode-iris-cli -- fmt --check --diff path/to/directory
+cat path/to/spec.iris | cargo run --locked -p gecode-iris-cli -- fmt --stdin-filepath path/to/spec.iris -
+cargo test --locked -p gecode-iris-cli --test fmt
 ```
 
 Directories recurse into `.iris` files, skipping symlinks and including
@@ -241,13 +241,13 @@ conformance reader specs: some test layout or error positions deliberately.
 Run cases through `iris` with an implementation's executable or wrapper command:
 
 ```sh
-cargo run --locked -p iris-cli -- conformance '<command>' \
+cargo run --locked -p gecode-iris-cli -- conformance '<command>' \
   --driver-id '<stable-id>' --filter '<path-substring>' --version 0.1 \
   --timeout 30 <cases-dir>...
-cargo run --locked -p iris-cli -- conformance target/debug/iris-driver ../conformance/cases/0.1/smoke
+cargo run --locked -p gecode-iris-cli -- conformance target/debug/iris-driver ../conformance/cases/0.1/smoke
 ```
 
-`iris conformance` calls the `iris-conformance` library directly. With no roots,
+`iris conformance` calls the `gecode-iris-conformance` library directly. With no roots,
 it uses `conformance/cases/0.1` relative to the invocation directory (run from
 the repository root or supply explicit roots). Version defaults to `0.1`, the
 only supported language version; timeout defaults to 30 positive seconds per
@@ -261,8 +261,8 @@ passes, and 2 for configuration, case-loading, or zero-selection errors.
 Run the full Rust driver suite with the standalone runner after the workspace build:
 
 ```sh
-cargo run --locked -p iris-conformance -- run --driver "\"$PWD/target/debug/iris-driver\"" ../conformance/cases/0.1
-cargo run --locked -p iris-conformance -- run --driver "\"$PWD/target/debug/iris-driver\"" ../formats
+cargo run --locked -p gecode-iris-conformance -- run --driver "\"$PWD/target/debug/iris-driver\"" ../conformance/cases/0.1
+cargo run --locked -p gecode-iris-conformance -- run --driver "\"$PWD/target/debug/iris-driver\"" ../formats
 ```
 
 The [conformance workflow](../.github/workflows/conformance.yml) runs both roots
@@ -279,9 +279,9 @@ No adapter or real language cases are supplied by this crate.
 These demonstrations use only canned fixture outputs:
 
 ```sh
-cargo run --locked -p iris-conformance -- run --driver 'python3 iris-conformance/tests/canned-driver.py' iris-conformance/tests/fixtures/passing
-cargo run --locked -p iris-conformance -- run --driver 'python3 iris-conformance/tests/canned-driver.py' --driver-id canned iris-conformance/tests/fixtures/known
-cargo run --locked -p iris-conformance -- run --driver 'python3 iris-conformance/tests/canned-driver.py' --driver-id canned iris-conformance/tests/fixtures/failing
+cargo run --locked -p gecode-iris-conformance -- run --driver 'python3 iris-conformance/tests/canned-driver.py' iris-conformance/tests/fixtures/passing
+cargo run --locked -p gecode-iris-conformance -- run --driver 'python3 iris-conformance/tests/canned-driver.py' --driver-id canned iris-conformance/tests/fixtures/known
+cargo run --locked -p gecode-iris-conformance -- run --driver 'python3 iris-conformance/tests/canned-driver.py' --driver-id canned iris-conformance/tests/fixtures/failing
 ```
 
 The first two exit 0; the third intentionally exits 1 and demonstrates failure
@@ -308,7 +308,7 @@ The package version `0.1.0` maps to the GitHub release tag `rust-v0.1.0`.
 The [workspace configuration](../dist-workspace.toml) selects the platforms,
 installers and archive formats. The [CLI distribution configuration](iris-cli/dist.toml)
 names the release component `rust` so cargo-dist can parse those tags, while
-Cargo continues to build `iris-cli`. Only `iris` is distributed; `iris-driver`
+Cargo continues to build `gecode-iris-cli`. Only `iris` is distributed; `iris-driver`
 stays a conformance tool.
 
 For a package version `VERSION`, download assets from
@@ -394,7 +394,7 @@ JSON before timing. From the repository root (with Hyperfine on `PATH`):
 bench_dir=/tmp/iris-performance
 mkdir -p "$bench_dir"
 export CARGO_TARGET_DIR="$bench_dir/target"
-cargo build --manifest-path rust/Cargo.toml --release --locked -p iris-cli --bins
+cargo build --manifest-path rust/Cargo.toml --release --locked -p gecode-iris-cli --bins
 scripts/gecode-reference.sh
 eval "$(scripts/gecode-reference.sh --print-env)"
 adapter=$(conformance/adapters/gecode/build.sh)

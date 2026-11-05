@@ -50,7 +50,7 @@ From the repository root:
 ```sh
 eval "$(scripts/gecode-reference.sh --print-env)"
 adapter=$(conformance/adapters/gecode/build.sh)
-(cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$adapter\"" \
+(cd rust && cargo run --locked -p gecode-iris-conformance -- run --driver "\"$adapter\"" \
   --driver-id gecode-6.5.0-599f977b7855 ../formats)
 ```
 

@@ -2,8 +2,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use iris_conformance::case::{Case, Operation, OutputFormat, discover};
-use iris_conformance::examples::extract;
+use gecode_iris_conformance::case::{Case, Operation, OutputFormat, discover};
+use gecode_iris_conformance::examples::extract;
 use tempfile::TempDir;
 
 fn fixture() -> PathBuf {

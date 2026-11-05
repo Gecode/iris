@@ -1,6 +1,6 @@
 //! Structural resolution in Specification §11.2 operand order.
 use crate::{Error, ErrorCode as E, check::at_node, model::*, syntax::*};
-use iris_syntax::{Parse, SyntaxKind as K, SyntaxNode};
+use gecode_iris_syntax::{Parse, SyntaxKind as K, SyntaxNode};
 type Result<T = ()> = std::result::Result<T, Error>;
 
 pub(crate) fn resolve(parsed: &Parse, model: &mut SemanticModel, index: &SyntaxIndex) -> Result {

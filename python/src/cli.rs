@@ -16,6 +16,6 @@ const PANIC_STATUS: u8 = 101;
 #[pyfunction]
 pub fn run_cli(py: Python<'_>, argv: Vec<OsString>) -> u8 {
     py.detach(|| {
-        panic::catch_unwind(AssertUnwindSafe(|| iris_cli::run(argv))).unwrap_or(PANIC_STATUS)
+        panic::catch_unwind(AssertUnwindSafe(|| gecode_iris_cli::run(argv))).unwrap_or(PANIC_STATUS)
     })
 }

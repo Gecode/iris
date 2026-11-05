@@ -1,4 +1,4 @@
-use iris_conformance::{
+use gecode_iris_conformance::{
     RunOptions,
     case::{self, Case},
 };
@@ -26,7 +26,7 @@ fn full_conformance() {
     let count = paths.len();
     println!("Discovered {count} cases {operations:?}");
     println!("Cases by area: {areas:?}");
-    let report = iris_conformance::run(&RunOptions {
+    let report = gecode_iris_conformance::run(&RunOptions {
         driver: format!("\"{}\"", env!("CARGO_BIN_EXE_iris-driver")),
         driver_id: None,
         roots: paths,

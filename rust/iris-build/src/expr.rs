@@ -1,6 +1,6 @@
 //! Expressions: flat postfix operations, so that a chain of any length prints
 //! and drops without recursion.
-use iris_core::handle::{
+use gecode_iris_core::handle::{
     D0, D1, D2, D3, D4, D5, D6, D7, D8, Depth, Dyn, DynDepth, Float, Int, Leaf, Num, Str,
 };
 use std::marker::PhantomData;

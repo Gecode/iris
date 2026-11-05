@@ -1,9 +1,10 @@
-use iris_sema::*;
-use iris_syntax::{LanguageVersion, TextSize};
+use gecode_iris_sema::*;
+use gecode_iris_syntax::{LanguageVersion, TextSize};
 
 fn analyze(source: &str) -> Analysis {
-    let parsed = iris_syntax::parse(source.as_bytes(), "model", LanguageVersion::V0_1).unwrap();
-    let analysis = iris_sema::analyze(&parsed);
+    let parsed =
+        gecode_iris_syntax::parse(source.as_bytes(), "model", LanguageVersion::V0_1).unwrap();
+    let analysis = gecode_iris_sema::analyze(&parsed);
     assert!(analysis.is_valid(), "{:?}", analysis.diagnostics);
     analysis
 }

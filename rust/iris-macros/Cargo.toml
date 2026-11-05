@@ -1,5 +1,5 @@
 [package]
-name = "iris-macros"
+name = "gecode-iris-macros"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -20,8 +20,8 @@ proc-macro = true
 workspace = true
 
 [dependencies]
-iris-syntax = { version = "0.1.0", path = "../iris-syntax" }
-iris-sema = { version = "0.1.0", path = "../iris-sema" }
+gecode-iris-syntax = { version = "0.1.0", path = "../iris-syntax" }
+gecode-iris-sema = { version = "0.1.0", path = "../iris-sema" }
 proc-macro2 = "1.0"
 quote = "1.0"
 syn = { version = "3", default-features = false, features = ["full", "parsing", "printing", "proc-macro"] }

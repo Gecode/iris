@@ -2,7 +2,7 @@
 #[allow(dead_code)]
 mod support;
 
-use iris_syntax::{FormatOptions, LanguageVersion, TextRange, TextSize};
+use gecode_iris_syntax::{FormatOptions, LanguageVersion, TextRange, TextSize};
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent, TextEdit, Uri};
 use serde_json::{Value, json};
 use std::fs;
@@ -244,7 +244,7 @@ fn edits_preserve_formatter_output_with_physical_lines_and_both_encodings() {
                 edits[0].range.end,
                 Position::new(1, if utf8 { 14 } else { 11 })
             );
-            let expected = iris_syntax::format(
+            let expected = gecode_iris_syntax::format(
                 source.as_bytes(),
                 "test",
                 LanguageVersion::V0_1,
@@ -262,7 +262,7 @@ fn edits_preserve_formatter_output_with_physical_lines_and_both_encodings() {
                 Range::new(Position::new(0, start), Position::new(0, start + 4)),
             );
             let start = source.find("good").unwrap();
-            let formatted = iris_syntax::format_range(
+            let formatted = gecode_iris_syntax::format_range(
                 source.as_bytes(),
                 "test",
                 LanguageVersion::V0_1,
@@ -315,7 +315,7 @@ fn range_edits_never_split_a_crlf_pair() {
         client.open(&uri, 1, source);
         let cursor = Position::new(1, 0);
         let edits = range_edits(&mut client, &uri, Range::new(cursor, cursor));
-        let formatted = iris_syntax::format_range(
+        let formatted = gecode_iris_syntax::format_range(
             source.as_bytes(),
             "test",
             LanguageVersion::V0_1,

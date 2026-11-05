@@ -31,7 +31,7 @@ class IrisLspNotifications(private val project: Project) {
             .createNotification(
                 "Iris executable not found",
                 "Install iris by building from the Iris repository: in rust/, run " +
-                    "<code>cargo build --locked -p iris-cli --bin iris</code>. " +
+                    "<code>cargo build --locked -p gecode-iris-cli --bin iris</code>. " +
                     "In Settings → Languages &amp; Frameworks → Iris, set Executable path to " +
                     "rust/target/debug/iris (iris.exe on Windows), or put iris on PATH and leave the field empty. " +
                     "Then run Restart Iris Language Server. Check that a configured file is executable." + offer,

@@ -25,9 +25,9 @@ It is not a separate implementation of the reader language.
 A new crate, `rust/iris-js`, is the boundary, built with wasm-bindgen
 like `iris-wasm` but separate from it, so the playground keeps its own
 contract and size budget. A spec is parsed once into a handle. Read data
-crosses the boundary in a binary layout built with `iris-core`'s validated
+crosses the boundary in a binary layout built with `gecode-iris-core`'s validated
 column constructors, and JavaScript copies it into typed arrays, so `Data`
-holds no WebAssembly memory. JSON and dzn are rendered by `iris-core` on
+holds no WebAssembly memory. JSON and dzn are rendered by `gecode-iris-core` on
 request.
 
 ## Consequences

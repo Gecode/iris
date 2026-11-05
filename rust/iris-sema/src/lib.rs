@@ -12,7 +12,7 @@ mod targets;
 mod work;
 
 pub use diagnostic::{Error, ErrorCode};
-use iris_syntax::{DiagnosticPhase, Parse};
+use gecode_iris_syntax::{DiagnosticPhase, Parse};
 pub use model::*;
 
 #[derive(Debug)]

@@ -1,4 +1,4 @@
-use iris_conformance::{
+use gecode_iris_conformance::{
     RunOptions,
     case::{self, Case, Operation},
 };
@@ -13,7 +13,7 @@ fn parse_only_conformance() {
         .filter(|path| Case::load(path, "0.1").unwrap().operation == Operation::Parse)
         .collect();
     let count = roots.len();
-    let report = iris_conformance::run(&RunOptions {
+    let report = gecode_iris_conformance::run(&RunOptions {
         driver: format!("\"{}\"", env!("CARGO_BIN_EXE_iris-driver")),
         driver_id: None,
         roots,

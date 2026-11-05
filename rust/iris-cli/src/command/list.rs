@@ -1,5 +1,5 @@
 use clap::Args;
-use iris_core::{Data, Spec};
+use gecode_iris_core::{Data, Spec};
 use std::{
     io::{self, Write},
     path::PathBuf,

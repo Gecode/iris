@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
 
-use iris_conformance::grammar::check_grammar;
+use gecode_iris_conformance::grammar::check_grammar;
 use serde_json::json;
 use tempfile::TempDir;
 

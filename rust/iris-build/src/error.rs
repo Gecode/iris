@@ -1,5 +1,5 @@
 //! What `build()` reports.
-use iris_core::Failure;
+use gecode_iris_core::Failure;
 use std::fmt;
 
 /// Which check of the builder failed. The language's own errors are

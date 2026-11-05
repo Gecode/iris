@@ -3,9 +3,9 @@ use std::process::ExitCode;
 use std::time::Duration;
 
 use clap::{ArgGroup, Parser, Subcommand};
-use iris_conformance::RunOptions;
-use iris_conformance::compare;
-use iris_conformance::differential::{self, Limit};
+use gecode_iris_conformance::RunOptions;
+use gecode_iris_conformance::compare;
+use gecode_iris_conformance::differential::{self, Limit};
 
 #[derive(Parser)]
 #[command(
@@ -131,7 +131,7 @@ fn compare_manifest(manifest: &Path) -> ExitCode {
 fn main() -> ExitCode {
     match Cli::parse().command {
         Commands::CheckGrammar { paths } => {
-            match iris_conformance::grammar::check_grammar(&paths) {
+            match gecode_iris_conformance::grammar::check_grammar(&paths) {
                 Ok(report) => {
                     print!("{}", report.render());
                     ExitCode::from(report.exit_code())
@@ -157,7 +157,7 @@ fn main() -> ExitCode {
             source,
             destination,
             check,
-        } => match iris_conformance::examples::extract(&source, &destination, check) {
+        } => match gecode_iris_conformance::examples::extract(&source, &destination, check) {
             Ok(report) => {
                 println!("{report}");
                 ExitCode::SUCCESS
@@ -185,7 +185,7 @@ fn main() -> ExitCode {
                 version,
                 timeout,
             };
-            match iris_conformance::run(&options) {
+            match gecode_iris_conformance::run(&options) {
                 Ok(report) => {
                     print!("{}", report.render());
                     ExitCode::from(report.exit_code())

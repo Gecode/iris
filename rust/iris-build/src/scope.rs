@@ -1,6 +1,6 @@
 //! Scopes, the guards of block statements, and the builder.
-use iris_core::Spec;
-use iris_core::handle::{
+use gecode_iris_core::Spec;
+use gecode_iris_core::handle::{
     D0, D1, D2, D3, D4, D5, D6, D7, D8, Depth, Dyn, DynDepth, Maybe, Presence, Required,
 };
 use std::cell::RefCell;

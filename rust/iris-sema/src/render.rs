@@ -1,5 +1,5 @@
 use crate::Error;
-use iris_syntax::{FormatError, ParseError};
+use gecode_iris_syntax::{FormatError, ParseError};
 
 /// Keep reported coordinates in the header; locate the excerpt by raw span.
 pub fn render_error(error: &Error, bytes: &[u8]) -> String {

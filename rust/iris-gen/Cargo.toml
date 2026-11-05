@@ -1,5 +1,5 @@
 [package]
-name = "iris-gen"
+name = "gecode-iris-gen"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,7 +8,7 @@ description = "Generate spec builder programs from Iris reader specs"
 repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
-documentation = "https://docs.rs/iris-gen"
+documentation = "https://docs.rs/gecode-iris-gen"
 keywords.workspace = true
 categories = ["parsing"]
 publish = false
@@ -17,5 +17,5 @@ publish = false
 workspace = true
 
 [dependencies]
-iris-sema = { version = "0.1.0", path = "../iris-sema" }
-iris-syntax = { version = "0.1.0", path = "../iris-syntax" }
+gecode-iris-sema = { version = "0.1.0", path = "../iris-sema" }
+gecode-iris-syntax = { version = "0.1.0", path = "../iris-syntax" }

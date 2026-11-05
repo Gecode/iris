@@ -12,7 +12,7 @@ type checker runs. It should not wait until data is read. Builders also
 bring the host language's abstraction to reader specs: a function can
 produce a fragment, and a loop can produce fields.
 
-The Rust builder exists, as the `iris-build` crate re-exported by
+The Rust builder exists, as the `gecode-iris-build` crate re-exported by
 `gecode_iris::build`, and its section below is compiled as a test. The other
 languages' APIs do not exist yet: their code is sketches, and the names in it
 are illustrative. The principles are the part to follow. Each implementation
@@ -781,7 +781,7 @@ const end = b.forward<string>("_"); // only a store binds it
 ## Type safety for text specs
 
 Many users will keep writing `.iris` text and still want typed access.
-`iris-sema` already infers each name's value types, depths, and possible
+`gecode-iris-sema` already infers each name's value types, depths, and possible
 absence. That is enough to generate the same handles a builder returns:
 
 - **`iris gen --lang L SPEC`** prints a module of declared handles, in the
@@ -816,7 +816,7 @@ Each implementation's builder is tested in four ways:
    with the original, as syntax trees. Whitespace, comments, redundant
    parentheses, and generated record names do not count as differences.
    This proves that the builder covers the language and that its printer is
-   right. The comparison is a new `iris-conformance` subcommand. The
+   right. The comparison is a new `gecode-iris-conformance` subcommand. The
    generator doubles as a migration tool for users who want to move a text
    spec into code.
 2. **Idiomatic format builders.** Each format in `formats/` gets a

@@ -36,12 +36,13 @@ Build and publication commands belong in the component guides below.
 Follow [rust/README.md](rust/README.md) for development checks, API stability,
 MSRV, and publication preparation. All workspace crates currently have
 `publish = false`; enabling crates.io publication and registry automation is
-M7 work. The dependency order is `iris-syntax`, `iris-sema`, `iris-core`,
-`iris-gen`, `gecode-iris`, `iris-conformance`, `iris-lsp`, then `iris-cli`.
-The independent `iris-conformance` runner can go anywhere before `iris-cli`.
+M7 work. The dependency order is `gecode-iris-syntax`, `gecode-iris-sema`,
+`gecode-iris-core`, `gecode-iris-macros`, `gecode-iris-build`, `gecode-iris-gen`,
+`gecode-iris`, `gecode-iris-conformance`, `gecode-iris-lsp`, then `gecode-iris-cli`.
+The independent `gecode-iris-conformance` runner can go anywhere before `gecode-iris-cli`.
 The M5 browser crate `iris-wasm` stays unpublished and does not enter CLI
-archives. If enabled for publication later, it follows `iris-syntax`,
-`iris-sema` and `iris-core`. The nightly fuzz crate stays unpublished.
+archives. If enabled for publication later, it follows `gecode-iris-syntax`,
+`gecode-iris-sema` and `gecode-iris-core`. The nightly fuzz crate stays unpublished.
 
 The operational binary path is [Release binaries](rust/README.md#release-binaries):
 use its local cargo-dist checks before an authorized `rust-vVERSION` tag push.

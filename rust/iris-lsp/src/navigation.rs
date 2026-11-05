@@ -1,6 +1,6 @@
 use crate::document::{Document, LineIndex, PositionEncoding};
-use iris_sema::{DefinitionId, DefinitionKind, SemanticModel};
-use iris_syntax::{LanguageVersion, TextRange, TextSize};
+use gecode_iris_sema::{DefinitionId, DefinitionKind, SemanticModel};
+use gecode_iris_syntax::{LanguageVersion, TextRange, TextSize};
 use lsp_server::{ErrorCode, Request, Response, ResponseError};
 use lsp_types::{
     GotoDefinitionResponse, Location, PrepareRenameResponse, Range, TextDocumentPositionParams,
@@ -306,9 +306,9 @@ fn validate_rename(
             new_name,
         );
     }
-    let parsed = iris_syntax::parse(renamed.as_bytes(), origin, LanguageVersion::V0_1)
+    let parsed = gecode_iris_syntax::parse(renamed.as_bytes(), origin, LanguageVersion::V0_1)
         .map_err(|error| failed(error.to_string()))?;
-    let analysis = iris_sema::analyze(&parsed);
+    let analysis = gecode_iris_sema::analyze(&parsed);
     if let Some(error) = analysis.first_error() {
         return Err(failed(format!(
             "cannot rename to '{new_name}': {}",

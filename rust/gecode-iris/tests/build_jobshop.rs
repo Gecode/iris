@@ -5,7 +5,7 @@ use gecode_iris::build::{
     sum_over, word,
 };
 use gecode_iris::{Failure, Params, Spec};
-use iris_conformance::case::{self, Case};
+use gecode_iris_conformance::case::{self, Case};
 use std::{fs, path::Path};
 
 const MSG_DISTINCT: &str = "a job uses a machine twice; each job must use every machine once";

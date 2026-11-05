@@ -1,6 +1,6 @@
 use crate::document::Positions;
-use iris_sema::{DefinitionKind, Resolution, SemanticModel};
-use iris_syntax::{SyntaxKind as K, SyntaxNode, SyntaxToken, TextRange, TextSize};
+use gecode_iris_sema::{DefinitionKind, Resolution, SemanticModel};
+use gecode_iris_syntax::{SyntaxKind as K, SyntaxNode, SyntaxToken, TextRange, TextSize};
 use lsp_types::{
     Position, SemanticToken, SemanticTokenModifier as Modifier, SemanticTokenType as Type,
     SemanticTokens, SemanticTokensLegend,

@@ -14,7 +14,7 @@ macro_rules! syntax_kinds {
             fn decode(raw: rowan::SyntaxKind) -> SyntaxKind {
                 match raw.0 {
                     $(value if value == SyntaxKind::$kind as u16 => SyntaxKind::$kind,)+
-                    _ => panic!("syntax kind was not created by iris-syntax"),
+                    _ => panic!("syntax kind was not created by gecode-iris-syntax"),
                 }
             }
         }

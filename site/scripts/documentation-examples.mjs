@@ -59,10 +59,10 @@ export async function collectDocumentationExamples({ tools, formats, execute, co
   add('fmt', command(['fmt', spec]));
 
   // Source-derived setup commands are checked against their owning READMEs.
-  await addReadmeCommand('build-cli', 'rust/iris-lsp/README.md', 'cargo build --locked -p iris-cli --bin iris');
+  await addReadmeCommand('build-cli', 'rust/iris-lsp/README.md', 'cargo build --locked -p gecode-iris-cli --bin iris');
   await addReadmeCommand('build-jetbrains', 'editors/jetbrains/README.md', './gradlew build verifyPlugin');
   await addReadmeCommand('rust-doctest', 'rust/gecode-iris/README.md', 'cargo test --locked -p gecode-iris --doc');
-  add('build-driver', 'cargo build --locked -p iris-cli --bin iris-driver');
+  add('build-driver', 'cargo build --locked -p gecode-iris-cli --bin iris-driver');
   // buildExampleTools above executes this build (with both binaries selected).
   const lsp = await readSource('rust/iris-lsp/README.md');
   const directive = '# iris: sample samples/small.txt';

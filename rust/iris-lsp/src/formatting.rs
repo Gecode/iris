@@ -2,7 +2,9 @@ use crate::{
     document::{Document, PositionEncoding, Positions},
     structure::{respond, response_error},
 };
-use iris_syntax::{FormatEdit, FormatError, FormatOptions, LanguageVersion, TextRange, TextSize};
+use gecode_iris_syntax::{
+    FormatEdit, FormatError, FormatOptions, LanguageVersion, TextRange, TextSize,
+};
 use lsp_server::{ErrorCode, Request, Response, ResponseError};
 use lsp_types::{
     Range, TextEdit, Uri,
@@ -40,7 +42,7 @@ fn document_edits(
     uri: &Uri,
     encoding: PositionEncoding,
 ) -> Result<Vec<TextEdit>, ResponseError> {
-    let formatted = match iris_syntax::format(
+    let formatted = match gecode_iris_syntax::format(
         document.source.as_bytes(),
         uri.as_str(),
         LanguageVersion::V0_1,
@@ -78,7 +80,7 @@ fn range_edits(
         .map_err(|error| response_error(ErrorCode::InvalidParams, error.to_string()))?;
     let end = TextSize::try_from(bytes.end)
         .map_err(|error| response_error(ErrorCode::InvalidParams, error.to_string()))?;
-    let formatted = match iris_syntax::format_range(
+    let formatted = match gecode_iris_syntax::format_range(
         document.source.as_bytes(),
         uri.as_str(),
         LanguageVersion::V0_1,

@@ -1,7 +1,7 @@
 //! `iris gen`: generate code from a reader spec.
 use crate::{CheckFailure, check_spec, render_error};
 use clap::{Args, Subcommand, builder::PossibleValuesParser, builder::TypedValueParser};
-use iris_gen::{Language, builder_code};
+use gecode_iris_gen::{Language, builder_code};
 use std::{
     io::{self, Write},
     path::PathBuf,

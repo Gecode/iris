@@ -103,31 +103,31 @@ between implementations finds bugs that no single implementation finds.
 ### 4.2 The Rust reference implementation is layered
 
 ```
-iris-syntax   lexer, lossless CST (rowan), error-tolerant parser, formatter
+gecode-iris-syntax       lexer, lossless CST (rowan), error-tolerant parser, formatter
      │
-iris-sema     name resolution, scopes, record names, types and shapes,
-     │        diagnostics with codes
-     ├── iris-lint   lints and their fixes, if built (§8.13)
-     ├── iris-macros the `iris!` proc macro, used through gecode-iris
-     ├── iris-gen    generates spec builder programs from reader specs
+gecode-iris-sema         name resolution, scopes, record names, types and shapes,
+     │                   diagnostics with codes
+     ├── iris-lint       lints and their fixes, if built (§8.13)
+     ├── gecode-iris-macros  the `iris!` proc macro, used through gecode-iris
+     ├── gecode-iris-gen     generates spec builder programs from reader specs
      │
-iris-core     reader, expression evaluator, data model, work budgets,
-     │        JSON and dzn output
-     ├── iris-cli    `iris` binary
-     ├── iris-lsp    language server
-     ├── iris-build  spec builder with typed handles
-     ├── iris-wasm   wasm-bindgen API for the playground
-     ├── iris-js     wasm-bindgen binding for the TypeScript package
-     └── (python/)   PyO3 binding
+gecode-iris-core         reader, expression evaluator, data model, work budgets,
+     │                   JSON and dzn output
+     ├── gecode-iris-cli     `iris` binary
+     ├── gecode-iris-lsp     language server
+     ├── gecode-iris-build   spec builder with typed handles
+     ├── iris-wasm       wasm-bindgen API for the playground
+     ├── iris-js         wasm-bindgen binding for the TypeScript package
+     └── (python/)       PyO3 binding
 ```
 
-`iris-lint` depends on `iris-sema` only, so the reader and the Python
+`iris-lint` depends on `gecode-iris-sema` only, so the reader and the Python
 binding do not carry it. The CLI, the LSP, and the WASM crate use it.
-`iris-macros` depends on `iris-syntax` and `iris-sema`, never on
-`iris-core`: it checks a spec at compile time, and the code it expands to
-calls the reader through `gecode-iris`. `iris-build` depends on `iris-core`
-and `iris-macros`, for `pattern!`, and `gecode-iris` re-exports it as
-`gecode_iris::build`. `iris-gen` depends on `iris-syntax` and `iris-sema` only:
+`gecode-iris-macros` depends on `gecode-iris-syntax` and `gecode-iris-sema`, never on
+`gecode-iris-core`: it checks a spec at compile time, and the code it expands to
+calls the reader through `gecode-iris`. `gecode-iris-build` depends on `gecode-iris-core`
+and `gecode-iris-macros`, for `pattern!`, and `gecode-iris` re-exports it as
+`gecode_iris::build`. `gecode-iris-gen` depends on `gecode-iris-syntax` and `gecode-iris-sema` only:
 it lowers a checked spec to a language-independent program, and each language
 adds a backend that renders it. The CLI uses it for `iris gen builder`.
 
@@ -206,7 +206,7 @@ iris/
 ├── formats/                 library of reader specs for standard formats
 │   └── <format>/            <format>.iris, README.md, samples/, expected/
 ├── rust/                    Cargo workspace (crates from §4.2, and the
-│                            conformance runner iris-conformance, §7.2)
+│                            conformance runner gecode-iris-conformance, §7.2)
 ├── python/                  PyO3/maturin package
 ├── typescript/              npm package over rust/iris-js (WebAssembly)
 ├── cpp/                     C++ library (CMake)
@@ -365,9 +365,9 @@ reported upstream. Gecode itself needs no changes.
 
 ### 8.1 Rust (`rust/`)
 
-- Crates: `iris-syntax`, `iris-sema`, `iris-core`, `iris-cli`,
-  `iris-lsp`, `iris-wasm`, `iris-js`, `iris-macros` (after 0.1),
-  `iris-build` (§8.15), `iris-gen`, and `iris-lint` if built (§8.13), published
+- Crates: `gecode-iris-syntax`, `gecode-iris-sema`, `gecode-iris-core`, `gecode-iris-cli`,
+  `gecode-iris-lsp`, `iris-wasm`, `iris-js`, `gecode-iris-macros` (after 0.1),
+  `gecode-iris-build` (§8.15), `gecode-iris-gen`, and `iris-lint` if built (§8.13), published
   under the umbrella crate `gecode-iris`.
 - API sketch:
   ```rust
@@ -382,8 +382,8 @@ reported upstream. Gecode itself needs no changes.
 - Optional `serde` feature: deserialize `Data` into user structs (after
   0.1).
 - An `iris!` macro for inline specs (after 0.1), in a proc-macro crate
-  `iris-macros` that `gecode-iris` re-exports. It parses and checks an
-  embedded spec at compile time with `iris-syntax` and `iris-sema`, turns
+  `gecode-iris-macros` that `gecode-iris` re-exports. It parses and checks an
+  embedded spec at compile time with `gecode-iris-syntax` and `gecode-iris-sema`, turns
   their diagnostics into compile errors pointing into the spec text, and
   expands to a ready `Spec`. It depends on `proc-macro2`, `quote` and
   `syn`; small dependencies like these are acceptable throughout the Rust
@@ -397,7 +397,7 @@ reported upstream. Gecode itself needs no changes.
     `concat!`, is a usage error.
   - Origin: `iris!` for an inline spec, the path as written for a file.
   - Expansion: `Spec::parse` on the same bytes and origin, so the spec is
-    parsed again at run time. A cheaper expansion would need `iris-core`
+    parsed again at run time. A cheaper expansion would need `gecode-iris-core`
     types, or a serialized form of them, in the macro.
   - Diagnostics: the error code, then exactly what `iris check` prints.
     Stable Rust can only mark the whole literal or file path; on nightly the
@@ -669,7 +669,7 @@ GitHub repository avatar, all from the existing mark.
 Check every version against WCAG contrast for any text, at 16 px, and in
 dark mode.
 
-### 8.12 Formatter (`iris fmt`, in `iris-syntax`)
+### 8.12 Formatter (`iris fmt`, in `gecode-iris-syntax`)
 
 - **One style.** Specs are short, often embedded in programs, and shared
   through the format library, so a single style is worth more than
@@ -734,7 +734,7 @@ are written. When those are done we decide (§12, open question 3):
 - No useful lints: no linter. Drop `iris-lint`, `iris lint`, and lint
   suppressions from this plan.
 - One or two: report them as warnings from `iris check` and the LSP, in
-  `iris-sema`, without a separate crate or command.
+  `gecode-iris-sema`, without a separate crate or command.
 - More: build the linter as described below.
 
 A candidate that points at confusing 0.1 behavior may belong in
@@ -855,14 +855,14 @@ every language. In short:
 - Errors carry the language error code, the emitted line, and the host
   call site.
 - The same handle types serve typed views of text specs: `iris gen --lang
-  L SPEC` and the `iris!` macro generate them from `iris-sema`'s facts.
+  L SPEC` and the `iris!` macro generate them from `gecode-iris-sema`'s facts.
 - Placement: a `build` module in the Rust workspace re-exported by
   `gecode-iris`; pure Python in `gecode_iris.build`, with stubs;
   `iris/build.hpp`; the package `dev.gecode.iris.build`, with the Kotlin
   DSL in `iris-kotlin`; and pure TypeScript in the TypeScript package.
 - **Tests:** a generator, `iris gen builder --lang L`, turns every checked
   conformance and format spec into builder code. Running that code must
-  reproduce the spec, compared as syntax trees by an `iris-conformance`
+  reproduce the spec, compared as syntax trees by a `gecode-iris-conformance`
   subcommand. Each format also gets an idiomatic hand-written builder, and
   type tests check that misuse fails to compile.
 
@@ -876,7 +876,7 @@ every language. In short:
   wasm-bindgen 0.2.129 like `iris-wasm`, is the boundary; `iris-wasm`
   stays the playground's crate with its own contract and size budget.
   WebAssembly adds no semantics: parsing, reading, errors, JSON, and dzn
-  come from `iris-core`, so a conformance difference is a binding bug.
+  come from `gecode-iris-core`, so a conformance difference is a binding bug.
   The API does not depend on the backend, so a pure-TypeScript backend
   could replace WebAssembly later without breaking users.
 - API:
@@ -900,9 +900,9 @@ every language. In short:
 - **Memory:** `Data` is copied into JavaScript typed arrays with offsets
   per level, so it needs no `free()`. Only `Spec` holds a WebAssembly
   handle; it supports `[Symbol.dispose]` with a `FinalizationRegistry`
-  fallback and never requires `free()`. `iris-core`'s validated column
+  fallback and never requires `free()`. `gecode-iris-core`'s validated column
   constructors carry data across the boundary in a binary layout, and
-  JSON and dzn are rendered by `iris-core` only on request.
+  JSON and dzn are rendered by `gecode-iris-core` only on request.
 - **Errors:** `IrisError extends Error` with `code`, `message`,
   `inputLocation` and `specLocation` (each `{ origin, line, column }` or
   `null`), `context`, `recordPath`, the diagnostic text, and `toJSON()`.
@@ -1012,7 +1012,7 @@ Dependencies flow downward. Work in the same row can run in parallel.
 | M0 | Foundations | Repository skeleton, `CONTEXT.md`, ADRs 1 to 11, license, CI scaffolding, brand | The layout exists and builds empty, and the logo and icons are in `brand/` |
 | M1 | 0.1 Specification | Chapters from §6, grammar, data model, JSON schemas, error code registry, answers to §6.2 | Every item in §6.2 is decided, with a case planned for each |
 | M2 | 0.1 conformance suite | Gecode tests ported, example formats, the runner, the Gecode adapter | The suite runs green against Gecode 6.5.0, apart from documented Gecode bugs |
-| M3 | Rust core and CLI | `iris-syntax`, `iris-sema`, `iris-core`, `iris-cli` | 100% conformance, performance target met, fuzzing in CI |
+| M3 | Rust core and CLI | `gecode-iris-syntax`, `gecode-iris-sema`, `gecode-iris-core`, `gecode-iris-cli` | 100% conformance, performance target met, fuzzing in CI |
 | M4a | Python | Wheels, stubs, docs | 100% conformance, wheels on TestPyPI |
 | M4b | Tooling | Tree-sitter, TextMate, LSP, VS Code, JetBrains, and Zed packages | Every syntactically valid conformance spec parses cleanly, the LSP features in §8.7 work, and the JetBrains plugin passes the Plugin Verifier |
 | M4c | C++ | Port, CMake package | 100% conformance, sanitizer runs clean, differential fuzzing against Rust |
@@ -1123,7 +1123,7 @@ before M4e.
   checksum check (§8.14), decided on 2026-11-01. Bundling was estimated at
   about 5 MiB of plugin download per platform, from a comparable Rust
   language server.
-- **No memory-mapped input:** iris-core reads input files into memory
+- **No memory-mapped input:** gecode-iris-core reads input files into memory
   with an ordinary buffered read, decided on 2026-11-01 from the rust-013
   measurements. Reading a generated 100 MB DIMACS file took 15 ms of a
   16 s run, so a map would gain almost nothing. Mapping the file itself

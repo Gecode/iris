@@ -3,9 +3,9 @@
 mod command;
 pub mod protocol;
 pub use command::run;
-use iris_sema::Analysis;
-pub use iris_sema::render_error;
-use iris_syntax::{LanguageVersion, Parse, ParseError};
+use gecode_iris_sema::Analysis;
+pub use gecode_iris_sema::render_error;
+use gecode_iris_syntax::{LanguageVersion, Parse, ParseError};
 
 #[derive(Debug)]
 pub struct CheckedSpec {
@@ -14,7 +14,7 @@ pub struct CheckedSpec {
 }
 #[derive(Debug)]
 pub enum CheckFailure {
-    Language(iris_sema::Error),
+    Language(gecode_iris_sema::Error),
     Host(ParseError),
 }
 impl std::fmt::Display for CheckFailure {
@@ -27,11 +27,12 @@ impl std::fmt::Display for CheckFailure {
 }
 impl std::error::Error for CheckFailure {}
 pub fn check_spec(bytes: &[u8], origin: &str) -> Result<CheckedSpec, CheckFailure> {
-    let parsed = iris_syntax::parse(bytes, origin, LanguageVersion::V0_1).map_err(|e| match e {
-        ParseError::InvalidUtf8(d) => CheckFailure::Language(iris_sema::Error::from(&d)),
-        other => CheckFailure::Host(other),
-    })?;
-    let analysis = iris_sema::analyze(&parsed);
+    let parsed =
+        gecode_iris_syntax::parse(bytes, origin, LanguageVersion::V0_1).map_err(|e| match e {
+            ParseError::InvalidUtf8(d) => CheckFailure::Language(gecode_iris_sema::Error::from(&d)),
+            other => CheckFailure::Host(other),
+        })?;
+    let analysis = gecode_iris_sema::analyze(&parsed);
     if let Some(error) = analysis.first_error() {
         return Err(CheckFailure::Language(error.clone()));
     }

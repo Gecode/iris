@@ -1,4 +1,4 @@
-# iris-macros
+# gecode-iris-macros
 
 The procedural macro behind `gecode_iris::iris!`, described in
 [PLAN.md §8.1](../../PLAN.md#81-rust-rust). It is work after Iris 0.1 with no
@@ -14,11 +14,11 @@ let spec = gecode_iris::iris!(r#"
 let dimacs = gecode_iris::iris!(file = "specs/dimacs-cnf.iris");
 ```
 
-The macro checks the spec with [iris-syntax](../iris-syntax/README.md) and
-[iris-sema](../iris-sema/README.md), in the same order as `iris check`, and
+The macro checks the spec with [gecode-iris-syntax](../iris-syntax/README.md) and
+[gecode-iris-sema](../iris-sema/README.md), in the same order as `iris check`, and
 reports the first error as a compile error: the error code, then exactly the
 text `iris check` prints. A valid spec expands to `Spec::parse` on the same
-bytes and origin. The crate never depends on `iris-core`
+bytes and origin. The crate never depends on `gecode-iris-core`
 ([§4.2](../../PLAN.md#42-the-rust-reference-implementation-is-layered)).
 
 An inline spec has the origin `iris!`. A file path is relative to the calling
@@ -26,7 +26,7 @@ package's `CARGO_MANIFEST_DIR` and is its own origin. The expansion embeds the
 file with `include_bytes!`, so Cargo rebuilds the caller when the file changes.
 
 The crate also implements `pattern!`, which
-[iris-build](../iris-build/README.md) exports. It splits a line pattern literal
+[gecode-iris-build](../iris-build/README.md) exports. It splits a line pattern literal
 into text and `{name}` interpolations, and expands to `Pattern` calls.
 
 On stable Rust the compiler marks the whole literal or file path. On nightly
@@ -36,7 +36,7 @@ without escapes.
 From `rust/`:
 
 ```sh
-cargo test --locked -p iris-macros
+cargo test --locked -p gecode-iris-macros
 cargo test --locked -p gecode-iris --test macro_errors
 cargo test --locked -p gecode-iris --test macro_corpus -- --nocapture
 ```

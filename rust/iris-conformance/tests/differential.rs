@@ -2,8 +2,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-use iris_conformance::case::Case;
-use iris_conformance::differential;
+use gecode_iris_conformance::case::Case;
+use gecode_iris_conformance::differential;
 use tempfile::TempDir;
 
 fn fake_driver(options: &str) -> String {

@@ -1,4 +1,4 @@
-use iris_syntax::{Diagnostic, DiagnosticCode, SourceLocation, TextRange};
+use gecode_iris_syntax::{Diagnostic, DiagnosticCode, SourceLocation, TextRange};
 use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -4,8 +4,8 @@
 
 use std::collections::BTreeMap;
 
-use iris_conformance::differential;
-use iris_core::{Failure, Params, Spec};
+use gecode_iris_conformance::differential;
+use gecode_iris_core::{Failure, Params, Spec};
 
 const SEED: u64 = 7_4006;
 const CASES: u64 = 400;
@@ -19,7 +19,7 @@ fn generated_specs_are_mostly_valid_and_read() {
     let mut codes = BTreeMap::<String, u64>::new();
     for index in 0..CASES {
         let case = differential::generate(SEED, index);
-        let checked = iris_cli::check_spec(&case.spec, "generated.iris");
+        let checked = gecode_iris_cli::check_spec(&case.spec, "generated.iris");
         let spec = Spec::parse(&case.spec, "generated.iris");
         assert_eq!(
             checked.is_ok(),

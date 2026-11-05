@@ -22,7 +22,7 @@ workspace = true
 fault-injection = []
 
 [dependencies]
-iris-core = { version = "0.1.0", path = "../iris-core" }
+gecode-iris-core = { version = "0.1.0", path = "../iris-core" }
 serde_json = "1"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

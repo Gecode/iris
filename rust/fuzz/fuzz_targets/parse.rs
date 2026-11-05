@@ -2,7 +2,7 @@
 //! lossless: its text reconstructs the source byte for byte.
 #![no_main]
 
-use iris_syntax::{LanguageVersion, ParseError, parse};
+use gecode_iris_syntax::{LanguageVersion, ParseError, parse};
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|source: &[u8]| {

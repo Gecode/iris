@@ -1,6 +1,6 @@
 //! Immutable block membership and statement setup, prepared once per spec.
 use super::*;
-use iris_sema::{Possibilities, ValueType};
+use gecode_iris_sema::{Possibilities, ValueType};
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct StatementId(usize);

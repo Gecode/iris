@@ -1,7 +1,7 @@
 //! Logical records remain metadata; fields remain borrowed column selections.
 use super::*;
 use crate::reader::repeat::{MarkerSubtree, RecordId};
-use iris_sema::{Denotation, RepeatId, Resolution};
+use gecode_iris_sema::{Denotation, RepeatId, Resolution};
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct ListSelection {
@@ -278,7 +278,7 @@ impl<'a> Evaluator<'a, '_, '_> {
     }
 }
 
-fn field_name(node: &SyntaxNode) -> iris_syntax::SyntaxToken {
+fn field_name(node: &SyntaxNode) -> gecode_iris_syntax::SyntaxToken {
     tokens(node)
         .into_iter()
         .find(|t| t.kind() == K::Ident)

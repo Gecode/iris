@@ -1,5 +1,5 @@
 [package]
-name = "iris-conformance"
+name = "gecode-iris-conformance"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,10 +8,15 @@ description = "Language-neutral conformance runner for Iris implementations"
 repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
-documentation = "https://docs.rs/iris-conformance"
+documentation = "https://docs.rs/gecode-iris-conformance"
 keywords.workspace = true
 categories = ["development-tools::testing", "command-line-utilities"]
 publish = false
+
+# The runner keeps the short command name.
+[[bin]]
+name = "iris-conformance"
+path = "src/main.rs"
 
 [lints]
 workspace = true

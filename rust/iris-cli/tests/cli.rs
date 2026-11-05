@@ -1,4 +1,4 @@
-use iris_conformance::canonical::{Outcome, OutcomeKind};
+use gecode_iris_conformance::canonical::{Outcome, OutcomeKind};
 use std::process::{Command, Output};
 use tempfile::TempDir;
 fn fixture(bytes: &[u8]) -> (TempDir, String) {
@@ -21,7 +21,7 @@ fn check(args: &[&str]) -> Output {
 }
 #[test]
 fn dzn_cli_matches_driver_for_every_dzn_case() {
-    use iris_conformance::case::{self, Case, Operation, OutputFormat};
+    use gecode_iris_conformance::case::{self, Case, Operation, OutputFormat};
     let repo = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let paths = case::discover(
         &[repo.join("conformance/cases/0.1"), repo.join("formats")],
@@ -172,19 +172,19 @@ fn excerpt_escapes_controls_and_uses_physical_pattern_line() {
     assert!(stderr.starts_with(&format!("{path}:2: unknown type 'unknown'")));
     assert!(stderr.contains("1 |         line"));
     assert!(!stderr.contains('\t'));
-    let error = match iris_cli::check_spec(b"let x=\"a\r\0b\" @", "test").unwrap_err() {
-        iris_cli::CheckFailure::Language(error) => error,
+    let error = match gecode_iris_cli::check_spec(b"let x=\"a\r\0b\" @", "test").unwrap_err() {
+        gecode_iris_cli::CheckFailure::Language(error) => error,
         _ => unreachable!(),
     };
-    let rendered = iris_cli::render_error(&error, b"let x=\"a\r\0b\" @");
+    let rendered = gecode_iris_cli::render_error(&error, b"let x=\"a\r\0b\" @");
     assert!(rendered.contains("a\\r\\u{0}b"));
     assert!(!rendered.contains('\r'));
     assert!(!rendered.contains('\0'));
-    let error = match iris_cli::check_spec(b"\0", "test").unwrap_err() {
-        iris_cli::CheckFailure::Language(error) => error,
+    let error = match gecode_iris_cli::check_spec(b"\0", "test").unwrap_err() {
+        gecode_iris_cli::CheckFailure::Language(error) => error,
         _ => unreachable!(),
     };
-    assert!(!iris_cli::render_error(&error, b"\0").contains('\0'));
+    assert!(!gecode_iris_cli::render_error(&error, b"\0").contains('\0'));
 }
 
 #[test]
@@ -337,9 +337,9 @@ fn read_json_and_instance_caret() {
     ] {
         std::fs::write(&path, source).unwrap();
         std::fs::write(input, bytes).unwrap();
-        let spec = iris_core::Spec::parse(source.as_bytes(), &path).unwrap();
-        let iris_core::Failure::Language(error) = spec
-            .read(bytes.as_bytes(), input, &iris_core::Params::new())
+        let spec = gecode_iris_core::Spec::parse(source.as_bytes(), &path).unwrap();
+        let gecode_iris_core::Failure::Language(error) = spec
+            .read(bytes.as_bytes(), input, &gecode_iris_core::Params::new())
             .unwrap_err()
         else {
             panic!("expected a language error")
@@ -442,7 +442,8 @@ fn deeply_dimensional_arrays_serialize() {
 }
 #[test]
 fn ordered_parameter_admission_precedes_input_validation() {
-    let params = iris_cli::protocol::parse_params("{\"z\":\"  a=b\\n\",\"a\":\"2\"}").unwrap();
+    let params =
+        gecode_iris_cli::protocol::parse_params("{\"z\":\"  a=b\\n\",\"a\":\"2\"}").unwrap();
     assert_eq!(
         params.pairs(),
         &[("z".into(), "  a=b\n".into()), ("a".into(), "2".into())]
@@ -856,8 +857,8 @@ check all(x in a:x>2)||all(y in a:y>1)"####,
         let input = input.to_str().unwrap();
         let expected: serde_json::Value = serde_json::from_str(expected).unwrap();
         if expected.get("code").is_some() && expected["input_location"].is_null() {
-            let iris_core::Failure::Language(error) =
-                iris_core::Spec::parse(source.as_bytes(), &path).unwrap_err()
+            let gecode_iris_core::Failure::Language(error) =
+                gecode_iris_core::Spec::parse(source.as_bytes(), &path).unwrap_err()
             else {
                 panic!("{name}: language error")
             };
@@ -878,8 +879,8 @@ check all(x in a:x>2)||all(y in a:y>1)"####,
             );
             continue;
         }
-        let spec = iris_core::Spec::parse(source.as_bytes(), &path).unwrap();
-        let result = spec.read(bytes.as_bytes(), input, &iris_core::Params::new());
+        let spec = gecode_iris_core::Spec::parse(source.as_bytes(), &path).unwrap();
+        let result = spec.read(bytes.as_bytes(), input, &gecode_iris_core::Params::new());
         let output = driver(&["read", &path, input]);
         assert!(output.stderr.is_empty(), "{name}: {output:?}");
         let actual: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
@@ -901,7 +902,7 @@ check all(x in a:x>2)||all(y in a:y>1)"####,
                 );
             }
         }
-        let iris_core::Failure::Language(error) = result.unwrap_err() else {
+        let gecode_iris_core::Failure::Language(error) = result.unwrap_err() else {
             panic!("{name}: language error")
         };
         assert_eq!(
@@ -918,16 +919,19 @@ check all(x in a:x>2)||all(y in a:y>1)"####,
         );
         if matches!(
             error.code,
-            iris_core::ErrorCode::CheckFailed | iris_core::ErrorCode::DivisionZero
+            gecode_iris_core::ErrorCode::CheckFailed | gecode_iris_core::ErrorCode::DivisionZero
         ) {
-            let parsed =
-                iris_syntax::parse(source.as_bytes(), &path, iris_syntax::LanguageVersion::V0_1)
-                    .unwrap();
+            let parsed = gecode_iris_syntax::parse(
+                source.as_bytes(),
+                &path,
+                gecode_iris_syntax::LanguageVersion::V0_1,
+            )
+            .unwrap();
             let node = parsed
                 .syntax()
                 .descendants()
                 .find(|node| {
-                    node.kind() == iris_syntax::SyntaxKind::Check
+                    node.kind() == gecode_iris_syntax::SyntaxKind::Check
                         && source[..usize::from(node.text_range().start())]
                             .bytes()
                             .filter(|&b| b == b'\n')
@@ -962,13 +966,13 @@ check all(x in a:x>2)||all(y in a:y>1)"####,
             "{name}: {stderr}"
         );
     }
-    let spec = iris_core::Spec::parse(
+    let spec = gecode_iris_core::Spec::parse(
         b"repeat 2 as rows {x:int} check all(r in rows:r.x>0)",
         "spec",
     )
     .unwrap();
     for input in [b"1 0", b"1 2", b"0 1", b"3 4"] {
-        let result = spec.read(input, "input", &iris_core::Params::new());
+        let result = spec.read(input, "input", &gecode_iris_core::Params::new());
         assert_eq!(result.is_ok(), input == b"1 2" || input == b"3 4");
     }
 }

@@ -1,4 +1,4 @@
-use iris_conformance::{
+use gecode_iris_conformance::{
     canonical::{Outcome, OutcomeKind},
     case::{Case, Operation, OutputFormat},
     driver::DriverCommand,
@@ -55,7 +55,7 @@ fn scalar_differential() {
         let mut families = std::collections::BTreeMap::new();
         for (index, probe) in probes.iter().enumerate() {
             *families.entry(probe.family).or_insert(0usize) += 1;
-            iris_cli::check_spec(probe.spec.as_bytes(), "generated differential probe")
+            gecode_iris_cli::check_spec(probe.spec.as_bytes(), "generated differential probe")
                 .unwrap_or_else(|error| {
                     panic!(
                         "invalid generated probe seed={seed} index={index}: {}: {error}",

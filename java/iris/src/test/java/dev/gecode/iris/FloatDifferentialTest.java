@@ -104,7 +104,7 @@ class FloatDifferentialTest {
     List<String> command = new ArrayList<>();
     String cli = System.getProperty("iris.cli");
     if (cli == null) {
-      command.addAll(List.of("cargo", "run", "--quiet", "--locked", "-p", "iris-cli", "--bin"));
+      command.addAll(List.of("cargo", "run", "--quiet", "--locked", "-p", "gecode-iris-cli", "--bin"));
       command.addAll(List.of("iris", "--"));
     } else {
       command.add(cli);

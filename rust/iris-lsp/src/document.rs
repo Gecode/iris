@@ -1,5 +1,5 @@
-use iris_sema::Analysis;
-use iris_syntax::{LanguageVersion, Parse, ParseError, SyntaxNode, TextRange, TextSize};
+use gecode_iris_sema::Analysis;
+use gecode_iris_syntax::{LanguageVersion, Parse, ParseError, SyntaxNode, TextRange, TextSize};
 use lsp_types::{Position, PositionEncodingKind, Range, TextDocumentContentChangeEvent};
 use std::time::{Duration, Instant};
 
@@ -88,8 +88,9 @@ impl Document {
 
     pub(crate) fn analyze(&mut self, origin: &str) -> Result<&Analysis, ParseError> {
         if self.snapshot.is_none() {
-            let parsed = iris_syntax::parse(self.source.as_bytes(), origin, LanguageVersion::V0_1)?;
-            let analysis = iris_sema::analyze(&parsed);
+            let parsed =
+                gecode_iris_syntax::parse(self.source.as_bytes(), origin, LanguageVersion::V0_1)?;
+            let analysis = gecode_iris_sema::analyze(&parsed);
             self.snapshot = Some(AnalysisSnapshot { parsed, analysis });
         }
         Ok(&self

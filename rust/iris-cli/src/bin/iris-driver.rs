@@ -1,5 +1,5 @@
-use iris_cli::{CheckFailure, check_spec, protocol};
-use iris_core::{Failure, Params, Spec};
+use gecode_iris_cli::{CheckFailure, check_spec, protocol};
+use gecode_iris_core::{Failure, Params, Spec};
 use std::{
     ffi::OsString,
     io::{self, Write},

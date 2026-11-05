@@ -1,6 +1,6 @@
 [package]
 # The release component name lets dist parse the repository's rust-vVERSION tags.
-# Cargo still builds the iris-cli package; release artifacts use the rust prefix.
+# Cargo still builds the gecode-iris-cli package; release artifacts use the rust prefix.
 name = "rust"
 description = "Iris reader spec tools and language server"
 repository = "https://github.com/Gecode/iris"

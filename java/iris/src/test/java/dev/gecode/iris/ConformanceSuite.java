@@ -228,7 +228,7 @@ final class ConformanceSuite {
                 "--quiet",
                 "--locked",
                 "-p",
-                "iris-conformance",
+                "gecode-iris-conformance",
                 "--",
                 "run",
                 "--driver",

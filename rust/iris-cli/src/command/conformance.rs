@@ -1,5 +1,5 @@
 use clap::Args;
-use iris_conformance::RunOptions;
+use gecode_iris_conformance::RunOptions;
 use std::{path::PathBuf, time::Duration};
 
 #[derive(Args)]
@@ -36,7 +36,7 @@ pub fn run(arguments: Arguments) -> u8 {
         version: arguments.version,
         timeout: arguments.timeout,
     };
-    match iris_conformance::run(&options) {
+    match gecode_iris_conformance::run(&options) {
         Ok(report) => {
             print!("{}", report.render());
             report.exit_code()

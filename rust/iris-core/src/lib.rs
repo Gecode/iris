@@ -13,10 +13,10 @@ mod value;
 
 pub use cancellation::{CancellationToken, ReadOptions};
 pub use error::{Error, ErrorCode, InputSpan, Location};
+use gecode_iris_sema::Analysis;
+pub use gecode_iris_syntax::LanguageVersion;
+use gecode_iris_syntax::{Parse, ParseError};
 pub use handle::Handle;
-use iris_sema::Analysis;
-pub use iris_syntax::LanguageVersion;
-use iris_syntax::{Parse, ParseError};
 use std::{collections::HashMap, fmt, path::Path};
 pub use value::{AccessError, ColumnError, Data, Entry, Leaves, Value, ValueRef};
 
@@ -36,13 +36,16 @@ impl Spec {
         origin: &str,
         version: LanguageVersion,
     ) -> Result<Self, Failure> {
-        let parsed = iris_syntax::parse(source, origin, version).map_err(|error| match error {
-            ParseError::InvalidUtf8(diagnostic) => {
-                Failure::Language(Error::from_spec(&iris_sema::Error::from(&diagnostic)))
-            }
-            ParseError::SourceTooLarge { len } => Failure::Host(HostError::SourceTooLarge { len }),
-        })?;
-        let analysis = iris_sema::analyze(&parsed);
+        let parsed =
+            gecode_iris_syntax::parse(source, origin, version).map_err(|error| match error {
+                ParseError::InvalidUtf8(diagnostic) => Failure::Language(Error::from_spec(
+                    &gecode_iris_sema::Error::from(&diagnostic),
+                )),
+                ParseError::SourceTooLarge { len } => {
+                    Failure::Host(HostError::SourceTooLarge { len })
+                }
+            })?;
+        let analysis = gecode_iris_sema::analyze(&parsed);
         if let Some(error) = analysis.first_error() {
             return Err(Error::from_spec(error).into());
         }
@@ -283,7 +286,7 @@ pub enum HostError {
 pub struct UnsupportedFeature {
     pub feature: &'static str,
     pub task: &'static str,
-    pub range: iris_syntax::TextRange,
+    pub range: gecode_iris_syntax::TextRange,
 }
 impl From<Error> for Failure {
     fn from(error: Error) -> Self {

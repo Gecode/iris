@@ -289,7 +289,7 @@ Gecode test porting follows [PORTING.md](PORTING.md). Extract the Specification'
 executable examples from the repository root with:
 
 ```sh
-(cd rust && cargo run --locked -p iris-conformance -- extract-examples \
+(cd rust && cargo run --locked -p gecode-iris-conformance -- extract-examples \
   ../spec/0.1 ../conformance/cases/0.1/spec-examples)
 ```
 
@@ -298,7 +298,7 @@ for missing, changed, or stale files and stale directories. Run it after changin
 example or the extractor:
 
 ```sh
-(cd rust && cargo run --locked -p iris-conformance -- extract-examples \
+(cd rust && cargo run --locked -p gecode-iris-conformance -- extract-examples \
   ../spec/0.1 ../conformance/cases/0.1/spec-examples --check)
 ```
 
@@ -353,8 +353,8 @@ matches the exact serialization failure; every other failure remains FAIL.
 From `rust/`, check reader specs independently of any implementation or driver:
 
 ```sh
-cargo run --locked -p iris-conformance -- check-grammar
-cargo run --locked -p iris-conformance -- check-grammar ../conformance/cases ../formats
+cargo run --locked -p gecode-iris-conformance -- check-grammar
+cargo run --locked -p gecode-iris-conformance -- check-grammar ../conformance/cases ../formats
 ```
 
 The command interprets [grammar.ebnf](../spec/0.1/grammar.ebnf), including its named
@@ -405,7 +405,7 @@ known-failure handling.
 
 `iris-conformance compare LEFT RIGHT` compares two reader specs as syntax trees,
 through the same recognizer as the grammar check. A language adding a builder
-generator uses it to round-trip the corpus; see the [iris-conformance
+generator uses it to round-trip the corpus; see the [gecode-iris-conformance
 README](../rust/iris-conformance/README.md#comparing-reader-specs).
 
 ## Running cases
@@ -413,7 +413,7 @@ README](../rust/iris-conformance/README.md#comparing-reader-specs).
 From `rust/`:
 
 ```sh
-cargo run --locked -p iris-conformance -- run --driver '<command>' \
+cargo run --locked -p gecode-iris-conformance -- run --driver '<command>' \
   [--driver-id ID] [--filter PATTERN] [--skip PATTERN]... [--version 0.1] [--timeout SECONDS] <cases-dir>...
 ```
 
@@ -457,8 +457,8 @@ Build the Rust workspace and run both roots from the repository root:
 
 ```sh
 (cd rust && cargo build --workspace --locked)
-(cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$PWD/target/debug/iris-driver\"" ../conformance/cases/0.1)
-(cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$PWD/target/debug/iris-driver\"" ../formats)
+(cd rust && cargo run --locked -p gecode-iris-conformance -- run --driver "\"$PWD/target/debug/iris-driver\"" ../conformance/cases/0.1)
+(cd rust && cargo run --locked -p gecode-iris-conformance -- run --driver "\"$PWD/target/debug/iris-driver\"" ../formats)
 ```
 
 The Rust driver needs no `--driver-id`: every case must match its primary
@@ -471,7 +471,7 @@ Build the adapter and run the real suite from the repository root:
 ```sh
 adapter=$(conformance/adapters/gecode/build.sh)
 ctest --test-dir "$(dirname "$adapter")" --output-on-failure
-(cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$adapter\"" \
+(cd rust && cargo run --locked -p gecode-iris-conformance -- run --driver "\"$adapter\"" \
   --driver-id gecode-6.5.0-599f977b7855 ../conformance/cases/0.1)
 ```
 

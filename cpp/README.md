@@ -162,8 +162,8 @@ runner with Cargo.
 To run the runner by hand, from the repository root:
 
 ```sh
-(cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$PWD/../cpp/build/dev/iris-driver\"" ../conformance/cases/0.1)
-(cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$PWD/../cpp/build/dev/iris-driver\"" ../formats)
+(cd rust && cargo run --locked -p gecode-iris-conformance -- run --driver "\"$PWD/../cpp/build/dev/iris-driver\"" ../conformance/cases/0.1)
+(cd rust && cargo run --locked -p gecode-iris-conformance -- run --driver "\"$PWD/../cpp/build/dev/iris-driver\"" ../formats)
 ```
 
 The driver implements the `parse`, `read`, `catalog` and `dzn` operations.
@@ -277,7 +277,7 @@ conformance cases given as roots. Build the Rust driver in release mode and
 the sanitized driver, then from `rust/`:
 
 ```sh
-cargo build --release --locked -p iris-cli -p iris-conformance
+cargo build --release --locked -p gecode-iris-cli -p gecode-iris-conformance
 (cd ../cpp && cmake --preset asan && cmake --build --preset asan --target iris-driver)
 ASAN_OPTIONS=abort_on_error=1 UBSAN_OPTIONS=print_stacktrace=1:abort_on_error=1 \
   target/release/iris-conformance differential \

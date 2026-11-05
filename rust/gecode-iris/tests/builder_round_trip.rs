@@ -7,9 +7,9 @@ mod equal_operands;
 #[path = "../../iris-gen/tests/layout_forms/mod.rs"]
 mod layout_forms;
 
-use iris_cli::check_spec;
-use iris_conformance::compare::compare;
-use iris_gen::{Language, builder_code};
+use gecode_iris_cli::check_spec;
+use gecode_iris_conformance::compare::compare;
+use gecode_iris_gen::{Language, builder_code};
 use std::{
     collections::BTreeSet,
     fmt::Write as _,

@@ -94,10 +94,10 @@ jobs:
         run: npm run test:workerd
       - name: Run conformance cases with the Node driver
         working-directory: rust
-        run: cargo run --locked -p iris-conformance -- run --driver "\"$(command -v node)\" \"$PWD/../typescript/test/conformance-driver.ts\"" ../conformance/cases/0.1
+        run: cargo run --locked -p gecode-iris-conformance -- run --driver "\"$(command -v node)\" \"$PWD/../typescript/test/conformance-driver.ts\"" ../conformance/cases/0.1
       - name: Run format cases with the Node driver
         working-directory: rust
-        run: cargo run --locked -p iris-conformance -- run --driver "\"$(command -v node)\" \"$PWD/../typescript/test/conformance-driver.ts\"" ../formats
+        run: cargo run --locked -p gecode-iris-conformance -- run --driver "\"$(command -v node)\" \"$PWD/../typescript/test/conformance-driver.ts\"" ../formats
       - name: Lint iris-js
         working-directory: rust
         run: cargo clippy -p iris-js --all-targets --locked -- -D warnings

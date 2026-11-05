@@ -10,7 +10,7 @@
 //! so a slow but legal input ends in `E-BUDGET` rather than a timeout.
 #![no_main]
 
-use iris_core::{Data, Failure, Params, Spec};
+use gecode_iris_core::{Data, Failure, Params, Spec};
 use libfuzzer_sys::fuzz_target;
 
 const SPEC_ORIGIN: &str = "fuzz.iris";

@@ -1,9 +1,9 @@
-# iris-gen
+# gecode-iris-gen
 
 Generates spec builder programs from reader specs, as described in
 [docs/builders.md](../../docs/builders.md). It belongs to the builder work of
-[PLAN.md §8.15](../../PLAN.md#815-spec-builders). It depends only on `iris-syntax`
-and `iris-sema`, and `iris gen builder` is its command.
+[PLAN.md §8.15](../../PLAN.md#815-spec-builders). It depends only on `gecode-iris-syntax`
+and `gecode-iris-sema`, and `iris gen builder` is its command.
 
 `lower` turns a spec that `iris check` accepts into a `Program`, a flat list of
 events with expressions in postfix form. Nothing in a `Program` belongs to one
@@ -11,10 +11,10 @@ language, and neither lowering nor rendering recurses, so generation handles
 every nesting that the language allows. A `Backend` renders a `Program` as source.
 
 ```rust
-use iris_gen::{Language, builder_code};
+use gecode_iris_gen::{Language, builder_code};
 
-let parsed = iris_syntax::parse(b"x: int\n", "x.iris", iris_syntax::LanguageVersion::V0_1)?;
-let analysis = iris_sema::analyze(&parsed);
+let parsed = gecode_iris_syntax::parse(b"x: int\n", "x.iris", gecode_iris_syntax::LanguageVersion::V0_1)?;
+let analysis = gecode_iris_sema::analyze(&parsed);
 let code = builder_code(&parsed, &analysis, Language::Rust)?;
 ```
 
@@ -59,6 +59,6 @@ its place goes into a `let`, and only the `let` has to match rustfmt exactly:
 From `rust/`:
 
 ```sh
-cargo test --locked -p iris-gen
+cargo test --locked -p gecode-iris-gen
 cargo test --locked -p gecode-iris --test builder_round_trip -- --nocapture
 ```

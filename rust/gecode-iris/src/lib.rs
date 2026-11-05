@@ -1,4 +1,4 @@
-//! The public Iris reader API, re-exported from `iris-core`.
+//! The public Iris reader API, re-exported from `gecode-iris-core`.
 //!
 //! Parse a reader spec once with [`Spec::parse`], supply caller parameters through
 //! [`Params`], then read input bytes with [`Spec::read`] or a file with
@@ -32,18 +32,18 @@
 //! These are host API usage errors, separate from reading failures.
 //! [`Failure`], [`HostError`], and [`AccessError`] are non-exhaustive; callers
 //! matching their variants must include a fallback arm.
-pub use iris_core::*;
+pub use gecode_iris_core::*;
 
 /// Build reader specs in Rust, with typed handles.
 ///
-/// See the [`iris_build`] crate documentation.
+/// See the [`gecode_iris_build`] crate documentation.
 pub mod build {
-    pub use iris_build::*;
+    pub use gecode_iris_build::*;
 }
 
 #[doc(hidden)]
 pub mod __private {
-    pub use iris_macros::iris;
+    pub use gecode_iris_macros::iris;
 }
 
 /// Check a reader spec at compile time and return its [`Spec`].

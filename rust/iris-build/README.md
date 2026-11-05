@@ -1,4 +1,4 @@
-# iris-build
+# gecode-iris-build
 
 The Rust spec builder, described in
 [PLAN.md §8.15](../../PLAN.md#815-spec-builders) and designed in
@@ -43,7 +43,7 @@ without limit therefore grows without limit.
 From `rust/`:
 
 ```sh
-cargo test --locked -p iris-build
+cargo test --locked -p gecode-iris-build
 cargo test --locked -p gecode-iris --test build_jobshop --test build_corpus --test build_types
 ```
 

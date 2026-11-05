@@ -1,5 +1,5 @@
 //! Driver JSON transport. No language decision is made by serialization.
-use iris_sema::Error;
+use gecode_iris_sema::Error;
 use serde::{
     Deserialize,
     de::{self, MapAccess, Visitor},
@@ -7,11 +7,11 @@ use serde::{
 use std::{collections::HashSet, fmt};
 
 pub fn error_json(error: &Error) -> Result<Vec<u8>, serde_json::Error> {
-    iris_core::Error::from_spec(error).to_json()
+    gecode_iris_core::Error::from_spec(error).to_json()
 }
 pub const PARSE_SUCCESS: &[u8] = b"{\"iris\":\"0.1\",\"parsed\":true}\n";
 
-struct Parameters(iris_core::Params);
+struct Parameters(gecode_iris_core::Params);
 impl<'de> Deserialize<'de> for Parameters {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         struct ParameterVisitor;
@@ -22,7 +22,7 @@ impl<'de> Deserialize<'de> for Parameters {
             }
             fn visit_map<M: MapAccess<'de>>(self, mut map: M) -> Result<Parameters, M::Error> {
                 let mut names = HashSet::new();
-                let mut params = iris_core::Params::new();
+                let mut params = gecode_iris_core::Params::new();
                 while let Some((name, value)) = map.next_entry::<String, String>()? {
                     if !names.insert(name.clone()) {
                         return Err(de::Error::custom("duplicate parameter"));
@@ -35,7 +35,7 @@ impl<'de> Deserialize<'de> for Parameters {
         deserializer.deserialize_map(ParameterVisitor)
     }
 }
-pub fn parse_params(text: &str) -> Result<iris_core::Params, serde_json::Error> {
+pub fn parse_params(text: &str) -> Result<gecode_iris_core::Params, serde_json::Error> {
     serde_json::from_str::<Parameters>(text).map(|params| params.0)
 }
 pub fn validate_parse_params(text: &str) -> Result<(), serde_json::Error> {

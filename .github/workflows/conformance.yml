@@ -52,9 +52,9 @@ jobs:
       - name: Check format library formatting
         run: rust/target/debug/iris fmt --check formats/
       - name: Check Specification examples
-        run: (cd rust && cargo run --locked -p iris-conformance -- extract-examples ../spec/0.1 ../conformance/cases/0.1/spec-examples --check)
+        run: (cd rust && cargo run --locked -p gecode-iris-conformance -- extract-examples ../spec/0.1 ../conformance/cases/0.1/spec-examples --check)
       - name: Check formal grammar
-        run: (cd rust && cargo run --locked -p iris-conformance -- check-grammar)
+        run: (cd rust && cargo run --locked -p gecode-iris-conformance -- check-grammar)
       - name: Run Gecode conformance cases
         run: |
           skips=()
@@ -63,13 +63,13 @@ jobs:
               [[ -z "$pattern" || "$pattern" == \#* ]] || skips+=(--skip "$pattern")
             done < conformance/adapters/gecode/libstdcxx-skips.txt
           fi
-          (cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$adapter\"" --driver-id gecode-6.5.0-599f977b7855 "${skips[@]}" ../conformance/cases/0.1)
+          (cd rust && cargo run --locked -p gecode-iris-conformance -- run --driver "\"$adapter\"" --driver-id gecode-6.5.0-599f977b7855 "${skips[@]}" ../conformance/cases/0.1)
       - name: Run Gecode format cases
-        run: (cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$adapter\"" --driver-id gecode-6.5.0-599f977b7855 ../formats)
+        run: (cd rust && cargo run --locked -p gecode-iris-conformance -- run --driver "\"$adapter\"" --driver-id gecode-6.5.0-599f977b7855 ../formats)
       - name: Run Rust conformance cases
-        run: (cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$PWD/target/debug/iris-driver\"" ../conformance/cases/0.1)
+        run: (cd rust && cargo run --locked -p gecode-iris-conformance -- run --driver "\"$PWD/target/debug/iris-driver\"" ../conformance/cases/0.1)
       - name: Run Rust format cases
-        run: (cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$PWD/target/debug/iris-driver\"" ../formats)
+        run: (cd rust && cargo run --locked -p gecode-iris-conformance -- run --driver "\"$PWD/target/debug/iris-driver\"" ../formats)
       - name: Check Rust formatting
         working-directory: rust
         run: cargo fmt --all -- --check
@@ -81,7 +81,7 @@ jobs:
         run: cargo test --workspace --locked
       - name: Test EditorConfig support
         working-directory: rust
-        run: cargo test --locked -p iris-syntax --features editorconfig
+        run: cargo test --locked -p gecode-iris-syntax --features editorconfig
       - name: Build Rust documentation
         working-directory: rust
         env:

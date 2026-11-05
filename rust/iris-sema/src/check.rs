@@ -1,5 +1,7 @@
 use crate::{Error, ErrorCode as E, model::*, syntax::*};
-use iris_syntax::{Parse, ParseCheck, ParseCheckKind as C, SyntaxKind as K, SyntaxNode, TextSize};
+use gecode_iris_syntax::{
+    Parse, ParseCheck, ParseCheckKind as C, SyntaxKind as K, SyntaxNode, TextSize,
+};
 use std::collections::HashMap;
 
 type Result<T = ()> = std::result::Result<T, Error>;
@@ -200,7 +202,7 @@ impl StatementChecks<'_> {
         };
         if let Some(message) = message {
             let code = if event.kind == C::CaptureForm {
-                E::Syntax(iris_syntax::DiagnosticCode::Pattern)
+                E::Syntax(gecode_iris_syntax::DiagnosticCode::Pattern)
             } else {
                 E::Type
             };
@@ -372,7 +374,7 @@ pub(crate) fn at_node(parsed: &Parse, node: &SyntaxNode, code: E, message: Strin
         code,
         message,
         range: node.text_range(),
-        location: iris_syntax::SourceLocation {
+        location: gecode_iris_syntax::SourceLocation {
             origin: parsed.origin().into(),
             line: line_of(parsed, node.text_range().start()),
             column: None,

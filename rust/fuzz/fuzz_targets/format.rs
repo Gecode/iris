@@ -1,7 +1,7 @@
 //! Checks formatter idempotence and syntax tree preservation at several widths.
 #![no_main]
 
-use iris_syntax::{
+use gecode_iris_syntax::{
     FormatError, FormatOptions, LanguageVersion, SyntaxElement, SyntaxKind as K, SyntaxNode,
     format, parse,
 };

@@ -17,14 +17,14 @@ publish = false
 workspace = true
 
 [dependencies]
-iris-build = { version = "0.1.0", path = "../iris-build" }
-iris-core = { version = "0.1.0", path = "../iris-core" }
-iris-macros = { version = "0.1.0", path = "../iris-macros" }
+gecode-iris-build = { version = "0.1.0", path = "../iris-build" }
+gecode-iris-core = { version = "0.1.0", path = "../iris-core" }
+gecode-iris-macros = { version = "0.1.0", path = "../iris-macros" }
 
 [dev-dependencies]
-# Path only: publication drops these, because iris-cli comes after this crate.
-iris-cli = { path = "../iris-cli" }
-iris-conformance = { version = "0.1.0", path = "../iris-conformance" }
-iris-gen = { path = "../iris-gen" }
+# Path only: publication drops these, because gecode-iris-cli comes after this crate.
+gecode-iris-cli = { path = "../iris-cli" }
+gecode-iris-conformance = { version = "0.1.0", path = "../iris-conformance" }
+gecode-iris-gen = { path = "../iris-gen" }
 serde_json = "1.0"
 trybuild = "1.0"

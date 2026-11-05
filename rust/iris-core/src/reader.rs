@@ -4,8 +4,10 @@ use crate::{
     numeric,
     value::{Frame, LeafStorage, Name, NameId},
 };
-use iris_sema::{DefinitionId, DefinitionKind, ReferenceId, RepeatId, Resolution, SemanticModel};
-use iris_syntax::{DecodedString, SyntaxKind as K, SyntaxNode, SyntaxToken, TextRange};
+use gecode_iris_sema::{
+    DefinitionId, DefinitionKind, ReferenceId, RepeatId, Resolution, SemanticModel,
+};
+use gecode_iris_syntax::{DecodedString, SyntaxKind as K, SyntaxNode, SyntaxToken, TextRange};
 use std::{collections::HashMap, sync::Arc};
 
 const BASE_BUDGET: u128 = 1 << 20;
@@ -22,7 +24,7 @@ pub(crate) struct ModelIndex {
     pub checks: HashMap<TextRange, usize>,
     pub expressions: HashMap<TextRange, usize>,
     pub comprehensions: HashMap<TextRange, usize>,
-    pub structural: HashMap<NameId, iris_sema::Denotation>,
+    pub structural: HashMap<NameId, gecode_iris_sema::Denotation>,
     patterns: HashMap<TextRange, pattern::Pattern>,
     pub pattern_literals: HashMap<TextRange, String>,
     /// Every ordinary string token is decoded at load time. Read-time users
@@ -208,11 +210,11 @@ impl ModelIndex {
                     [
                         (
                             r.list_definition,
-                            iris_sema::Denotation::RecordList(RepeatId(i)),
+                            gecode_iris_sema::Denotation::RecordList(RepeatId(i)),
                         ),
                         (
                             r.each_definition,
-                            iris_sema::Denotation::Record(RepeatId(i)),
+                            gecode_iris_sema::Denotation::Record(RepeatId(i)),
                         ),
                     ]
                     .into_iter()

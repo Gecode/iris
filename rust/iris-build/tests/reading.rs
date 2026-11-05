@@ -1,9 +1,9 @@
 //! Typed access through handles: empty arrays, absence, and the errors a
 //! handle declared by hand can still meet.
-use iris_build::{
+use gecode_iris_build::{
     D1, D2, Field, Float, Int, Maybe, Num, Numbers, SpecBuilder, Str, float, int, num, word,
 };
-use iris_core::{AccessError, Data, Params};
+use gecode_iris_core::{AccessError, Data, Params};
 
 fn read(build: impl FnOnce(&mut SpecBuilder), input: &[u8]) -> Data {
     let mut b = SpecBuilder::unnamed();
@@ -104,7 +104,7 @@ fn a_declared_handle_reports_what_went_wrong() {
     const MISSING: Field<Int> = Field::declared("missing");
     const WRONG_TYPE: Field<Str> = Field::declared("x");
     const WRONG_DEPTH: Field<Int, D1> = Field::declared("x");
-    const ABSENT: Field<Int, iris_build::D0, Maybe> = Field::declared("missing");
+    const ABSENT: Field<Int, gecode_iris_build::D0, Maybe> = Field::declared("missing");
     assert!(matches!(
         data.try_get(MISSING),
         Err(AccessError::UnknownEntry(_))

@@ -2,7 +2,7 @@
 use crate::expr::{Name, ValueTag, ValueType};
 use crate::field::{BuilderId, Field};
 use crate::types::{Declared, IntoDeclared};
-use iris_core::handle::{D0, Str};
+use gecode_iris_core::handle::{D0, Str};
 
 /// A capture's type: `{x:type}`, or [`untyped`] for `{x}`.
 #[derive(Debug, Clone)]

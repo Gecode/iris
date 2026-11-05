@@ -215,7 +215,7 @@ and `-PirisCli=PATH` runs a given `iris` binary instead of `cargo run`.
 By hand from the root, after `./gradlew :iris-driver:installDist` in `java/`:
 
 ```sh
-(cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$PWD/../java/iris-driver/build/install/iris-driver/bin/iris-driver\"" ../conformance/cases/0.1)
+(cd rust && cargo run --locked -p gecode-iris-conformance -- run --driver "\"$PWD/../java/iris-driver/build/install/iris-driver/bin/iris-driver\"" ../conformance/cases/0.1)
 ```
 
 Run the same command with `../formats` for the format cases. This form needs a

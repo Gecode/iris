@@ -86,14 +86,14 @@ When no usable binary is found, a warning explains how to build `iris`:
 
 ```sh
 # In rust/ at the root of this repository:
-cargo build --locked -p iris-cli --bin iris
+cargo build --locked -p gecode-iris-cli --bin iris
 ```
 
 The notification names `rust/target/debug/iris` (`iris.exe` on Windows),
 the executable-path setting, the `PATH` fallback, and the restart action.
 **Configure Iris** opens the settings page. Repeated file opens share one
 notification until it expires or lookup succeeds.
-See [`iris-lsp`](../../rust/iris-lsp/README.md) for server behavior.
+See [`gecode-iris-lsp`](../../rust/iris-lsp/README.md) for server behavior.
 
 ## Downloading the server
 
@@ -166,7 +166,7 @@ To run against the real server, build with a
 separate target directory and pass the executable:
 
 ```sh
-(cd ../../rust && CARGO_TARGET_DIR=/tmp/iris-jetbrains-test-target cargo build --locked -p iris-cli --bin iris)
+(cd ../../rust && CARGO_TARGET_DIR=/tmp/iris-jetbrains-test-target cargo build --locked -p gecode-iris-cli --bin iris)
 IRIS_TEST_EXECUTABLE=/tmp/iris-jetbrains-test-target/debug/iris ./gradlew test verifyPlugin
 ```
 
@@ -201,7 +201,7 @@ record initialization, document diagnostics, restart, and shutdown.
 
 `./gradlew test build verifyPlugin` passed with 13 headless tests and printed
 the real-server format test's skip reason. A fresh server built with
-`CARGO_TARGET_DIR=/tmp/iris-jetbrains-004-target cargo build --locked -p iris-cli --bin iris`
+`CARGO_TARGET_DIR=/tmp/iris-jetbrains-004-target cargo build --locked -p gecode-iris-cli --bin iris`
 then passed `IRIS_TEST_EXECUTABLE=/tmp/iris-jetbrains-004-target/debug/iris ./gradlew test verifyPlugin`:
 14 tests, zero failures, errors, or skips. This includes all eight download
 tests, transport and restart, and the real-server DIMACS edit/fix test in

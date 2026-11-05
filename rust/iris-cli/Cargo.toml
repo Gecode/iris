@@ -1,5 +1,5 @@
 [package]
-name = "iris-cli"
+name = "gecode-iris-cli"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,7 +8,7 @@ description = "Command-line tools for reading instance files with Iris"
 repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
-documentation = "https://docs.rs/iris-cli"
+documentation = "https://docs.rs/gecode-iris-cli"
 keywords.workspace = true
 categories = ["command-line-utilities", "parsing"]
 publish = false
@@ -26,12 +26,12 @@ name = "iris-driver"
 path = "src/bin/iris-driver.rs"
 
 [dependencies]
-iris-conformance = { version = "0.1.0", path = "../iris-conformance" }
-iris-core = { version = "0.1.0", path = "../iris-core" }
-iris-gen = { version = "0.1.0", path = "../iris-gen" }
-iris-lsp = { version = "0.1.0", path = "../iris-lsp" }
-iris-syntax = { version = "0.1.0", path = "../iris-syntax", features = ["editorconfig"] }
-iris-sema = { version = "0.1.0", path = "../iris-sema" }
+gecode-iris-conformance = { version = "0.1.0", path = "../iris-conformance" }
+gecode-iris-core = { version = "0.1.0", path = "../iris-core" }
+gecode-iris-gen = { version = "0.1.0", path = "../iris-gen" }
+gecode-iris-lsp = { version = "0.1.0", path = "../iris-lsp" }
+gecode-iris-syntax = { version = "0.1.0", path = "../iris-syntax", features = ["editorconfig"] }
+gecode-iris-sema = { version = "0.1.0", path = "../iris-sema" }
 clap = { version = "4.6", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

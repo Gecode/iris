@@ -1,13 +1,13 @@
 //! The printed text: every grammar production, the parenthesis and lookahead
 //! tables, and specs far larger than a program would write by hand.
-use iris_build::{
+use gecode_iris_build::{
     D0, DynDepth, DynField, Field, Int, Maybe, Num, Pattern, SpecBuilder, Str, all, alphabet, any,
     bind, blank, count, count_over, defined, discard, discard_as, distinct, eol, float, gecode,
     int, lit, max, min, num, over, pattern, reference, rest, rest_of_line, size, sum, sum_over, ty,
     untyped, validate, word,
 };
-use iris_core::Params;
-use iris_syntax::{FormatOptions, LanguageVersion, format};
+use gecode_iris_core::Params;
+use gecode_iris_syntax::{FormatOptions, LanguageVersion, format};
 
 /// Check that `text` is what `iris fmt` writes with no line limit.
 fn assert_formatted(text: &str) {
@@ -44,7 +44,7 @@ fn assert_prints(build: impl FnOnce(&mut SpecBuilder), expected: &str) {
 
 /// `let v = expression`, with `x`, `y` and `z` defined first.
 #[track_caller]
-fn assert_expression<E: iris_build::Operand>(
+fn assert_expression<E: gecode_iris_build::Operand>(
     build: impl FnOnce(Field<Int>, Field<Int>, Field<Int>) -> E,
     expected: &str,
 ) {
@@ -161,10 +161,10 @@ fn lists_types_and_params() {
 }
 
 trait IntoUntil {
-    fn into_until(self) -> iris_build::ListReading<Int>;
+    fn into_until(self) -> gecode_iris_build::ListReading<Int>;
 }
-impl IntoUntil for iris_build::NamedType<Int> {
-    fn into_until(self) -> iris_build::ListReading<Int> {
+impl IntoUntil for gecode_iris_build::NamedType<Int> {
+    fn into_until(self) -> gecode_iris_build::ListReading<Int> {
         ty(self).until(1)
     }
 }
@@ -257,7 +257,7 @@ fn a_forward_record_serves_use_before_the_repeat() {
     assert_prints(
         |b| {
             let job = b.forward_record("job", "jobs");
-            let x: Field<Int, iris_build::D1> = b.forward("x");
+            let x: Field<Int, gecode_iris_build::D1> = b.forward("x");
             b.let_("n", size(job));
             b.let_("total", sum_over(job, |j| j.get(x)));
             b.repeat(2, |r| {
@@ -688,5 +688,5 @@ fn num_entries_read_as_numbers() {
     let x: Field<Num> = b.read("x", num());
     let spec = b.build().unwrap();
     let data = spec.read(b"2.5", "input", &Params::new()).unwrap();
-    assert_eq!(data.get(x), iris_build::Number::Float(2.5));
+    assert_eq!(data.get(x), gecode_iris_build::Number::Float(2.5));
 }

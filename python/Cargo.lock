@@ -178,9 +178,89 @@ dependencies = [
 name = "gecode-iris"
 version = "0.1.0"
 dependencies = [
- "iris-build",
- "iris-core",
- "iris-macros",
+ "gecode-iris-build",
+ "gecode-iris-core",
+ "gecode-iris-macros",
+]
+
+[[package]]
+name = "gecode-iris-build"
+version = "0.1.0"
+dependencies = [
+ "gecode-iris-core",
+ "gecode-iris-macros",
+]
+
+[[package]]
+name = "gecode-iris-cli"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "gecode-iris-conformance",
+ "gecode-iris-core",
+ "gecode-iris-gen",
+ "gecode-iris-lsp",
+ "gecode-iris-sema",
+ "gecode-iris-syntax",
+ "serde",
+ "serde_json",
+ "similar",
+]
+
+[[package]]
+name = "gecode-iris-conformance"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "ryu",
+ "serde",
+ "serde_json",
+ "shell-words",
+ "tempfile",
+ "toml",
+]
+
+[[package]]
+name = "gecode-iris-core"
+version = "0.1.0"
+dependencies = [
+ "gecode-iris-sema",
+ "gecode-iris-syntax",
+ "ryu",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "gecode-iris-gen"
+version = "0.1.0"
+dependencies = [
+ "gecode-iris-sema",
+ "gecode-iris-syntax",
+]
+
+[[package]]
+name = "gecode-iris-lsp"
+version = "0.1.0"
+dependencies = [
+ "crossbeam-channel",
+ "gecode-iris-core",
+ "gecode-iris-sema",
+ "gecode-iris-syntax",
+ "lsp-server",
+ "lsp-types",
+ "serde_json",
+]
+
+[[package]]
+name = "gecode-iris-macros"
+version = "0.1.0"
+dependencies = [
+ "gecode-iris-sema",
+ "gecode-iris-syntax",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -188,8 +268,23 @@ name = "gecode-iris-python"
 version = "0.1.0"
 dependencies = [
  "gecode-iris",
- "iris-cli",
+ "gecode-iris-cli",
  "pyo3",
+]
+
+[[package]]
+name = "gecode-iris-sema"
+version = "0.1.0"
+dependencies = [
+ "gecode-iris-syntax",
+]
+
+[[package]]
+name = "gecode-iris-syntax"
+version = "0.1.0"
+dependencies = [
+ "ec4rs",
+ "rowan",
 ]
 
 [[package]]
@@ -229,101 +324,6 @@ checksum = "cc4e190f5d26ca7051642629da2c52fc03bde85a03197c99408dcd291734c855"
 dependencies = [
  "equivalent",
  "hashbrown 0.17.1",
-]
-
-[[package]]
-name = "iris-build"
-version = "0.1.0"
-dependencies = [
- "iris-core",
- "iris-macros",
-]
-
-[[package]]
-name = "iris-cli"
-version = "0.1.0"
-dependencies = [
- "clap",
- "iris-conformance",
- "iris-core",
- "iris-gen",
- "iris-lsp",
- "iris-sema",
- "iris-syntax",
- "serde",
- "serde_json",
- "similar",
-]
-
-[[package]]
-name = "iris-conformance"
-version = "0.1.0"
-dependencies = [
- "clap",
- "ryu",
- "serde",
- "serde_json",
- "shell-words",
- "tempfile",
- "toml",
-]
-
-[[package]]
-name = "iris-core"
-version = "0.1.0"
-dependencies = [
- "iris-sema",
- "iris-syntax",
- "ryu",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "iris-gen"
-version = "0.1.0"
-dependencies = [
- "iris-sema",
- "iris-syntax",
-]
-
-[[package]]
-name = "iris-lsp"
-version = "0.1.0"
-dependencies = [
- "crossbeam-channel",
- "iris-core",
- "iris-sema",
- "iris-syntax",
- "lsp-server",
- "lsp-types",
- "serde_json",
-]
-
-[[package]]
-name = "iris-macros"
-version = "0.1.0"
-dependencies = [
- "iris-sema",
- "iris-syntax",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "iris-sema"
-version = "0.1.0"
-dependencies = [
- "iris-syntax",
-]
-
-[[package]]
-name = "iris-syntax"
-version = "0.1.0"
-dependencies = [
- "ec4rs",
- "rowan",
 ]
 
 [[package]]

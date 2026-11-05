@@ -108,7 +108,7 @@ class IrisBinaryDownloadTest : BasePlatformTestCase() {
         UIUtil.dispatchAllInvocationEvents()
         assertFalse(offer.isExpired)
         assertEquals(listOf(offer), notifications)
-        assertTrue(offer.content.contains("cargo build --locked -p iris-cli --bin iris"))
+        assertTrue(offer.content.contains("cargo build --locked -p gecode-iris-cli --bin iris"))
         assertEmpty(requests)
         assertNull(release.cachedExecutable())
     }

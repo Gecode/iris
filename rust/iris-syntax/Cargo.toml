@@ -1,5 +1,5 @@
 [package]
-name = "iris-syntax"
+name = "gecode-iris-syntax"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,7 +8,7 @@ description = "Lossless parsing and formatting for the Iris reader language"
 repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
-documentation = "https://docs.rs/iris-syntax"
+documentation = "https://docs.rs/gecode-iris-syntax"
 keywords.workspace = true
 categories = ["parsing"]
 publish = false

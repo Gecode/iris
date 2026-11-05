@@ -1,5 +1,5 @@
 [package]
-name = "iris-sema"
+name = "gecode-iris-sema"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,7 +8,7 @@ description = "Semantic analysis and diagnostics for the Iris reader language"
 repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
-documentation = "https://docs.rs/iris-sema"
+documentation = "https://docs.rs/gecode-iris-sema"
 keywords.workspace = true
 categories = ["parsing"]
 publish = false
@@ -17,4 +17,4 @@ publish = false
 workspace = true
 
 [dependencies]
-iris-syntax = { version = "0.1.0", path = "../iris-syntax" }
+gecode-iris-syntax = { version = "0.1.0", path = "../iris-syntax" }

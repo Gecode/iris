@@ -3,7 +3,7 @@
 The Python package `gecode-iris`, imported as `gecode_iris`, binds the Rust
 reference implementation with PyO3 and maturin. Python adds no reader
 behavior: parsing, reading, errors, canonical JSON and dzn all come from
-`iris-core`, so a conformance difference is a binding bug. `PLAN.md` §8.2
+`gecode-iris-core`, so a conformance difference is a binding bug. `PLAN.md` §8.2
 describes the package; milestone M4a builds it.
 
 ```python
@@ -101,7 +101,7 @@ usage error, 1 for a spec or instance error). Installing the package into an
 environment, or running `uvx --from gecode-iris iris`, is enough to use it
 without a Rust toolchain.
 
-The command line is the Rust library function `iris_cli::run`, which the
+The command line is the Rust library function `gecode_iris_cli::run`, which the
 extension exposes as `gecode_iris._native.run_cli(argv)`. The script,
 `gecode_iris._cli:main`, adds no command logic. It flushes Python's
 `sys.stdout` and `sys.stderr`, restores the default `SIGINT` handler so that
@@ -299,8 +299,8 @@ source tree off `sys.path`, so the installed package is what runs:
 
 ```sh
 PY="$PWD/python/.venv/bin/python"
-(cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$PY\" -I \"$PWD/../python/tests/conformance_driver.py\"" ../conformance/cases/0.1)
-(cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$PY\" -I \"$PWD/../python/tests/conformance_driver.py\"" ../formats)
+(cd rust && cargo run --locked -p gecode-iris-conformance -- run --driver "\"$PY\" -I \"$PWD/../python/tests/conformance_driver.py\"" ../conformance/cases/0.1)
+(cd rust && cargo run --locked -p gecode-iris-conformance -- run --driver "\"$PY\" -I \"$PWD/../python/tests/conformance_driver.py\"" ../formats)
 ```
 
 Every case passes with no `--driver-id` and no exemptions.
@@ -310,7 +310,7 @@ Every case passes with no `--driver-id` and no exemptions.
 The crates in `rust/` that the package depends on are outside `python/`, and
 `maturin sdist` copies them into the source distribution. A crate must
 therefore not read files outside its own directory at build time;
-`iris-conformance` embeds copies of the two Specification files it needs for
+`gecode-iris-conformance` embeds copies of the two Specification files it needs for
 this reason (see [its README](../rust/iris-conformance/README.md)). To check
 that the source distribution builds, build a wheel from it outside the
 checkout, in `python/`:

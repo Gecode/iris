@@ -1,5 +1,5 @@
 use crate::document::{LineIndex, Positions};
-use iris_sema::Error;
+use gecode_iris_sema::Error;
 use lsp_types::{CodeDescription, Diagnostic, DiagnosticSeverity, NumberOrString};
 
 const DIAGNOSTIC_DOCS_BASE_URL: &str = "https://iris.gecode.dev/specification/0.1/errors/";
@@ -44,13 +44,13 @@ pub(crate) fn sample_file(
 }
 
 pub(crate) fn sample_failure(
-    error: &iris_core::Failure,
+    error: &gecode_iris_core::Failure,
     directive: &crate::sample::Directive,
     source: &str,
     lines: &LineIndex,
     positions: &crate::document::Positions,
 ) -> Diagnostic {
-    use iris_core::Failure;
+    use gecode_iris_core::Failure;
     let Failure::Language(error) = error else {
         return sample_file(
             &crate::sample::bounded(&error.to_string(), 3500),

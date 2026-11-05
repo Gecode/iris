@@ -6,7 +6,7 @@ use crate::{
     semantic_tokens, structure,
 };
 use crossbeam_channel::{after, never, select};
-use iris_syntax::ParseError;
+use gecode_iris_syntax::ParseError;
 use lsp_server::{Connection, ErrorCode, Message, Notification, Request, Response};
 use lsp_types::{
     CompletionOptions, FoldingRangeProviderCapability, HoverProviderCapability, InitializeParams,
@@ -418,7 +418,7 @@ impl Server {
         );
         document.samples.outcomes.clear();
         if errors.is_empty() && document.samples.directives.iter().any(|d| d.path.is_some()) {
-            document.samples.cancellation = Some(iris_core::CancellationToken::default());
+            document.samples.cancellation = Some(gecode_iris_core::CancellationToken::default());
             if self.queued.insert(uri.clone()) {
                 self.pending.push_back(uri.clone());
             }
@@ -569,7 +569,7 @@ mod tests {
         stale_success: bool,
     ) -> (
         Client,
-        crossbeam_channel::Receiver<iris_core::CancellationToken>,
+        crossbeam_channel::Receiver<gecode_iris_core::CancellationToken>,
         Gate,
     ) {
         let (started, wait_started) = crossbeam_channel::bounded(1);

@@ -105,7 +105,7 @@ function(run_batches paths)
     list(SUBLIST paths ${start} ${batch_size} batch)
     list(TRANSFORM batch PREPEND "${REPOSITORY}/")
     execute_process(
-      COMMAND "${CARGO}" run --quiet --locked -p iris-conformance --
+      COMMAND "${CARGO}" run --quiet --locked -p gecode-iris-conformance --
         run --driver "\"${DRIVER}\"" --version 0.1 --timeout ${CASE_TIMEOUT}
         ${batch}
       WORKING_DIRECTORY "${REPOSITORY}/rust"

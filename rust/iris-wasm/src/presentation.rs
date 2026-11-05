@@ -1,4 +1,4 @@
-use iris_syntax::{Parse, SyntaxKind as K, TextRange};
+use gecode_iris_syntax::{Parse, SyntaxKind as K, TextRange};
 use serde::Serialize;
 
 #[derive(Serialize)]

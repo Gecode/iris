@@ -7,7 +7,7 @@ The unpublished crate is built for `wasm32-unknown-unknown` by
 covers the build and the TypeScript API.
 
 The crate adds no semantics. Parsing, reading, errors, canonical JSON and dzn
-all come from iris-core.
+all come from gecode-iris-core.
 
 ## Boundary contract
 
@@ -15,7 +15,7 @@ all come from iris-core.
 - `read` and `catalog(input, origin, params)` return data in the binary
   transfer layout. `params` is a flat list of name/value pairs in caller order.
 - `renderJson(data)` and `renderDzn(data)` render transfer bytes through
-  iris-core, so JSON and dzn are produced only when the caller asks for them.
+  gecode-iris-core, so JSON and dzn are produced only when the caller asks for them.
 - A failure is thrown as a JSON envelope string:
   `{"kind":"language","document":D,"diagnostic":T}` carries the canonical
   error document `D` as text and the error's display text `T`;
@@ -33,7 +33,7 @@ all come from iris-core.
 [`src/transfer.rs`](src/transfer.rs) documents the transfer layout. It aligns
 every numeric array to 8 bytes, so JavaScript views leaves and offsets in place
 as `BigInt64Array`, `Float64Array` and `Uint32Array`. Decoding uses checked
-reads and iris-core's validated column constructors, so a malformed buffer is an
+reads and gecode-iris-core's validated column constructors, so a malformed buffer is an
 error, not a panic.
 
 Compared with [iris-wasm](../iris-wasm/README.md), the playground's crate, it

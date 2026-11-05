@@ -1,6 +1,6 @@
 //! Small-input execution regressions; CLI performance acceptance is separate.
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use iris_core::{Params, Spec};
+use gecode_iris_core::{Params, Spec};
 use std::{
     fs,
     hint::black_box,

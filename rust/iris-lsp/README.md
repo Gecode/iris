@@ -1,4 +1,4 @@
-# iris-lsp
+# gecode-iris-lsp
 
 The Iris 0.1 language server, part of milestone M4b in
 [PLAN.md §8.7](../../PLAN.md#87-language-server-rustiris-lsp).
@@ -10,7 +10,7 @@ with `iris lsp`.
 Build and start from `rust/`:
 
 ```sh
-cargo build --locked -p iris-cli --bin iris
+cargo build --locked -p gecode-iris-cli --bin iris
 ./target/debug/iris lsp
 ```
 
@@ -45,7 +45,7 @@ use the negotiated encoding and physical source lines, including CRLF and
 lone CR. Invalid edits leave the previous buffer and version intact and log
 an error; a full replacement or close/open can resynchronize the buffer.
 
-The server reuses `iris-syntax` and `iris-sema`, preserving the checker's
+The server reuses `gecode-iris-syntax` and `gecode-iris-sema`, preserving the checker's
 [error order](../../spec/0.1/errors.md#112-error-order). It publishes at most
 one parse or resolution error, with its registered code, message, raw source
 range, and a `codeDescription` link. Unavailable ordinary values remain a
@@ -240,7 +240,7 @@ and memory in the document and model size, in addition to cached analysis.
 ## Formatting
 
 The server advertises document and range formatting using the existing
-`iris-syntax` formatter and [fixed style](../../docs/formatting.md). It ignores
+`gecode-iris-syntax` formatter and [fixed style](../../docs/formatting.md). It ignores
 client `tabSize`, `insertSpaces`, and other formatting options. For `file:`
 URIs, `FormatOptions::for_path` reads `max_line_length` from the document path's
 `.editorconfig` hierarchy on each request, with the same behavior as `iris fmt`.
@@ -279,8 +279,8 @@ The server does not modify the buffer or write the reader spec to disk.
 From `rust/`:
 
 ```sh
-cargo test --locked -p iris-lsp
-cargo test --locked -p iris-cli --test lsp_stdio
+cargo test --locked -p gecode-iris-lsp
+cargo test --locked -p gecode-iris-cli --test lsp_stdio
 ```
 
 The in-process client in `tests/support/mod.rs` uses the production server

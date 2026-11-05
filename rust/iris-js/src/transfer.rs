@@ -14,12 +14,12 @@
 //!         | leaf-count pad8 u32{leaf-count + 1} string-bytes   value type 2, string
 //! ```
 //!
-//! Levels hold the cumulative offsets of `iris_core::Value::levels`. String
+//! Levels hold the cumulative offsets of `gecode_iris_core::Value::levels`. String
 //! leaves are byte offsets into the UTF-8 bytes that follow them; the last
 //! offset is the byte count.
 //!
 //! `typescript/src/transfer.ts` decodes the same layout.
-use iris_core::{ColumnError, Data, Entry, Leaves, Value};
+use gecode_iris_core::{ColumnError, Data, Entry, Leaves, Value};
 use std::fmt;
 
 pub const FORMAT_VERSION: u32 = 1;

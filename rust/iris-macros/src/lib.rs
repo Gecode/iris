@@ -4,11 +4,11 @@
 //! `$crate` path to [`iris!`](macro@iris), so the expansion names the reader
 //! API correctly even when a dependent renames `gecode-iris`.
 //!
-//! The macro checks a reader spec at compile time with `iris-syntax` and
-//! `iris-sema`, exactly as `iris check` does, and reports the first language
+//! The macro checks a reader spec at compile time with `gecode-iris-syntax` and
+//! `gecode-iris-sema`, exactly as `iris check` does, and reports the first language
 //! error as a compile error. A valid spec expands to `Spec::parse` on the same
-//! bytes and origin. This crate never depends on `iris-core`.
-use iris_syntax::{LanguageVersion, ParseError};
+//! bytes and origin. This crate never depends on `gecode-iris-core`.
+use gecode_iris_syntax::{LanguageVersion, ParseError};
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use std::ops::Range;
@@ -159,10 +159,10 @@ fn load(source: &SpecSource) -> syn::Result<LoadedSpec<'_>> {
 
 /// Reject the spec with its first error, in the order `iris check` uses.
 fn check(spec: &LoadedSpec) -> syn::Result<()> {
-    let parsed = match iris_syntax::parse(&spec.bytes, &spec.origin, LanguageVersion::V0_1) {
+    let parsed = match gecode_iris_syntax::parse(&spec.bytes, &spec.origin, LanguageVersion::V0_1) {
         Ok(parsed) => parsed,
         Err(ParseError::InvalidUtf8(diagnostic)) => {
-            return Err(spec.language_error(&iris_sema::Error::from(&diagnostic)));
+            return Err(spec.language_error(&gecode_iris_sema::Error::from(&diagnostic)));
         }
         Err(error) => {
             return Err(syn::Error::new(
@@ -171,7 +171,7 @@ fn check(spec: &LoadedSpec) -> syn::Result<()> {
             ));
         }
     };
-    match iris_sema::analyze(&parsed).first_error() {
+    match gecode_iris_sema::analyze(&parsed).first_error() {
         Some(error) => Err(spec.language_error(error)),
         None => Ok(()),
     }
@@ -179,11 +179,11 @@ fn check(spec: &LoadedSpec) -> syn::Result<()> {
 
 impl LoadedSpec<'_> {
     /// The registry code, then the rendering `iris check` prints.
-    fn language_error(&self, error: &iris_sema::Error) -> syn::Error {
+    fn language_error(&self, error: &gecode_iris_sema::Error) -> syn::Error {
         let message = format!(
             "{}: {}",
             error.code.as_str(),
-            iris_sema::render_error(error, &self.bytes)
+            gecode_iris_sema::render_error(error, &self.bytes)
         );
         syn::Error::new(self.error_span(error.range.into()), message)
     }

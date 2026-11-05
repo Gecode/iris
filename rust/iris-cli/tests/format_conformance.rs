@@ -1,5 +1,5 @@
-use iris_conformance::case::{self, Case, Operation, OutputFormat};
-use iris_syntax::{FormatError, FormatOptions, LanguageVersion, ParseError, format};
+use gecode_iris_conformance::case::{self, Case, Operation, OutputFormat};
+use gecode_iris_syntax::{FormatError, FormatOptions, LanguageVersion, ParseError, format};
 use serde_json::Value;
 use std::{collections::BTreeMap, fs, path::Path, path::PathBuf, process::Command};
 

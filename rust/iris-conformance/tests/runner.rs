@@ -3,10 +3,10 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-use iris_conformance::canonical::{Outcome, OutcomeKind};
-use iris_conformance::case::{Case, Operation, OutputFormat, discover};
-use iris_conformance::report::differences;
-use iris_conformance::{CaseStatus, RunOptions, run};
+use gecode_iris_conformance::canonical::{Outcome, OutcomeKind};
+use gecode_iris_conformance::case::{Case, Operation, OutputFormat, discover};
+use gecode_iris_conformance::report::differences;
+use gecode_iris_conformance::{CaseStatus, RunOptions, run};
 use serde_json::{Value, json};
 use tempfile::TempDir;
 

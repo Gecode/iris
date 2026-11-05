@@ -1,11 +1,11 @@
 use crate::input::{Input, Position};
-use iris_syntax::TextRange;
+use gecode_iris_syntax::TextRange;
 use serde::Serialize;
 use std::{fmt, ops::Range};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorCode {
-    Spec(iris_sema::ErrorCode),
+    Spec(gecode_iris_sema::ErrorCode),
     ParamUnknown,
     ParamMissing,
     ParamType,
@@ -152,7 +152,7 @@ impl Error {
             }),
         }
     }
-    pub fn from_spec(error: &iris_sema::Error) -> Self {
+    pub fn from_spec(error: &gecode_iris_sema::Error) -> Self {
         let mut result = Self::new(ErrorCode::Spec(error.code), error.message.clone());
         result.details.spec_location = Some(Location {
             origin: Some(error.location.origin.to_string()),

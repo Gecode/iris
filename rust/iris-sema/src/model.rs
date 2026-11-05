@@ -1,4 +1,4 @@
-use iris_syntax::{SyntaxNode, TextRange, TextSize};
+use gecode_iris_syntax::{SyntaxNode, TextRange, TextSize};
 
 macro_rules! ids {
     ($($name:ident),*) => { $(

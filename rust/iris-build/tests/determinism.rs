@@ -1,6 +1,6 @@
 //! The same calls give the same text, whatever else the process has done:
 //! internal names come from stream order, never from a global counter.
-use iris_build::{SpecBuilder, int, lit, pattern, sum_over};
+use gecode_iris_build::{SpecBuilder, int, lit, pattern, sum_over};
 use std::thread;
 
 fn program() -> String {

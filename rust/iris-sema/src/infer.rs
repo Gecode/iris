@@ -2,7 +2,7 @@
 use crate::environment::{Binding, Changes, Environment};
 use crate::targets::{TargetSetId, TargetSets};
 use crate::{model::*, syntax::*};
-use iris_syntax::{SyntaxKind as K, SyntaxNode};
+use gecode_iris_syntax::{SyntaxKind as K, SyntaxNode};
 use std::collections::{BTreeSet, HashMap};
 
 pub(crate) fn infer(model: &mut SemanticModel, index: &SyntaxIndex) {
@@ -32,7 +32,7 @@ pub(crate) fn infer(model: &mut SemanticModel, index: &SyntaxIndex) {
 struct Inference<'a> {
     model: &'a mut SemanticModel,
     index: &'a SyntaxIndex,
-    references: HashMap<iris_syntax::TextRange, usize>,
+    references: HashMap<gecode_iris_syntax::TextRange, usize>,
     expressions: HashMap<SyntaxNode, usize>,
     targets: TargetSets,
     type_kinds: HashMap<DefinitionId, ReadingKind>,
@@ -402,7 +402,11 @@ impl Inference<'_> {
         }
         facts
     }
-    fn infer_reference(&mut self, range: iris_syntax::TextRange, env: &Environment) -> ValueFacts {
+    fn infer_reference(
+        &mut self,
+        range: gecode_iris_syntax::TextRange,
+        env: &Environment,
+    ) -> ValueFacts {
         crate::work::record();
         let Some(&index) = self.references.get(&range) else {
             return ValueFacts::unknown();

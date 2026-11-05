@@ -19,7 +19,7 @@ From the repository root:
 ```sh
 adapter=$(conformance/adapters/gecode/build.sh)
 ctest --test-dir "$(dirname "$adapter")" --output-on-failure
-(cd rust && cargo run --locked -p iris-conformance -- run \
+(cd rust && cargo run --locked -p gecode-iris-conformance -- run \
   --driver "\"$adapter\"" --driver-id gecode-6.5.0-599f977b7855 \
   ../conformance/cases/0.1/smoke)
 ```

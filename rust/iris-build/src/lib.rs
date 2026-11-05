@@ -2,18 +2,18 @@
 //!
 //! A builder writes a reader spec: every call adds a statement, and
 //! [`SpecBuilder::build`] prints the text and parses it with
-//! [`Spec::parse`](iris_core::Spec::parse). The result is an ordinary spec, so
+//! [`Spec::parse`](gecode_iris_core::Spec::parse). The result is an ordinary spec, so
 //! the language's own checks decide what is valid. The builder adds only the
 //! checks that a text spec cannot need; see [`BuildErrorKind`].
 //!
 //! Every defining statement returns a typed handle, a [`Field`]. In the builder
 //! a handle is an expression. After reading it is a key, and
-//! [`Data::get`](iris_core::Data::get) returns the host type for its value type
+//! [`Data::get`](gecode_iris_core::Data::get) returns the host type for its value type
 //! and depth:
 //!
 //! ```
-//! use iris_build::{SpecBuilder, int, lit};
-//! use iris_core::Params;
+//! use gecode_iris_build::{SpecBuilder, int, lit};
+//! use gecode_iris_core::Params;
 //!
 //! let mut b = SpecBuilder::new("row");
 //! let n = b.read("n", int());
@@ -45,16 +45,16 @@
 //!   as in `check !defined(name)`.
 //!
 //! ```
-//! use iris_build::{DynField, Field, SpecBuilder, float, int, lit};
+//! use gecode_iris_build::{DynField, Field, SpecBuilder, float, int, lit};
 //!
 //! let mut b = SpecBuilder::unnamed();
 //! let x = b.read("x", int());
 //! let x = b.read(x, float()); // redefined, so a `DynField`
-//! let y: Field<iris_build::Int> = b.forward("y");
+//! let y: Field<gecode_iris_build::Int> = b.forward("y");
 //! b.let_("sum", y + x.dynamic());
 //! b.let_(y, lit(1));
 //! let zz: DynField = b.undefined("zz");
-//! b.check(!iris_build::defined(zz));
+//! b.check(!gecode_iris_build::defined(zz));
 //! assert!(b.source().is_ok());
 //! ```
 mod check;
@@ -74,7 +74,7 @@ pub use expr::{
     count, count_over, defined, distinct, gecode, lit, max, min, over, size, sum, sum_over,
 };
 pub use field::{DynField, Field, Forward};
-pub use iris_core::handle::{
+pub use gecode_iris_core::handle::{
     Array, D0, D1, D2, D3, D4, D5, D6, D7, D8, Depth, Dyn, DynDepth, Float, Int, Leaf, Maybe, Num,
     Number, Numbers, Presence, Required, Str,
 };
@@ -92,7 +92,7 @@ pub use types::{
 #[doc(hidden)]
 pub mod __private {
     pub use crate::pattern::Pattern;
-    pub use iris_macros::pattern;
+    pub use gecode_iris_macros::pattern;
 }
 
 /// A line pattern, written like `format!`.

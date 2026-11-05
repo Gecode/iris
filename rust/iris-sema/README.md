@@ -1,13 +1,13 @@
-# iris-sema
+# gecode-iris-sema
 
 Parse-time validity, name resolution, and conservative value facts for Iris 0.1.
 This is the semantic layer in [PLAN.md §4.2](../../PLAN.md#42-the-rust-reference-implementation-is-layered),
 part of milestone M3 ([§8.1](../../PLAN.md#81-rust-rust)). It depends only on
-`iris-syntax`; it performs no I/O or expression execution.
+`gecode-iris-syntax`; it performs no I/O or expression execution.
 
 ```rust
-let parsed = iris_syntax::parse(source, origin, iris_syntax::LanguageVersion::V0_1)?;
-let analysis = iris_sema::analyze(&parsed);
+let parsed = gecode_iris_syntax::parse(source, origin, gecode_iris_syntax::LanguageVersion::V0_1)?;
+let analysis = gecode_iris_sema::analyze(&parsed);
 ```
 
 `Analysis` retains at most the first language error in the order defined by
@@ -30,9 +30,9 @@ use conservative summaries; these do not enumerate input orders or solve path
 conditions. Facts describe successful values, not proof that a statement can
 execute without a runtime error.
 
-From `rust/`, `cargo test --locked -p iris-sema` checks model navigation,
+From `rust/`, `cargo test --locked -p gecode-iris-sema` checks model navigation,
 uncertainty and shapes, diagnostic messages, and phase/operand ordering.
-The driver conformance integration test lives in `iris-cli`.
+The driver conformance integration test lives in `gecode-iris-cli`.
 
 `render_error` and `render_format_error` provide the shared source excerpts for
 the CLI and browser. Checking keeps Specification error order; formatting stays

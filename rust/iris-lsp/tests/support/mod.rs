@@ -26,7 +26,7 @@ pub struct Client {
 impl Client {
     pub fn new(capabilities: Value) -> Self {
         Self::with_server(capabilities, |connection| {
-            iris_lsp::run(connection).map_err(|error| error.to_string())
+            gecode_iris_lsp::run(connection).map_err(|error| error.to_string())
         })
     }
 

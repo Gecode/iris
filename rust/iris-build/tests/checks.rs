@@ -1,10 +1,10 @@
 //! The builder's own checks, each reported by `build()`.
-use iris_build::{
+use gecode_iris_build::{
     BuildError, BuildErrorKind, D0, D1, DynField, Field, Float, Int, Maybe, Num, Record,
     SpecBuilder, Str, all, alphabet, bind, defined, discard, float, int, lit, over, pattern,
     reference, size, word,
 };
-use iris_core::Params;
+use gecode_iris_core::Params;
 
 fn failure_of(builder: SpecBuilder) -> BuildError {
     builder.build().expect_err("the builder should fail")
@@ -194,7 +194,7 @@ fn values_with_no_spelling_are_rejected() {
     });
     unprintable(|b| {
         let t = lit("}").dynamic();
-        b.line(iris_build::Pattern::new().part(iris_build::validate(t..)));
+        b.line(gecode_iris_build::Pattern::new().part(gecode_iris_build::validate(t..)));
     });
 }
 
@@ -513,7 +513,7 @@ fn a_named_type_handle_belongs_to_its_declaration() {
     let old = b.if_(1, |s| s.define_type("t", int())).finish();
     b.if_(1, |s| {
         s.define_type("t", float());
-        s.line(pattern!("{x}", x = iris_build::validate(old)));
+        s.line(pattern!("{x}", x = gecode_iris_build::validate(old)));
     });
     assert_kind!(failure_of(b), BuildErrorKind::Scope);
 
@@ -748,7 +748,7 @@ fn a_store_defines_a_forward_handle() {
     assert_kind!(failure_of(b), BuildErrorKind::Binding);
 
     let mut b = SpecBuilder::unnamed();
-    let end: Field<Str, iris_build::D0, Maybe> = b.forward("end");
+    let end: Field<Str, gecode_iris_build::D0, Maybe> = b.forward("end");
     b.sections().until("END").store(end).body(|_| {});
     assert!(b.build().is_ok());
 

@@ -1,5 +1,5 @@
 [package]
-name = "iris-build"
+name = "gecode-iris-build"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -17,8 +17,8 @@ publish = false
 workspace = true
 
 [dependencies]
-iris-core = { version = "0.1.0", path = "../iris-core" }
-iris-macros = { version = "0.1.0", path = "../iris-macros" }
+gecode-iris-core = { version = "0.1.0", path = "../iris-core" }
+gecode-iris-macros = { version = "0.1.0", path = "../iris-macros" }
 
 [dev-dependencies]
-iris-syntax = { version = "0.1.0", path = "../iris-syntax" }
+gecode-iris-syntax = { version = "0.1.0", path = "../iris-syntax" }

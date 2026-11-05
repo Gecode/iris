@@ -71,7 +71,7 @@ fn dispatch(command: Command) -> u8 {
         Command::Check { spec } => check(spec),
         Command::Fmt(arguments) => fmt::run(arguments),
         Command::Gen(arguments) => generate::run(arguments),
-        Command::Lsp => match iris_lsp::run_stdio() {
+        Command::Lsp => match gecode_iris_lsp::run_stdio() {
             Ok(()) => 0,
             Err(error) => {
                 eprintln!("iris lsp: {error}");

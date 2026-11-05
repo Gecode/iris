@@ -1,4 +1,4 @@
-# iris-conformance
+# gecode-iris-conformance
 
 The shared conformance runner for Iris implementations, part of milestone M2
 in [PLAN.md §7.2](../../PLAN.md#72-runner-and-driver-protocol). It has no
@@ -9,8 +9,8 @@ The [conformance contract](../../conformance/README.md) defines the case format,
 driver protocol, runner commands, and grammar checks. From `rust/`:
 
 ```sh
-cargo test --locked -p iris-conformance
-cargo run --locked -p iris-conformance -- --help
+cargo test --locked -p gecode-iris-conformance
+cargo run --locked -p gecode-iris-conformance -- --help
 ```
 
 The runner embeds two Specification files in `embedded/0.1/`, so that the
@@ -26,8 +26,8 @@ change to those files, update the copies to match.
 [builder round trip](../README.md) checks what a generated builder prints:
 
 ```sh
-cargo run --locked -p iris-conformance -- compare left.iris right.iris
-cargo run --locked -p iris-conformance -- compare --manifest pairs.tsv
+cargo run --locked -p gecode-iris-conformance -- compare left.iris right.iris
+cargo run --locked -p gecode-iris-conformance -- compare --manifest pairs.tsv
 ```
 
 Both sides go through the recognizer of the embedded formal grammar, so the
@@ -48,7 +48,7 @@ recognized.
 one limit, `--cases N` or `--duration SECONDS`:
 
 ```sh
-cargo run --release --locked -p iris-conformance -- differential \
+cargo run --release --locked -p gecode-iris-conformance -- differential \
   --driver "\"$PWD/target/release/iris-driver\"" \
   --driver "\"$PWD/../cpp/build/asan/iris-driver\"" \
   --seed 7 --duration 600 --jobs 8 --keep /tmp/iris-differential \
@@ -86,7 +86,7 @@ Differential: seed=7 cases=12000 comparisons=48000 disagreements=0
 
 and counts per strategy, request and outcome kind. Usage and I/O errors exit
 2. `tests/differential.rs` checks the subcommand with the fake driver
-`tests/differential-driver.py`, and `iris-cli`'s
+`tests/differential-driver.py`, and `gecode-iris-cli`'s
 `tests/differential_generator.rs` checks that most generated specs are valid
 and read.
 

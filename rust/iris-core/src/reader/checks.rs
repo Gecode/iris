@@ -2,7 +2,7 @@
 use super::*;
 use crate::eval::{Evaluator, Kind, View};
 use crate::reader::repeat::RecordId;
-use iris_sema::{CheckInfo, Denotation};
+use gecode_iris_sema::{CheckInfo, Denotation};
 use std::fmt::Write;
 
 #[derive(Clone)]

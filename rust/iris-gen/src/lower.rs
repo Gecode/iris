@@ -4,8 +4,8 @@
 //! because the language's nesting limits are not a bound on this crate's stack.
 use std::collections::{HashMap, HashSet};
 
-use iris_sema::{Analysis, Denotation, Reference, RepeatId, Resolution};
-use iris_syntax::{
+use gecode_iris_sema::{Analysis, Denotation, Reference, RepeatId, Resolution};
+use gecode_iris_syntax::{
     DecodedString, Parse, SyntaxElement, SyntaxKind as K, SyntaxNode, SyntaxToken, TextSize,
     WalkEvent,
 };
@@ -17,7 +17,7 @@ use crate::program::{
 };
 
 /// The program of a spec, or the first error that `iris check` reports.
-pub fn lower(parsed: &Parse, analysis: &Analysis) -> Result<Program, iris_sema::Error> {
+pub fn lower(parsed: &Parse, analysis: &Analysis) -> Result<Program, gecode_iris_sema::Error> {
     if let Some(error) = analysis.first_error() {
         return Err(error.clone());
     }

@@ -1,9 +1,12 @@
-use iris_sema::{Error, ErrorCode};
-use iris_syntax::{DiagnosticCode, LanguageVersion};
+use gecode_iris_sema::{Error, ErrorCode};
+use gecode_iris_syntax::{DiagnosticCode, LanguageVersion};
 fn error(bytes: &[u8]) -> Error {
-    match iris_syntax::parse(bytes, "test", LanguageVersion::V0_1) {
-        Ok(parsed) => iris_sema::analyze(&parsed).first_error().unwrap().clone(),
-        Err(iris_syntax::ParseError::InvalidUtf8(d)) => Error::from(&d),
+    match gecode_iris_syntax::parse(bytes, "test", LanguageVersion::V0_1) {
+        Ok(parsed) => gecode_iris_sema::analyze(&parsed)
+            .first_error()
+            .unwrap()
+            .clone(),
+        Err(gecode_iris_syntax::ParseError::InvalidUtf8(d)) => Error::from(&d),
         Err(error) => panic!("{error}"),
     }
 }

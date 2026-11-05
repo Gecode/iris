@@ -1,8 +1,8 @@
 //! Lowering a reader spec to the language-independent program.
-use iris_gen::lower;
-use iris_gen::program::{Event, Name, NameKind, Program, RepeatNames};
-use iris_sema::analyze;
-use iris_syntax::{LanguageVersion, parse};
+use gecode_iris_gen::lower;
+use gecode_iris_gen::program::{Event, Name, NameKind, Program, RepeatNames};
+use gecode_iris_sema::analyze;
+use gecode_iris_syntax::{LanguageVersion, parse};
 
 fn program(source: &str) -> Program {
     let parsed = parse(source.as_bytes(), "test.iris", LanguageVersion::V0_1).unwrap();

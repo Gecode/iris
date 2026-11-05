@@ -3,10 +3,10 @@ use crate::{
     document::{Document, PositionEncoding, Positions},
     structure::{analyzed_document, respond, response_error},
 };
-use iris_sema::{
+use gecode_iris_sema::{
     DefinitionKind, Possibilities, Resolution, ScopeId, SemanticModel, ValueFacts, ValueType,
 };
-use iris_syntax::{SyntaxKind as K, SyntaxNode, SyntaxToken, TextRange, TextSize};
+use gecode_iris_syntax::{SyntaxKind as K, SyntaxNode, SyntaxToken, TextRange, TextSize};
 use lsp_server::{ErrorCode, Request, Response, ResponseError};
 use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionResponse, CompletionTextEdit, Documentation,
@@ -109,9 +109,9 @@ fn hover(
         let kind = match reference.resolution {
             Resolution::NamedType(_) => DefinitionKind::NamedType,
             Resolution::Structural { ref denotation, .. } => match denotation {
-                iris_sema::Denotation::Record(_) => DefinitionKind::EachRecord,
-                iris_sema::Denotation::RecordList(_) => DefinitionKind::RecordList,
-                iris_sema::Denotation::Value => DefinitionKind::Read,
+                gecode_iris_sema::Denotation::Record(_) => DefinitionKind::EachRecord,
+                gecode_iris_sema::Denotation::RecordList(_) => DefinitionKind::RecordList,
+                gecode_iris_sema::Denotation::Value => DefinitionKind::Read,
             },
             _ => DefinitionKind::Read,
         };
@@ -516,7 +516,7 @@ impl Visibility {
         }
     }
 
-    fn contains(&self, definition: &iris_sema::Definition, offset: TextSize) -> bool {
+    fn contains(&self, definition: &gecode_iris_sema::Definition, offset: TextSize) -> bool {
         match definition.kind {
             DefinitionKind::NamedType => {
                 self.ancestors[definition.scope.0] && definition.node.text_range().end() < offset

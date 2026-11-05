@@ -2,8 +2,8 @@
 mod presentation;
 mod preview;
 
-use iris_core::{Failure, Params, Spec};
-use iris_syntax::{FormatOptions, LanguageVersion};
+use gecode_iris_core::{Failure, Params, Spec};
+use gecode_iris_syntax::{FormatOptions, LanguageVersion};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::io::{self, Write};
@@ -81,7 +81,7 @@ pub fn read(request_json: &str) -> String {
         data.write_dzn(&mut dzn).map_err(output_failure)?;
         let mut summary = CappedWriter::default();
         let format_name = spec.format_name().filter(|name| !name.is_empty());
-        iris_core::summary::write_summary(
+        gecode_iris_core::summary::write_summary(
             &mut summary,
             &request.input_origin,
             format_name.as_deref(),
@@ -100,18 +100,18 @@ pub fn check(request_json: &str) -> String {
     respond(|| {
         let request: SpecRequest = decode(request_json)?;
         validate_spec(&request.language, &request.spec, &request.spec_origin)?;
-        let parsed = iris_syntax::parse(
+        let parsed = gecode_iris_syntax::parse(
             request.spec.as_bytes(),
             &request.spec_origin,
             LanguageVersion::V0_1,
         )
         .map_err(|error| host("resource", &error.to_string()))?;
         let colors = presentation::colors(&parsed, &request.spec);
-        let analysis = iris_sema::analyze(&parsed);
+        let analysis = gecode_iris_sema::analyze(&parsed);
         if let Some(error) = analysis.first_error() {
-            let core_error = iris_core::Error::from_spec(error);
+            let core_error = gecode_iris_core::Error::from_spec(error);
             return Ok(
-                json!({"kind":"language", "code":error.code.as_str(), "diagnostic":format!("{}\n", iris_sema::render_error(error, request.spec.as_bytes())), "range":presentation::range(error.range, &request.spec), "specLocation":core_error.spec_location(), "errorJson":error_json(&core_error), "colors":colors}),
+                json!({"kind":"language", "code":error.code.as_str(), "diagnostic":format!("{}\n", gecode_iris_sema::render_error(error, request.spec.as_bytes())), "range":presentation::range(error.range, &request.spec), "specLocation":core_error.spec_location(), "errorJson":error_json(&core_error), "colors":colors}),
             );
         }
         let suffix = parsed
@@ -130,7 +130,7 @@ pub fn format(request_json: &str) -> String {
     respond(|| {
         let request: SpecRequest = decode(request_json)?;
         validate_spec(&request.language, &request.spec, &request.spec_origin)?;
-        match iris_syntax::format(
+        match gecode_iris_syntax::format(
             request.spec.as_bytes(),
             &request.spec_origin,
             LanguageVersion::V0_1,
@@ -138,7 +138,7 @@ pub fn format(request_json: &str) -> String {
         ) {
             Ok(spec) => Ok(json!({"kind":"formatted", "spec":spec})),
             Err(error) => Ok(
-                json!({"kind":"formatError", "diagnostic":format!("{}\n", iris_sema::render_format_error(error, request.spec.as_bytes(), &request.spec_origin))}),
+                json!({"kind":"formatError", "diagnostic":format!("{}\n", gecode_iris_sema::render_format_error(error, request.spec.as_bytes(), &request.spec_origin))}),
             ),
         }
     })
@@ -175,7 +175,7 @@ fn validate_spec(language: &str, spec: &str, origin: &str) -> Result<(), Value> 
 fn host(category: &str, message: &str) -> Value {
     json!({"kind":"host", "category":category, "message":message})
 }
-fn error_json(error: &iris_core::Error) -> String {
+fn error_json(error: &gecode_iris_core::Error) -> String {
     String::from_utf8(error.to_json().expect("serializable diagnostic")).expect("JSON is UTF-8")
 }
 fn output_failure(_: impl std::fmt::Display) -> Value {

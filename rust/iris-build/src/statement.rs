@@ -1,6 +1,6 @@
 //! The statement stream: one flat list in text order, with blocks marked by
 //! openers and [`Stmt::Close`], so that every pass is a loop over it.
-use iris_core::handle::Str;
+use gecode_iris_core::handle::Str;
 use std::collections::{HashMap, HashSet};
 
 use crate::error::{Issue, IssueKind};

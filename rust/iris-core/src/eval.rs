@@ -4,8 +4,8 @@ use crate::{
     reader::{Interpreter, WorkKind, expression, tokens},
     value::LeafStorage,
 };
-use iris_sema::{DefinitionId, RepeatId};
-use iris_syntax::{SyntaxKind as K, SyntaxNode};
+use gecode_iris_sema::{DefinitionId, RepeatId};
+use gecode_iris_syntax::{SyntaxKind as K, SyntaxNode};
 use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},
@@ -312,7 +312,7 @@ impl<'a, 's, 'i> Evaluator<'a, 's, 'i> {
                         K::HostConstant => {
                             let token = &tokens(&node)[0];
                             let id = self.reader.spec.index.references[&token.text_range()];
-                            let iris_sema::Resolution::HostConstant(value) =
+                            let gecode_iris_sema::Resolution::HostConstant(value) =
                                 self.reader.spec.analysis.model.reference(id).resolution
                             else {
                                 unreachable!("constant")

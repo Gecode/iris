@@ -3,7 +3,7 @@
 //! that each expansion reads every case of its spec exactly as `Spec::parse`
 //! reads it.
 use gecode_iris::Spec;
-use iris_conformance::case::{self, Case, Operation};
+use gecode_iris_conformance::case::{self, Case, Operation};
 use std::{
     collections::BTreeMap,
     fmt::Write,

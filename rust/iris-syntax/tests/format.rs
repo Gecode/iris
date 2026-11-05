@@ -1,6 +1,6 @@
 mod support;
 
-use iris_syntax::{FormatError, FormatOptions, LanguageVersion, format};
+use gecode_iris_syntax::{FormatError, FormatOptions, LanguageVersion, format};
 use support::checked;
 
 #[test]
@@ -319,7 +319,7 @@ fn joined_header_suffixes_are_measured() {
 
 #[test]
 fn statement_widths_around_flat_size() {
-    use iris_syntax::{SyntaxKind as K, parse};
+    use gecode_iris_syntax::{SyntaxKind as K, parse};
     let source = include_str!("fixtures/format/rules.iris");
     let flat = checked(source, usize::MAX);
     let parsed = parse(flat.as_bytes(), "flat", LanguageVersion::V0_1).unwrap();

@@ -15,8 +15,8 @@ safe, fast code that compiles to native targets and WASM
 
 Rust is the reference implementation. Its parser is lossless and
 error-tolerant from the start, using a rowan concrete syntax tree.
-`iris-syntax` owns lexing, parsing, and formatting; `iris-sema` owns
-resolution and diagnostics; `iris-core` owns reading, evaluation, the data
+`gecode-iris-syntax` owns lexing, parsing, and formatting; `gecode-iris-sema` owns
+resolution and diagnostics; `gecode-iris-core` owns reading, evaluation, the data
 model, work budgets, and output.
 
 The CLI, language server, playground, and Python binding use these layers.

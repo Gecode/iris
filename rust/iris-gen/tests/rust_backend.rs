@@ -1,7 +1,7 @@
 //! The Rust text of each production and each identifier rule.
-use iris_gen::{Language, builder_code};
-use iris_sema::analyze;
-use iris_syntax::{LanguageVersion, parse};
+use gecode_iris_gen::{Language, builder_code};
+use gecode_iris_sema::analyze;
+use gecode_iris_syntax::{LanguageVersion, parse};
 
 mod equal_operands;
 

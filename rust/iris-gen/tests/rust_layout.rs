@@ -13,9 +13,9 @@ use std::{
     thread,
 };
 
-use iris_gen::{Language, builder_code};
-use iris_sema::analyze;
-use iris_syntax::{LanguageVersion, parse};
+use gecode_iris_gen::{Language, builder_code};
+use gecode_iris_sema::analyze;
+use gecode_iris_syntax::{LanguageVersion, parse};
 
 mod layout_forms;
 

@@ -1,6 +1,6 @@
 //! CST indexing shared by the checker, resolver, and fact inference.
 use crate::model::*;
-use iris_syntax::{SyntaxKind as K, SyntaxNode, SyntaxToken, TextSize};
+use gecode_iris_syntax::{SyntaxKind as K, SyntaxNode, SyntaxToken, TextSize};
 use std::collections::HashMap;
 
 pub(crate) fn tokens(node: &SyntaxNode) -> Vec<SyntaxToken> {

@@ -31,7 +31,7 @@ pub fn run_stdio() -> Result<()> {
 }
 
 #[cfg(test)]
-extern crate self as iris_lsp;
+extern crate self as gecode_iris_lsp;
 
 #[cfg(test)]
 #[allow(dead_code)]

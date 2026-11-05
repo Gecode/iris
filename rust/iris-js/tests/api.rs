@@ -1,4 +1,4 @@
-use iris_core::{Params, Spec};
+use gecode_iris_core::{Params, Spec};
 use iris_js::{SpecHandle, render_dzn, render_json, transfer};
 use serde_json::Value as Json;
 

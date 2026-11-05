@@ -1,5 +1,5 @@
-use iris_sema::render_format_error;
-use iris_syntax::{FormatOptions, LanguageVersion};
+use gecode_iris_sema::render_format_error;
+use gecode_iris_syntax::{FormatOptions, LanguageVersion};
 use std::{
     fs,
     io::{self, Read, Write},
@@ -127,13 +127,14 @@ fn format_source(
         None => FormatOptions::default(),
     };
     let origin_text = origin.to_string_lossy();
-    let formatted = match iris_syntax::format(bytes, &origin_text, LanguageVersion::V0_1, options) {
-        Ok(formatted) => formatted,
-        Err(error) => {
-            eprintln!("{}", render_format_error(error, bytes, &origin_text));
-            return Ok(false);
-        }
-    };
+    let formatted =
+        match gecode_iris_syntax::format(bytes, &origin_text, LanguageVersion::V0_1, options) {
+            Ok(formatted) => formatted,
+            Err(error) => {
+                eprintln!("{}", render_format_error(error, bytes, &origin_text));
+                return Ok(false);
+            }
+        };
     let changed = formatted.as_bytes() != bytes;
     if arguments.diff {
         if changed {

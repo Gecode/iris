@@ -1,6 +1,6 @@
 //! Typed handles and the names behind them.
-use iris_core::handle::{self, D0, Depth, Dyn, DynDepth, Leaf, Maybe, Presence, Required};
-use iris_core::{AccessError, Data, Handle};
+use gecode_iris_core::handle::{self, D0, Depth, Dyn, DynDepth, Leaf, Maybe, Presence, Required};
+use gecode_iris_core::{AccessError, Data, Handle};
 use std::collections::HashSet;
 use std::fmt;
 use std::marker::PhantomData;

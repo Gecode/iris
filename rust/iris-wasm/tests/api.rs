@@ -11,9 +11,13 @@ fn exact_documents_and_decimal_table_values() {
     let input = "9007199254740993 9223372036854775807 -9223372036854775808";
     let output = read(source, input);
     assert_eq!(output["kind"], "success");
-    let spec = iris_core::Spec::parse(source.as_bytes(), "spec.iris").unwrap();
+    let spec = gecode_iris_core::Spec::parse(source.as_bytes(), "spec.iris").unwrap();
     let data = spec
-        .read(input.as_bytes(), "input.txt", &iris_core::Params::new())
+        .read(
+            input.as_bytes(),
+            "input.txt",
+            &gecode_iris_core::Params::new(),
+        )
         .unwrap();
     assert_eq!(
         output["json"],
@@ -32,9 +36,9 @@ fn errors_keep_cli_bytes_and_host_distinctions() {
     let result = read("x: int", "bad");
     assert_eq!(result["kind"], "language");
     assert!(result["diagnostic"].as_str().unwrap().contains('^'));
-    let spec = iris_core::Spec::parse(b"x: int", "spec.iris").unwrap();
-    let iris_core::Failure::Language(error) = spec
-        .read(b"bad", "input.txt", &iris_core::Params::new())
+    let spec = gecode_iris_core::Spec::parse(b"x: int", "spec.iris").unwrap();
+    let gecode_iris_core::Failure::Language(error) = spec
+        .read(b"bad", "input.txt", &gecode_iris_core::Params::new())
         .unwrap_err()
     else {
         panic!()

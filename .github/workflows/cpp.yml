@@ -289,7 +289,7 @@ jobs:
           restore-keys: |
             cpp-differential-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
       - name: Build the Rust driver and the runner
-        run: cargo build --release --locked -p iris-cli -p iris-conformance
+        run: cargo build --release --locked -p gecode-iris-cli -p gecode-iris-conformance
       - name: Configure the sanitized C++ driver
         working-directory: cpp
         env:

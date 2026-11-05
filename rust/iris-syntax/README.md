@@ -1,6 +1,6 @@
-# iris-syntax
+# gecode-iris-syntax
 
-`iris-syntax` validates reader-spec bytes, parses Iris 0.1 into a lossless
+`gecode-iris-syntax` validates reader-spec bytes, parses Iris 0.1 into a lossless
 rowan concrete syntax tree, and formats reader specs. Broken syntax yields a tree and
 diagnostics so reading tools, the language server, and the formatter can share
 one parser. This is part of milestone M3; see
@@ -10,13 +10,13 @@ one parser. This is part of milestone M3; see
 The language contract is the [Specification](../../spec/0.1/README.md).
 
 ```rust
-use iris_syntax::{LanguageVersion, parse};
+use gecode_iris_syntax::{LanguageVersion, parse};
 
 let source = b"line \"n={n:0..}\"";
 let parsed = parse(source, "numbers.iris", LanguageVersion::V0_1)?;
 assert_eq!(parsed.syntax().text().to_string().as_bytes(), source);
 assert!(parsed.diagnostics().is_empty());
-# Ok::<(), iris_syntax::ParseError>(())
+# Ok::<(), gecode_iris_syntax::ParseError>(())
 ```
 
 The version is an explicit parameter; only `LanguageVersion::V0_1` exists.
@@ -38,7 +38,7 @@ from rowan's representation, separate from language diagnostics.
 
 Zero syntax diagnostics is necessary for full parse success. Name resolution,
 name conflicts, reading-type compatibility, and record scopes belong to
-`iris-sema`. In particular, `x:unknown`, `a[1]:rest`, and
+`gecode-iris-sema`. In particular, `x:unknown`, `a[1]:rest`, and
 `type t=alphabet "ab" line "{x:t}"` retain syntax for that later analysis.
 The parser only tracks completed named-type spellings to select the grammar's
 type alternative; it does not resolve aliases. Fixed function names, call forms
@@ -71,7 +71,7 @@ whole line patterns (including capture whitespace), comments, token spellings,
 and statement order are preserved.
 
 ```rust
-use iris_syntax::{FormatOptions, LanguageVersion, format};
+use gecode_iris_syntax::{FormatOptions, LanguageVersion, format};
 
 let output = format(
     b"repeat 2 {x:int}",
@@ -80,7 +80,7 @@ let output = format(
     FormatOptions::default(),
 )?;
 assert_eq!(output, "repeat 2 {\n  x: int\n}\n");
-# Ok::<(), iris_syntax::FormatError>(())
+# Ok::<(), gecode_iris_syntax::FormatError>(())
 ```
 
 `FormatOptions` contains only `line_width`, defaulting to 100. Width counts
@@ -140,9 +140,9 @@ From `rust/`, run the workspace build, formatting, Clippy, and test commands in
 [the workspace README](../README.md). Focused syntax checks:
 
 ```sh
-cargo test --locked -p iris-syntax
-cargo test --locked -p iris-syntax repository_losslessness -- --nocapture
-cargo test --locked -p iris-syntax fixture_truncation_sweep -- --nocapture
+cargo test --locked -p gecode-iris-syntax
+cargo test --locked -p gecode-iris-syntax repository_losslessness -- --nocapture
+cargo test --locked -p gecode-iris-syntax fixture_truncation_sweep -- --nocapture
 ```
 
 Tests cover lexical boundaries, contextual keywords, range lookahead, statement
@@ -163,7 +163,7 @@ conformance or invoke an implementation driver.
 each syntax-clean source it checks widths 40, 80 and 100 for idempotence, the
 same CST without whitespace, and byte-identical protected text. It reports
 syntax-clean, syntax-invalid and invalid UTF-8 counts separately. Run it with
-`cargo test --locked -p iris-syntax repository_formatting -- --nocapture` to see
+`cargo test --locked -p gecode-iris-syntax repository_formatting -- --nocapture` to see
 the counts. Formatter tests also reproduce all 22 guide pairs at their stated
 widths, compare [rule snapshots](tests/fixtures/format/README.md), and exercise
 range widening and error isolation. No test rewrites reader specs in place.

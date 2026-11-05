@@ -3,8 +3,8 @@ use crate::{
     document::{Document, Positions},
     formatting,
 };
-use iris_core::{CancellationToken, Failure, HostError, Params, ReadOptions, Spec, summary};
-use iris_syntax::{SyntaxKind, SyntaxNode, TextRange, TextSize};
+use gecode_iris_core::{CancellationToken, Failure, HostError, Params, ReadOptions, Spec, summary};
+use gecode_iris_syntax::{SyntaxKind, SyntaxNode, TextRange, TextSize};
 use lsp_types::{
     Diagnostic, DiagnosticSeverity, Hover, HoverContents, InlayHint, InlayHintLabel,
     InlayHintTooltip, MarkupContent, MarkupKind, NumberOrString, Uri,
@@ -507,10 +507,10 @@ mod tests {
                 "a".repeat(n * 32),
                 "# iris: sample \"with spaces\" instance=2 param p=3 unknown\n".repeat(n)
             );
-            let parsed = iris_syntax::parse(
+            let parsed = gecode_iris_syntax::parse(
                 source.as_bytes(),
                 "spec",
-                iris_syntax::LanguageVersion::V0_1,
+                gecode_iris_syntax::LanguageVersion::V0_1,
             )
             .unwrap();
             let positions =

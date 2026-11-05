@@ -11,8 +11,8 @@ mod rust;
 use std::fmt;
 use std::str::FromStr;
 
-use iris_sema::Analysis;
-use iris_syntax::Parse;
+use gecode_iris_sema::Analysis;
+use gecode_iris_syntax::Parse;
 
 pub use lower::lower;
 use program::Program;
@@ -70,7 +70,7 @@ pub fn builder_code(
     parsed: &Parse,
     analysis: &Analysis,
     language: Language,
-) -> Result<String, iris_sema::Error> {
+) -> Result<String, gecode_iris_sema::Error> {
     let program = lower(parsed, analysis)?;
     Ok(match language {
         Language::Rust => rust::RustBackend.render(&program),

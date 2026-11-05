@@ -2,7 +2,7 @@ use crate::{
     document::{Document, PositionEncoding, Positions},
     semantic_tokens,
 };
-use iris_syntax::{SyntaxKind as K, SyntaxNode, TextRange};
+use gecode_iris_syntax::{SyntaxKind as K, SyntaxNode, TextRange};
 use lsp_server::{ErrorCode, Request, Response, ResponseError};
 use lsp_types::{
     DocumentSymbol, DocumentSymbolResponse, FoldingRange, FoldingRangeKind, Location,

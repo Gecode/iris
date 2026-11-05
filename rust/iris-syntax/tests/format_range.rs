@@ -1,5 +1,5 @@
 mod support;
-use iris_syntax::{
+use gecode_iris_syntax::{
     FormatError, FormatOptions, LanguageVersion, RangeFormat, SyntaxKind, TextRange, TextSize,
     format, format_range, parse,
 };

@@ -122,7 +122,7 @@ class IrisPluginTest : BasePlatformTestCase() {
             PlatformTestUtil.waitWithEventsDispatching("Iris install notification", { received.isNotEmpty() }, 10)
             val notification = received.single()
             assertEquals("Iris executable not found", notification.title)
-            assertTrue(notification.content.contains("cargo build --locked -p iris-cli --bin iris"))
+            assertTrue(notification.content.contains("cargo build --locked -p gecode-iris-cli --bin iris"))
             assertTrue(notification.content.contains("Executable path"))
             assertTrue(notification.content.contains("PATH"))
             assertTrue(notification.actions.any { it.templatePresentation.text == "Configure Iris" })

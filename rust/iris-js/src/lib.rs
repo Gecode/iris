@@ -3,7 +3,7 @@
 //! A [`SpecHandle`] parses a reader spec once and reads many inputs. Reads
 //! return data in the binary layout of [`transfer`], which JavaScript copies
 //! into its own objects, and [`render_json`] and [`render_dzn`] render that
-//! layout through iris-core on request.
+//! layout through gecode-iris-core on request.
 //!
 //! Every failure is a JSON envelope in the `Err` string, which JavaScript
 //! receives as a thrown string:
@@ -23,7 +23,7 @@
 //! trap that a bug would cause; the published module never has it.
 pub mod transfer;
 
-use iris_core::{Data, Failure, HostError, Params, Spec};
+use gecode_iris_core::{Data, Failure, HostError, Params, Spec};
 use serde_json::json;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::wasm_bindgen;

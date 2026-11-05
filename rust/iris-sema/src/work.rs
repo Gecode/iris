@@ -13,7 +13,7 @@ pub(crate) fn record() {
 mod tests {
     use super::OPERATIONS;
     use crate::{DefinitionId, Resolution, ValueFacts, ValueType};
-    use iris_syntax::LanguageVersion;
+    use gecode_iris_syntax::LanguageVersion;
 
     fn repetition_work(statement: &str, repetitions: usize) -> usize {
         let source = if statement == "x:int\n" {
@@ -22,7 +22,7 @@ mod tests {
             format!("let x=0\n{}let result=x\n", statement.repeat(repetitions))
         };
         let parsed =
-            iris_syntax::parse(source.as_bytes(), "scaling", LanguageVersion::V0_1).unwrap();
+            gecode_iris_syntax::parse(source.as_bytes(), "scaling", LanguageVersion::V0_1).unwrap();
         OPERATIONS.with(|operations| operations.set(0));
         let analysis = crate::analyze(&parsed);
         let work = OPERATIONS.with(|operations| operations.get());
@@ -64,7 +64,7 @@ mod tests {
 #[cfg(test)]
 mod container_tests {
     use super::OPERATIONS;
-    use iris_syntax::LanguageVersion;
+    use gecode_iris_syntax::LanguageVersion;
 
     fn source(family: &str, n: usize) -> String {
         match family {
@@ -103,7 +103,7 @@ mod container_tests {
     fn work(family: &str, n: usize) -> usize {
         let source = source(family, n);
         let parsed =
-            iris_syntax::parse(source.as_bytes(), "scaling", LanguageVersion::V0_1).unwrap();
+            gecode_iris_syntax::parse(source.as_bytes(), "scaling", LanguageVersion::V0_1).unwrap();
         OPERATIONS.with(|count| count.set(0));
         let analysis = crate::analyze(&parsed);
         assert!(analysis.is_valid(), "{:?}", analysis.diagnostics);

@@ -5,8 +5,8 @@ use gecode_iris::build::{
     max, min, size, sum, word,
 };
 use gecode_iris::{Data, Failure, Params, Spec};
-use iris_conformance::canonical::{Outcome, OutcomeKind};
-use iris_conformance::case::Case;
+use gecode_iris_conformance::canonical::{Outcome, OutcomeKind};
+use gecode_iris_conformance::case::Case;
 use std::{fs, path::Path};
 
 fn case(path: &str) -> Case {

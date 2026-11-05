@@ -1,4 +1,4 @@
-use iris_core::Data;
+use gecode_iris_core::Data;
 use serde::Serialize;
 
 const ENTRY_LIMIT: usize = 64;

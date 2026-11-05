@@ -1,4 +1,4 @@
-use iris_syntax::{LanguageVersion, parse};
+use gecode_iris_syntax::{LanguageVersion, parse};
 use std::{collections::BTreeSet, ffi::OsStr, fs, path::PathBuf, process::Command};
 
 #[test]

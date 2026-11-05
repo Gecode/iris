@@ -1,34 +1,34 @@
-# iris-cli
+# gecode-iris-cli
 
 The `iris` command and Rust conformance driver, part of milestone M3 in
 [PLAN.md §8.1](../../PLAN.md#81-rust-rust) and the [§4.2
 layers](../../PLAN.md#42-the-rust-reference-implementation-is-layered). The
 user command checks and formats reader specs, reads inputs through
-[iris-core](../iris-core/README.md), and starts the language server. The driver
+[gecode-iris-core](../iris-core/README.md), and starts the language server. The driver
 implements parse-and-resolve, reading, catalog, and dzn output. Parse-only
 requests never execute expressions or parameter defaults.
 
 From `rust/`:
 
 ```sh
-cargo run --locked -p iris-cli -- --version
-cargo run --locked -p iris-cli -- lsp
-cargo run --locked -p iris-cli -- check path/to/spec.iris
-cargo run --locked -p iris-cli -- read path/to/spec.iris path/to/input.txt
-cargo run --locked -p iris-cli -- read path/to/spec.iris path/to/input.txt --summary
-cargo run --locked -p iris-cli -- read path/to/spec.iris path/to/input.txt --json --param instance=2
-cargo run --locked -p iris-cli -- read path/to/spec.iris path/to/input.txt --dzn
-cargo run --locked -p iris-cli -- list path/to/spec.iris path/to/input.txt
-cargo run --locked -p iris-cli -- list path/to/spec.iris path/to/input.txt --dzn
-cargo run --locked -p iris-cli -- fmt path/to/spec.iris
-cargo run --locked -p iris-cli -- fmt --check --diff path/to/directory
-cargo run --locked -p iris-cli -- gen builder --lang rust path/to/spec.iris
-cargo run --locked -p iris-cli --bin iris-driver -- parse path/to/spec.iris --version 0.1
-cargo run --locked -p iris-cli -- conformance target/debug/iris-driver ../conformance/cases/0.1/smoke
-cargo test --locked -p iris-cli
-cargo test --locked -p iris-cli --test complete
-cargo test --locked -p iris-cli --test gen
-cargo test --locked -p iris-cli --test parse_conformance -- --nocapture
+cargo run --locked -p gecode-iris-cli -- --version
+cargo run --locked -p gecode-iris-cli -- lsp
+cargo run --locked -p gecode-iris-cli -- check path/to/spec.iris
+cargo run --locked -p gecode-iris-cli -- read path/to/spec.iris path/to/input.txt
+cargo run --locked -p gecode-iris-cli -- read path/to/spec.iris path/to/input.txt --summary
+cargo run --locked -p gecode-iris-cli -- read path/to/spec.iris path/to/input.txt --json --param instance=2
+cargo run --locked -p gecode-iris-cli -- read path/to/spec.iris path/to/input.txt --dzn
+cargo run --locked -p gecode-iris-cli -- list path/to/spec.iris path/to/input.txt
+cargo run --locked -p gecode-iris-cli -- list path/to/spec.iris path/to/input.txt --dzn
+cargo run --locked -p gecode-iris-cli -- fmt path/to/spec.iris
+cargo run --locked -p gecode-iris-cli -- fmt --check --diff path/to/directory
+cargo run --locked -p gecode-iris-cli -- gen builder --lang rust path/to/spec.iris
+cargo run --locked -p gecode-iris-cli --bin iris-driver -- parse path/to/spec.iris --version 0.1
+cargo run --locked -p gecode-iris-cli -- conformance target/debug/iris-driver ../conformance/cases/0.1/smoke
+cargo test --locked -p gecode-iris-cli
+cargo test --locked -p gecode-iris-cli --test complete
+cargo test --locked -p gecode-iris-cli --test gen
+cargo test --locked -p gecode-iris-cli --test parse_conformance -- --nocapture
 ```
 
 `iris check SPEC` prints `SPEC: ok`, optionally with the format name, and exits
@@ -41,7 +41,7 @@ Usage errors exit 2; file acquisition and resource failures exit 1.
 `iris --version` reports the Cargo package version and supported language versions
 (currently `iris 0.1.0 (languages: 0.1)`).
 
-The command runs in the library: `iris_cli::run(args)` takes the process
+The command runs in the library: `gecode_iris_cli::run(args)` takes the process
 arguments, program name first, and returns the exit status as a `u8`. It
 writes to the process's standard output and error, flushes standard output
 before it returns, and never exits the process. Help and usage messages name
@@ -86,7 +86,7 @@ modes).
 ## Conformance
 
 `iris conformance DRIVER [ROOTS...] [--driver-id ID] [--filter TEXT]
-[--version 0.1] [--timeout SECONDS]` reuses the `iris-conformance` library.
+[--version 0.1] [--timeout SECONDS]` reuses the `gecode-iris-conformance` library.
 It prints the same case lines and final report as `iris-conformance run`.
 The driver is a command string split using shell quoting, with no shell
 execution or expansion; quote paths with spaces inside the string. Roots are
@@ -108,7 +108,7 @@ driver protocol details.
 ## Language server
 
 `iris lsp` serves framed LSP over stdin/stdout through
-[iris-lsp](../iris-lsp/README.md), with parse and resolution diagnostics.
+[gecode-iris-lsp](../iris-lsp/README.md), with parse and resolution diagnostics.
 See that crate's README for editor startup, synchronization, and encodings.
 Errors go to stderr; the server exits 0 after shutdown/exit, or 1 on failure.
 
@@ -169,7 +169,7 @@ temporary directory cannot affect results.
 
 `iris gen builder --lang LANGUAGE SPEC` prints a program that builds the reader
 spec with the spec builder of that language, through
-[iris-gen](../iris-gen/README.md). Rust is the only language so far. The program
+[gecode-iris-gen](../iris-gen/README.md). Rust is the only language so far. The program
 is a complete file: its `builder` function returns the `SpecBuilder`, and its
 `main` prints the spec's source.
 
@@ -240,7 +240,7 @@ roots through `iris-conformance run` against the built driver on every push
 and pull request, on Ubuntu and macOS, alongside the Gecode adapter runs.
 
 ```sh
-cargo test --locked -p iris-cli --test read_conformance -- --nocapture
+cargo test --locked -p gecode-iris-cli --test read_conformance -- --nocapture
 ```
 
 Read and catalog enforce [Specification §10's work budgets](../../spec/0.1/10-work-budgets.md):
@@ -276,7 +276,7 @@ mismatch. Build the pinned adapter from the repository root, then run from
 
 ```sh
 adapter=$(../conformance/adapters/gecode/build.sh)
-GECODE_ADAPTER="$adapter" cargo test --locked -p iris-cli --test scalar_differential -- --ignored --nocapture
+GECODE_ADAPTER="$adapter" cargo test --locked -p gecode-iris-cli --test scalar_differential -- --ignored --nocapture
 ```
 
 Checks execute immediately outside instances. False checks report a saved

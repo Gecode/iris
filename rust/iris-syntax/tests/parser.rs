@@ -1,4 +1,4 @@
-use iris_syntax::{
+use gecode_iris_syntax::{
     DiagnosticCode as C, DiagnosticPhase, LanguageVersion, Parse, ParseError, SyntaxKind as K,
     SyntaxNode, parse,
 };

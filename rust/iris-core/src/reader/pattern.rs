@@ -1,6 +1,6 @@
 use super::*;
 use crate::input::{Line, is_line_blank, is_word_byte};
-use iris_sema::ReadingKind;
+use gecode_iris_sema::ReadingKind;
 
 /// Decoded scanner metadata over the existing pattern CST. Bounds retain their
 /// original nodes; only a selected match may evaluate them.

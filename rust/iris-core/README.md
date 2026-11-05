@@ -1,13 +1,13 @@
-# iris-core
+# gecode-iris-core
 
 Input reading, expression evaluation, column data, canonical JSON, and dzn
 output for Iris 0.1. This is the runtime layer in [PLAN.md
 §4.2](../../PLAN.md#42-the-rust-reference-implementation-is-layered), part of
-milestone M3 ([§8.1](../../PLAN.md#81-rust-rust)). It depends on `iris-syntax`
-and `iris-sema`; parsing and resolution use their existing APIs.
+milestone M3 ([§8.1](../../PLAN.md#81-rust-rust)). It depends on `gecode-iris-syntax`
+and `gecode-iris-sema`; parsing and resolution use their existing APIs.
 
 ```rust
-use iris_core::{Params, Spec};
+use gecode_iris_core::{Params, Spec};
 
 let spec = Spec::parse(b"x:int let square=x^2", "scalar.iris")?;
 let data = spec.read(b"7", "input.txt", &Params::new())?;
@@ -81,7 +81,7 @@ word/rest values are validated again after byte-wise tokenization.
 `i64`, `&[i64]`, `Array` for deeper entries, `Option` for one that may be absent,
 or `ValueRef` where the depth is open. `Data::try_get` reports a handle that does
 not match the data. The `handle` module holds the markers these views are built
-from; [iris-build](../iris-build/README.md) creates the handles.
+from; [gecode-iris-build](../iris-build/README.md) creates the handles.
 
 Values store typed contiguous leaves and cumulative offsets for each array
 level, preserving ragged rows, empty arrays, value types, and depths.
@@ -188,9 +188,9 @@ including signed zero, subnormals, and the appendix C.4 correction just below
 From `rust/`:
 
 ```sh
-cargo test --locked -p iris-core
-cargo test --locked -p iris-core budget -- --nocapture
-cargo test --locked -p iris-cli --test read_conformance -- --nocapture
+cargo test --locked -p gecode-iris-core
+cargo test --locked -p gecode-iris-core budget -- --nocapture
+cargo test --locked -p gecode-iris-cli --test read_conformance -- --nocapture
 ```
 
 Conformance is the main semantic coverage. A focused column-access test checks

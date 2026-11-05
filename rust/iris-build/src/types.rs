@@ -1,5 +1,5 @@
 //! Reading types and the options of a declaration.
-use iris_core::handle::{D0, Depth, DynDepth, Float, Int, Num, Str};
+use gecode_iris_core::handle::{D0, Depth, DynDepth, Float, Int, Num, Str};
 use std::marker::PhantomData;
 use std::ops::{Range, RangeFrom, RangeInclusive, RangeTo, RangeToInclusive};
 

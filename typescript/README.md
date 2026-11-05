@@ -4,7 +4,7 @@ The npm package `gecode-iris` gives JavaScript and TypeScript the Rust
 reference implementation, compiled to WebAssembly from the crate
 [`rust/iris-js`](../rust/iris-js/README.md). The package adds no reader
 behavior: parsing, reading, errors, canonical JSON and dzn all come from
-iris-core, so a conformance difference is a binding bug. `PLAN.md` §8.16
+gecode-iris-core, so a conformance difference is a binding bug. `PLAN.md` §8.16
 describes the package; milestone M4f builds it.
 
 ```ts
@@ -178,7 +178,7 @@ policy.
   order. With the option `{ bigint: true }`, both return integers as `bigint`.
 - `data.toJSON()` returns the canonical JSON document, ending in a newline, and
   `data.toDzn()` returns the dzn text of the Specification's appendix B. Both
-  are rendered by iris-core when called. `JSON.stringify(data)` calls `toJSON`
+  are rendered by gecode-iris-core when called. `JSON.stringify(data)` calls `toJSON`
   and so produces the document as one JSON string; write `data.toJSON()`
   directly instead.
 - Every accessor returns a copy, so changing a returned array never changes the
@@ -363,8 +363,8 @@ public API. From the repository root, it passes every case with no driver ID or
 exemptions:
 
 ```sh
-(cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$(command -v node)\" \"$PWD/../typescript/test/conformance-driver.ts\"" ../conformance/cases/0.1)
-(cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$(command -v node)\" \"$PWD/../typescript/test/conformance-driver.ts\"" ../formats)
+(cd rust && cargo run --locked -p gecode-iris-conformance -- run --driver "\"$(command -v node)\" \"$PWD/../typescript/test/conformance-driver.ts\"" ../conformance/cases/0.1)
+(cd rust && cargo run --locked -p gecode-iris-conformance -- run --driver "\"$(command -v node)\" \"$PWD/../typescript/test/conformance-driver.ts\"" ../formats)
 ```
 
 ## Code style
