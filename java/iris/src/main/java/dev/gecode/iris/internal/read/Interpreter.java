@@ -30,7 +30,9 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 
-/** Runs a reader spec on an input and returns the data read (§9). */
+/**
+ * Runs a reader spec on an input and returns the data read or the catalog of its instances (§9).
+ */
 public final class Interpreter {
   private final Program program;
   private final Resolution resolution;
@@ -66,8 +68,11 @@ public final class Interpreter {
   /** Whether the selected instance has been read. */
   private boolean isSelectedRead = false;
 
+  /** What a catalog found so far, or null during a read. */
+  private @Nullable Catalog catalog = null;
+
   /**
-   * Prepares a read of {@code text}.
+   * Prepares a read or a catalog of {@code text}.
    *
    * @param program the reader spec
    * @param resolution what the reader spec refers to
@@ -101,6 +106,32 @@ public final class Interpreter {
    * @throws IrisException for the first error
    */
   public SequencedMap<String, Stored> run() {
+    execute();
+    SequencedMap<String, Stored> data = new LinkedHashMap<>();
+    execution
+        .frame(0)
+        .forEach((name, value) -> {
+          if (!Resolution.isInternal(name)) {
+            data.put(name, value);
+          }
+        });
+    return data;
+  }
+
+  /**
+   * Runs the reader spec on every instance of the input, keeping none of their values (§9.6).
+   *
+   * @return the entries of the catalog, in order
+   * @throws IrisException for the first error that is not a rejection in an instance
+   */
+  public SequencedMap<String, Stored> catalog() {
+    Catalog result = new Catalog();
+    catalog = result;
+    execute();
+    return result.entries();
+  }
+
+  private void execute() {
     // A misspelt parameter would otherwise be ignored silently.
     for (String name : params.keySet()) {
       if (!resolution.parameters().contains(name)) {
@@ -122,15 +153,6 @@ public final class Interpreter {
       throw execution.inputFailure(
           ErrorCode.TRAILING_INPUT, "unexpected input after the end of the spec: " + quote(rest));
     }
-    SequencedMap<String, Stored> data = new LinkedHashMap<>();
-    execution
-        .frame(0)
-        .forEach((name, value) -> {
-          if (!Resolution.isInternal(name)) {
-            data.put(name, value);
-          }
-        });
-    return data;
   }
 
   private void run(List<Stmt> block) {
@@ -368,11 +390,15 @@ public final class Interpreter {
 
   /**
    * Tests whether the instance being read may not be the selected one. When selecting by name, it
-   * is the selected one if it has the name, and may not be while the name is not defined yet.
+   * is the selected one if it has the name, and may not be while the name is not defined yet. A
+   * catalog selects no instance.
    */
   private boolean mayBeSkipped() {
     if (current == 0) {
       return false;
+    }
+    if (catalog != null) {
+      return true;
     }
     String name = wanted;
     if (name == null) {
@@ -387,13 +413,17 @@ public final class Interpreter {
   /**
    * Rejects the instance being read with {@code error}. Reading stops, unless the instance may not
    * be the selected one: then the first rejection is kept, and reading continues (see {@link
-   * #instances}). The error is only made if it is needed, as an instance can be rejected often.
+   * #instances}). A catalog keeps its {@code summary} instead of the error. Both are only made if
+   * they are needed, as an instance can be rejected often.
    */
-  private void reject(Supplier<IrisException> error) {
+  private void reject(Supplier<IrisException> error, Supplier<String> summary) {
     if (!mayBeSkipped()) {
       throw error.get();
     }
-    if (deferred == null) {
+    Catalog listing = catalog;
+    if (listing != null) {
+      listing.reject(summary);
+    } else if (deferred == null) {
       deferred = error.get();
     }
   }
@@ -401,8 +431,15 @@ public final class Interpreter {
   /** {@code check e "message"}. */
   private void check(Stmt.Check s) {
     if (!evaluator.holds(s)) {
-      reject(() -> evaluator.failure(s));
+      reject(() -> evaluator.failure(s), () -> checkSummary(s));
     }
+  }
+
+  private static String checkSummary(Stmt.Check s) {
+    String message = s.message();
+    return message == null || message.isEmpty()
+        ? "check on line " + s.line() + " of the spec"
+        : message;
   }
 
   /*
@@ -443,6 +480,8 @@ public final class Interpreter {
    * <p>A rejection of an instance that is not the selected one does not stop reading, so that an
    * invalid instance does not hide the ones after it. Other errors do, as the input cannot be read
    * on.
+   *
+   * <p>A catalog reads every instance and keeps none of them, whatever the selection says.
    */
   private void instances(Stmt.Instances s) {
     String selection = params.get("instance");
@@ -463,7 +502,9 @@ public final class Interpreter {
       if (input.position() == start) {
         throw execution.failure(ErrorCode.NO_PROGRESS, "an instance must read some input");
       }
-      if (isChosen(count, frame, selection)) {
+      if (catalog != null) {
+        catalog.finishInstance(instanceName(frame));
+      } else if (isChosen(count, frame, selection)) {
         // An instance selected by name may have been rejected before its name was known.
         IrisException rejection = deferred;
         if (rejection != null) {
@@ -475,6 +516,10 @@ public final class Interpreter {
           return;
         }
       }
+    }
+    if (catalog != null) {
+      catalog.setInstances(count);
+      return;
     }
     if (count == 0) {
       throw execution.failure(ErrorCode.INSTANCE_EMPTY, "the file contains no instance");
@@ -637,11 +682,17 @@ public final class Interpreter {
       String source = arm.pattern().source();
       if (seen[found] > 0) {
         int first = seen[found];
-        reject(() ->
-            execution.located(
-                ErrorCode.SECTIONS_REPEATED,
-                "a second line matching \"" + source + "\" (the first is on line " + first + ")",
-                at));
+        reject(
+            () ->
+                execution.located(
+                    ErrorCode.SECTIONS_REPEATED,
+                    "a second line matching \""
+                        + source
+                        + "\" (the first is on line "
+                        + first
+                        + ")",
+                    at),
+            () -> "a second line matching \"" + source + "\"");
       } else {
         seen[found] = at.line();
       }
@@ -690,7 +741,7 @@ public final class Interpreter {
         if (!input.skipToData()) {
           throw error.get();
         }
-        reject(error);
+        reject(error, () -> "no line matching \"" + source + "\"");
         return;
       }
     }

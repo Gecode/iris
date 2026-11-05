@@ -3,7 +3,6 @@ package dev.gecode.iris;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -27,15 +26,14 @@ import java.util.regex.Pattern;
 final class ConformanceSuite {
   private static final int BATCH_SIZE = 25;
   private static final int MAX_PARALLEL_BATCHES = 8;
-  private static final String DEFERRED_TIMEOUT_SECONDS = "10";
   private static final String DRIVER_JVM_OPTIONS = "-Xmx1g";
   private static final List<String> ROOTS = List.of("conformance/cases/0.1", "formats");
+  private static final List<String> OPERATIONS = List.of("parse", "read", "catalog", "dzn");
   private static final Set<String> TOP_LEVEL_KEYS =
       Set.of("operation", "output", "title", "section", "source", "tags");
   private static final Pattern BARE_KEY = Pattern.compile("([A-Za-z0-9_-]+)\\s*=.*");
   private static final Pattern OPERATION =
       Pattern.compile("operation\\s*=\\s*\"(parse|read|catalog|dzn)\"\\s*(#.*)?");
-  private static final Pattern DEFERRED_LINE = Pattern.compile("(\\S+) (§10\\.[2-5])");
   private static final Pattern OUTCOME = Pattern.compile("(PASS|FAIL) (.+)");
 
   private final Path repository;
@@ -54,95 +52,33 @@ final class ConformanceSuite {
         System.getProperty("iris.driver"));
   }
 
-  /** Runs every case of {@code operation}, and throws unless all of them pass. */
-  void requireAllPass(String operation)
-      throws IOException, InterruptedException, ExecutionException {
-    requireOutcomes(operation, List.of());
-  }
-
   /**
-   * Runs every case of {@code operation}, and throws unless exactly the cases listed in the
-   * resource {@code deferredResource} fail.
+   * Runs every case of every operation, and throws unless all of them pass. An operation without
+   * cases is an error, as the selection must have gone wrong.
    */
-  void requireOutcomes(String operation, String deferredResource)
-      throws IOException, InterruptedException, ExecutionException {
-    try (InputStream stream = ConformanceSuite.class.getResourceAsStream(deferredResource)) {
-      if (stream == null) {
-        throw new AssertionError("no resource " + deferredResource);
-      }
-      requireOutcomes(operation, new String(stream.readAllBytes(), UTF_8).lines().toList());
-    }
-  }
-
-  private void requireOutcomes(String operation, List<String> deferredLines)
-      throws IOException, InterruptedException, ExecutionException {
+  void requireAllPass() throws IOException, InterruptedException, ExecutionException {
     Map<Path, String> operations = new LinkedHashMap<>();
     for (String root : ROOTS) {
       for (Path directory : discover(repository.resolve(root))) {
         operations.put(directory, operation(directory));
       }
     }
-    Map<Path, String> deferred = deferred(deferredLines, repository, operations, operation);
-    List<Path> selected =
-        operations.keySet().stream().filter(c -> operations.get(c).equals(operation)).toList();
-    System.out.printf(
-        "Selected %d %s cases from %d discovered in %s%n",
-        selected.size(), operation, operations.size(), String.join(" and ", ROOTS));
-    if (selected.isEmpty()) {
-      throw new AssertionError("no " + operation + " cases selected");
-    }
-    Map<Path, Boolean> passed = run(selected, deferred.keySet());
-    List<String> problems = problems(passed, deferred.keySet());
-    if (!problems.isEmpty()) {
-      throw new AssertionError(String.join("\n", problems));
-    }
-    int passes = selected.size() - deferred.size();
-    System.out.printf(
-        "Summary: total=%d pass=%d deferred=%d fail=0%n", selected.size(), passes, deferred.size());
-    if (!deferred.isEmpty()) {
-      Map<String, Integer> perRule = new TreeMap<>();
-      deferred.values().forEach(rule -> perRule.merge(rule, 1, Integer::sum));
-      System.out.println("Deferred per rule: " + perRule);
-    }
-  }
-
-  /**
-   * Returns the rule of each case in the lines of a deferred list, one {@code <case path> §10.x}
-   * each. The paths are relative to {@code repository}.
-   *
-   * @param operations the operation of every discovered case
-   * @param operation the operation that the list is for
-   */
-  static Map<Path, String> deferred(
-      List<String> lines, Path repository, Map<Path, String> operations, String operation) {
-    Map<Path, String> deferred = new LinkedHashMap<>();
-    for (String line : lines) {
-      Matcher entry = DEFERRED_LINE.matcher(line);
-      if (!entry.matches()) {
-        throw new IllegalArgumentException("malformed deferred line: " + line);
-      }
-      Path directory = repository.resolve(entry.group(1));
-      if (!operation.equals(operations.get(directory))) {
-        throw new IllegalArgumentException("not a " + operation + " case: " + line);
-      }
-      if (deferred.put(directory, entry.group(2)) != null) {
-        throw new IllegalArgumentException("repeated deferred case: " + line);
+    Map<String, Integer> counts = new TreeMap<>();
+    operations.values().forEach(operation -> counts.merge(operation, 1, Integer::sum));
+    for (String operation : OPERATIONS) {
+      if (!counts.containsKey(operation)) {
+        throw new AssertionError("no " + operation + " cases selected");
       }
     }
-    return deferred;
-  }
-
-  /** Returns what is wrong with {@code passed}, given the cases that should still fail. */
-  static List<String> problems(Map<Path, Boolean> passed, Set<Path> deferred) {
-    List<String> problems = new ArrayList<>();
-    passed.forEach((directory, pass) -> {
-      if (pass && deferred.contains(directory)) {
-        problems.add("passes but is on the deferred list: " + directory);
-      } else if (!pass && !deferred.contains(directory)) {
-        problems.add("fails but is not on the deferred list: " + directory);
-      }
-    });
-    return problems;
+    System.out.printf("Selected %s from %s%n", counts, String.join(" and ", ROOTS));
+    List<Path> selected = List.copyOf(operations.keySet());
+    Map<Path, Boolean> passed = run(selected);
+    List<String> failures =
+        selected.stream().filter(c -> !passed.get(c)).map(c -> "fails: " + c).toList();
+    if (!failures.isEmpty()) {
+      throw new AssertionError(String.join("\n", failures));
+    }
+    System.out.printf("Summary: total=%d pass=%d fail=0%n", selected.size(), selected.size());
   }
 
   /**
@@ -162,15 +98,14 @@ final class ConformanceSuite {
     return outcomes;
   }
 
-  /** Runs {@code selected} in batches, keeping the cases of {@code deferred} in their own. */
-  private Map<Path, Boolean> run(List<Path> selected, Set<Path> deferred)
+  /** Runs {@code selected} in batches. */
+  private Map<Path, Boolean> run(List<Path> selected)
       throws InterruptedException, ExecutionException {
     List<Callable<Map<Path, Boolean>>> batches = new ArrayList<>();
-    addBatches(batches, selected.stream().filter(c -> !deferred.contains(c)).toList(), List.of());
-    addBatches(
-        batches,
-        selected.stream().filter(deferred::contains).toList(),
-        List.of("--timeout", DEFERRED_TIMEOUT_SECONDS));
+    for (int start = 0; start < selected.size(); start += BATCH_SIZE) {
+      List<Path> batch = selected.subList(start, Math.min(start + BATCH_SIZE, selected.size()));
+      batches.add(() -> runBatch(batch));
+    }
     int threads = Math.min(Runtime.getRuntime().availableProcessors(), MAX_PARALLEL_BATCHES);
     Map<Path, Boolean> passed = new LinkedHashMap<>();
     try (ExecutorService pool = Executors.newFixedThreadPool(threads)) {
@@ -179,14 +114,6 @@ final class ConformanceSuite {
       }
     }
     return passed;
-  }
-
-  private void addBatches(
-      List<Callable<Map<Path, Boolean>>> batches, List<Path> cases, List<String> options) {
-    for (int start = 0; start < cases.size(); start += BATCH_SIZE) {
-      List<Path> batch = cases.subList(start, Math.min(start + BATCH_SIZE, cases.size()));
-      batches.add(() -> runBatch(batch, options));
-    }
   }
 
   /** Returns the case directories under {@code root}, in order, without following links. */
@@ -249,8 +176,7 @@ final class ConformanceSuite {
     return operation == null ? "read" : operation;
   }
 
-  private Map<Path, Boolean> runBatch(List<Path> cases, List<String> options)
-      throws IOException, InterruptedException {
+  private Map<Path, Boolean> runBatch(List<Path> cases) throws IOException, InterruptedException {
     List<String> command =
         new ArrayList<>(
             List.of(
@@ -266,7 +192,6 @@ final class ConformanceSuite {
                 "\"" + driver + "\"",
                 "--version",
                 "0.1"));
-    command.addAll(options);
     cases.forEach(directory -> command.add(directory.toString()));
     var builder = new ProcessBuilder(command);
     builder.directory(repository.resolve("rust").toFile());

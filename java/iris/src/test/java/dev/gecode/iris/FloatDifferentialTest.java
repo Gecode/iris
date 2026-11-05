@@ -48,9 +48,11 @@ class FloatDifferentialTest {
       }
       byte[] bytes = input.toString().getBytes(UTF_8);
       Files.write(inputFile, bytes);
-      String document = spec.read(bytes).toJson();
-      assertEquals(rust(specFile, inputFile), document, "the documents differ");
+      Data data = spec.read(bytes);
+      String document = data.toJson();
+      assertEquals(rust(specFile, inputFile, "--json"), document, "the documents differ");
       requireRoundTrip(document, expected);
+      assertEquals(rust(specFile, inputFile, "--dzn"), data.toDzn(), "the dzn texts differ");
       compared += expected.length;
     }
     System.out.printf("Compared %d floats, with no differences%n", compared);
@@ -60,14 +62,17 @@ class FloatDifferentialTest {
   private static double next(SplittableRandom random, int index) {
     int ulps = random.nextInt(-3, 4);
     double value =
-        switch (index % 8) {
+        switch (index % 11) {
           case 0, 1 -> anyBits(random);
           case 2 -> near(Math.scalb(1.0, random.nextInt(-1021, 1024)), ulps);
           case 3 -> near(Double.parseDouble("1e" + random.nextInt(-307, 309)), ulps);
           case 4 -> near(Double.MIN_NORMAL, Math.abs(ulps));
           case 5 -> near(Double.MAX_VALUE, -Math.abs(ulps));
           case 6 -> (double) ((1L << 53) + random.nextInt(-1024, 1025));
-          default -> random.nextDouble(1e21, 1e23);
+          case 7 -> random.nextDouble(1e21, 1e23);
+          case 8 -> (double) random.nextLong(1, 100_000_000_000_000_000L);
+          case 9 -> near(1e17, -random.nextInt(1, 26));
+          default -> random.nextLong(1L << 50) + 0.5;
         };
     return random.nextBoolean() ? value : -value;
   }
@@ -94,7 +99,8 @@ class FloatDifferentialTest {
     }
   }
 
-  private static String rust(Path spec, Path input) throws IOException, InterruptedException {
+  private static String rust(Path spec, Path input, String format)
+      throws IOException, InterruptedException {
     List<String> command = new ArrayList<>();
     String cli = System.getProperty("iris.cli");
     if (cli == null) {
@@ -103,7 +109,7 @@ class FloatDifferentialTest {
     } else {
       command.add(cli);
     }
-    command.addAll(List.of("read", spec.toString(), input.toString(), "--json"));
+    command.addAll(List.of("read", spec.toString(), input.toString(), format));
     var builder = new ProcessBuilder(command);
     builder.directory(Path.of(System.getProperty("iris.repository"), "rust").toFile());
     builder.redirectError(ProcessBuilder.Redirect.INHERIT);

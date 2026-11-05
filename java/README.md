@@ -4,9 +4,10 @@ The pure-Java library `dev.gecode:iris` (Java 27, module `dev.gecode.iris`)
 and the Kotlin extensions module `dev.gecode:iris-kotlin`. `PLAN.md` §8.3
 describes both; milestone M4d builds them.
 
-So far the library parses reader specs, applies every parse-time check of the
-Specification, and reads input into columnar data. Work budgets, catalog and
-dzn come with task `java-003`, and `iris-kotlin` with `java-005`.
+The library parses reader specs, applies every parse-time check of the
+Specification, reads input into columnar data under the work budgets of chapter
+10, lists the instances of an input, and writes dzn. `iris-kotlin` comes with
+task `java-005`.
 
 ```java
 import dev.gecode.iris.Data;
@@ -20,6 +21,9 @@ try {
   long vars = data.get("vars").asLong();
   long[] first = data.get("clauses").get(0).longs();  // a copy
   String document = data.toJson();
+  String dzn = data.toDzn();
+  Data catalog = spec.catalog(input, "sat.cnf");  // the entries instances, name and failed
+  long instances = catalog.get("instances").asLong();
 } catch (IrisException e) {
   e.code();                  // ErrorCode.EXPECTED_VALUE, whose code() is "E-EXPECTED-VALUE"
   e.error().inputLocation(); // origin, line and column of the input
@@ -27,8 +31,8 @@ try {
 }
 ```
 
-`read` also takes a `Path`, whose text is the origin. It then wraps an
-`IOException` in an `UncheckedIOException`. Asking a `Value` for something it
+`read` and `catalog` also take a `Path`, whose text is the origin. They then wrap
+an `IOException` in an `UncheckedIOException`. Asking a `Value` for something it
 is not throws `IllegalStateException` or `IndexOutOfBoundsException`, never
 `IrisException`, as that is a mistake in the calling code.
 
@@ -37,14 +41,14 @@ is not throws `IllegalStateException` or `IndexOutOfBoundsException`, never
 | Path | Contents |
 |---|---|
 | `iris/` | The library. Only `dev.gecode.iris` is exported; `dev.gecode.iris.internal.syntax` holds the lexer, parser and resolver, and `dev.gecode.iris.internal.read` the reader. |
-| `iris-driver/` | The conformance driver, which is not published. `parse` and `read` are complete, apart from work budgets; `catalog` and `dzn` check the spec and then answer exit status 3, as a host failure, until `java-003`. The JVM decodes arguments in the locale's encoding before `main` runs, so outside a UTF-8 locale the driver answers exit status 3 for non-ASCII `--params` instead of reading changed values; JSON escapes work in any locale. |
+| `iris-driver/` | The conformance driver, which is not published. It implements `parse`, `read`, `catalog` (`--format json|dzn`) and `dzn`. The JVM decodes arguments in the locale's encoding before `main` runs, so outside a UTF-8 locale the driver answers exit status 3 for non-ASCII `--params` instead of reading changed values; JSON escapes work in any locale. |
 | `iris-kotlin/` | The Kotlin module, still empty. |
 | `build-logic/` | The convention plugin `iris.java-conventions` shared by the modules. |
 | `gradle/libs.versions.toml` | The pinned versions. |
 
 The legal nesting of §5.12 needs up to about 900 KiB of stack on a JVM, so
-`Spec.parse` and `Spec.read` run on a shared pool of threads with 4 MiB stacks
-(`LargeStack`). A legal spec parses and reads whatever stack the caller has.
+`Spec.parse`, `Spec.read` and `Spec.catalog` run on a shared pool of threads
+with 4 MiB stacks (`LargeStack`). A legal spec parses and reads whatever stack the caller has.
 
 §5.12 bounds parsing, not the tree. Left operands can chain for tens of
 thousands of nodes, as in `(((1+1)+1)+1)`, and aliases can chain to any length.
@@ -55,8 +59,13 @@ follow.
 
 Nor does anything bound the dimensions of a value. A value is a view of a
 `Table`: flat leaves and one array of offsets per level. Values are made on
-access, and nothing that walks them recurses. `Budget` has the charge events of
-§10.2 to §10.4 and accepts every charge until `java-003` gives it limits.
+access, and nothing that walks them recurses.
+
+`Budget` keeps the units left of the two limits of §10.1, which stay below 2^36.
+A charge is compared whole with what is left, so no charge can overflow a
+`long`. Every site of §10.2 to §10.4 charges before it allocates what the charge
+pays for, so a huge repeat or array of empty rows fails at the limit instead of
+running out of time or memory.
 
 ## Building and testing
 
@@ -65,10 +74,10 @@ with `cargo` on `PATH`, since the conformance test runs the Rust runner. It
 fails rather than skips without `cargo`.
 
 ```sh
-./gradlew build          # compile, spotlessCheck, and all tests
+./gradlew build          # compile, spotlessCheck, all tests, and conformance
 ./gradlew spotlessApply  # rewrite the sources
-./gradlew :iris:test --tests dev.gecode.iris.ParseConformanceTest
-./gradlew :iris:test --tests dev.gecode.iris.ReadConformanceTest
+./gradlew conformance    # every conformance case, through the installed driver
+./gradlew :iris:test --tests dev.gecode.iris.BudgetLimitsTest
 ./gradlew :iris:test --tests dev.gecode.iris.FloatDifferentialTest
 ```
 
@@ -77,28 +86,29 @@ run inside `compileJava`, so they have no task of their own: any Error Prone
 warning fails the build through `-Werror`, and NullAway reports at error level
 for `@NullMarked` code, which is all of `dev.gecode.iris`.
 
-`ParseConformanceTest` selects the `parse` cases in `conformance/cases/0.1` and
-`formats`, runs them with the installed driver, and prints the selection and
-the totals. It has no driver ID and no exemptions.
+`./gradlew conformance` selects every case in `conformance/cases/0.1` and
+`formats`, runs them with the installed driver through the Rust runner, and
+prints the counts per operation and the totals. It has no driver ID and no
+exemptions, and it fails on any failing case or an operation without cases.
+`./gradlew test` leaves it out and `./gradlew build` runs it once. Add `--rerun`
+to repeat it when nothing changed.
 
-`ReadConformanceTest` does the same for the `read` cases, with one exception:
-the cases in `iris/src/test/resources/deferred-cases.txt` need a work budget,
-so they must fail until `java-003`. Each line is a case path and the rule of
-chapter 10 it needs. The test fails on a failing case off the list and on a
-passing case on it, and prints the counts per rule. The listed cases run with
-`--timeout 10` and `JAVA_OPTS=-Xmx1g`, as a read without budgets can run for
-very long on them.
+`BudgetLimitsTest` charges a known cost at each site of §10.2 to §10.4 and uses
+up the rest of the limit: the spec that ends exactly on the limit must pass for
+`read` and `catalog`, and the one with a unit more must fail with `E-BUDGET`.
 
 `FloatDifferentialTest` compares `Spec.read` with the Rust `iris read --json`
-byte for byte on a million floats from a fixed seed, and checks that each
-printed value parses to the same double. `-PirisFloatValues=N` sets the number
+and `iris read --dzn` byte for byte on a million floats from a fixed seed, and
+checks that each printed value parses to the same double. `-PirisFloatValues=N` sets the number
 and `-PirisCli=PATH` runs a given `iris` binary instead of `cargo run`.
 
 By hand from the root, after `./gradlew :iris-driver:installDist` in `java/`:
 
 ```sh
-(cd rust && python3 -I -c 'import pathlib,tomllib; [print(p.parent) for r in ("../conformance/cases/0.1","../formats") for p in pathlib.Path(r).rglob("case.toml") if tomllib.loads(p.read_text()).get("operation")=="parse"]' | xargs cargo run --locked -p iris-conformance -- run --driver "\"$PWD/../java/iris-driver/build/install/iris-driver/bin/iris-driver\"")
+(cd rust && cargo run --locked -p iris-conformance -- run --driver "\"$PWD/../java/iris-driver/build/install/iris-driver/bin/iris-driver\"" ../conformance/cases/0.1)
 ```
+
+Run the same command with `../formats` for the format cases.
 
 ## Pinned tools
 

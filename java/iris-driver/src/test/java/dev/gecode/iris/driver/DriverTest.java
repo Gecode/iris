@@ -129,10 +129,40 @@ class DriverTest {
     assertEquals(new Result(3, ""), run("read", valid, directory.resolve("missing").toString()));
   }
 
+  @Test
+  void writesTheCatalogDocument() {
+    String document =
+        "{\"iris\":\"0.1\",\"entries\":[{\"name\":\"instances\",\"type\":\"int\",\"depth\":0,"
+            + "\"value\":1}]}\n";
+    assertEquals(new Result(0, document), run("catalog", valid, input));
+    assertEquals(new Result(0, document), run("catalog", valid, input, "--format", "json"));
+  }
+
+  @Test
+  void writesTheCatalogInDzn() {
+    assertEquals(
+        new Result(0, "instances = 1;\n"), run("catalog", valid, input, "--format", "dzn"));
+  }
+
+  @Test
+  void writesDzn() {
+    assertEquals(new Result(0, "n = 5;\n"), run("dzn", valid, input));
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"catalog", "dzn"})
-  void reportsAnUnimplementedOperationAsAHostFailure(String operation) {
-    assertEquals(new Result(3, ""), run(operation, valid, input));
+  void writesTheErrorDocumentOfAnyOperation(String operation) throws IOException {
+    String word = Files.writeString(directory.resolve("word"), "a\n").toString();
+    Result result = run(operation, valid, word);
+    assertEquals(1, result.status());
+    assertEquals(true, result.document().startsWith("{\"code\":\"E-"), result.document());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"catalog", "dzn"})
+  void reportsAnUnreadableInputOfAnyOperationAsAHostFailure(String operation) {
+    String missing = directory.resolve("missing").toString();
+    assertEquals(new Result(3, ""), run(operation, valid, missing));
   }
 
   @ParameterizedTest
@@ -162,6 +192,8 @@ class DriverTest {
     assertEquals(new Result(2, ""), run("parse", valid, "--params", "{\"a\":1}"));
     assertEquals(new Result(2, ""), run("parse", valid, "--format", "json"));
     assertEquals(new Result(2, ""), run("read", valid, "in", "--format", "json"));
+    assertEquals(new Result(2, ""), run("dzn", valid, "in", "--format", "dzn"));
     assertEquals(new Result(2, ""), run("catalog", valid, "in", "--format", "xml"));
+    assertEquals(new Result(2, ""), run("catalog", valid, "in", "--format"));
   }
 }

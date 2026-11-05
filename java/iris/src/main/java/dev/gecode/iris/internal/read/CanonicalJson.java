@@ -9,6 +9,7 @@ import org.jspecify.annotations.Nullable;
 /** The canonical JSON documents: data (§3.3) and errors (§3.7), each with its final newline. */
 public final class CanonicalJson {
   private static final char[] HEX = "0123456789abcdef".toCharArray();
+  private static final ArraySyntax ARRAYS = new ArraySyntax("[", "]", ",");
 
   private CanonicalJson() {}
 
@@ -71,48 +72,9 @@ public final class CanonicalJson {
     }
   }
 
-  /**
-   * Writes {@code array} with a cursor for each level. Any number of dimensions is legal (§5.12),
-   * so the walk does not recurse.
-   */
   private static void array(StringBuilder out, Stored.Array array) {
     Table table = array.table();
-    int depth = table.depth();
-    int outermost = array.level();
-    int[] start = new int[depth];
-    int[] cursor = new int[depth];
-    int[] end = new int[depth];
-    int level = outermost;
-    open(table, level, array.row(), start, cursor, end);
-    out.append('[');
-    while (true) {
-      if (cursor[level] == end[level]) {
-        out.append(']');
-        if (level == outermost) {
-          return;
-        }
-        level--;
-        continue;
-      }
-      if (cursor[level] != start[level]) {
-        out.append(',');
-      }
-      int child = cursor[level]++;
-      if (level + 1 == depth) {
-        value(out, table.leaf(child));
-      } else {
-        level++;
-        open(table, level, child, start, cursor, end);
-        out.append('[');
-      }
-    }
-  }
-
-  private static void open(Table table, int level, int row, int[] start, int[] cursor, int[] end) {
-    int[] offsets = table.offsets(level);
-    start[level] = offsets[row];
-    cursor[level] = offsets[row];
-    end[level] = offsets[row + 1];
+    ARRAYS.write(out, array, index -> value(out, table.leaf(index)));
   }
 
   private static void location(StringBuilder out, @Nullable Location location) {

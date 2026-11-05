@@ -1,6 +1,7 @@
 package dev.gecode.iris;
 
 import dev.gecode.iris.internal.read.CanonicalJson;
+import dev.gecode.iris.internal.read.Dzn;
 import dev.gecode.iris.internal.read.Stored;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -10,7 +11,7 @@ import java.util.Map;
 import java.util.SequencedMap;
 import org.jspecify.annotations.Nullable;
 
-/** The entries that a read produced, in definition order (§3.1). */
+/** The entries that a read or a catalog produced, in definition order (§3.1). */
 public final class Data {
   private final SequencedMap<String, Stored> stored;
   private final List<Entry> entries;
@@ -63,5 +64,10 @@ public final class Data {
   /** Returns the canonical data document (§3.3), with its final newline. */
   public String toJson() {
     return CanonicalJson.data(stored);
+  }
+
+  /** Returns the dzn document (appendix B), which is empty for data without entries. */
+  public String toDzn() {
+    return Dzn.data(stored);
   }
 }

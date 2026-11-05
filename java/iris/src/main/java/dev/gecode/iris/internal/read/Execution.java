@@ -17,7 +17,7 @@ import org.jspecify.annotations.Nullable;
 final class Execution {
   private final Input input;
   private final @Nullable String specOrigin;
-  private final Budget budget = new Budget();
+  private final Budget budget;
 
   /** The values: the outermost frame, and one per active repeat iteration or instance. */
   private final List<SequencedMap<String, Stored>> frames = new ArrayList<>();
@@ -42,6 +42,7 @@ final class Execution {
   Execution(Input input, @Nullable String specOrigin) {
     this.input = input;
     this.specOrigin = specOrigin;
+    this.budget = new Budget(input.bytes().length);
     frames.add(new LinkedHashMap<>());
   }
 

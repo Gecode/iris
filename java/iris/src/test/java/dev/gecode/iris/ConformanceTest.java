@@ -12,11 +12,11 @@ import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
-class ReadConformanceTest {
+/** The tests that run the installed driver. The task {@code conformance} runs them. */
+class ConformanceTest {
   @Test
-  void everyReadCaseOffTheDeferredListPasses()
-      throws IOException, InterruptedException, ExecutionException {
-    ConformanceSuite.fromBuild().requireOutcomes("read", "/deferred-cases.txt");
+  void everyCasePasses() throws IOException, InterruptedException, ExecutionException {
+    ConformanceSuite.fromBuild().requireAllPass();
   }
 
   /** The shell script holds the argument's bytes, so this JVM's locale cannot change them. */

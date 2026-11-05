@@ -2,6 +2,7 @@ package dev.gecode.iris.driver;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import dev.gecode.iris.Data;
 import dev.gecode.iris.IrisException;
 import dev.gecode.iris.Params;
 import dev.gecode.iris.Spec;
@@ -65,17 +66,22 @@ final class Driver {
       Spec spec = Spec.parse(source, request.spec());
       return switch (request.operation()) {
         case PARSE -> new Response(Json.PARSED, 0);
-        case READ -> {
+        case READ -> new Response(read(spec, request).toJson(), 0);
+        case CATALOG -> {
           byte[] input = Files.readAllBytes(Path.of(request.input()));
-          yield new Response(spec.read(input, request.input(), request.params()).toJson(), 0);
+          Data data = spec.catalog(input, request.input(), request.params());
+          yield new Response(request.format() == Format.DZN ? data.toDzn() : data.toJson(), 0);
         }
-        case CATALOG, DZN ->
-            throw new UnsupportedOperationException(
-                "the operation " + request.operation() + " is not implemented");
+        case DZN -> new Response(read(spec, request).toDzn(), 0);
       };
     } catch (IrisException e) {
       return new Response(e.error().toJson(), LANGUAGE_ERROR);
     }
+  }
+
+  private static Data read(Spec spec, Request request) throws IOException {
+    byte[] input = Files.readAllBytes(Path.of(request.input()));
+    return spec.read(input, request.input(), request.params());
   }
 
   /** The operations of the protocol. */
@@ -83,6 +89,12 @@ final class Driver {
     PARSE,
     READ,
     CATALOG,
+    DZN
+  }
+
+  /** The documents that a catalog can answer with. */
+  private enum Format {
+    JSON,
     DZN
   }
 
@@ -102,8 +114,10 @@ final class Driver {
    * @param spec the path of the reader spec
    * @param input the path of the input, which is empty for a parse
    * @param params the parameters
+   * @param format the document of a catalog
    */
-  private record Request(Operation operation, String spec, String input, Params params) {
+  private record Request(
+      Operation operation, String spec, String input, Params params, Format format) {
     private static final String USAGE =
         "usage: iris-driver parse|read|catalog|dzn SPEC [INPUT] "
             + "[--params JSON] [--version 0.1] [--format json|dzn]";
@@ -125,7 +139,12 @@ final class Driver {
       List<String> options = List.of(args).subList(positionals, args.length);
       checkOptions(operation, options);
       String input = operation == Operation.PARSE ? "" : args[2];
-      return new Request(operation, args[1], input, params(options));
+      return new Request(operation, args[1], input, params(options), format(options));
+    }
+
+    private static Format format(List<String> options) {
+      int option = options.indexOf("--format");
+      return option >= 0 && options.get(option + 1).equals("dzn") ? Format.DZN : Format.JSON;
     }
 
     private static Params params(List<String> options) {

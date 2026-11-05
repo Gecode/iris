@@ -1,6 +1,7 @@
 package dev.gecode.iris;
 
 import dev.gecode.iris.internal.read.Interpreter;
+import dev.gecode.iris.internal.read.Stored;
 import dev.gecode.iris.internal.syntax.Ast;
 import dev.gecode.iris.internal.syntax.LargeStack;
 import dev.gecode.iris.internal.syntax.Lexer;
@@ -14,6 +15,8 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.SequencedMap;
+import java.util.function.Function;
 import org.jspecify.annotations.Nullable;
 
 /** A parsed reader spec, checked against every parse-time rule of the Specification. */
@@ -201,11 +204,132 @@ public final class Spec {
     }
   }
 
+  /**
+   * Lists the instances of an input without an origin or parameters (§9.6). The data has the entry
+   * {@code instances} with their number, {@code name} with their names if all have one, and {@code
+   * failed} with the first rejection of each if any has one.
+   *
+   * @param input the bytes of the input
+   * @return the catalog
+   * @throws IrisException for the first error that is not a rejection in an instance
+   */
+  public Data catalog(byte[] input) {
+    return catalogBytes(input, null, Params.of());
+  }
+
+  /**
+   * Lists the instances of an input without parameters, as {@link #catalog(byte[])} says.
+   *
+   * @param input the bytes of the input
+   * @param origin the name of the input in errors
+   * @return the catalog
+   * @throws IrisException for the first error that is not a rejection in an instance
+   */
+  public Data catalog(byte[] input, String origin) {
+    return catalogBytes(input, origin, Params.of());
+  }
+
+  /**
+   * Lists the instances of an input, as {@link #catalog(byte[])} says.
+   *
+   * @param input the bytes of the input
+   * @param origin the name of the input in errors
+   * @param params the parameters
+   * @return the catalog
+   * @throws IrisException for the first error that is not a rejection in an instance
+   */
+  public Data catalog(byte[] input, String origin, Params params) {
+    return catalogBytes(input, origin, params);
+  }
+
+  /**
+   * Lists the instances of an input without an origin or parameters, as {@link #catalog(byte[])}
+   * says.
+   *
+   * @param input the text of the input
+   * @return the catalog
+   * @throws IrisException for the first error that is not a rejection in an instance
+   * @throws IllegalArgumentException if the text has an unpaired surrogate, which has no UTF-8 form
+   */
+  public Data catalog(String input) {
+    return catalogBytes(encode(input), null, Params.of());
+  }
+
+  /**
+   * Lists the instances of an input without parameters, as {@link #catalog(byte[])} says.
+   *
+   * @param input the text of the input
+   * @param origin the name of the input in errors
+   * @return the catalog
+   * @throws IrisException for the first error that is not a rejection in an instance
+   * @throws IllegalArgumentException if the text has an unpaired surrogate, which has no UTF-8 form
+   */
+  public Data catalog(String input, String origin) {
+    return catalogBytes(encode(input), origin, Params.of());
+  }
+
+  /**
+   * Lists the instances of an input, as {@link #catalog(byte[])} says.
+   *
+   * @param input the text of the input
+   * @param origin the name of the input in errors
+   * @param params the parameters
+   * @return the catalog
+   * @throws IrisException for the first error that is not a rejection in an instance
+   * @throws IllegalArgumentException if the text has an unpaired surrogate, which has no UTF-8 form
+   */
+  public Data catalog(String input, String origin, Params params) {
+    return catalogBytes(encode(input), origin, params);
+  }
+
+  /**
+   * Lists the instances of a file without parameters, as {@link #catalog(byte[])} says. Its path is
+   * the origin of the input.
+   *
+   * @param input the file
+   * @return the catalog
+   * @throws IrisException for the first error that is not a rejection in an instance
+   * @throws UncheckedIOException if the file cannot be read
+   */
+  public Data catalog(Path input) {
+    return catalog(input, Params.of());
+  }
+
+  /**
+   * Lists the instances of a file, as {@link #catalog(byte[])} says. Its path is the origin of the
+   * input.
+   *
+   * @param input the file
+   * @param params the parameters
+   * @return the catalog
+   * @throws IrisException for the first error that is not a rejection in an instance
+   * @throws UncheckedIOException if the file cannot be read
+   */
+  public Data catalog(Path input, Params params) {
+    try {
+      return catalogBytes(Files.readAllBytes(input), input.toString(), params);
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
   private Data readBytes(byte[] input, @Nullable String inputOrigin, Params params) {
+    return interpret(input, inputOrigin, params, Interpreter::run);
+  }
+
+  private Data catalogBytes(byte[] input, @Nullable String inputOrigin, Params params) {
+    return interpret(input, inputOrigin, params, Interpreter::catalog);
+  }
+
+  private Data interpret(
+      byte[] input,
+      @Nullable String inputOrigin,
+      Params params,
+      Function<Interpreter, SequencedMap<String, Stored>> operation) {
     Interpreter interpreter =
         new Interpreter(
             parsed.program(), parsed.resolution(), origin, input, inputOrigin, params.values());
-    return new Data(LargeStack.call(interpreter::run));
+    return new Data(LargeStack.call(() -> operation.apply(interpreter)));
   }
 
   private static byte[] encode(String input) {

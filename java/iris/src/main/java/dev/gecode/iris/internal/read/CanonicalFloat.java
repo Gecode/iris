@@ -11,12 +11,29 @@ package dev.gecode.iris.internal.read;
 final class CanonicalFloat {
   private CanonicalFloat() {}
 
+  /**
+   * A positive decimal.
+   *
+   * @param digits its significant digits, without leading or trailing zeros
+   * @param decimalPoint how many of them stand before the decimal point, which can be any number
+   */
+  record Decimal(String digits, int decimalPoint) {}
+
   /** Returns the spelling of the finite float {@code value}. */
   static String of(double value) {
     if (value == 0.0) {
       return Double.doubleToRawLongBits(value) < 0 ? "-0.0" : "0";
     }
-    String shortest = Double.toString(Math.abs(value));
+    Decimal decimal = shortest(Math.abs(value));
+    String fixed = fixed(decimal.digits(), decimal.decimalPoint());
+    String scientific = scientific(decimal.digits(), decimal.decimalPoint());
+    String spelling = fixed.length() <= scientific.length() ? fixed : scientific;
+    return value < 0 ? "-" + spelling : spelling;
+  }
+
+  /** Returns the digits of {@link Double#toString} for {@code magnitude}, which is positive. */
+  static Decimal shortest(double magnitude) {
+    String shortest = Double.toString(magnitude);
     int marker = shortest.indexOf('E');
     String mantissa = marker < 0 ? shortest : shortest.substring(0, marker);
     int exponent = marker < 0 ? 0 : Integer.parseInt(shortest.substring(marker + 1));
@@ -30,15 +47,11 @@ final class CanonicalFloat {
     while (allDigits.charAt(end - 1) == '0') {
       end--;
     }
-    String digits = allDigits.substring(leading, end);
-    int decimalPoint = point + exponent - leading;
-    String fixed = fixed(digits, decimalPoint);
-    String scientific = scientific(digits, decimalPoint);
-    String spelling = fixed.length() <= scientific.length() ? fixed : scientific;
-    return value < 0 ? "-" + spelling : spelling;
+    return new Decimal(allDigits.substring(leading, end), point + exponent - leading);
   }
 
-  private static String fixed(String digits, int decimalPoint) {
+  /** Returns {@code digits} in fixed notation, with no decimal point after a whole number. */
+  static String fixed(String digits, int decimalPoint) {
     if (decimalPoint <= 0) {
       return "0." + "0".repeat(-decimalPoint) + digits;
     }
