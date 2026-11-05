@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <charconv>
 #include <concepts>
 #include <cstddef>
