@@ -1,6 +1,6 @@
 ---
 title: Other implementations
-description: The status of the Java implementation and of Gecode.
+description: How the implementations of Iris relate, and the status of Gecode.
 editUrl: false
 prev: false
 next: false
@@ -12,13 +12,11 @@ program. The [Python package](/using/python/) binds the Rust implementation
 and installs the same `iris` command. The
 [TypeScript package](/using/typescript/) runs the Rust implementation as
 WebAssembly in Node, browsers and edge runtimes. The
-[C++ library](/using/cpp/) is a native implementation for C++23.
+[C++ library](/using/cpp/) is a native implementation for C++23, and the
+[Java library](/using/java/) a native implementation for Java 27, with a Kotlin
+module.
 
-## Planned implementations
-
-- **Java and Kotlin:** a native Java implementation with a Kotlin module.
-
-It has no release date. The
+The
 [conformance suite](https://github.com/Gecode/iris/blob/main/conformance/README.md)
 holds the language-neutral cases that every implementation must pass.
 

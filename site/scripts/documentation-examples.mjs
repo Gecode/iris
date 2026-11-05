@@ -4,6 +4,7 @@ import { resolve, dirname } from 'node:path';
 import { strictEqual, ok } from 'node:assert';
 import { repository } from './markdown-sources.mjs';
 import { collectCppExamples, cppPages } from './cpp-examples.mjs';
+import { collectJavaExamples, javaPages } from './java-examples.mjs';
 import { collectLearningExamples, learningPages } from './learning-examples.mjs';
 import { collectPythonExamples, pythonPages } from './python-examples.mjs';
 import { collectTypescriptExamples, typescriptPages } from './typescript-examples.mjs';
@@ -13,6 +14,7 @@ export const documentationPages = {
   ...pythonPages,
   ...typescriptPages,
   ...cppPages,
+  ...javaPages,
   'tools/cli/index.html': ['build-cli', 'check', 'read-default', 'read-summary', 'read-json', 'read-dzn', 'read-param', 'list', 'list-dzn', 'fmt', 'fmt-check', 'fmt-diff', 'build-driver', 'conformance'],
   'tools/formatter/index.html': ['format-before', 'format-after', 'format-stdin'],
   'tools/lsp/index.html': ['sample-directive'],
@@ -77,6 +79,7 @@ export async function collectDocumentationExamples({ tools, formats, execute, co
   Object.assign(examples, await collectPythonExamples({ tools, execute }));
   Object.assign(examples, await collectTypescriptExamples());
   Object.assign(examples, await collectCppExamples());
+  Object.assign(examples, await collectJavaExamples());
   return examples;
 
   async function addReadmeCommand(id, path, code) {

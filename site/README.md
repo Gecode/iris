@@ -8,10 +8,11 @@ then shows executable format examples. The format library renders every
 format’s README, highlighted reader spec, and cases with their real output.
 The Language Specification is rendered directly from `spec/`, with versioned
 chapter pages and error-code links shared with the language server.
-The introduction, tutorial, guides, tools, Rust, Python, TypeScript and C++ pages use the same
-shell, and so do the Python API reference that pdoc generates and the C++ API
-reference that Doxygen generates.
-The other implementations page identifies planned implementations.
+The introduction, tutorial, guides, tools, Rust, Python, TypeScript, C++ and Java pages use the same
+shell, and so do the Python API reference that pdoc generates, the C++ API
+reference that Doxygen generates, and the Java and Kotlin API references that
+Javadoc and Dokka generate.
+The other implementations page relates the implementations and Gecode.
 
 ## Build and check
 
@@ -19,7 +20,8 @@ Use Node 22.12 or newer, npm, the stable Rust toolchain, and
 [uv](https://docs.astral.sh/uv/), which builds the Python package for its API
 reference. The C++ API reference requires
 [Doxygen](https://www.doxygen.nl/) 1.9.8 or newer: install `doxygen` with
-Homebrew or apt. Asset preparation also requires `rsvg-convert`:
+Homebrew or apt. The Java and Kotlin API references require Java 27, as `java`
+on `PATH` or in `JAVA_HOME`, for the Gradle build in `java/`. Asset preparation also requires `rsvg-convert`:
 install `librsvg` with Homebrew or `librsvg2-bin` on Ubuntu.
 
 In this directory:
@@ -243,6 +245,33 @@ the `.iris-cpp-api` rules in `src/styles/custom.css` style Doxygen's markup. The
 pages therefore pass the ordinary link, HTML and contrast checks.
 `npm run check:cpp-api`, part of `npm run check`, compares the built pages with
 that output and requires every public class and the members the guide names.
+
+## Java and Kotlin guide and API references
+
+`/using/java/` renders the examples in `java/iris-examples` the same way,
+collected by `scripts/java-examples.mjs`, which also checks that the install
+command and the Gradle and Maven snippets still appear in `java/README.md`. The
+site build runs no example: `ExamplesTest` in `java/` compiles and runs each one
+and compares its output; see the [Java README](../java/README.md#building-and-testing).
+
+Every dev/build runs `scripts/prepare-java-api.mjs`. It runs `:iris:javadoc` and
+`:iris-kotlin:dokkaGenerate` through the Gradle wrapper, so a warning from either
+tool fails the build, and so does a missing Java 27. The script keeps the content
+of the package page and each type page of Javadoc, and of the package page and
+each function page of Dokka, and drops the tools' navigation, scripts, styles and
+tabs. It turns member signatures into plain anchors, keeps only `class`, `href`
+and `id`, and points links at the new URLs, such as `/using/java/api/value-type/`
+and `/using/java/kotlin-api/to-int-array/`. Javadoc's serialized form is not
+published, so its notes are dropped; any other link to a dropped page fails the
+build. Dokka cannot resolve the types of `dev.gecode:iris`, so the script links
+them to the Javadoc pages. The ignored `src/generated/java-api.json` and
+`kotlin-api.json` hold the fragments and their outlines, the two
+`[...page].astro` files in `src/pages/using/java/` place each in a Starlight page,
+and the `.iris-java-api` and `.iris-kotlin-api` rules in `src/styles/custom.css`
+style the tools' markup. The pages therefore pass the ordinary link, HTML and
+contrast checks, with no exclusions. `npm run check:java-api`, part of
+`npm run check`, compares the built pages with that output and requires every
+public type, every extension, and the members the guide names.
 
 ## Playground
 

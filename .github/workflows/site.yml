@@ -14,6 +14,20 @@ on:
       - 'cpp/examples/**'
       - 'cpp/Doxyfile'
       - 'cpp/README.md'
+      - 'java/iris/src/main/**'
+      - 'java/iris/build.gradle.kts'
+      - 'java/iris-kotlin/src/main/**'
+      - 'java/iris-kotlin/build.gradle.kts'
+      - 'java/iris-examples/src/main/**'
+      - 'java/iris-examples/build.gradle.kts'
+      - 'java/iris-driver/build.gradle.kts'
+      - 'java/iris-jmh/build.gradle.kts'
+      - 'java/build-logic/**'
+      - 'java/gradle/**'
+      - 'java/gradlew'
+      - 'java/settings.gradle.kts'
+      - 'java/gradle.properties'
+      - 'java/README.md'
       - 'spec/**'
       - '.editorconfig'
       - 'LICENSE'
@@ -34,6 +48,20 @@ on:
       - 'cpp/examples/**'
       - 'cpp/Doxyfile'
       - 'cpp/README.md'
+      - 'java/iris/src/main/**'
+      - 'java/iris/build.gradle.kts'
+      - 'java/iris-kotlin/src/main/**'
+      - 'java/iris-kotlin/build.gradle.kts'
+      - 'java/iris-examples/src/main/**'
+      - 'java/iris-examples/build.gradle.kts'
+      - 'java/iris-driver/build.gradle.kts'
+      - 'java/iris-jmh/build.gradle.kts'
+      - 'java/build-logic/**'
+      - 'java/gradle/**'
+      - 'java/gradlew'
+      - 'java/settings.gradle.kts'
+      - 'java/gradle.properties'
+      - 'java/README.md'
       - 'spec/**'
       - '.editorconfig'
       - 'LICENSE'
@@ -94,6 +122,16 @@ jobs:
           key: site-cargo-${{ runner.os }}-${{ runner.arch }}-${{ steps.compiler.outputs.identity }}-${{ hashFiles('rust/Cargo.lock', 'python/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ hashFiles('rust/**/*.rs', 'rust/**/Cargo.toml', 'python/src/**/*.rs', 'python/Cargo.toml', 'spec/0.1/grammar.ebnf', 'spec/0.1/errors.md') }}
           restore-keys: |
             site-cargo-${{ runner.os }}-${{ runner.arch }}-${{ steps.compiler.outputs.identity }}-${{ hashFiles('rust/Cargo.lock', 'python/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+      # The build renders the Java and Kotlin API references with Gradle.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '27'
+          cache: gradle
+          cache-dependency-path: |
+            java/**/*.gradle.kts
+            java/gradle/libs.versions.toml
+            java/gradle/wrapper/gradle-wrapper.properties
       # The build renders the Python API reference with maturin and pdoc through uv.
       - uses: astral-sh/setup-uv@v7
       # The build renders brand assets, and the C++ API reference with Doxygen.

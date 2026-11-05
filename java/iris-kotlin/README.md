@@ -63,7 +63,8 @@ Delegated properties and the kotlinx.serialization decoder of §8.3 come later.
 In `java/`:
 
 ```sh
-./gradlew :iris-kotlin:check          # tests, detekt and checkDependencies
+./gradlew :iris-kotlin:check          # tests, detekt, Dokka and checkDependencies
+./gradlew :iris-kotlin:dokkaGenerate  # the API reference, in build/dokka/html
 ./gradlew :iris-kotlin:spotlessCheck  # ktfmt in kotlinlang style; spotlessApply rewrites
 ```
 

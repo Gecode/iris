@@ -1,0 +1,12 @@
+vars int 0
+clauses int 0
+clause int 2
+true false
+3 3
+2
+clause 0: [1, -2]
+clause 1: [2, 3, -1]
+clause 2: [-3]
+the integer 3
+an array of 3
+the value is an array, not a single value

@@ -50,15 +50,84 @@ value of any depth can be compared and hashed.
 `dev.gecode.iris` and the module are both `@NullMarked`: the package annotation
 covers tools that do not read `module-info`, such as those on the class path.
 
+## Using it from another project
+
+`dev.gecode:iris` and `dev.gecode:iris-kotlin` are not on Maven Central yet. To
+use them from another project, install both in the local Maven repository:
+
+```sh
+./gradlew publishToMavenLocal
+```
+
+A Gradle project then needs Java 27 and these lines:
+
+```kotlin
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+java { toolchain { languageVersion = JavaLanguageVersion.of(27) } }
+
+dependencies {
+    implementation("dev.gecode:iris:0.1.0")
+}
+```
+
+A Maven project adds this dependency and sets `maven.compiler.release` to 27:
+
+```xml
+<dependency>
+  <groupId>dev.gecode</groupId>
+  <artifactId>iris</artifactId>
+  <version>0.1.0</version>
+</dependency>
+```
+
+For the Kotlin extensions, use `dev.gecode:iris-kotlin` in the same way:
+
+```kotlin
+dependencies {
+    implementation("dev.gecode:iris-kotlin:0.1.0")
+}
+```
+
+```xml
+<dependency>
+  <groupId>dev.gecode</groupId>
+  <artifactId>iris-kotlin</artifactId>
+  <version>0.1.0</version>
+</dependency>
+```
+
+Kotlin has no JVM 27 target, so a Kotlin project on Java 27 needs these lines in
+Gradle, as this build does (see [Java 27 gaps](#java-27-gaps)):
+
+```kotlin
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.jvm.JvmTargetValidationMode
+import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
+
+kotlin { compilerOptions { jvmTarget = JvmTarget.JVM_26 } }
+
+tasks.withType<KotlinJvmCompile>().configureEach {
+    jvmTargetValidationMode = JvmTargetValidationMode.IGNORE
+}
+```
+
+The [site guide](../site/src/content/docs/using/java.mdx) shows these snippets
+and the site check compares them with this file, so change both together.
+
 ## Layout
 
 | Path | Contents |
 |---|---|
 | `iris/` | The library. Only `dev.gecode.iris` is exported; `dev.gecode.iris.internal.syntax` holds the lexer, parser and resolver, and `dev.gecode.iris.internal.read` the reader. |
 | `iris-driver/` | The conformance driver, which is not published. It implements `parse`, `read`, `catalog` (`--format json|dzn`) and `dzn`. The JVM decodes arguments in the locale's encoding before `main` runs, so outside a UTF-8 locale the driver answers exit status 3 for non-ASCII `--params` instead of reading changed values; JSON escapes work in any locale. [Windows](#windows) has a narrower guarantee. |
+| `iris-examples/` | The examples of the site's [Java and Kotlin guide](../site/src/content/docs/using/java.mdx), which are not published: sources in `src/main/java/examples` and `src/main/kotlin/examples`, each with its recorded `.out` beside it. |
 | `iris-jmh/` | The JMH benchmarks, which are not published. Nothing else depends on this module, so JMH stays out of `dev.gecode:iris`. |
 | `iris-kotlin/` | The Kotlin extensions, in the exported package `dev.gecode.iris.kotlin` of the module of that name. |
-| `build-logic/` | The convention plugins `iris.java-conventions`, shared by the modules, and `iris.kotlin-conventions`. |
+| `build-logic/` | The convention plugins `iris.java-conventions`, shared by the modules, `iris.kotlin-conventions`, `iris.kotlin-docs` for Dokka, and `iris.published` for the two published modules. |
 | `gradle/libs.versions.toml` | The pinned versions. |
 | `detekt.yml` | The detekt configuration: what differs from the default rules. |
 
@@ -94,6 +163,8 @@ fails rather than skips without `cargo`.
 ./gradlew spotlessApply  # rewrite the Java and Kotlin sources
 ./gradlew conformance    # every conformance case, through the installed driver
 ./gradlew :iris:javadoc  # the API reference, in iris/build/docs/javadoc
+./gradlew :iris-kotlin:dokkaGenerate  # the Kotlin API reference, in iris-kotlin/build/dokka/html
+./gradlew :iris-examples:test  # run the guide's examples and compare their output
 ./gradlew :iris:test --tests dev.gecode.iris.BudgetLimitsTest
 ./gradlew :iris:test --tests dev.gecode.iris.FloatDifferentialTest
 ./gradlew :iris-kotlin:check  # the Kotlin tests, detekt and the dependency check
@@ -112,6 +183,18 @@ for `@NullMarked` code, which is all of `dev.gecode.iris`.
 missing comment included. The build runs it through `check`. `ApiTest` checks the
 module descriptor, that public signatures name no internal type, and the error
 fields.
+
+`:iris-kotlin:dokkaGenerate` also fails on any warning and runs through `check`.
+The site build runs both tasks and publishes the result in its own pages (see
+[site/README.md](../site/README.md)).
+
+`ExamplesTest` runs every example in `iris-examples` from the repository root, in
+a JVM of its own, and requires exit status 0, nothing on standard error, and the
+output in the `.out` file beside the source. A new example needs that file and an
+entry in `site/scripts/java-examples.mjs`: the site check fails on a file the
+guide does not show. `iris-examples` has the same compiler, Error Prone, NullAway,
+Spotless, ktfmt and detekt checks as the library, except for Kotlin's explicit
+API mode, which a program does not need.
 
 `./gradlew conformance` selects every case in `conformance/cases/0.1` and
 `formats`, runs them with the installed driver's classes through the Rust runner, and
@@ -239,7 +322,7 @@ a quiet machine before reading anything into a small difference.
 
 Gradle 9.8.2 (wrapper), Spotless 8.11.0 with google-java-format 2.0.0, Error
 Prone 2.52.0, NullAway 0.14.3, JSpecify 1.0.1, JUnit 5.14.4, Kotlin 2.4.21, ktfmt
-0.64, detekt 2.0.0-alpha.6 and JMH 1.37.
+0.64, detekt 2.0.0-alpha.6, Dokka 2.2.0 and JMH 1.37.
 
 ### Java 27 gaps
 
@@ -260,3 +343,9 @@ does not export.
 detekt has no stable release for Kotlin 2.4: the 1.x line stops at 1.23.8, so
 `2.0.0-alpha.6`, the newest release, is pinned. It is built against Kotlin
 2.4.10 and analyzes this code, with type resolution, without complaint.
+
+Dokka 2.2.0, the newest stable release, runs on Java 27 with Kotlin 2.4.21 without
+a warning. It cannot resolve the types of `dev.gecode:iris`, which it leaves
+unlinked; `site/scripts/prepare-java-api.mjs` links them to the Javadoc pages. It
+stays in its own Gradle configurations, so it is not on the compile or runtime
+class path that `checkDependencies` checks, nor in the published POM.

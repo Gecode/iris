@@ -16,7 +16,7 @@ tags; [§11](PLAN.md#11-milestones) defines the release milestones.
 |---|---|---|
 | Rust crates and CLI binaries | `rust-vVERSION` | cargo-dist workflow ready; crates.io publication planned for M7 |
 | Python | `python-vVERSION` | Planned: binding, wheels, source distribution, and registry publication |
-| Java and Kotlin | `java-vVERSION` | Planned: native library, Kotlin module, and registry publication |
+| Java and Kotlin | `java-vVERSION` | Native library and Kotlin module ready; Maven Central publication planned for M7 |
 | C++ | `cpp-vVERSION` | Planned: native library, CMake package, and distribution |
 | Documentation site | No version tag; deploys from `main` | Deployment configured; production setup and live verification required |
 

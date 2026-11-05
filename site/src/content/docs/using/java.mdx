@@ -1,0 +1,161 @@
+---
+title: Java and Kotlin
+description: Read input with a reader spec from Java 27 with the native iris library, and from Kotlin with its extensions.
+editUrl: false
+prev: false
+next: false
+---
+import CheckedExample from '../../../components/docs/CheckedExample.astro';
+
+The `iris` library is a native Java implementation of Iris. Its only dependency
+is the JSpecify annotations. It passes the same conformance suite as the Rust
+reference implementation, so it reads every input as the [CLI](/tools/cli/)
+does. The [Java API reference](/using/java/api/) lists every public class and
+method, and the [Kotlin API reference](/using/java/kotlin-api/) lists the
+extensions.
+
+## Add the library to a project
+
+The library needs Java 27. It is not on Maven Central yet; publication is
+planned. Package versions and language versions are separate; the current
+library is 0.1.0 and implements Iris 0.1.
+
+Until then, build it from a checkout. With Java 27 installed, run this in the
+`java` directory of an Iris checkout, which installs both modules in your local
+Maven repository:
+
+<CheckedExample id="java-install" />
+
+A Gradle project then uses the coordinates `dev.gecode:iris:0.1.0`. Once the
+library is published, `mavenLocal()` can go:
+
+<CheckedExample id="java-gradle" title="build.gradle.kts" />
+
+A Maven project adds the same coordinates, and sets `maven.compiler.release` to
+27:
+
+<CheckedExample id="java-maven" title="pom.xml" />
+
+The jar is the module `dev.gecode.iris`, so a modular application writes
+`requires dev.gecode.iris;`, and it also works on the class path.
+
+## Parse a reader spec and read input
+
+The examples on this page are in
+[`java/iris-examples`](https://github.com/Gecode/iris/tree/main/java/iris-examples),
+and a test compiles each one, runs it and compares its output. They read files
+from the format library, so run them from the root of an Iris checkout.
+
+<CheckedExample id="java-Read" title="Read.java" />
+
+`Spec.parse` parses and checks a reader spec. The declaration reads `n`, then a
+row of `n` integers. `spec.read` reads input from a `String`, a `byte[]` or a
+`Path`; the origin names, such as `example.iris` and `input.txt`, appear in
+error messages. A `Spec` can read any number of inputs.
+
+## Read files, instances and parameters
+
+`Spec.parse` takes the bytes of a reader spec, so read the file yourself.
+`spec.read` and `spec.catalog` take a `Path` directly, and its text is the
+origin. They wrap an `IOException` in an `UncheckedIOException`.
+
+<CheckedExample id="java-Instances" title="Instances.java" />
+
+`spec.catalog` lists the instances in an input as data. The `instance`
+parameter selects one instance during a read, by name or by its number,
+counting from 1. `Params` holds name and value strings, as the
+[Specification](/specification/0.1/09-params-and-instances/) defines: write
+`Params.of("instance", "2")`, not a number. `Params.of` also takes a `Map`, and
+`params.with` returns `Params` with one more value.
+
+## Access data
+
+`data.entries()` returns the entries in the order the reader spec defines them,
+as records of a name and a `Value`. `data.get(name)` returns an entry's value,
+and `data.find(name)` returns it or `null`.
+
+<CheckedExample id="java-Access" title="Access.java" />
+
+`asLong`, `asDouble` and `asString` return a single value. `size`, `get` and
+`at` walk an array, including arrays whose rows have different lengths; `at`
+takes one index per level, counted from 0. `longs`, `ints` and `doubles` return
+a one-dimensional row as a new primitive array on each call, and `strings` an
+unmodifiable list. `ints` throws `ArithmeticException` for an integer that does
+not fit an `int`.
+
+`Value` is sealed, so a `switch` over it needs no default. Asking a `Value` for
+something it is not, or asking `data.get` for an unknown name, throws
+`IllegalStateException` or `IndexOutOfBoundsException`. These are mistakes in
+the calling code and never an `IrisException`.
+
+## dzn and JSON
+
+`data.toDzn()` returns the MiniZinc data of the
+[dzn appendix](/specification/0.1/appendix-b-dzn/), and `data.toJson()` the
+canonical JSON document of the
+[data model](/specification/0.1/03-data-model/). Every line ends in a newline.
+
+<CheckedExample id="java-Output" title="Output.java" />
+
+## Handle errors
+
+A language error is an `IrisException`, an unchecked exception that
+`Spec.parse`, `spec.read` and `spec.catalog` throw. `getMessage()` is the
+diagnostic that [Specification chapter 11](/specification/0.1/errors/) describes.
+
+<CheckedExample id="java-Errors" title="Errors.java" />
+
+`code()` returns the `ErrorCode` of the stable
+[error code](/specification/0.1/errors/), and its `code()` the spelling. Compare
+codes, not messages. `origin()`, `line()` and `column()` give the location in
+the input if the error has one, and otherwise in the reader spec; each can be
+`null`. `path()` gives the indices of a failed check's witness.
+
+`error()` returns the `IrisError` with all the details: `message()`,
+`inputLocation()`, `specLocation()`, `context()` and `recordPath()`, and
+`toJson()` for the canonical error document. It is sealed, with one record for
+each of `SpecError`, `ReadError` and `CheckError`.
+
+The language's fixed [work budgets](/specification/0.1/10-work-budgets/) bound
+every read. A read that exhausts one fails with the code `E-BUDGET`, and the
+library has no budget settings.
+
+## Kotlin
+
+The module `dev.gecode:iris-kotlin` adds extensions to the Java API. It depends
+on `dev.gecode:iris` and the Kotlin standard library, and nothing else. It is
+not on Maven Central yet either; the command above installs it too.
+
+<CheckedExample id="kotlin-gradle" title="build.gradle.kts" />
+
+In Maven:
+
+<CheckedExample id="kotlin-maven" title="pom.xml" />
+
+The module still needs Java 27 to run, but Kotlin has no JVM 27 target yet, so
+its classes target JVM 26. A Kotlin project does the same. On Java 27, Gradle
+would otherwise reject the difference between the Java and Kotlin targets:
+
+<CheckedExample id="kotlin-target" title="build.gradle.kts" />
+
+The Java API works from Kotlin as it is. `data["n"]` and `value[0]` call the
+Java `get` methods as operators.
+
+<CheckedExample id="kotlin-Read" title="Read.kt" />
+
+The Java API is `@NullMarked`, so Kotlin sees non-null types, and a result
+marked `@Nullable`, such as that of `data.find`, as nullable. The extensions
+add indexing by several levels at once, arrays and sequences:
+
+<CheckedExample id="kotlin-Extensions" title="Extensions.kt" />
+
+`value[i, j]` selects what `value.at(i, j)` does. `toIntArray`, `toLongArray`
+and `toDoubleArray` return a new array, and `toIntArray` throws
+`ArithmeticException` as `ints` does. `asSequence` walks the elements of an
+array or the entries of `Data`, `leaves` the single values at any depth in row
+order, and `toParams` makes `Params` from a map. Misuse throws what the Java API
+throws.
+
+`IrisError` is sealed in Kotlin as well, so a `when` over it needs no `else`:
+
+<CheckedExample id="kotlin-Errors" title="Errors.kt" />

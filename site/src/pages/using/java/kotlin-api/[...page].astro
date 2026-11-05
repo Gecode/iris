@@ -1,0 +1,23 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+// Generated during every build by scripts/prepare-java-api.mjs.
+import reference from '../../../../generated/kotlin-api.json';
+
+export function getStaticPaths() {
+  return reference.pages.map(page => ({ params: { page: page.slug || undefined }, props: { page } }));
+}
+const { page } = Astro.props;
+---
+<StarlightPage hasSidebar={true} headings={page.headings} frontmatter={{
+  title: page.title,
+  description: `${page.title} of the iris Kotlin extensions.`,
+  editUrl: false, prev: false, next: false,
+}}>
+  <p class="max-w-[68ch]">
+    Dokka {reference.dokka} generates this <a href="/using/java/kotlin-api/">reference</a> during
+    each site build from the Kotlin sources. The <a href="/using/java/#kotlin">guide</a> shows the
+    extensions in use, and the <a href="/using/java/api/">Java API reference</a> covers the types
+    they extend.
+  </p>
+  <div class="iris-kotlin-api min-w-0 max-w-[76ch]" data-kotlin-api set:html={page.html} />
+</StarlightPage>

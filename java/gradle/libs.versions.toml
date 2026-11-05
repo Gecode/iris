@@ -10,6 +10,7 @@ junit = "5.14.4"
 kotlin = "2.4.21"
 ktfmt = "0.64"
 detekt = "2.0.0-alpha.6"
+dokka = "2.2.0"
 jmh = "1.37"
 
 [libraries]
@@ -18,6 +19,7 @@ errorprone-plugin = { module = "net.ltgt.gradle:gradle-errorprone-plugin", versi
 nullaway-plugin = { module = "net.ltgt.gradle:gradle-nullaway-plugin", version.ref = "nullaway-plugin" }
 kotlin-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 detekt-plugin = { module = "dev.detekt:detekt-gradle-plugin", version.ref = "detekt" }
+dokka-plugin = { module = "org.jetbrains.dokka:dokka-gradle-plugin", version.ref = "dokka" }
 errorprone-core = { module = "com.google.errorprone:error_prone_core", version.ref = "errorprone" }
 nullaway = { module = "com.uber.nullaway:nullaway", version.ref = "nullaway" }
 jspecify = { module = "org.jspecify:jspecify", version.ref = "jspecify" }

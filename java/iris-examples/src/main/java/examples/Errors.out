@@ -1,0 +1,7 @@
+E-EXPECTED-VALUE
+true
+expected an int in -3..3, found '4'
+2 3
+repeat [1 of 1] > clause
+the input does not match
+formats/dimacs-cnf/cases/literal-out-of-range/input.txt:2:3: expected an int in -3..3, found '4'

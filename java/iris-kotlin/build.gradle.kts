@@ -1,6 +1,8 @@
 plugins {
     `java-library`
     id("iris.kotlin-conventions")
+    id("iris.kotlin-docs")
+    id("iris.published")
 }
 
 dependencies {

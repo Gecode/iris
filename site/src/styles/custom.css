@@ -227,6 +227,38 @@
   .iris-cpp-api .memproto .mlabel { @apply ms-3 text-xs text-iris-muted; }
   .iris-cpp-api .memdoc { @apply mt-3; }
   .iris-cpp-api [id]:target { @apply outline-2 outline-offset-4 outline-iris-orange; }
+  .iris-java-api { @apply leading-7; }
+  .iris-java-api :is(h2, h3) { @apply scroll-mt-24 font-medium leading-tight tracking-normal wrap-anywhere; }
+  .iris-java-api h2 { @apply mt-10 border-t border-iris-border pt-6 text-2xl; }
+  .iris-java-api h3 { @apply mt-8 font-mono text-lg; }
+  .iris-java-api :is(.summary-list, .details-list, .member-list) { @apply m-0 list-none p-0; }
+  .iris-java-api :is(.summary-list, .details-list, .member-list) > li { @apply m-0; }
+  .iris-java-api .inheritance { @apply font-mono text-sm text-iris-muted; }
+  .iris-java-api .inheritance .inheritance { @apply mt-0 ps-4; }
+  .iris-java-api :is(.type-signature, .member-signature) { @apply mt-3 overflow-x-auto border-s-3 border-iris-blue bg-iris-surface px-4 py-3 font-mono text-sm leading-6 text-iris-ink; }
+  .iris-java-api :is(.element-name) { @apply font-semibold; }
+  .iris-java-api .block { @apply mt-3; }
+  .iris-java-api .summary-table { @apply mt-4 grid items-baseline gap-x-4 gap-y-2 text-sm; }
+  .iris-java-api .summary-table > * { @apply mt-0 min-w-0 wrap-anywhere; }
+  .iris-java-api .summary-table .block { @apply mt-0; }
+  .iris-java-api .two-column-summary { @apply grid-cols-[minmax(0,1fr)_minmax(0,2fr)] max-[50rem]:grid-cols-1; }
+  .iris-java-api .three-column-summary { @apply grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,2fr)] max-[50rem]:grid-cols-1; }
+  .iris-java-api .table-header { @apply font-semibold max-[50rem]:hidden; }
+  .iris-java-api .col-last { @apply text-iris-muted max-[50rem]:mb-3; }
+  .iris-java-api .notes { @apply mt-3 text-sm; }
+  .iris-java-api .notes dt { @apply mt-2 font-semibold; }
+  .iris-java-api .notes dd { @apply mt-0 ms-4; }
+  .iris-java-api .tag-list { @apply m-0 list-none p-0; }
+  .iris-java-api [id]:target { @apply outline-2 outline-offset-4 outline-iris-orange; }
+  .iris-kotlin-api { @apply leading-7; }
+  .iris-kotlin-api h2 { @apply mt-10 scroll-mt-24 border-t border-iris-border pt-6 text-2xl font-medium leading-tight tracking-normal; }
+  .iris-kotlin-api .symbol { @apply mt-3 overflow-x-auto border-s-3 border-iris-blue bg-iris-surface px-4 py-3 font-mono text-sm leading-6 text-iris-ink; }
+  .iris-kotlin-api .symbol .function { @apply font-semibold; }
+  .iris-kotlin-api .keyValue { @apply mt-3 grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-x-4 max-[50rem]:grid-cols-1; }
+  .iris-kotlin-api .keyValue > * { @apply mt-0 min-w-0 wrap-anywhere; }
+  .iris-kotlin-api .table-row { @apply mt-0; }
+  .iris-kotlin-api .brief { @apply mt-2 text-sm text-iris-muted; }
+  .iris-kotlin-api [id]:target { @apply outline-2 outline-offset-4 outline-iris-orange; }
   .expressive-code pre:focus-visible { outline-offset: -4px; }
 
   /* The stock page frame still owns offsets, the popover, and focus trapping. */

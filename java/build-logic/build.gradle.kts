@@ -6,4 +6,5 @@ dependencies {
   implementation(libs.nullaway.plugin)
   implementation(libs.kotlin.plugin)
   implementation(libs.detekt.plugin)
+  implementation(libs.dokka.plugin)
 }

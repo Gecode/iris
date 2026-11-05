@@ -1,6 +1,7 @@
 plugins {
   `java-library`
   id("iris.java-conventions")
+  id("iris.published")
 }
 
 dependencies { api(libs.jspecify) }
