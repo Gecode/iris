@@ -443,6 +443,15 @@ void Params::set(std::string_view name, std::string_view value) {
   values.values.push_back(std::move(owned_value));
 }
 
+namespace {
+
+/// The values of Params without values. It is built before every scope, as
+/// the first read would otherwise bind it to a resource that it outlives:
+/// an empty container of a debug MSVC build holds an allocation.
+const detail::ParamsImpl no_params;
+
+} // namespace
+
 detail::ParamsImpl &Params::own() {
   if (!impl_)
     impl_ = detail::make_shared<detail::ParamsImpl>();
@@ -452,8 +461,7 @@ detail::ParamsImpl &Params::own() {
 }
 
 const detail::ParamsImpl &Params::values() const {
-  static const detail::ParamsImpl none;
-  return impl_ ? *impl_ : none;
+  return impl_ ? *impl_ : no_params;
 }
 
 std::size_t Params::size() const { return values().names.size(); }
