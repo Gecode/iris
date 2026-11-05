@@ -156,6 +156,20 @@ fn extra_specs() -> Vec<(String, String)> {
     specs
 }
 
+/// Return a command that runs rustfmt. It recurses on the main thread, and the
+/// deepest limit specs overflow the default stack on macOS, so it gets the
+/// largest stack that the system allows.
+fn rustfmt() -> Command {
+    if cfg!(unix) {
+        let mut command = Command::new("sh");
+        let script = r#"ulimit -s "$(ulimit -Hs)"; exec rustfmt "$@""#;
+        command.args(["-c", script, "rustfmt"]);
+        command
+    } else {
+        Command::new("rustfmt")
+    }
+}
+
 /// Specs at the limits of Specification §5.12, by name. None of them is in the
 /// corpus count, and the deep ones show that generation needs no stack of its
 /// own and that the generated program still compiles.
@@ -322,7 +336,7 @@ impl Project {
     }
 
     fn check_formatting(&self, specs: &[Generated], limits: &[(&str, String)]) {
-        let mut rustfmt = Command::new("rustfmt");
+        let mut rustfmt = rustfmt();
         rustfmt.args(["--check", "--edition", "2024"]);
         rustfmt.args(specs.iter().map(|spec| self.source(&spec.module)));
         rustfmt.args(limits.iter().map(|(name, _)| self.limit_source(name)));
