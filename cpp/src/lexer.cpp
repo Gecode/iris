@@ -221,7 +221,7 @@ private:
     static constexpr std::string_view singles = "{}[]()=<>+-*/%^!,.:\0"sv;
     const std::string_view rest = src_.substr(p_);
     t.kind = Token::Kind::Punct;
-    const auto *op = std::ranges::find_if(
+    const auto op = std::ranges::find_if(
         operators, [rest](std::string_view o) { return rest.starts_with(o); });
     if (op != operators.end())
       t.text = *op;

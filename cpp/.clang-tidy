@@ -39,6 +39,9 @@ Checks: >
 WarningsAsErrors: '*'
 HeaderFilterRegex: '.*/cpp/(include|src|driver|tests)/.*'
 CheckOptions:
+  # An iterator is a pointer in libstdc++ and libc++ but a class in MSVC, so
+  # `const auto *` does not compile there. Look no further than the alias.
+  readability-qualified-auto.IgnoreAliasing: false
   readability-identifier-naming.ClassCase: CamelCase
   readability-identifier-naming.StructCase: CamelCase
   readability-identifier-naming.EnumCase: CamelCase

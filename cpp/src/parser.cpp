@@ -451,8 +451,8 @@ private:
         {"check", K::Check, &Parser::check, false},
         {"type", K::Type, &Parser::type_def, false},
     }};
-    const auto *e = std::ranges::find(statements, k, &Keyword::keyword);
-    return (e == statements.end()) ? nullptr : e;
+    const auto e = std::ranges::find(statements, k, &Keyword::keyword);
+    return (e == statements.end()) ? nullptr : &*e;
   }
 
   /**
@@ -851,7 +851,7 @@ private:
     }};
     if (t.kind != Token::Kind::Punct)
       return std::nullopt;
-    const auto *o = std::ranges::find(ops, t.text, &Entry::text);
+    const auto o = std::ranges::find(ops, t.text, &Entry::text);
     if (o == ops.end())
       return std::nullopt;
     return o->op;
