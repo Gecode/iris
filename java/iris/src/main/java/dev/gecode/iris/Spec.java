@@ -90,12 +90,12 @@ public final class Spec {
     return new Parsed(program, Resolver.resolve(program, origin));
   }
 
-  /** Returns the tree of the reader spec, for the tests of this package. */
+  /** {@return the tree of the reader spec, for the tests of this package} */
   Ast.Program program() {
     return parsed.program();
   }
 
-  /** Returns the name of the format that the reader spec reads, or null if it names none. */
+  /** {@return the name of the format that the reader spec reads, or null if it names none} */
   public @Nullable String format() {
     return parsed.program().format();
   }

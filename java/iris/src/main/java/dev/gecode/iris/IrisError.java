@@ -7,25 +7,25 @@ import org.jspecify.annotations.Nullable;
 
 /** The details of an error, in the terms of the Specification's canonical error document. */
 public sealed interface IrisError extends Serializable {
-  /** Returns the stable code of the error. */
+  /** {@return the stable code of the error} */
   ErrorCode code();
 
-  /** Returns the main diagnostic text, without a location. */
+  /** {@return the main diagnostic text, without a location} */
   String message();
 
-  /** Returns the location in the input, or null if the error has none. */
+  /** {@return the location in the input, or null if the error has none} */
   @Nullable Location inputLocation();
 
-  /** Returns the location in the reader spec, or null if the error has none. */
+  /** {@return the location in the reader spec, or null if the error has none} */
   @Nullable Location specLocation();
 
-  /** Returns the execution context, outermost first, or null if the error has none. */
+  /** {@return the execution context, outermost first, or null if the error has none} */
   @Nullable String context();
 
-  /** Returns the indices of a failed check's witness, or null for any other error. */
+  /** {@return the indices of a failed check's witness, or null for any other error} */
   @Nullable List<Integer> recordPath();
 
-  /** Returns the canonical error document of this error (§3.7), with its final newline. */
+  /** {@return the canonical error document of this error (§3.7), with its final newline} */
   default String toJson() {
     return CanonicalJson.error(this);
   }

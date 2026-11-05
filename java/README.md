@@ -26,6 +26,10 @@ try {
   long instances = catalog.get("instances").asLong();
 } catch (IrisException e) {
   e.code();                  // ErrorCode.EXPECTED_VALUE, whose code() is "E-EXPECTED-VALUE"
+  e.origin();                // origin, line and column of the input if the error has them,
+  e.line();                  // and otherwise of the reader spec; any of them can be null
+  e.column();
+  e.path();                  // the indices of a failed check's witness, or null
   e.error().inputLocation(); // origin, line and column of the input
   e.error().specLocation();  // origin, line and, for E-SPEC-UTF8, column of the reader spec
 }
@@ -34,7 +38,17 @@ try {
 `read` and `catalog` also take a `Path`, whose text is the origin. They then wrap
 an `IOException` in an `UncheckedIOException`. Asking a `Value` for something it
 is not throws `IllegalStateException` or `IndexOutOfBoundsException`, never
-`IrisException`, as that is a mistake in the calling code.
+`IrisException`, as that is a mistake in the calling code. `ints()` throws
+`ArithmeticException` for an integer that does not fit an `int`.
+
+`longs()`, `ints()` and `doubles()` return a new array on each call, and
+`strings()` an unmodifiable list. Values are equal if they have the same type,
+shape and leaves. The comparison walks the levels of an array in a loop, so a
+value of any depth can be compared and hashed.
+
+`Value` and `IrisError` are sealed, so a `switch` over them needs no default.
+`dev.gecode.iris` and the module are both `@NullMarked`: the package annotation
+covers tools that do not read `module-info`, such as those on the class path.
 
 ## Layout
 
@@ -74,9 +88,10 @@ with `cargo` on `PATH`, since the conformance test runs the Rust runner. It
 fails rather than skips without `cargo`.
 
 ```sh
-./gradlew build          # compile, spotlessCheck, all tests, and conformance
+./gradlew build          # compile, spotlessCheck, all tests, conformance, and javadoc
 ./gradlew spotlessApply  # rewrite the sources
 ./gradlew conformance    # every conformance case, through the installed driver
+./gradlew :iris:javadoc  # the API reference, in iris/build/docs/javadoc
 ./gradlew :iris:test --tests dev.gecode.iris.BudgetLimitsTest
 ./gradlew :iris:test --tests dev.gecode.iris.FloatDifferentialTest
 ```
@@ -85,6 +100,11 @@ fails rather than skips without `cargo`.
 run inside `compileJava`, so they have no task of their own: any Error Prone
 warning fails the build through `-Werror`, and NullAway reports at error level
 for `@NullMarked` code, which is all of `dev.gecode.iris`.
+
+`:iris:javadoc` documents only the exported package and fails on any warning, a
+missing comment included. The build runs it through `check`. `ApiTest` checks the
+module descriptor, that public signatures name no internal type, and the error
+fields.
 
 `./gradlew conformance` selects every case in `conformance/cases/0.1` and
 `formats`, runs them with the installed driver through the Rust runner, and

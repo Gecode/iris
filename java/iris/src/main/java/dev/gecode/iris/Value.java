@@ -4,35 +4,51 @@ import dev.gecode.iris.internal.read.CanonicalJson;
 import dev.gecode.iris.internal.read.Stored;
 import dev.gecode.iris.internal.read.Table;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A value that a read produced: a single integer, float or string, or an array of them, which can
  * be nested and ragged (§3.2).
  *
  * <p>Asking a value for something it is not, such as the integer of a string, is a mistake in the
- * calling code. It throws {@link IllegalStateException} or, for an index out of range, {@link
- * IndexOutOfBoundsException}.
+ * calling code, never an {@link IrisException}. It throws {@link IllegalStateException} or, for an
+ * index out of range, {@link IndexOutOfBoundsException}.
+ *
+ * <p>Values are equal if they have the same type, shape and leaves, where floats compare as {@link
+ * Double#equals} does.
  */
 public sealed interface Value {
-  /** Returns the type of the leaves. */
+  /** {@return the type of the leaves} */
   ValueType type();
 
-  /** Returns the depth: 0 for a single value, and otherwise the levels of nesting. */
+  /** {@return the depth: 0 for a single value, and otherwise the levels of nesting} */
   default int depth() {
     return 0;
   }
 
-  /** Returns the number of elements of this array. */
+  /** {@return the number of elements of this array} */
   default int size() {
     throw notAnArray();
   }
 
-  /** Returns element {@code index} of this array, counted from 0. */
+  /**
+   * Gets an element of this array.
+   *
+   * @param index the index of the element, counted from 0
+   * @return the element
+   */
   default Value get(int index) {
     throw notAnArray();
   }
 
-  /** Returns what the indices {@code path} select in turn, or this value if there are none. */
+  /**
+   * Follows indices into this value.
+   *
+   * @param path the indices to select in turn
+   * @return what they select, or this value if there are none
+   */
   default Value at(int... path) {
     Value value = this;
     for (int index : path) {
@@ -41,29 +57,30 @@ public sealed interface Value {
     return value;
   }
 
-  /** Returns this single integer. */
+  /** {@return this single integer} */
   default long asLong() {
     throw wrongType(ValueType.INT);
   }
 
-  /** Returns this single number, as a float if it is an integer. */
+  /** {@return this single number, as a float if it is an integer} */
   default double asDouble() {
     throw wrongType(ValueType.FLOAT);
   }
 
-  /** Returns this single string. */
+  /** {@return this single string} */
   default String asString() {
     throw wrongType(ValueType.STRING);
   }
 
-  /** Returns a copy of the integers of this one-dimensional array. */
+  /** {@return a copy of the integers of this one-dimensional array} */
   default long[] longs() {
     throw notAnArray();
   }
 
   /**
-   * Returns a copy of the integers of this one-dimensional array.
+   * Narrows the integers of this one-dimensional array.
    *
+   * @return a copy of the integers
    * @throws ArithmeticException if an integer does not fit an {@code int}
    */
   default int[] ints() {
@@ -75,13 +92,13 @@ public sealed interface Value {
     return narrowed;
   }
 
-  /** Returns a copy of the numbers of this one-dimensional array, integers as floats. */
+  /** {@return a copy of the numbers of this one-dimensional array, integers as floats} */
   default double[] doubles() {
     throw notAnArray();
   }
 
-  /** Returns a copy of the strings of this one-dimensional array. */
-  default String[] strings() {
+  /** {@return the strings of this one-dimensional array, as an unmodifiable list} */
+  default List<String> strings() {
     throw notAnArray();
   }
 
@@ -216,9 +233,10 @@ public sealed interface Value {
     }
 
     @Override
-    public String[] strings() {
+    public List<String> strings() {
       requireRow(ValueType.STRING);
-      return Arrays.copyOfRange(array.table().strings(), array.firstLeaf(), array.endLeaf());
+      List<String> leaves = Arrays.asList(array.table().strings());
+      return Collections.unmodifiableList(leaves.subList(array.firstLeaf(), array.endLeaf()));
     }
 
     private void requireRow(ValueType wanted) {
@@ -232,7 +250,17 @@ public sealed interface Value {
       }
     }
 
-    /** Returns the array in canonical JSON. */
+    @Override
+    public boolean equals(@Nullable Object other) {
+      return other instanceof ArrayValue value && array.hasSameContent(value.array);
+    }
+
+    @Override
+    public int hashCode() {
+      return array.contentHash();
+    }
+
+    /** {@return the array in canonical JSON} */
     @Override
     public String toString() {
       return CanonicalJson.value(array);

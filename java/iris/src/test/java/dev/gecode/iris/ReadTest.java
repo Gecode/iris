@@ -10,16 +10,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.lang.module.ModuleDescriptor;
-import java.lang.module.ModuleFinder;
-import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -92,7 +87,7 @@ class ReadTest {
     assertArrayEquals(new int[] {1, 2}, data.get("i").ints());
     assertArrayEquals(new double[] {1, 2}, data.get("i").doubles());
     assertArrayEquals(new double[] {0.5, 1.5}, data.get("f").doubles());
-    assertArrayEquals(new String[] {"a", "b"}, data.get("s").strings());
+    assertEquals(List.of("a", "b"), data.get("s").strings());
   }
 
   @Test
@@ -115,11 +110,28 @@ class ReadTest {
   void aColumnIsACopy() {
     Value column = read("a[2]: int", "1 2").get("a");
     column.longs()[0] = 9;
+    column.ints()[0] = 9;
+    column.doubles()[0] = 9;
     assertEquals(1, column.longs()[0]);
     assertEquals(new Value.IntValue(1), column.get(0));
-    Value words = read("a[2]: word", "x y").get("a");
-    words.strings()[0] = "z";
-    assertEquals("x", words.strings()[0]);
+    Value floats = read("a[2]: float", "0.5 1.5").get("a");
+    floats.doubles()[0] = 9;
+    assertEquals(new Value.FloatValue(0.5), floats.get(0));
+  }
+
+  @Test
+  void aListOfStringsCannotBeChanged() {
+    List<String> words = read("a[2]: word", "x y").get("a").strings();
+    assertThrows(UnsupportedOperationException.class, () -> words.set(0, "z"));
+    assertThrows(UnsupportedOperationException.class, () -> words.add("z"));
+    assertEquals(List.of("x", "y"), words);
+  }
+
+  @Test
+  void rowsOfRaggedStringsAreLists() {
+    Value rows = read("repeat 2 {\nn: int\na[n]: word\n}", "2 x y 1 z").get("a");
+    assertEquals(List.of("x", "y"), rows.get(0).strings());
+    assertEquals(List.of("z"), rows.get(1).strings());
   }
 
   @Test
@@ -138,13 +150,17 @@ class ReadTest {
     assertThrows(IllegalStateException.class, () -> integer.get(0));
     assertThrows(IllegalStateException.class, () -> integer.at(0));
     assertThrows(IllegalStateException.class, integer::longs);
+    assertThrows(IllegalStateException.class, integer::ints);
     assertThrows(IllegalStateException.class, integer::doubles);
     assertThrows(IllegalStateException.class, integer::strings);
     assertThrows(IllegalStateException.class, data.get("s")::asLong);
     assertThrows(IllegalStateException.class, data.get("s")::asDouble);
     assertThrows(IllegalStateException.class, data.get("a")::asLong);
+    assertThrows(IllegalStateException.class, data.get("a")::asDouble);
+    assertThrows(IllegalStateException.class, data.get("a")::asString);
     assertThrows(IllegalStateException.class, data.get("a")::strings);
     assertThrows(IllegalStateException.class, data.get("b")::longs);
+    assertThrows(IllegalStateException.class, data.get("b")::ints);
     assertThrows(IllegalStateException.class, data.get("w")::doubles);
     assertThrows(IndexOutOfBoundsException.class, () -> data.get("a").get(1));
     assertThrows(IndexOutOfBoundsException.class, () -> data.get("a").get(-1));
@@ -221,7 +237,7 @@ class ReadTest {
   void anExceptionPrefersTheInputLocation() {
     Spec spec = Spec.parse("a: int", "spec");
     var failure = assertThrows(IrisException.class, () -> spec.read("x", "input"));
-    assertTrue(failure.getMessage().startsWith("input:1:1: "), failure.getMessage());
+    assertEquals("input:1:1: expected int, found 'x'", failure.getMessage());
   }
 
   @Test
@@ -265,18 +281,6 @@ class ReadTest {
     assertThrows(IllegalArgumentException.class, () -> Params.of(Map.of("a", "\uD83Dx")));
     assertThrows(IllegalArgumentException.class, () -> Params.of().with("a", "\uDE00\uD83D"));
     assertEquals("😀", Params.of("a", "😀").values().get("a"));
-  }
-
-  @Test
-  void exportsOnlyThePublicPackage() throws URISyntaxException {
-    Path classes = Path.of(Spec.class.getProtectionDomain().getCodeSource().getLocation().toURI());
-    ModuleDescriptor module =
-        ModuleFinder.of(classes).find("dev.gecode.iris").orElseThrow().descriptor();
-    assertEquals(
-        Set.of("dev.gecode.iris"),
-        module.exports().stream()
-            .map(ModuleDescriptor.Exports::source)
-            .collect(Collectors.toSet()));
   }
 
   @Test

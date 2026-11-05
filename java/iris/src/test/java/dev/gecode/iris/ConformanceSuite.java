@@ -74,7 +74,10 @@ final class ConformanceSuite {
     List<Path> selected = List.copyOf(operations.keySet());
     Map<Path, Boolean> passed = run(selected);
     List<String> failures =
-        selected.stream().filter(c -> !passed.get(c)).map(c -> "fails: " + c).toList();
+        selected.stream()
+            .filter(c -> !passed.getOrDefault(c, false))
+            .map(c -> "fails: " + c)
+            .toList();
     if (!failures.isEmpty()) {
       throw new AssertionError(String.join("\n", failures));
     }

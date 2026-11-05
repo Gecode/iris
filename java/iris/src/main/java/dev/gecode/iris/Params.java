@@ -19,14 +19,17 @@ public final class Params {
     this.values = Collections.unmodifiableSequencedMap(values);
   }
 
-  /** Returns no parameters. */
+  /** {@return no parameters} */
   public static Params of() {
     return NONE;
   }
 
   /**
-   * Returns the one parameter {@code name} with {@code value}.
+   * Makes one parameter.
    *
+   * @param name the name
+   * @param value the text of the value
+   * @return the parameter
    * @throws IllegalArgumentException if either has an unpaired surrogate, which is not text
    */
   public static Params of(String name, String value) {
@@ -34,8 +37,10 @@ public final class Params {
   }
 
   /**
-   * Returns the parameters {@code values}, in its iteration order.
+   * Makes parameters from a map.
    *
+   * @param values the names with their values, in the order of the parameters
+   * @return the parameters
    * @throws IllegalArgumentException if a name or value has an unpaired surrogate, which is not
    *     text
    */
@@ -50,9 +55,11 @@ public final class Params {
   }
 
   /**
-   * Returns these parameters with {@code name} set to {@code value}. A name already present keeps
-   * its position.
+   * Sets a parameter. A name already present keeps its position.
    *
+   * @param name the name
+   * @param value the text of the value
+   * @return these parameters with the change, which leaves this object as it is
    * @throws IllegalArgumentException if either has an unpaired surrogate, which is not text
    */
   public Params with(String name, String value) {
@@ -63,7 +70,7 @@ public final class Params {
     return new Params(copy);
   }
 
-  /** Returns the parameters as an unmodifiable map, in the order they were given. */
+  /** {@return the parameters as an unmodifiable map, in the order they were given} */
   public SequencedMap<String, String> values() {
     return values;
   }

@@ -1,6 +1,5 @@
 package dev.gecode.iris;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -26,8 +25,8 @@ class CatalogTest {
     Data data = Spec.parse(SPEC).catalog("0 a 1 b");
     assertEquals(List.of("instances", "name", "failed"), names(data));
     assertEquals(2, data.get("instances").asLong());
-    assertArrayEquals(new String[] {"a", "b"}, data.get("name").strings());
-    assertArrayEquals(new String[] {"positive", ""}, data.get("failed").strings());
+    assertEquals(List.of("a", "b"), data.get("name").strings());
+    assertEquals(List.of("positive", ""), data.get("failed").strings());
   }
 
   @Test
@@ -91,11 +90,7 @@ class CatalogTest {
     Location location =
         assertThrows(IrisException.class, () -> spec.catalog(file)).error().inputLocation();
     assertEquals(new Location(file.toString(), 1, 1), location);
-    assertNull(
-        assertThrows(IrisException.class, () -> spec.catalog("a"))
-            .error()
-            .inputLocation()
-            .origin());
+    assertNull(assertThrows(IrisException.class, () -> spec.catalog("a")).origin());
   }
 
   @Test

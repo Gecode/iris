@@ -5,6 +5,17 @@ plugins {
 
 dependencies { api(libs.jspecify) }
 
+// Only the exported package has a public API. The source path resolves the rest.
+tasks.javadoc {
+  exclude("dev/gecode/iris/internal/**")
+  (options as StandardJavadocDocletOptions).apply {
+    addBooleanOption("Xwerror", true)
+    addStringOption("-source-path", sourceSets.main.get().java.srcDirs.single().path)
+  }
+}
+
+tasks.check { dependsOn(tasks.javadoc) }
+
 val repository = rootDir.parentFile
 val installedDriver = project(":iris-driver").layout.buildDirectory.dir("install/iris-driver")
 

@@ -38,19 +38,26 @@ public final class Data {
    */
   public record Entry(String name, Value value) {}
 
-  /** Returns the entries, in definition order. */
+  /** {@return the entries, in definition order} */
   public List<Entry> entries() {
     return entries;
   }
 
-  /** Returns the value of the entry {@code name}, or null if there is none. */
+  /**
+   * Finds an entry.
+   *
+   * @param name the name of the entry
+   * @return its value, or null if there is none
+   */
   public @Nullable Value find(String name) {
     return values.get(name);
   }
 
   /**
-   * Returns the value of the entry {@code name}.
+   * Gets an entry.
    *
+   * @param name the name of the entry
+   * @return its value
    * @throws IllegalStateException if there is no such entry
    */
   public Value get(String name) {
@@ -61,12 +68,12 @@ public final class Data {
     return value;
   }
 
-  /** Returns the canonical data document (§3.3), with its final newline. */
+  /** {@return the canonical data document (§3.3), with its final newline} */
   public String toJson() {
     return CanonicalJson.data(stored);
   }
 
-  /** Returns the dzn document (appendix B), which is empty for data without entries. */
+  /** {@return the dzn document (appendix B), which is empty for data without entries} */
   public String toDzn() {
     return Dzn.data(stored);
   }

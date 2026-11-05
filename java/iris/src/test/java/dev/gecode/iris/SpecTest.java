@@ -1,8 +1,10 @@
 package dev.gecode.iris;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Objects.requireNonNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
@@ -20,6 +22,7 @@ import dev.gecode.iris.internal.syntax.Resolver;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 class SpecTest {
@@ -93,7 +96,7 @@ class SpecTest {
   }
 
   /** Runs {@code action} on a small stack, and returns what it threw. */
-  private static Throwable onSmallStack(Runnable action) throws InterruptedException {
+  private static @Nullable Throwable onSmallStack(Runnable action) throws InterruptedException {
     var thrown = new AtomicReference<Throwable>();
     var thread = new Thread(null, action, "small-stack", SMALL_STACK);
     thread.setUncaughtExceptionHandler((t, e) -> thrown.set(e));
@@ -138,7 +141,7 @@ class SpecTest {
   void excessiveNestingIsAnErrorOnASmallStack() throws InterruptedException {
     String source = "(".repeat(100_000);
     Throwable thrown = onSmallStack(() -> Spec.parse("let a = " + source));
-    assertEquals(ErrorCode.SPEC_NESTING, ((IrisException) thrown).code());
+    assertEquals(ErrorCode.SPEC_NESTING, assertInstanceOf(IrisException.class, thrown).code());
   }
 
   /**
@@ -240,9 +243,10 @@ class SpecTest {
     var program = new AtomicReference<Ast.Program>();
     assertNull(onSmallStack(() -> program.set(parsed(source))));
     assertNull(onSmallStack(() -> assertEquals(program.get(), parsed(source))));
-    var declaration = (Stmt.Declaration) program.get().body().getLast();
+    Ast.Program parsed = requireNonNull(program.get());
+    var declaration = (Stmt.Declaration) parsed.body().getLast();
     assertEquals(new ReadingType.Named(39_999, ReadingKind.FLOAT), declaration.type());
-    assertEquals("t39999", program.get().types().get(39_999).name());
+    assertEquals("t39999", parsed.types().get(39_999).name());
   }
 
   @Test
