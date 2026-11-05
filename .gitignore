@@ -22,6 +22,7 @@ __pycache__/
 
 # Gradle
 .gradle/
+.kotlin/
 
 # macOS
 .DS_Store

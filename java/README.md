@@ -6,8 +6,8 @@ describes both; milestone M4d builds them.
 
 The library parses reader specs, applies every parse-time check of the
 Specification, reads input into columnar data under the work budgets of chapter
-10, lists the instances of an input, and writes dzn. `iris-kotlin` comes with
-task `java-005`.
+10, lists the instances of an input, and writes dzn. `iris-kotlin` adds Kotlin
+extensions; [its README](iris-kotlin/README.md) shows them.
 
 ```java
 import dev.gecode.iris.Data;
@@ -56,9 +56,10 @@ covers tools that do not read `module-info`, such as those on the class path.
 |---|---|
 | `iris/` | The library. Only `dev.gecode.iris` is exported; `dev.gecode.iris.internal.syntax` holds the lexer, parser and resolver, and `dev.gecode.iris.internal.read` the reader. |
 | `iris-driver/` | The conformance driver, which is not published. It implements `parse`, `read`, `catalog` (`--format json|dzn`) and `dzn`. The JVM decodes arguments in the locale's encoding before `main` runs, so outside a UTF-8 locale the driver answers exit status 3 for non-ASCII `--params` instead of reading changed values; JSON escapes work in any locale. |
-| `iris-kotlin/` | The Kotlin module, still empty. |
-| `build-logic/` | The convention plugin `iris.java-conventions` shared by the modules. |
+| `iris-kotlin/` | The Kotlin extensions, in the exported package `dev.gecode.iris.kotlin` of the module of that name. |
+| `build-logic/` | The convention plugins `iris.java-conventions`, shared by the modules, and `iris.kotlin-conventions`. |
 | `gradle/libs.versions.toml` | The pinned versions. |
+| `detekt.yml` | The detekt configuration: what differs from the default rules. |
 
 The legal nesting of §5.12 needs up to about 900 KiB of stack on a JVM, so
 `Spec.parse`, `Spec.read` and `Spec.catalog` run on a shared pool of threads
@@ -88,18 +89,22 @@ with `cargo` on `PATH`, since the conformance test runs the Rust runner. It
 fails rather than skips without `cargo`.
 
 ```sh
-./gradlew build          # compile, spotlessCheck, all tests, conformance, and javadoc
-./gradlew spotlessApply  # rewrite the sources
+./gradlew build          # compile, spotlessCheck, detekt, all tests, conformance, and javadoc
+./gradlew spotlessApply  # rewrite the Java and Kotlin sources
 ./gradlew conformance    # every conformance case, through the installed driver
 ./gradlew :iris:javadoc  # the API reference, in iris/build/docs/javadoc
 ./gradlew :iris:test --tests dev.gecode.iris.BudgetLimitsTest
 ./gradlew :iris:test --tests dev.gecode.iris.FloatDifferentialTest
+./gradlew :iris-kotlin:check  # the Kotlin tests, detekt and the dependency check
 ```
 
 `-Xlint:all -Werror` applies to main and test sources. Error Prone and NullAway
 run inside `compileJava`, so they have no task of their own: any Error Prone
 warning fails the build through `-Werror`, and NullAway reports at error level
 for `@NullMarked` code, which is all of `dev.gecode.iris`.
+
+`iris-kotlin` compiles with `allWarningsAsErrors`, and detekt and ktfmt run in
+`check`; [its README](iris-kotlin/README.md) has the details.
 
 `:iris:javadoc` documents only the exported package and fails on any warning, a
 missing comment included. The build runs it through `check`. `ApiTest` checks the
@@ -133,7 +138,8 @@ Run the same command with `../formats` for the format cases.
 ## Pinned tools
 
 Gradle 9.8.2 (wrapper), Spotless 8.11.0 with google-java-format 2.0.0, Error
-Prone 2.52.0, NullAway 0.14.3, JSpecify 1.0.1 and JUnit 5.14.4.
+Prone 2.52.0, NullAway 0.14.3, JSpecify 1.0.1, JUnit 5.14.4, Kotlin 2.4.21, ktfmt
+0.64 and detekt 2.0.0-alpha.6.
 
 ### Java 27 gaps
 
@@ -142,3 +148,15 @@ compiler inside Gradle has no JVM 27 target, so compiling `build-logic` warns
 and targets JVM 26; this affects only the build logic. Gradle may also print
 `Did not receive connection preamble within 10s` during a `--no-daemon` run,
 which is noise unless the build fails.
+
+`iris-kotlin` has the same gap. Kotlin 2.4.21 has no JVM 27 target, so its
+classes target JVM 26 (class file version 70), while `module-info.class` and
+`dev.gecode:iris` are version 71. The build turns off the Gradle plugin's check
+that the Java and Kotlin targets match. The module still needs Java 27, as
+`dev.gecode:iris` does. The compiler reads the Java 27 classes and the
+`module-info` of `dev.gecode.iris`, and rejects a use of a package that module
+does not export.
+
+detekt has no stable release for Kotlin 2.4: the 1.x line stops at 1.23.8, so
+`2.0.0-alpha.6`, the newest release, is pinned. It is built against Kotlin
+2.4.10 and analyzes this code, with type resolution, without complaint.
