@@ -16,7 +16,7 @@
 //! The API is ordinary Rust on native targets, so it is tested without a
 //! JavaScript engine.
 //!
-//! The wasm32 export [`instance_memory`] is internal to the package and absent
+//! The wasm32 export `instance_memory` is internal to the package and absent
 //! from its published declarations: it gives the instance's memory, which the
 //! package measures after each read. With the off-by-default `fault-injection`
 //! feature, the internal export `armTrap` lets the package's tests force the
