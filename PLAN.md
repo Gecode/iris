@@ -1019,7 +1019,8 @@ Dependencies flow downward. Work in the same row can run in parallel.
 | M5 | Site and playground | Starlight site, the Specification rendered, guides, WASM playground, format pages | Deployed at `iris.gecode.dev` |
 | M6 | Skill | `skill/iris`, evals | The eval set passes, for example 8 of 10 formats read correctly on the first attempt |
 | M6b | Lint decision | Review `docs/lint-candidates.md` (§8.13, §12 open question 3), then build what the decision calls for | The decision is recorded in §12; any lints that ship have tests, fixes where possible, and site pages. Not required for M7 |
-| M7 | 0.1.0 release | The 0.1 Specification frozen, every package published as 0.1.0, announcement | Every registry and marketplace (including JetBrains Marketplace) has 0.1.0, and the docs are live |
+| M7 | 0.1.0 release | The 0.1 Specification frozen; Rust, Python, TypeScript, Java and Kotlin, C++, the VS Code extension, and the JetBrains plugin published as 0.1.0; announcement | Those registries and marketplaces have 0.1.0, and the docs are live |
+| M7a | Remaining tooling | Tree-sitter and the Zed extension (finishing M4b), the skill's evals (finishing M6) | Those packages are published, and the skill's eval set passes. Not required for M7; follows it in 0.x package releases |
 | M7b | Spec builders | Builders in every implementation (§8.15), `iris gen`, the round-trip generator and comparison, a builder page in each API guide | Every checked conformance and format spec round-trips through each language's builder, and every format has an idiomatic builder whose cases pass. Not required for M7; ships in 0.x package releases |
 
 M4a to M4f can start once M2 is done, and run in parallel, which is where
@@ -1065,7 +1066,17 @@ before M4e.
   2026-10-31 found `gecode-iris` free on crates.io, PyPI, and npm,
   `tree-sitter-iris` free on npm, and `Gecode/iris` not yet in use.
   Publishing `dev.gecode` on Maven Central requires verifying ownership of
-  the `gecode.dev` domain.
+  the `gecode.dev` domain. Published crates take the `gecode-iris-` prefix
+  (`gecode-iris-syntax`, `-sema`, `-core`, `-macros`, `-build`, `-gen`,
+  `-lsp`, `-conformance`, `-cli`), because a check on 2026-11-05 found
+  `iris-core`, `iris-cli`, and `iris-macros` taken on crates.io. The JetBrains
+  plugin has the ID `dev.gecode.iris` and the name `Gecode Iris`, because an
+  unrelated plugin is called Iris. The VS Code extension is `gecode.iris` and
+  the Homebrew formula is `gecode/tap/iris`. `iris-driver` is a conformance
+  tool and stays out of `cargo install` and the release archives.
+- **Domain:** the project's domain is `gecode.dev`, and `dev.gecode` where
+  reverse order is used. `gecode.org` is no longer the project's, so nothing
+  here links to it or uses `org.gecode`.
 - **Gecode:** 6.5.0 keeps its own implementation, which defines Iris 0.1.
   Gecode 7 may switch to the Iris C++ library.
 - **Versions:** Iris 0.1 is the Gecode 6.5.0 language. Iris 1.0 develops it
