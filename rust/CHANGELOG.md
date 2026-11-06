@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.0 - 2026-11-06
+
 ### Library
 
 - Add the `gecode-iris-gen` crate, which generates spec builder programs
