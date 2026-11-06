@@ -7,8 +7,8 @@ next: false
 ---
 
 The Rust implementation supplies the `iris` command-line tool and the
-language server. Build them from source; package registries, binary releases,
-and editor marketplace listings are planned.
+language server. [Install it](/tools/cli/#install) from a binary release or
+crates.io. Editor marketplace listings are planned.
 
 - [CLI](/tools/cli/): validate a reader spec, read input as JSON, dzn or a summary, list instances, and run conformance cases.
 - [Formatter](/tools/formatter/): one style for reader specs, with the line width from EditorConfig.

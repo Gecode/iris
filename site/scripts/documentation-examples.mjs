@@ -72,7 +72,7 @@ export async function collectDocumentationExamples({ tools, formats, execute, co
   add('rust-example', await rustExample(), 'rust');
   // rustdoc compiles and executes this exact body, including its hidden Ok line.
   execute('cargo', ['test', '--locked', '-p', 'gecode-iris', '--doc', '--quiet'], 0, true, { cwd: resolve(repository, 'rust') });
-  add('rust-dependency', '[dependencies]\ngecode-iris = { path = "../iris/rust/gecode-iris" }', 'toml');
+  add('rust-dependency', '[dependencies]\ngecode-iris = "0.1"', 'toml');
   Object.assign(examples, await collectLearningExamples({ tools, execute, command }));
   Object.assign(examples, await collectPythonExamples({ tools, execute }));
   Object.assign(examples, await collectTypescriptExamples());

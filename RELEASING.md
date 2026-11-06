@@ -14,7 +14,7 @@ tags; [§11](PLAN.md#11-milestones) defines the release milestones.
 
 | Component | Tag | Current release support |
 |---|---|---|
-| Rust crates and CLI binaries | `rust-vVERSION` | Ready: crates package and build, and the cargo-dist workflow is in place; publication is by hand |
+| Rust crates and CLI binaries | `rust-vVERSION` | Released: 0.1.0 on crates.io and GitHub; crates are published by hand until trusted publishing is set up |
 | Python | `python-vVERSION` | Ready: the release workflow needs the PyPI setup below |
 | TypeScript | `typescript-vVERSION` | Ready: the release workflow needs the npm setup below |
 | Java and Kotlin | `java-vVERSION` | Native library and Kotlin module ready; Maven Central publication planned for M7 |

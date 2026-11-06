@@ -27,7 +27,7 @@ implementation crate, [gecode-iris-macros](iris-macros/README.md), depends on
 reader specs in Rust with typed handles.
 [gecode-iris-gen](iris-gen/README.md) prints a builder program for a reader spec, which
 `iris gen builder` exposes; it depends on `gecode-iris-syntax` and `gecode-iris-sema` only.
-The ten `gecode-iris` crates are ready for crates.io, and
+The ten `gecode-iris` crates are on crates.io, and
 [RELEASING.md](../RELEASING.md#rust) holds the publication procedure. The order is
 `gecode-iris-syntax`, `gecode-iris-sema`, `gecode-iris-core`, `gecode-iris-macros`,
 `gecode-iris-build`, `gecode-iris-gen`, `gecode-iris`, `gecode-iris-conformance`,
