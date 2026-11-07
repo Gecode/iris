@@ -4,9 +4,13 @@
 //! a [`Backend`] renders that as source in one implementation language. A new
 //! language adds a [`Language`] variant, a backend module and one match arm in
 //! [`builder_code`].
+//!
+//! [`view`](view::view) turns a checked spec into a language-independent
+//! [`View`](view::View) of typed handles, and [`view_code`] prints it.
 mod lower;
 pub mod program;
 mod rust;
+pub mod view;
 
 use std::fmt;
 use std::str::FromStr;
@@ -74,5 +78,17 @@ pub fn builder_code(
     let program = lower(parsed, analysis)?;
     Ok(match language {
         Language::Rust => rust::RustBackend.render(&program),
+    })
+}
+
+/// A module of the spec's typed handles, or the first error that `iris check`
+/// reports.
+pub fn view_code(
+    analysis: &Analysis,
+    language: Language,
+) -> Result<String, gecode_iris_sema::Error> {
+    let view = view::view(analysis)?;
+    Ok(match language {
+        Language::Rust => rust::view::render(&view),
     })
 }

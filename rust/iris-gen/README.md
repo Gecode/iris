@@ -1,9 +1,9 @@
 # gecode-iris-gen
 
-Generates spec builder programs from reader specs, as described in
-[docs/builders.md](../../docs/builders.md). It belongs to the builder work of
+Generates spec builder programs and typed views from reader specs, as described
+in [docs/builders.md](../../docs/builders.md). It belongs to the builder work of
 [PLAN.md §8.15](../../PLAN.md#815-spec-builders). It depends only on `gecode-iris-syntax`
-and `gecode-iris-sema`, and `iris gen builder` is its command.
+and `gecode-iris-sema`, and `iris gen builder` and `iris gen` are its commands.
 
 `lower` turns a spec that `iris check` accepts into a `Program`, a flat list of
 events with expressions in postfix form. Nothing in a `Program` belongs to one
@@ -56,9 +56,31 @@ its place goes into a `let`, and only the `let` has to match rustfmt exactly:
   display columns, and only in ASCII is a length a width. It takes a table of
   Unicode widths to do better, which this crate does not have.
 
+## Views
+
+`view` turns a spec that `iris check` accepts into a `View`, a list of handles
+that belongs to no language, and `view_code` prints it. Each `Handle` holds the
+entry's name and its `Access`: `Typed` with a value type, a depth and whether the
+entry may be absent, or `Dynamic`. Every fact comes from
+`SemanticModel::output_entries`; this crate infers nothing. A typed handle is a
+promise that `get` cannot fail on data that a read produces, so an entry is
+`Dynamic` unless its facts leave one value type and one depth. `Num` needs each
+definition to leave both int and float open, so `x:int x:float` is `Dynamic`.
+
+The Rust printer writes one `pub const` per entry, with handle types named as
+text, so this crate does not link `gecode-iris-build`. The header is a plain
+comment and each constant has its own `#[allow]`, because `include!` rejects inner
+attributes and inner doc comments. It maps a depth above 8 to
+`DynField`, because `gecode_iris::build` stops at `D8`; the `View` keeps the real
+depth for languages without that limit. Identifiers follow the builder's rules,
+but only keywords are reserved, since a view has no generated names beside its
+own. An identifier stops at 40 columns, which gives a declaration three layouts.
+A new language adds a printer, not a change to `View`.
+
 From `rust/`:
 
 ```sh
 cargo test --locked -p gecode-iris-gen
+cargo test --locked -p gecode-iris --test view_formats --test view_soundness -- --nocapture
 cargo test --locked -p gecode-iris --test builder_round_trip -- --nocapture
 ```

@@ -473,7 +473,7 @@ fn joined_definition_facts(
         .unwrap_or_else(ValueFacts::unknown)
 }
 
-fn fallback_facts(definition: &Definition) -> ValueFacts {
+pub(crate) fn fallback_facts(definition: &Definition) -> ValueFacts {
     if matches!(definition.kind, DefinitionKind::Let | DefinitionKind::Param) {
         return ValueFacts::known(ValueType::Int, 0);
     }

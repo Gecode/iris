@@ -237,6 +237,21 @@ pub struct ComprehensionInfo {
     pub domain: SyntaxNode,
     pub record_elements: Option<RepeatId>,
 }
+/// An entry that a successful read can leave in its data. Catalog data is not
+/// described here: it has its own entries.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OutputEntry {
+    pub name: String,
+    /// Every definition of the name that can reach the data, in source order.
+    /// More than one means that the name is redefined.
+    pub definitions: Vec<DefinitionId>,
+    /// The depths the entry can have, and the value types of its leaves. An
+    /// entry without leaves can have any value type in its data.
+    pub facts: ValueFacts,
+    /// Whether a successful read can leave no such entry. `false` is a proof.
+    /// `true` can also mean only that the analysis found no proof.
+    pub possibly_absent: bool,
+}
 #[derive(Debug, Default, Clone)]
 pub struct SemanticModel {
     pub(crate) definitions: Vec<Definition>,
@@ -247,6 +262,7 @@ pub struct SemanticModel {
     pub(crate) expressions: Vec<ExpressionInfo>,
     pub(crate) checks: Vec<CheckInfo>,
     pub(crate) comprehensions: Vec<ComprehensionInfo>,
+    pub(crate) output_entries: Vec<OutputEntry>,
 }
 impl SemanticModel {
     pub fn definitions(&self) -> &[Definition] {
@@ -272,6 +288,11 @@ impl SemanticModel {
     }
     pub fn comprehensions(&self) -> &[ComprehensionInfo] {
         &self.comprehensions
+    }
+    /// The entries of a successful read, by first definition. Empty when the
+    /// spec is invalid.
+    pub fn output_entries(&self) -> &[OutputEntry] {
+        &self.output_entries
     }
     pub fn definition(&self, id: DefinitionId) -> &Definition {
         &self.definitions[id.0]

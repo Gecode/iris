@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Library
+
+- Add `SemanticModel::output_entries` and `OutputEntry` to gecode-iris-sema: each
+  output entry's depth, value type, possible absence and definitions.
+- Add `gecode_iris_gen::view` and `view_code`, which turn a reader spec into a
+  list of typed handles and print it, with a Rust printer.
+
+### CLI
+
+- Add `iris gen --lang rust SPEC`, which prints a module of declared handles of
+  a text spec, of the types the spec builder returns. A name without one value
+  type and depth gets a `DynField`.
+
 ## 0.1.0 - 2026-11-06
 
 ### Library

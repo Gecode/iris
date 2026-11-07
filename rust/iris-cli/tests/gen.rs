@@ -83,3 +83,52 @@ fn the_language_is_required() {
     assert_eq!(output.status.code(), Some(2));
     assert!(stderr(&output).contains("--lang"), "{}", stderr(&output));
 }
+
+fn generate_view(spec: &str) -> Output {
+    iris(&["gen", "--lang", "rust", spec])
+}
+
+#[test]
+fn the_jobshop_view_matches_its_recording() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let spec = root.join("../../formats/jobshop/jobshop.iris");
+    let output = generate_view(spec.to_str().unwrap());
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    assert_eq!(stderr(&output), "");
+    let recording = fs::read_to_string(root.join("tests/fixtures/jobshop-view.rs")).unwrap();
+    assert_eq!(String::from_utf8(output.stdout).unwrap(), recording);
+}
+
+#[test]
+fn a_view_of_a_rejected_spec_fails_as_the_check_does() {
+    let directory = tempfile::tempdir().unwrap();
+    let spec = write_spec(directory.path(), b"let x = nothing(1)\n");
+    let generated = generate_view(&spec);
+    assert_eq!(generated.status.code(), Some(1));
+    assert_eq!(generated.stdout, b"");
+    assert_eq!(stderr(&generated), stderr(&iris(&["check", &spec])));
+}
+
+#[test]
+fn a_view_of_a_missing_file_fails_with_no_output() {
+    let directory = tempfile::tempdir().unwrap();
+    let spec = directory.path().join("missing.iris");
+    let generated = generate_view(spec.to_str().unwrap());
+    assert_eq!(generated.status.code(), Some(1));
+    assert_eq!(generated.stdout, b"");
+    assert!(stderr(&generated).contains("missing.iris"));
+}
+
+#[test]
+fn a_view_needs_a_language_and_a_spec() {
+    for arguments in [
+        &["gen"][..],
+        &["gen", "spec.iris"],
+        &["gen", "--lang", "rust"],
+        &["gen", "--lang", "cobol", "spec.iris"],
+    ] {
+        let output = iris(arguments);
+        assert_eq!(output.status.code(), Some(2), "{arguments:?}");
+        assert_eq!(output.stdout, b"", "{arguments:?}");
+    }
+}

@@ -834,7 +834,13 @@ absence. That is enough to generate the same handles a builder returns:
 - **`iris gen --lang L SPEC`** prints a module of declared handles, in the
   style of the Java section, for Rust, Python, C++, Java, Kotlin, or
   TypeScript. A name whose facts are not a single value type and depth
-  gets a dynamic handle.
+  gets a dynamic handle. Rust is the only language so far: it prints one
+  `pub const` per entry, named like the entry, to use by path
+  (`jobshop::n_jobs`). A name redefined with another value type, a depth
+  that varies, a depth above 8 in Rust, and a parameter without a default
+  are all dynamic. A name is `Maybe` when it is not always in the output,
+  as in the builder. `repeat 0 {if 0 {x:int}}` runs no definition of `x`, but
+  every read publishes its empty column, so `x` is not `Maybe`.
 - **The `iris!` macro** (PLAN.md §8.1) expands to a plain `Spec` today.
   It will instead expand to a value with a `spec` field and one field per
   handle, generated at compile time, so that Rust needs no generated file.

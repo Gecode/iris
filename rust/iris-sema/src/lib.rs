@@ -4,6 +4,7 @@ mod diagnostic;
 mod environment;
 mod infer;
 mod model;
+mod output;
 mod render;
 mod resolve;
 pub use render::{render_error, render_format_error};
@@ -43,6 +44,7 @@ pub fn analyze(parsed: &Parse) -> Analysis {
         .or_else(|| resolve::resolve(parsed, &mut model, &index).err());
     if error.is_none() {
         infer::infer(&mut model, &index);
+        output::collect(&mut model, &index);
     }
     Analysis {
         model,

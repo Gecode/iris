@@ -8,6 +8,10 @@ use gecode_iris::{Failure, Params, Spec};
 use gecode_iris_conformance::case::{self, Case};
 use std::{fs, path::Path};
 
+/// What `iris gen --lang rust` prints for `formats/jobshop/jobshop.iris`.
+#[path = "../../iris-cli/tests/fixtures/jobshop-view.rs"]
+mod view;
+
 const MSG_DISTINCT: &str = "a job uses a machine twice; each job must use every machine once";
 const MSG_TOTAL: &str = "the total duration is too large";
 
@@ -87,6 +91,34 @@ fn code(failure: &Failure) -> String {
         Failure::Language(error) => error.code.as_str().to_owned(),
         other => panic!("unexpected failure: {other}"),
     }
+}
+
+/// A compile error unless both handles have one type.
+fn same_handle<H>(_: H, _: H) {}
+
+#[test]
+fn a_view_of_the_text_spec_has_the_handles_of_the_builder() {
+    let built = jobshop();
+    same_handle(built.name, view::name);
+    same_handle(built.n_jobs, view::n_jobs);
+    same_handle(built.n_machines, view::n_machines);
+    same_handle(built.machine, view::machine);
+    same_handle(built.duration, view::duration);
+    let mut read = 0;
+    for case in cases() {
+        let input = fs::read(case.input.as_ref().unwrap()).unwrap();
+        let Ok(data) = built.spec.read(&input, "input", &params(&case)) else {
+            continue;
+        };
+        read += 1;
+        assert_eq!(data.get(view::name), data.get(built.name));
+        assert_eq!(data.get(view::n_jobs), data.get(built.n_jobs));
+        assert_eq!(data.get(view::n_machines), data.get(built.n_machines));
+        let rows = |handle: Field<Int, D2>| data.get(handle).rows().collect::<Vec<_>>();
+        assert_eq!(rows(view::machine), rows(built.machine));
+        assert_eq!(rows(view::duration), rows(built.duration));
+    }
+    assert!(read >= 2, "too few reads: {read}");
 }
 
 #[test]
