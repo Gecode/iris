@@ -188,6 +188,7 @@ public:
     }
     exec(spec.body);
     spec_line = 0;
+    owner_line = 0;
     // Reading stops after the selected instance
     if (!trailing_ && !selected_ && in.skip_to_data())
       throw input_error(ErrorCode::TrailingInput,
@@ -703,6 +704,7 @@ private:
 
   void exec(const Stmt &s) {
     spec_line = s.line;
+    owner_line = 0;
     switch (s.kind) {
     case Stmt::Kind::Comment:
       in.comments.insert(in.comments.end(), s.words.begin(), s.words.end());
@@ -1142,6 +1144,7 @@ private:
       std::size_t start = in.pos;
       Seq<Entry> f = instance(s.body, n);
       spec_line = s.line;
+      owner_line = 0;
       if (in.pos == start)
         fail(ErrorCode::NoProgress, "an instance must read some input");
       if (listings_) {
@@ -1217,6 +1220,9 @@ private:
       starts.ints.push_back(static_cast<std::int64_t>(in.next_data()));
       std::size_t start = in.pos;
       exec(s.body);
+      // The errors after the body keep the line of its last statement and
+      // belong to the repeat
+      owner_line = s.line;
       if (in.pos == start) {
         if (!n)
           fail(ErrorCode::NoProgress,
@@ -1273,6 +1279,7 @@ private:
     Place end_at = in.here();
     for (;;) {
       spec_line = s.line;
+      owner_line = 0;
       if (!in.skip_to_data()) {
         end_at = in.here();
         break;
@@ -1285,12 +1292,16 @@ private:
       }
       std::optional<std::size_t> found;
       Seq<Capture> caps;
+      // An arm owns the errors of matching its pattern and taking the
+      // captures
       for (std::size_t k = 0; !found && (k < s.arms.size()); k++) {
         caps.clear();
+        owner_line = s.arms[k].line;
         if (matches(s.arms[k].pattern, caps))
           found = k;
       }
       if (!found) {
+        owner_line = 0;
         if (s.skip_other) {
           in.to_eol();
           continue;
@@ -1335,6 +1346,7 @@ private:
         m += s.arms[k].pattern.source;
         m += "\" before ";
         m += end;
+        owner_line = s.arms[k].line;
         Error e = located(ErrorCode::LineMatch, std::move(m), end_at);
         // At the end of the input, no later instance can be hidden
         if (!in.skip_to_data())

@@ -141,6 +141,10 @@ protected:
   Seq<Context> context;
   /// Reader-spec line of the current statement, or 0
   std::size_t spec_line = 0;
+  /// Reader-spec line of the statement that errors belong to when it is not
+  /// the current one, or 0: a repeat after its body ran, or a sections arm
+  /// while it is matched
+  std::size_t owner_line = 0;
   /// Names bound by the comprehensions being evaluated
   const Binding *bindings = nullptr;
   /// The check being evaluated, or null

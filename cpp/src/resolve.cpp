@@ -131,10 +131,16 @@ private:
   Repeats repeats_;
   /// The statement visited
   Stmt *stmt_ = nullptr;
+  /// The line of the sections arm whose pattern is visited, or 0
+  std::size_t arm_line_ = 0;
   /// The names bound by the comprehensions around the expression
   Seq<Bound> bound_;
 
+  /// Fail with `code` and message `m` at the statement visited, in the arm
+  /// visited if there is one
   [[noreturn]] void fail(ErrorCode code, std::string_view m) const {
+    if (arm_line_ > 0)
+      fail_in(code, origin_, stmt_->line, arm_line_, m);
     fail_at(code, origin_, stmt_->line, m);
   }
   /// Add a definition of `n`
@@ -353,8 +359,11 @@ private:
     stmt_ = &s;
     type(s.type);
     pattern(s.pattern);
-    for (Arm &a : s.arms)
+    for (Arm &a : s.arms) {
+      arm_line_ = a.line;
       pattern(a.pattern);
+    }
+    arm_line_ = 0;
     for (Node<Expr> &d : s.dims)
       value(*d);
     if (s.expr)

@@ -2,12 +2,17 @@
 
 #include <cstddef>
 #include <optional>
+#include <source_location>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
 
 namespace iris {
+
+namespace detail {
+struct ErrorAccess;
+} // namespace detail
 
 /// A registered error code of the Iris Language Specification (chapter 11).
 enum class ErrorCode {
@@ -111,6 +116,9 @@ struct ErrorDetails {
   /// The summary of an earlier rejection in the same instance, which may
   /// explain this error
   std::optional<std::string> earlier_rejection = std::nullopt;
+  /// The host code that wrote the statement the error belongs to, for a
+  /// reader spec from a spec builder (see iris/build.hpp)
+  std::optional<std::source_location> call_site = std::nullopt;
 };
 
 /**
@@ -121,8 +129,9 @@ struct ErrorDetails {
  * `origin:line:column: message`, or `origin:line: message` without a
  * column. A read-time error goes on with the excerpt and a caret under the
  * column, then `  while reading: ` and the context, `  spec: origin:line`
- * for the statement, and `  after an earlier error in the instance: ` and
- * the earlier rejection, each on a line of its own if the error has it.
+ * for the statement, `call site: file:line:column` for the call site,
+ * and `  after an earlier error in the instance: ` and the earlier
+ * rejection, each on a line of its own if the error has it.
  */
 class Error : public std::runtime_error {
 public:
@@ -164,11 +173,23 @@ public:
   [[nodiscard]] const std::optional<std::string> &earlier_rejection() const {
     return details_.earlier_rejection;
   }
+  /// Return the host code that wrote the statement the error belongs to,
+  /// for a reader spec from a spec builder; a spec parsed from text has no
+  /// call sites
+  [[nodiscard]] const std::optional<std::source_location> &call_site() const {
+    return details_.call_site;
+  }
 
 private:
+  friend struct detail::ErrorAccess;
+
   ErrorCode code_;
   std::string message_;
   ErrorDetails details_;
+  /// The reader-spec line of the statement the error belongs to, when the
+  /// error lies past it: at the token after it, at the end of its block,
+  /// or at a statement a repeat or a sections arm ran
+  std::optional<std::size_t> owner_line_;
 };
 
 } // namespace iris

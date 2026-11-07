@@ -34,12 +34,13 @@ it in a `std::expected` instead: `parse`, `load`, `read`, `read_text`,
 
 `iris::Error` carries the error code, the message, the reader-spec and input
 locations, the excerpt of the input line, the context, the record path of a
-failed check, and the earlier rejection in the same instance that may
-explain the error. `details()` returns them as one `iris::ErrorDetails`, from
-which an error can be rebuilt. `what()` renders the diagnostic of
-Specification §11.1: `origin:line:column: message`, then the excerpt with a
-caret, `while reading:`, `spec:` and `after an earlier error in the
-instance:` lines when the error has them.
+failed check, the earlier rejection in the same instance that may explain
+the error, and for a spec from the spec builder the host call site of the
+statement it belongs to. `details()` returns them as one
+`iris::ErrorDetails`, from which an error can be rebuilt. `what()` renders
+the diagnostic of Specification §11.1: `origin:line:column: message`, then
+the excerpt with a caret, `while reading:`, `spec:`, `call site:` and
+`after an earlier error in the instance:` lines when the error has them.
 
 `iris::Data` holds the entries in definition order. Its accessors take a
 name and a path of indices, such as `data.ints("clause", {3})`, and throw
@@ -151,7 +152,7 @@ cmake --build --preset dev
 ctest --preset dev
 ```
 
-`ctest` runs forty-four tests. `spec-api` and `data-api` check the public
+`ctest` runs forty-five tests. `spec-api` and `data-api` check the public
 API; `data-api` also checks the driver's JSON of data, and both outputs
 under every rounding mode. `budget` checks the exact budget limits that no
 conformance case reaches. `memory` checks the allocation hook: it replaces
@@ -161,8 +162,13 @@ also on several threads and with the default resource, and return all of
 it. `headers-compile-alone` compiles each public header by itself, and
 `headers-name-no-gecode` checks that none names Gecode. `build-api` checks
 the spec builder: its scope, provenance, redefinition, printability and
-capture checks, the call site of each error, the text it prints, and the
-data it reads, including the jobshop example against every jobshop case.
+capture checks and their call sites, the text it prints, and the data it
+reads, including the jobshop example against every jobshop case.
+`build-call-sites` ports `rust/iris-build/tests/call_sites.rs`: the call
+site of every statement, of the language errors that `build()` reports,
+including those that lie past their statement, and of the read and catalog
+failures of a built spec, and none for a failure that names no statement or
+for a spec parsed from text.
 `build-types` checks with `static_assert` the types that `get`, the
 statements and the expressions give, and the values a parameter handle
 takes. Each `compiles-NAME` test builds a
@@ -400,9 +406,11 @@ come from PyPI through uv.
   rounding mode, and `dzn.cpp` spells floats with integer arithmetic.
   `builder/` is the spec builder: `state.hpp` and `state.cpp` hold the
   statements a builder records and the checks made as they are written,
-  `builder.cpp` holds the statement methods, `check.cpp` runs the checks
-  made at `build()`, and `print.cpp` prints the text and maps each line to
-  a call site.
+  `builder.cpp` holds the statement methods and maps each emitted line to
+  a call site, `check.cpp` runs the checks made at `build()`, and
+  `print.cpp` prints the text. `call_sites.hpp` and `call_sites.cpp` hold
+  the table of call sites that a built spec keeps and the access that
+  attaches it and records the statement an error belongs to.
 - `driver/`: `iris-driver`, the conformance driver. It speaks the protocol
   in [`conformance/README.md`](../conformance/README.md).
 - `fuzz/`: the libFuzzer targets `parse.cpp` and `read.cpp`, the

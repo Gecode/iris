@@ -14,6 +14,7 @@ namespace iris {
 
 namespace detail {
 struct SpecImpl;
+struct SpecAccess;
 } // namespace detail
 
 /**
@@ -100,6 +101,8 @@ public:
                    const Params &params = {}) const;
 
 private:
+  friend struct detail::SpecAccess;
+
   explicit Spec(std::shared_ptr<const detail::SpecImpl> impl);
 
   std::shared_ptr<const detail::SpecImpl> impl_;

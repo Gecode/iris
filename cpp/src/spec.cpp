@@ -37,6 +37,7 @@
 #include <iris/spec.hpp>
 
 #include "ast.hpp"
+#include "call_sites.hpp"
 #include "lexer.hpp"
 #include "numbers.hpp"
 #include "parser.hpp"
@@ -133,13 +134,26 @@ auto expected(F operation) -> std::expected<decltype(operation()), Error> {
   }
 }
 
-} // namespace
+/// Return the result of `operation`, and throw the Error it throws with the
+/// call site from `sites` of the statement the error belongs to
+template <class F>
+auto locating(const detail::CallSites &sites, F operation)
+    -> decltype(operation()) {
+  try {
+    return operation();
+  } catch (const Error &error) {
+    if (sites.empty())
+      throw;
+    throw sites.locate(error);
+  }
+}
 
-Spec::Spec(std::shared_ptr<const detail::SpecImpl> impl)
-    : impl_(std::move(impl)) {}
-
-Spec Spec::parse(std::string_view text, std::string_view origin,
-                 std::pmr::memory_resource &memory) {
+/// Parse and check the reader spec `text` from `origin`, allocating from
+/// `memory`, and keep a copy of the call sites `sites` of its lines, which
+/// is allocated from `memory` too
+std::shared_ptr<const detail::SpecImpl>
+parse_spec(std::string_view text, std::string_view origin,
+           std::pmr::memory_resource &memory, const detail::CallSites &sites) {
   const detail::MemoryScope scope(memory);
   const detail::NearestRounding rounding;
   detail::String name(origin);
@@ -147,11 +161,40 @@ Spec Spec::parse(std::string_view text, std::string_view origin,
   detail::ParsedSpec parsed =
       detail::parse_tokens(detail::lex(text, name), name);
   detail::resolve(parsed.body, name);
-  return Spec(detail::make_shared<const detail::SpecImpl>(
+  return detail::make_shared<const detail::SpecImpl>(
       detail::SpecImpl{.memory = &memory,
                        .origin = std::move(name),
                        .name = std::move(parsed.name),
-                       .body = std::move(parsed.body)}));
+                       .body = std::move(parsed.body),
+                       // A copy takes the resource of the scope
+                       .call_sites = sites});
+}
+
+} // namespace
+
+namespace detail {
+
+std::expected<Spec, Error> SpecAccess::try_parse(std::string_view text,
+                                                 std::string_view origin,
+                                                 CallSites sites) {
+  return expected([&] {
+    return Spec(
+        parse_spec(text, origin, *std::pmr::get_default_resource(), sites));
+  });
+}
+
+const CallSites &SpecAccess::call_sites(const Spec &spec) {
+  return spec.impl_->call_sites;
+}
+
+} // namespace detail
+
+Spec::Spec(std::shared_ptr<const detail::SpecImpl> impl)
+    : impl_(std::move(impl)) {}
+
+Spec Spec::parse(std::string_view text, std::string_view origin,
+                 std::pmr::memory_resource &memory) {
+  return Spec(parse_spec(text, origin, memory, {}));
 }
 
 std::expected<Spec, Error> Spec::try_parse(std::string_view text,
@@ -184,8 +227,10 @@ Data Spec::read_text(std::string_view text, std::string_view origin,
                      const Params &params) const {
   const detail::MemoryScope scope(*impl_->memory);
   const detail::NearestRounding rounding;
-  return Data(detail::make_shared<const detail::DataImpl>(
-      detail::read(*impl_, text, detail::String(origin), params.values())));
+  return locating(impl_->call_sites, [&] {
+    return Data(detail::make_shared<const detail::DataImpl>(
+        detail::read(*impl_, text, detail::String(origin), params.values())));
+  });
 }
 
 std::expected<Data, Error> Spec::try_read(const std::filesystem::path &path,
@@ -210,8 +255,10 @@ Data Spec::catalog_text(std::string_view text, std::string_view origin,
                         const Params &params) const {
   const detail::MemoryScope scope(*impl_->memory);
   const detail::NearestRounding rounding;
-  return Data(detail::make_shared<const detail::DataImpl>(
-      detail::catalog(*impl_, text, detail::String(origin), params.values())));
+  return locating(impl_->call_sites, [&] {
+    return Data(detail::make_shared<const detail::DataImpl>(detail::catalog(
+        *impl_, text, detail::String(origin), params.values())));
+  });
 }
 
 std::expected<Data, Error> Spec::try_catalog(const std::filesystem::path &path,

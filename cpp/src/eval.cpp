@@ -69,11 +69,14 @@ ReadSite Evaluator::site(const Place &at) const {
                                .column = at.column()},
              .excerpt = in.excerpt(at.start),
              .spec = std::nullopt,
-             .context = std::nullopt};
+             .context = std::nullopt,
+             .owner = std::nullopt};
   if (spec_line > 0)
     r.spec = Location{.origin = std::string(spec.origin),
                       .line = spec_line,
                       .column = std::nullopt};
+  if (owner_line > 0)
+    r.owner = owner_line;
   if (!context.empty()) {
     std::string c;
     for (std::size_t k = 0; k < context.size(); k++) {

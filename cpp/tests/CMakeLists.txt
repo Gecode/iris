@@ -52,8 +52,8 @@ add_test(NAME headers-name-no-gecode
   COMMAND "${CMAKE_COMMAND}" "-DHEADERS=${iris_headers}"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/no-gecode.cmake")
 
-# The spec builder: its checks, call sites, text and typed reads, and the
-# types it gives, which the second test checks at compile time.
+# The spec builder: its checks and their call sites, text and typed reads,
+# and the types it gives, which the second test checks at compile time.
 add_executable(iris-build-test build_test.cpp)
 target_link_libraries(iris-build-test PRIVATE iris::iris Threads::Threads)
 set_target_properties(iris-build-test PROPERTIES CXX_EXTENSIONS OFF)
@@ -61,6 +61,16 @@ target_compile_definitions(iris-build-test PRIVATE
   "IRIS_REPOSITORY=\"${PROJECT_SOURCE_DIR}/..\"")
 iris_set_warnings(iris-build-test)
 add_test(NAME build-api COMMAND iris-build-test)
+# The call site of every statement and of the errors of a built spec. The
+# table of call sites is internal, so the test includes the library's
+# headers.
+add_executable(iris-build-call-sites-test build_call_sites_test.cpp)
+target_include_directories(iris-build-call-sites-test PRIVATE
+  "${PROJECT_SOURCE_DIR}/src")
+target_link_libraries(iris-build-call-sites-test PRIVATE iris::iris)
+set_target_properties(iris-build-call-sites-test PROPERTIES CXX_EXTENSIONS OFF)
+iris_set_warnings(iris-build-call-sites-test)
+add_test(NAME build-call-sites COMMAND iris-build-call-sites-test)
 add_executable(iris-build-types-test build_types_test.cpp)
 target_link_libraries(iris-build-types-test PRIVATE iris::iris)
 set_target_properties(iris-build-types-test PROPERTIES CXX_EXTENSIONS OFF)

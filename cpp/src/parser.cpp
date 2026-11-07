@@ -102,9 +102,9 @@ struct CompiledPattern {
 };
 
 /// Compile line pattern `src` on line `line` of the reader spec from
-/// `origin`
+/// `origin`, in the statement or arm on line `owner`
 CompiledPattern compile(const String &src, const String &origin,
-                        std::size_t line) {
+                        std::size_t line, std::size_t owner) {
   using Item = Pattern::Item;
   CompiledPattern compiled;
   Pattern &pat = compiled.pattern;
@@ -122,7 +122,7 @@ CompiledPattern compile(const String &src, const String &origin,
       flush(pat, lit);
       const std::size_t q = src.find('}', p);
       if (q == String::npos)
-        fail_at(ErrorCode::SpecPattern, origin, line,
+        fail_in(ErrorCode::SpecPattern, origin, line, owner,
                 "unterminated capture in pattern \"" + src + "\"");
       const String cap = src.substr(p + 1, q - p - 1);
       p = q + 1;
@@ -130,7 +130,7 @@ CompiledPattern compile(const String &src, const String &origin,
         Item it(Item::Kind::Var);
         it.text = cap.substr(1);
         if (!is_name(it.text))
-          fail_at(ErrorCode::SpecPattern, origin, line,
+          fail_in(ErrorCode::SpecPattern, origin, line, owner,
                   "missing or bad name in pattern \"" + src + "\"");
         pat.items.push_back(std::move(it));
         continue;
@@ -139,7 +139,7 @@ CompiledPattern compile(const String &src, const String &origin,
       const std::size_t colon = cap.find(':');
       it.text = cap.substr(0, colon);
       if (!is_name(it.text) && !it.text.empty() && (it.text != "_"))
-        fail_at(ErrorCode::SpecPattern, origin, line,
+        fail_in(ErrorCode::SpecPattern, origin, line, owner,
                 "capture name '" + it.text + "' in pattern \"" + src +
                     "\" is not a name");
       compiled.capture_types.push_back(
@@ -148,7 +148,7 @@ CompiledPattern compile(const String &src, const String &origin,
     } else if (std::string_view(src).substr(p).starts_with("...")) {
       flush(pat, lit);
       if (src.find_first_not_of(" \t", p + 3) != String::npos)
-        fail_at(ErrorCode::SpecPattern, origin, line,
+        fail_in(ErrorCode::SpecPattern, origin, line, owner,
                 "'...' must end the pattern \"" + src + "\"");
       pat.items.emplace_back(Item::Kind::Any);
       p += 3;
@@ -196,6 +196,7 @@ public:
   ParsedSpec parse() {
     ParsedSpec s;
     while (peek().kind != Token::Kind::End) {
+      owner_line_ = peek().line;
       if (keyword("format")) {
         next();
         if ((peek().kind != Token::Kind::Ident) &&
@@ -236,6 +237,9 @@ private:
   bool repeat_start_ = false;
   /// Whether the statement being parsed may be each
   bool each_ok_ = false;
+  /// Line of the innermost statement or sections arm being parsed, which
+  /// the errors in it belong to wherever they are found
+  std::size_t owner_line_ = 0;
   /// Names bound by the comprehensions being parsed
   Seq<String> bound_;
   /// All names bound by comprehensions
@@ -277,7 +281,13 @@ private:
     return t;
   }
   [[noreturn]] void fail(ErrorCode code, std::string_view m) const {
-    fail_at(code, origin_, peek().line, m);
+    fail_on(code, peek().line, m);
+  }
+  /// Fail with `code` and message `m` on line `line`, in the statement or
+  /// arm being parsed
+  [[noreturn]] void fail_on(ErrorCode code, std::size_t line,
+                            std::string_view m) const {
+    fail_in(code, origin_, line, owner_line_, m);
   }
   static String describe(const Token &t) {
     if (t.kind == Token::Kind::End)
@@ -340,13 +350,13 @@ private:
   Pattern pattern() {
     const std::size_t line = peek().line;
     const String s = string("a line pattern");
-    CompiledPattern compiled = compile(s, origin_, line);
+    CompiledPattern compiled = compile(s, origin_, line, owner_line_);
     std::size_t k = 0;
     for (Pattern::Item &it : compiled.pattern.items)
       if (it.kind == Pattern::Item::Kind::Cap) {
         it.type = capture_type(compiled.capture_types[k++], line);
         if (it.type.read == ReadType::Symbol)
-          fail_at(ErrorCode::SpecPattern, origin_, line,
+          fail_on(ErrorCode::SpecPattern, line,
                   "a capture cannot be of an alphabet type");
       }
     return std::move(compiled.pattern);
@@ -356,8 +366,7 @@ private:
     // Parse the text in place of the tokens of the spec
     Seq<Token> sub = lex(text, origin_, line);
     if (sub.size() == 1)
-      fail_at(ErrorCode::SpecPattern, origin_, line,
-              "a capture needs a type after ':'");
+      fail_on(ErrorCode::SpecPattern, line, "a capture needs a type after ':'");
     std::swap(toks_, sub);
     const std::size_t at = p_;
     p_ = 0;
@@ -482,7 +491,14 @@ private:
     return (toks_[k].kind == Token::Kind::Punct) && (toks_[k].text == ":");
   }
 
+  /// Parse a statement, which owns the errors found while parsing it
   Node<Stmt> statement() {
+    const std::size_t outer = std::exchange(owner_line_, peek().line);
+    Node<Stmt> s = statement_contents();
+    owner_line_ = outer;
+    return s;
+  }
+  Node<Stmt> statement_contents() {
     const Token &t = peek();
     each_ok_ = repeat_start_;
     repeat_start_ = false;
@@ -783,12 +799,16 @@ private:
     while (!punct("}")) {
       if (peek().kind == Token::Kind::End)
         fail(ErrorCode::SpecSyntax, "missing '}'");
+      // The arm owns the errors found while parsing it
       Arm a;
+      a.line = peek().line;
+      const std::size_t outer = std::exchange(owner_line_, a.line);
       a.pattern = pattern();
       a.optional = accept("optional");
       a.last = accept("last");
       if (punct("{"))
         a.body = block();
+      owner_line_ = outer;
       s.arms.push_back(std::move(a));
     }
     next();
@@ -941,13 +961,12 @@ private:
     else if ((f == "min") || (f == "max") || (f == "sum") || (f == "distinct"))
       ok = (n >= 1);
     else if ((f == "all") || (f == "any"))
-      fail_at(ErrorCode::SpecFunction, origin_, line,
+      fail_on(ErrorCode::SpecFunction, line,
               "'" + f + "' needs the form " + f + "(x in a: e)");
     else
-      fail_at(ErrorCode::SpecFunction, origin_, line,
-              "unknown function '" + f + "'");
+      fail_on(ErrorCode::SpecFunction, line, "unknown function '" + f + "'");
     if (!ok)
-      fail_at(ErrorCode::SpecFunction, origin_, line,
+      fail_on(ErrorCode::SpecFunction, line,
               "wrong arguments for function '" + f + "'");
   }
   /// Return the value of the Gecode constant `n` on reader-spec line `line`
@@ -968,7 +987,7 @@ private:
         return c.value;
       known += (known.empty() ? "" : ", ") + String(c.name);
     }
-    fail_at(ErrorCode::SpecConstant, origin_, line,
+    fail_on(ErrorCode::SpecConstant, line,
             "unknown Gecode constant '" + n + "' (known: " + known + ")");
   }
   /// Test whether a comprehension for function `f` comes next, after "f("

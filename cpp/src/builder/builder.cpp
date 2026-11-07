@@ -2,9 +2,15 @@
 
 #include "state.hpp"
 
+#include "../call_sites.hpp"
+
+#include <cstddef>
 #include <cstdint>
+#include <optional>
+#include <source_location>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace iris::build {
 
@@ -12,47 +18,6 @@ namespace {
 
 /// The origin reported for the text a builder emits
 constexpr std::string_view origin = "builder.iris";
-
-/// Escape the control characters of `text`, as Rust's `escape_default`
-/// does: emitted strings keep some control characters raw, and a file name
-/// can hold them too, so a terminal must not act on them
-std::string escape_controls(std::string_view text) {
-  std::string escaped;
-  escaped.reserve(text.size());
-  const auto hex = [&](unsigned value) {
-    constexpr std::string_view digits = "0123456789abcdef";
-    escaped += "\\u{";
-    if (value >= 16)
-      escaped.push_back(digits[value / 16]);
-    escaped.push_back(digits[value % 16]);
-    escaped.push_back('}');
-  };
-  for (std::size_t i = 0; i < text.size(); i++) {
-    const auto byte = static_cast<unsigned char>(text[i]);
-    if (byte == '\t')
-      escaped += "\\t";
-    else if (byte == '\n')
-      escaped += "\\n";
-    else if (byte == '\r')
-      escaped += "\\r";
-    else if (byte < 0x20 || byte == 0x7f)
-      hex(byte);
-    else if (byte == 0xc2 && i + 1 < text.size() &&
-             static_cast<unsigned char>(text[i + 1]) >= 0x80 &&
-             static_cast<unsigned char>(text[i + 1]) <= 0x9f) {
-      // A C1 control character, U+0080 to U+009F.
-      hex(static_cast<unsigned char>(text[i + 1]));
-      i++;
-    } else
-      escaped.push_back(text[i]);
-  }
-  return escaped;
-}
-
-std::string site_text(const std::source_location &site) {
-  return std::string(site.file_name()) + ":" + std::to_string(site.line()) +
-         ":" + std::to_string(site.column());
-}
 
 /// Return line `number` of `text`, counted from 1
 std::optional<std::string_view> line_of(std::string_view text,
@@ -89,48 +54,42 @@ std::string render(const std::string &message,
         std::string number = std::to_string(*location->line);
         if (number.size() < 6)
           number.insert(0, 6 - number.size(), ' ');
-        out += "\n" + number + " | " + escape_controls(*line);
+        out += "\n" + number + " | " + iris::detail::escape_controls(*line);
       }
     }
   }
   if (call_site)
-    out += "\ncall site: " + escape_controls(site_text(*call_site));
+    out += "\ncall site: " + iris::detail::site_text(*call_site);
   return out;
 }
 
-/// The call site of the statement on line `number` of the emitted text:
-/// the first statement that starts on the line and is not a `}`, else the
-/// first that starts there, else the statement that holds the line, as for
-/// an `each` line
-std::optional<std::source_location> call_site_at(const detail::Printed &printed,
-                                                 std::size_t number) {
-  std::size_t start = 0;
-  for (std::size_t line = 1; line < number; line++) {
+/// The call site of each line of the emitted text: the first statement
+/// that starts on the line and is not a `}`, else the first that starts
+/// there, else the statement that holds the line, as for an `each` line
+iris::detail::CallSites line_sites(const detail::Printed &printed) {
+  iris::detail::Seq<std::optional<std::source_location>> lines;
+  const std::vector<detail::Printed::Entry> &entries = printed.sites;
+  std::optional<std::source_location> holder;
+  std::size_t next = 0;
+  for (std::size_t start = 0; start < printed.text.size();) {
     const std::size_t newline = printed.text.find('\n', start);
-    if (newline == std::string::npos)
-      return std::nullopt;
-    start = newline + 1;
+    const std::size_t end =
+        newline == std::string::npos ? printed.text.size() : newline + 1;
+    for (; next < entries.size() && entries[next].offset < start; next++)
+      holder = entries[next].site;
+    std::optional<std::source_location> statement;
+    std::optional<std::source_location> close;
+    for (std::size_t k = next; k < entries.size() && entries[k].offset < end;
+         k++) {
+      if (!entries[k].close && !statement)
+        statement = entries[k].site;
+      if (entries[k].close && !close)
+        close = entries[k].site;
+    }
+    lines.push_back(statement ? statement : close ? close : holder);
+    start = end;
   }
-  const std::size_t newline = printed.text.find('\n', start);
-  const std::size_t end =
-      newline == std::string::npos ? printed.text.size() : newline + 1;
-  const detail::Printed::Entry *first = nullptr;
-  const detail::Printed::Entry *holder = nullptr;
-  for (const detail::Printed::Entry &entry : printed.sites) {
-    if (entry.offset <= start)
-      holder = &entry;
-    if (entry.offset < start || entry.offset >= end)
-      continue;
-    if (!entry.close)
-      return entry.site;
-    if (first == nullptr)
-      first = &entry;
-  }
-  if (first != nullptr)
-    return first->site;
-  if (holder != nullptr)
-    return holder->site;
-  return std::nullopt;
+  return iris::detail::CallSites(std::move(lines));
 }
 
 BuildError issue_error(detail::Issue issue) {
@@ -182,16 +141,18 @@ std::expected<Spec, BuildError> try_build(const State &state) {
   std::expected<Printed, BuildError> result = printed(state);
   if (!result)
     return std::unexpected(std::move(result.error()));
-  std::expected<Spec, Error> spec = Spec::try_parse(result->text, origin);
+  const iris::detail::CallSites sites = line_sites(*result);
+  std::expected<Spec, Error> spec =
+      iris::detail::SpecAccess::try_parse(result->text, origin, sites);
   if (spec)
     return std::move(*spec);
-  const Error &error = spec.error();
-  std::optional<std::source_location> call_site;
-  if (error.spec_location() && error.spec_location()->line)
-    call_site = call_site_at(*result, *error.spec_location()->line);
-  return std::unexpected(Access::error(BuildErrorKind::Spec, error.what(),
-                                       error, std::move(result->text),
-                                       call_site));
+  // The message is the error without its call site, which the builder
+  // error shows after the emitted line
+  const Error located = sites.locate(spec.error());
+  const std::optional<std::source_location> call_site = located.call_site();
+  return std::unexpected(Access::error(BuildErrorKind::Spec,
+                                       spec.error().what(), located,
+                                       std::move(result->text), call_site));
 }
 
 } // namespace detail

@@ -41,6 +41,7 @@
 
 #pragma once
 
+#include "call_sites.hpp"
 #include "memory.hpp"
 
 #include <iris/data.hpp>
@@ -243,6 +244,8 @@ using Block = Seq<Node<Stmt>>;
 struct Arm {
   /// Line pattern
   Pattern pattern;
+  /// Reader-spec line of the pattern, where the arm starts
+  std::size_t line = 0;
   /// Statements run after the line matched
   Block body;
   /// Whether the input may lack a line matching the arm
@@ -361,6 +364,8 @@ struct SpecImpl {
   String name;
   /// Statements
   Block body;
+  /// The call site of each line, for a spec from a spec builder
+  CallSites call_sites;
 };
 
 } // namespace iris::detail

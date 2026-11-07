@@ -2,6 +2,7 @@
 // allocates from it and from nothing else. The test replaces the global
 // operator new to count the allocations that bypass the resource.
 
+#include <iris/build.hpp>
 #include <iris/iris.hpp>
 
 #include <atomic>
@@ -15,6 +16,7 @@
 #include <limits>
 #include <memory_resource>
 #include <new>
+#include <optional>
 #include <source_location>
 #include <span>
 #include <string>
@@ -60,6 +62,9 @@ void heap_free(void *p, std::size_t alignment) noexcept {
 thread_local bool global_heap_forbidden = false;
 /// The calls of the global operator new while it was forbidden
 std::atomic<std::size_t> forbidden_allocations{0};
+/// The calls of the global operator delete while the global operator new
+/// was forbidden
+std::atomic<std::size_t> forbidden_frees{0};
 
 /// Forbid the global operator new on this thread while this object exists
 class ForbidGlobalHeap {
@@ -71,6 +76,14 @@ public:
   ForbidGlobalHeap &operator=(const ForbidGlobalHeap &) = delete;
   ForbidGlobalHeap &operator=(ForbidGlobalHeap &&) = delete;
 };
+
+/// Free `p` from the global heap, counting the call if the global heap is
+/// forbidden
+void global_free(void *p, std::size_t alignment) noexcept {
+  if (global_heap_forbidden)
+    forbidden_frees++;
+  heap_free(p, alignment);
+}
 
 /// Allocate from the global heap, counting the call if it is forbidden
 void *global_allocate(std::size_t bytes, std::size_t alignment) {
@@ -313,6 +326,25 @@ void uses_default_resource() {
   check(memory.outstanding() == 0, "default resource memory returned");
 }
 
+/// A built spec keeps all its memory, the call sites of its lines
+/// included, in the default resource it was built with
+void keeps_built_specs_in_resource() {
+  CountingResource memory;
+  std::pmr::memory_resource *outer = std::pmr::set_default_resource(&memory);
+  {
+    iris::build::SpecBuilder b;
+    b.read("n", iris::build::int_);
+    std::optional<iris::Spec> spec(b.build());
+    {
+      const ForbidGlobalHeap forbid;
+      spec.reset();
+    }
+  }
+  std::pmr::set_default_resource(outer);
+  check(forbidden_frees == 0, "no global memory in a built spec");
+  check(memory.outstanding() == 0, "built spec memory returned");
+}
+
 /// Threads read with one spec and its resource at the same time
 void reads_on_threads() {
   CountingResource memory;
@@ -347,17 +379,17 @@ void *operator new(std::size_t bytes, std::align_val_t alignment) {
   return global_allocate(bytes, static_cast<std::size_t>(alignment));
 }
 void operator delete(void *p) noexcept {
-  heap_free(p, alignof(std::max_align_t));
+  global_free(p, alignof(std::max_align_t));
 }
 void operator delete(void *p, std::size_t) noexcept {
-  heap_free(p, alignof(std::max_align_t));
+  global_free(p, alignof(std::max_align_t));
 }
 void operator delete(void *p, std::align_val_t alignment) noexcept {
-  heap_free(p, static_cast<std::size_t>(alignment));
+  global_free(p, static_cast<std::size_t>(alignment));
 }
 void operator delete(void *p, std::size_t,
                      std::align_val_t alignment) noexcept {
-  heap_free(p, static_cast<std::size_t>(alignment));
+  global_free(p, static_cast<std::size_t>(alignment));
 }
 
 // NOLINTEND(readability-inconsistent-declaration-parameter-name)
@@ -466,6 +498,7 @@ int main() {
     run("reads_files_with_resource", reads_files_with_resource);
     run("returns_memory_on_errors", returns_memory_on_errors);
     run("uses_default_resource", uses_default_resource);
+    run("keeps_built_specs_in_resource", keeps_built_specs_in_resource);
     run("reads_on_threads", reads_on_threads);
     run("sets_params_safely", sets_params_safely);
     if constexpr (!moves_allocate)

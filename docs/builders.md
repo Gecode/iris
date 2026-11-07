@@ -543,9 +543,27 @@ expression copies its whole operation list, so a long chain built in a loop
 should move it: `total = std::move(total) + x`.
 
 A `BuildError` has a kind, the language error if there is one, the emitted
-text and line, and the `std::source_location` of the host call. Call sites
-are mapped by emitted line: an error gets the call site of the statement
-that starts its line.
+text and line, and the `std::source_location` of the host call. The spec
+that `build()` returns keeps the call site of each emitted line, so a
+failure while reading or cataloging gets one as well:
+`iris::Error::call_site()` returns it, and `what()` ends with a
+`call site: file:line:column` line before any earlier rejection. As in
+Rust, a failure that names no statement, such as `E-TRAILING-INPUT`, has no
+call site, nor does a catalog rejection, which is a summary in the data, nor
+a spec parsed from text.
+
+C++ errors locate the reader spec by line alone, and the builder prints one
+statement per line, so call sites are mapped by line. A line gets the call
+site of the first statement that starts on it, else of the call that wrote
+the block a `}` closes. The parser, resolver and reader record, inside the
+error, the line of the statement an error belongs to where the error lies
+past it, and that line picks the call site: the declaration before the
+token where its form is checked, the statement at the end of a block, the
+`if` whose block is nested too deeply, a section arm for failures found at
+its `sections` line, and a repeat for failures at its last body line. The
+error's code, message and location do not change. Statements that share a
+line, such as an `if` with an empty block and the `else` after it, share
+the first one's call site.
 
 A parameter handle also sets its parameter: after
 `auto scale = b.param("scale", 3)`, `params.set(scale, 3)` writes the

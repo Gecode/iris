@@ -1,5 +1,7 @@
 #include <iris/error.hpp>
 
+#include "call_sites.hpp"
+
 #include <algorithm>
 #include <cstddef>
 #include <optional>
@@ -41,6 +43,8 @@ std::string diagnostic(const std::string &message,
     text += "\n  while reading: " + *details.context;
   if (details.input_location && details.spec_location)
     text += "\n  spec: " + position(*details.spec_location);
+  if (details.call_site)
+    text += "\ncall site: " + detail::site_text(*details.call_site);
   if (details.earlier_rejection)
     text += "\n  after an earlier error in the instance: " +
             *details.earlier_rejection;

@@ -37,6 +37,7 @@ target_sources(iris
     src/builder/check.cpp
     src/builder/print.cpp
     src/builder/state.cpp
+    src/call_sites.cpp
     src/data.cpp
     src/dzn.cpp
     src/error.cpp
