@@ -7,6 +7,7 @@ import re
 from importlib.metadata import metadata
 from importlib.resources import files
 from pathlib import Path
+from typing import NamedTuple
 
 CARGO_MANIFEST = Path(__file__).resolve().parents[1] / "Cargo.toml"
 
@@ -66,3 +67,77 @@ def test_the_stub_declares_every_function_of_the_extension() -> None:
         if callable(value) and not isinstance(value, type) and not name.startswith("_")
     }
     assert declared == runtime
+
+
+class StubClass(NamedTuple):
+    """A class of the builder's stub: the names of its bases and its public
+    members."""
+
+    bases: list[str]
+    members: set[str]
+
+
+class BuilderStub(NamedTuple):
+    names: set[str]
+    classes: dict[str, StubClass]
+
+
+def builder_stub() -> BuilderStub:
+    """The public names and classes of the builder's stub. A name imported
+    into the stub counts only when it is re-exported as ``import x as x``."""
+    stub = files("gecode_iris.build") / "__init__.pyi"
+    names: set[str] = set()
+    classes: dict[str, StubClass] = {}
+    for node in ast.parse(stub.read_text(encoding="utf-8")).body:
+        if isinstance(node, (ast.ClassDef, ast.FunctionDef)):
+            names.add(node.name)
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            names.add(node.target.id)
+        elif isinstance(node, ast.Assign):
+            names.update(target.id for target in node.targets if isinstance(target, ast.Name))
+        elif isinstance(node, ast.ImportFrom):
+            names.update(alias.name for alias in node.names if alias.asname == alias.name)
+        if isinstance(node, ast.ClassDef):
+            bases = [ast.unparse(base).split("[")[0] for base in node.bases]
+            members = {
+                member.name if isinstance(member, ast.FunctionDef) else ast.unparse(member.target)
+                for member in node.body
+                if isinstance(member, (ast.FunctionDef, ast.AnnAssign))
+            }
+            public = {name for name in members if not name.startswith("_")}
+            classes[node.name] = StubClass(bases, public)
+    return BuilderStub({name for name in names if not name.startswith("_")}, classes)
+
+
+def test_the_builder_stub_declares_every_exported_name() -> None:
+    import gecode_iris.build as ib
+
+    assert builder_stub().names == set(vars(ib)["__all__"])
+
+
+def test_the_builder_stub_declares_the_members_of_each_class() -> None:
+    """The stub may declare a runtime member on the subclasses instead, with
+    their precise types, but it declares nothing that the runtime lacks."""
+    import gecode_iris.build as ib
+
+    classes = builder_stub().classes
+
+    def inherited(name: str) -> set[str]:
+        bases, members = classes[name]
+        return members.union(*(inherited(base) for base in bases if base in classes))
+
+    def below(name: str) -> set[str]:
+        subclasses = [sub for sub, stub in classes.items() if name in stub.bases]
+        return inherited(name).union(*(below(sub) for sub in subclasses))
+
+    for name in sorted(set(vars(ib)["__all__"]) & classes.keys()):
+        cls = getattr(ib, name)
+        foreign = set[str]().union(
+            *(dir(base) for base in cls.__mro__ if not base.__module__.startswith(ib.__name__))
+        )
+        annotated = set[str]().union(
+            *(vars(base).get("__annotations__", {}) for base in cls.__mro__)
+        )
+        runtime = {m for m in dir(cls) if not m.startswith("_") and m not in foreign}
+        assert runtime <= below(name), name
+        assert inherited(name) <= runtime | annotated, name

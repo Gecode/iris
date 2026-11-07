@@ -10,9 +10,14 @@
   list of typed handles and print it, with a Rust printer.
 - Add `Host::ex` to gecode-iris-build, so that a host constant can bound a range
   beside another expression: `lit(0)..=gecode::INT_MAX.ex()`.
+- Add `Error::owner` to gecode-iris-core: where the statement an error belongs
+  to starts, so that a host can find its call site as `CallSites::locate` does.
 - Add a hand-written spec builder for each format in the format library, as
   gecode-iris examples. A test reads every case of each format through its
   builder and judges the result as the conformance runner does.
+- Fix gecode-iris-build printing a capture whose type uses a record or a
+  comprehension: the builder panicked, or omitted the repeat's `each` or `as`
+  name. Such a type now names them like any other expression.
 
 ### CLI
 

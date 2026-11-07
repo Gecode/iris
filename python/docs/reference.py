@@ -93,7 +93,7 @@ def class_source(module: ModuleType, name: str) -> str:
 
 @contextmanager
 def defining_sources() -> Generator[None]:
-    """Let pdoc read ``Entry`` and ``Error`` from the modules that define them.
+    """Let pdoc read ``Entry``, ``Error`` and ``CallSite`` from their modules.
 
     The package sets their ``__module__`` to ``gecode_iris``, so
     ``inspect.getsource`` looks for them in the package's ``__init__.py``, and
@@ -102,6 +102,7 @@ def defining_sources() -> Generator[None]:
     sources: dict[object, str] = {
         gecode_iris.Entry: class_source(gecode_iris._data, "Entry"),
         gecode_iris.Error: class_source(gecode_iris._error, "Error"),
+        gecode_iris.CallSite: class_source(gecode_iris._error, "CallSite"),
     }
     original = pdoc.doc_ast._get_source
 

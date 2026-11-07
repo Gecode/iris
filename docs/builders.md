@@ -13,9 +13,10 @@ bring the host language's abstraction to reader specs: a function can
 produce a fragment, and a loop can produce fields.
 
 The Rust builder exists, as the `gecode-iris-build` crate re-exported by
-`gecode_iris::build`, and its section below is compiled as a test. The other
-languages' APIs do not exist yet: their code is sketches, and the names in it
-are illustrative. The principles are the part to follow. Each implementation
+`gecode_iris::build`, and its section below is compiled as a test. The
+Python builder exists too, as the `gecode_iris.build` module, and its section
+shows its API. The other languages' APIs do not exist yet: their code is
+sketches, and the names in it are illustrative. The principles are the part to follow. Each implementation
 chooses final names in its own idiom, and its API guide on the site documents
 them. [PLAN.md §8.15](../PLAN.md#815-spec-builders)
 gives the deliverables and the milestone.
@@ -83,7 +84,7 @@ language encodes this as cheaply as it can:
 | C++ | A `std::size_t` template parameter: `field<std::int64_t, 2>`. |
 | TypeScript | A depth parameter, `Field<"int", 2>`, mapped to the data type by conditional types. Keep the type-level arithmetic shallow for checker speed. |
 | Java, Kotlin | The data view type as the parameter, `IntField<List<long[]>>`, with one generic `get`. Java declares handles with factories that fix the depth (`int2`), and `build()` checks them. Kotlin scopes come in depth-specific receiver classes up to depth 3, and deeper entries are dynamic. |
-| Python | The data view type as the parameter, `Field[list[list[int]]]`, in the type stubs. Scopes come in depth-specific classes up to depth 3, and deeper entries are dynamic. |
+| Python | The data view type as the parameter, `IntField[list[list[int]]]`, in the type stubs. Scopes come in depth-specific classes, `Scope0` to `Scope3`, and deeper entries are `DynField`. |
 
 **Absence is in the type.** A definition that may not execute gives an
 optional handle: Rust `Option`, C++ `std::optional`, Java `@Nullable`,
@@ -290,8 +291,8 @@ never literal text.
 
 Every builder statement records where it was called: Rust
 `#[track_caller]`, C++ `std::source_location` default arguments, Java and
-Kotlin `StackWalker`, Python frames, and TypeScript `Error().stack` where
-available. A `build()` error shows the language error code and message, the
+Kotlin `StackWalker`, Python frames (skipping functions marked
+`@track_caller`), and TypeScript `Error().stack` where available. A `build()` error shows the language error code and message, the
 line of emitted text, and the host call site. A check failure while reading
 has a reader spec location. The builder maps it back to the host call site,
 so that `E-CHECK-FAILED` names the line of the user's program.
@@ -542,7 +543,10 @@ auto end = s.forward<std::string>("_"); // only a store binds it
 `with` blocks match Python's own nesting, and names defined inside them
 remain visible afterwards. Type stubs carry the handle types, so that
 pyright and mypy know `data[machine]` is `list[list[int]]`. The builder is
-pure Python on top of `Spec.parse`.
+pure Python; `build()` parses the emitted text with the Rust parser and
+keeps each statement's call site. Patterns are t-strings on Python 3.14 and
+later; on older versions the second arm is `(n_jobs, " ", n_machines)`.
+`python/examples/build_jobshop.py` runs this program with tuple patterns.
 
 ```python
 from gecode_iris import build as ib
@@ -557,16 +561,19 @@ with b.instances() as i:
     with i.sections(skip_other=True) as s:
         s.arm(t"instance {name}", optional=True)
         with s.arm(t"{n_jobs} {n_machines}", last=True) as a:
-            a.check(n_jobs <= ib.div(ib.div(gecode.INT_MAX - 2, 2), n_machines),
-                    "there are too many jobs and machines")
+            a.check(
+                n_jobs <= ib.div(ib.div(gecode.INT_MAX - 2, 2), n_machines),
+                "there are too many jobs and machines",
+            )
             with a.repeat(n_jobs) as jobs:
+                jobs.as_name("jobs")  # error messages name the records
                 with jobs.repeat(n_machines) as steps:
                     machine = steps.read("machine", ib.int_range(0, below=n_machines))
                     duration = steps.read("duration", ib.at_least(0))
     job = jobs.record
     i.check(ib.distinct(job[machine]), MSG_DISTINCT)
     i.check(ib.sum(job, lambda j: ib.sum(j[duration])) <= gecode.INT_MAX, MSG_TOTAL)
-spec = b.build()  # raises iris.Error, with the host line attached
+spec = b.build()  # raises ib.BuildError, naming the host line
 
 data = spec.read("jobshop1.txt", params={"instance": "la01"})
 data[n_jobs]   # int
@@ -577,12 +584,12 @@ data[name]     # str | None
 The dynamic forms:
 
 ```python
-x = b.forward("x", int)
-b.read(x, int_())  # the first definition binds it
-again = b.read(x, float_())  # redefined: returns a dynamic handle
-mixed = lit("1").dynamic() == 1
+x = b.forward("x", ib.IntField[int])
+b.read(x, ib.int_)  # the first definition binds it
+again = b.read(x, ib.float_)  # redefined: returns a DynField
+mixed = ib.lit("1").dynamic() == 1
 zz = b.undefined("zz")
-end = b.forward("_", str)  # only a store binds it
+end = b.forward("end", ib.StrField[str | None])  # only a store binds it
 ```
 
 ### Kotlin

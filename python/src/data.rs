@@ -35,25 +35,41 @@ impl PyData {
         PyTuple::new(py, entries.collect::<PyResult<Vec<_>>>()?)
     }
 
-    /// The whole value of an entry.
-    fn __getitem__<'py>(&self, py: Python<'py>, name: &str) -> PyResult<Bound<'py, PyAny>> {
-        to_python(py, self.value(name)?, &mut Vec::new())
+    /// The whole value of an entry, named or given by a builder handle. An
+    /// optional handle whose entry is absent gives `None`.
+    fn __getitem__<'py>(
+        &self,
+        py: Python<'py>,
+        key: &Bound<'py, PyAny>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        match Key::extract(key)? {
+            Key::Name(name) => to_python(py, self.value(&name)?, &mut Vec::new()),
+            Key::Handle(handle) => match self.find(&handle.name) {
+                Some(value) => {
+                    handle.check(value)?;
+                    to_python(py, value, &mut Vec::new())
+                }
+                None if handle.required => Err(PyKeyError::new_err(handle.name)),
+                None => Ok(py.None().into_bound(py)),
+            },
+        }
     }
 
-    fn __contains__(&self, name: &Bound<'_, PyAny>) -> bool {
-        name.extract::<&str>()
-            .is_ok_and(|name| self.0.entries().iter().any(|e| e.name() == name))
+    fn __contains__(&self, key: &Bound<'_, PyAny>) -> bool {
+        Key::extract(key).is_ok_and(|key| self.find(key.name()).is_some())
     }
 
     /// The integer row of an entry at a path.
-    #[pyo3(signature = (name, /, *indices))]
+    #[pyo3(signature = (key, /, *indices))]
     fn ints<'py>(
         &self,
         py: Python<'py>,
-        name: &str,
+        key: &Bound<'py, PyAny>,
         indices: Vec<isize>,
     ) -> PyResult<Bound<'py, PyList>> {
-        let row = self.row(name, &indices)?;
+        let key = Key::extract(key)?;
+        let name = key.name();
+        let row = self.row(&key, &indices)?;
         let ints = match row.depth() {
             1 => row.as_ints(),
             0 => Err(AccessError::ExpectedArray),
@@ -70,14 +86,16 @@ impl PyData {
     /// An array of an entry, or of its row at a path: a `numpy.ndarray` when
     /// numpy is importable and the array is rectangular, and nested lists
     /// otherwise.
-    #[pyo3(signature = (name, /, *indices))]
+    #[pyo3(signature = (key, /, *indices))]
     fn array<'py>(
         &self,
         py: Python<'py>,
-        name: &str,
+        key: &Bound<'py, PyAny>,
         indices: Vec<isize>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let value = self.value(name)?;
+        let key = Key::extract(key)?;
+        let name = key.name();
+        let value = self.keyed(&key)?;
         let mut path = resolve(value, &indices).map_err(|e| access_error(name, &indices, e))?;
         if value.select(&path).map_err(internal_error)?.depth() == 0 {
             return Err(access_error(name, &indices, AccessError::ExpectedArray));
@@ -118,20 +136,109 @@ impl PyData {
 }
 
 impl PyData {
-    fn value(&self, name: &str) -> PyResult<&Value> {
+    fn find(&self, name: &str) -> Option<&Value> {
         self.0
             .entries()
             .iter()
             .find(|entry| entry.name() == name)
             .map(|entry| entry.value())
+    }
+
+    fn value(&self, name: &str) -> PyResult<&Value> {
+        self.find(name)
             .ok_or_else(|| PyKeyError::new_err(name.to_owned()))
     }
 
-    fn row(&self, name: &str, indices: &[isize]) -> PyResult<ValueRef<'_>> {
-        let value = self.value(name)?;
+    /// The value of an entry named by `key`, checked against the promises of
+    /// a handle. An absent entry raises `KeyError`, even for an optional
+    /// handle, since there is no row to select.
+    fn keyed(&self, key: &Key) -> PyResult<&Value> {
+        let value = self.value(key.name())?;
+        if let Key::Handle(handle) = key {
+            handle.check(value)?;
+        }
+        Ok(value)
+    }
+
+    fn row(&self, key: &Key, indices: &[isize]) -> PyResult<ValueRef<'_>> {
+        let value = self.keyed(key)?;
         resolve(value, indices)
             .and_then(|path| value.select(&path))
-            .map_err(|e| access_error(name, indices, e))
+            .map_err(|e| access_error(key.name(), indices, e))
+    }
+}
+
+/// What `Data` access takes: an entry name, or a builder handle.
+enum Key {
+    Name(String),
+    Handle(HandleKey),
+}
+
+/// What a builder handle promises about its entry, as its `_iris_key()`
+/// method returns it: the name, the value type (`None` for any), the depth
+/// (`None` for any), and whether the entry is always present.
+#[derive(FromPyObject)]
+struct HandleKey {
+    #[pyo3(item(0))]
+    name: String,
+    #[pyo3(item(1))]
+    value_type: Option<String>,
+    #[pyo3(item(2))]
+    levels: Option<usize>,
+    #[pyo3(item(3))]
+    required: bool,
+}
+
+impl Key {
+    fn extract(key: &Bound<'_, PyAny>) -> PyResult<Self> {
+        if let Ok(name) = key.extract::<String>() {
+            return Ok(Self::Name(name));
+        }
+        match key.getattr_opt(pyo3::intern!(key.py(), "_iris_key"))? {
+            Some(method) => Ok(Self::Handle(method.call0()?.extract()?)),
+            None => Err(PyTypeError::new_err(format!(
+                "data keys are entry names or builder handles, not {}",
+                key.get_type()
+                    .name()
+                    .map_or_else(|_| "an unknown type".to_owned(), |name| name.to_string()),
+            ))),
+        }
+    }
+
+    fn name(&self) -> &str {
+        match self {
+            Self::Name(name) => name,
+            Self::Handle(handle) => &handle.name,
+        }
+    }
+}
+
+impl HandleKey {
+    /// Checks that an entry has the value type and depth the handle promises.
+    /// It does not when the handle is stale, because a later statement
+    /// redefined its name, or when it belongs to another reader spec.
+    fn check(&self, value: &Value) -> PyResult<()> {
+        let found = value.value_type();
+        let type_matches = match self.value_type.as_deref() {
+            None => true,
+            Some("num") => found == "int" || found == "float",
+            Some(expected) => found == expected,
+        };
+        let depth = value.depth();
+        let mismatch = if !type_matches {
+            format!(
+                "the handle has value type {}, but the entry has {found}",
+                self.value_type.as_deref().unwrap_or_default()
+            )
+        } else if let Some(levels) = self.levels.filter(|&levels| levels != depth) {
+            format!("the handle has depth {levels}, but the entry has depth {depth}")
+        } else {
+            return Ok(());
+        };
+        Err(PyTypeError::new_err(format!(
+            "entry '{}' does not match its handle: {mismatch}; the handle is stale or belongs to another reader spec",
+            self.name
+        )))
     }
 }
 

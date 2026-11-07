@@ -476,6 +476,38 @@ fn internal_names_skip_every_name_in_the_spec() {
 }
 
 #[test]
+fn capture_types_name_the_records_and_elements_they_use() {
+    let (mut x, mut z, mut w) = (None, None, None);
+    let b = assert_text(
+        |b| {
+            let a = b.read("a", int().dim(2));
+            x = Some(b.capture("x", lit(0)..=sum_over(a, |v| v)));
+            b.line(pattern!("{x}", x = x.unwrap()));
+            let (record, y) = b.repeat(2, |r| {
+                let (record, y) = (r.record(), r.read("y", int()));
+                z = Some(r.capture("z", lit(0)..=record.get(y).ex()));
+                r.line(pattern!("{z}", z = z.unwrap()));
+                (record, y)
+            });
+            w = Some(b.capture("w", lit(0)..=sum_over(record, |r| r.get(y))));
+            b.line(pattern!("{w}", w = w.unwrap()));
+        },
+        "a[2]: int\nline \"{x:0..sum(element_1 in a: element_1)}\"\n\
+         repeat 2 as records_1 {\n  each record_1\n  y: int\n  line \"{z:0..record_1.y}\"\n}\n\
+         line \"{w:0..sum(element_2 in records_1: element_2.y)}\"\n",
+    );
+    let input = b"1 2\n3\n1\n1\n2\n2\n3\n";
+    let data = b
+        .build()
+        .unwrap()
+        .read(input, "input", &Params::new())
+        .unwrap();
+    assert_eq!(data.get(x.unwrap()), 3);
+    assert_eq!(data.get(z.unwrap()), [1, 2]);
+    assert_eq!(data.get(w.unwrap()), 3);
+}
+
+#[test]
 fn records_project_and_index() {
     assert_prints(
         |b| {

@@ -52,24 +52,32 @@ jobs:
         run: uv run --no-sync ruff check
       - name: Type-check Python
         run: uv run --no-sync ty check
+      - name: Type-check the t-string files as Python 3.14
+        run: uv run --no-sync ty check --python-version 3.14 tests/test_build_tstrings.py tests/typecheck/build_tstrings.py
       - name: Check stubs accept the documented API
         run: |
-          uv run --no-sync --with numpy mypy tests/typecheck/data_usage.py
-          uv run --no-sync --with numpy pyright tests/typecheck/data_usage.py
+          for file in tests/typecheck/data_usage.py tests/typecheck/build_usage.py; do
+            uv run --no-sync --with numpy mypy "$file"
+            uv run --no-sync --with numpy pyright "$file"
+          done
+          uv run --no-sync --with numpy mypy --python-version 3.14 tests/typecheck/build_tstrings.py
+          uv run --no-sync --with numpy pyright --pythonversion 3.14 tests/typecheck/build_tstrings.py
       - name: Check stubs reject misuse on each marked line
         run: |
-          file=tests/typecheck/data_misuse.py
-          expected=$(grep -n '# error:' "$file" | cut -d: -f1)
-          status=0
-          mypy=$(uv run --no-sync --with numpy mypy "$file") || status=$?
-          test "$status" -eq 1
-          actual=$(sed -n 's|^tests/typecheck/data_misuse\.py:\([0-9]*\): error:.*|\1|p' <<< "$mypy" | sort -nu)
-          diff <(echo "$expected") <(echo "$actual") || { echo "$mypy"; exit 1; }
-          status=0
-          pyright=$(uv run --no-sync --with numpy pyright "$file") || status=$?
-          test "$status" -eq 1
-          actual=$(sed -n 's|^ *.*/data_misuse\.py:\([0-9]*\):[0-9]* - error:.*|\1|p' <<< "$pyright" | sort -nu)
-          diff <(echo "$expected") <(echo "$actual") || { echo "$pyright"; exit 1; }
+          for name in data_misuse build_misuse; do
+            file=tests/typecheck/$name.py
+            expected=$(grep -n '# error:' "$file" | cut -d: -f1)
+            status=0
+            mypy=$(uv run --no-sync --with numpy mypy "$file") || status=$?
+            test "$status" -eq 1
+            actual=$(sed -n "s|^tests/typecheck/$name\\.py:\\([0-9]*\\): error:.*|\\1|p" <<< "$mypy" | sort -nu)
+            diff <(echo "$expected") <(echo "$actual") || { echo "$mypy"; exit 1; }
+            status=0
+            pyright=$(uv run --no-sync --with numpy pyright "$file") || status=$?
+            test "$status" -eq 1
+            actual=$(sed -n "s|^ *.*/$name\\.py:\\([0-9]*\\):[0-9]* - error:.*|\\1|p" <<< "$pyright" | sort -nu)
+            diff <(echo "$expected") <(echo "$actual") || { echo "$pyright"; exit 1; }
+          done
       - name: Check Rust formatting
         run: cargo fmt --all -- --check
       - name: Lint Rust crate

@@ -33,6 +33,8 @@ lint = [
     "pyright==1.1.414",
     "ruff==0.17.3",
     "ty==0.0.96",
+    # typing.assert_type needs Python 3.11; the type tests import it from here.
+    "typing-extensions==4.16.0",
 ]
 
 [tool.maturin]
@@ -51,6 +53,11 @@ target-version = "py310"
 line-length = 100
 src = ["python", "tests"]
 
+[tool.ruff.per-file-target-version]
+# t-string patterns need Python 3.14; conftest.py skips the test before then.
+"tests/test_build_tstrings.py" = "py314"
+"tests/typecheck/build_tstrings.py" = "py314"
+
 [tool.ruff.lint]
 extend-select = ["B", "I", "UP"]
 
@@ -58,8 +65,15 @@ extend-select = ["B", "I", "UP"]
 python-version = "3.10"
 
 [tool.ty.src]
-# Its errors are intended; pyright and mypy check that they are reported.
-exclude = ["tests/typecheck/data_misuse.py"]
+# The misuse files' errors are intended; pyright and mypy check that they are
+# reported. The t-string files need Python 3.14: check them with
+# `ty check --python-version 3.14 FILE...`.
+exclude = [
+    "tests/typecheck/data_misuse.py",
+    "tests/typecheck/build_misuse.py",
+    "tests/test_build_tstrings.py",
+    "tests/typecheck/build_tstrings.py",
+]
 
 # numpy is optional: the stubs name its array type, and the guide's array
 # example imports it. Without numpy the check still passes, and ty treats

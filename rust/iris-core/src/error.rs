@@ -235,6 +235,16 @@ impl Error {
     pub fn spec_span(&self) -> Option<TextRange> {
         self.details.spec_span
     }
+    /// Where the statement this error belongs to starts in the spec text, when
+    /// `spec_span` does not show it: a failure at the end of a block, or one
+    /// noticed while reading a later statement, points past its statement.
+    ///
+    /// A host that maps statements to call sites itself, as a language binding
+    /// does, looks up `owner()`, or else the start of `spec_span()`, which is
+    /// the rule [`CallSites::locate`](crate::CallSites::locate) follows.
+    pub fn owner(&self) -> Option<TextSize> {
+        self.details.owner
+    }
     /// The host code that wrote the statement, for a spec from a builder.
     pub fn call_site(&self) -> Option<CallSite> {
         self.details.call_site

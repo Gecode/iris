@@ -49,10 +49,7 @@ impl CallSites {
     /// code and its location in the text.
     pub fn locate(&self, mut failure: Failure) -> Failure {
         if let Failure::Language(error) = &mut failure {
-            let statement = error
-                .details
-                .owner
-                .or_else(|| Some(error.spec_span()?.start()));
+            let statement = error.owner().or_else(|| Some(error.spec_span()?.start()));
             error.details.call_site = statement.and_then(|start| self.at(start.into()));
         }
         failure

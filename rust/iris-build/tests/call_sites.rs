@@ -468,9 +468,13 @@ fn assert_owner(error: &BuildError, line: u32, emitted_line: usize, emitted: Opt
     assert_here(spec.call_site(), line);
     assert_eq!(spec.spec_location().unwrap().line, Some(emitted_line));
     assert_eq!(error.emitted_line(), emitted);
-    let parsed = Spec::parse(error.text().unwrap().as_bytes(), "builder.iris").unwrap_err();
+    let owner = spec.owner().expect("the error names its statement");
+    let text = error.text().unwrap();
+    assert!(text[usize::from(owner)..].starts_with("bad[2]: rest"));
+    let parsed = Spec::parse(text.as_bytes(), "builder.iris").unwrap_err();
     let parsed = language_error(&parsed);
     assert_eq!(parsed.call_site(), None);
+    assert_eq!(parsed.owner(), Some(owner));
     assert_eq!(parsed.code, spec.code);
     assert_eq!(parsed.message(), spec.message());
     assert_eq!(parsed.spec_span(), spec.spec_span());

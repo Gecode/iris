@@ -1,10 +1,13 @@
 from collections.abc import Mapping, Sequence
 from os import PathLike
-from typing import Any, final
+from typing import Any, TypeVar, final, overload
 
 from numpy.typing import NDArray
 
 from gecode_iris._data import Entry, Value
+from gecode_iris.build import Field
+
+_T = TypeVar("_T")
 
 @final
 class Spec:
@@ -17,6 +20,10 @@ class Spec:
     def parse(text: str | bytes | bytearray, origin: str = "<string>") -> Spec:
         """Parse and check a reader spec given as ``str`` or ``bytes``."""
 
+    @staticmethod
+    def _parse_built(text: str, origin: str, call_sites: Any) -> Spec: ...
+    @property
+    def _call_sites(self) -> Any: ...
     @staticmethod
     def load(path: str | PathLike[str]) -> Spec:
         """Read and parse a reader spec file; the path is the error origin."""
@@ -46,20 +53,30 @@ class Data:
     ``data[name]`` returns an entry's value and ``name in data`` tests for an
     entry. Values are copied into Python objects on each access: an ``int``,
     ``float`` or ``str`` at depth 0, and nested lists at greater depths.
+
+    A handle from ``gecode_iris.build`` can stand for the name, and then
+    ``data[handle]`` has the handle's type: ``None`` when an optional entry is
+    absent. A handle whose entry has another value type or depth, because a
+    later statement redefined its name or the handle belongs to another reader
+    spec, raises ``TypeError``.
     """
 
     @property
     def entries(self) -> tuple[Entry, ...]:
         """The entries in the order their names were defined."""
 
-    def __getitem__(self, name: str, /) -> Value:
+    @overload
+    def __getitem__(self, key: str, /) -> Value: ...
+    @overload
+    def __getitem__(self, key: Field[_T], /) -> _T: ...
+    def __getitem__(self, key: str | Field[Any], /) -> Any:
         """The whole value of an entry; raises ``KeyError`` for an unknown name."""
 
-    def __contains__(self, name: object, /) -> bool: ...
-    def ints(self, name: str, /, *path: int) -> list[int]:
+    def __contains__(self, key: object, /) -> bool: ...
+    def ints(self, key: str | Field[Any], /, *path: int) -> list[int]:
         """The integer row of an entry at a path."""
 
-    def array(self, name: str, /, *path: int) -> NDArray[Any] | list[Value]:
+    def array(self, key: str | Field[Any], /, *path: int) -> NDArray[Any] | list[Value]:
         """An array of an entry, or of its row at a path.
 
         The result is a ``numpy.ndarray`` when numpy is importable and the

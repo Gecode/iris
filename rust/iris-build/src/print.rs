@@ -9,6 +9,7 @@ use crate::expr::{BinaryOp, BindingId, Op, UnaryOp};
 use crate::pattern::{CaptureSpec, Pattern, Piece};
 use crate::statement::{
     Definition, Mention, NameState, RepeatCount, SectionClause, State, Stmt, is_identifier,
+    mention_declared,
 };
 use crate::types::{AlphabetOption, Declared, ListTerminator, TypeSpec};
 
@@ -124,6 +125,33 @@ enum Task {
     ListMember(usize),
 }
 
+/// Visit every expression the text of `stmt` writes: those it mentions, and
+/// the types of the captures its pattern names, which print where they bind.
+fn printed_expressions(state: &State, stmt: &Stmt, visit: &mut impl FnMut(&[Op])) {
+    stmt.mentions(&mut |mention| {
+        if let Mention::Ops(ops) = mention {
+            visit(ops);
+        }
+    });
+    let (Stmt::Line(pattern) | Stmt::Find(pattern) | Stmt::Arm { pattern, .. }) = stmt else {
+        return;
+    };
+    for piece in &pattern.pieces {
+        if let Piece::Capture(name) = piece
+            && let Some(NameState::Capture {
+                spec: CaptureSpec::Typed(declared),
+                ..
+            }) = state.names.get(name.text)
+        {
+            mention_declared(declared, &mut |mention| {
+                if let Mention::Ops(ops) = mention {
+                    visit(ops);
+                }
+            });
+        }
+    }
+}
+
 /// Internal names, chosen after the whole stream is known.
 #[derive(Default)]
 struct Names {
@@ -185,11 +213,7 @@ impl Names {
             }
         };
         for stmt in &state.stmts {
-            stmt.mentions(&mut |mention| {
-                if let Mention::Ops(ops) = mention {
-                    visit_chosen(ops);
-                }
-            });
+            printed_expressions(state, stmt, &mut visit_chosen);
         }
 
         let mut fresh = Fresh {
@@ -208,11 +232,7 @@ impl Names {
                     names.list.insert(id, fresh.name("records"));
                 }
             }
-            stmt.mentions(&mut |mention| {
-                if let Mention::Ops(ops) = mention {
-                    names.name_bindings(ops, &mut fresh);
-                }
-            });
+            printed_expressions(state, stmt, &mut |ops| names.name_bindings(ops, &mut fresh));
         }
         names
     }

@@ -62,7 +62,8 @@ commands; its build checks that they still appear here.
 - `data["name"]` returns an entry's value, copied into Python objects: an
   `int`, `float` or `str` at depth 0, and nested lists at greater depths. The
   type `Value` describes these. `"name" in data` tests for an entry, and
-  `data.to_dict()` returns every entry as a `dict` in entry order.
+  `data.to_dict()` returns every entry as a `dict` in entry order. A handle
+  from `gecode_iris.build` works wherever a name does, as described below.
 - `data.ints(name, *path)` returns the integer row that `path` selects, as
   `list[int]`. A negative index counts from the end of its row, as in a list.
   The selection must have depth 1 and value type `int`.
@@ -82,7 +83,9 @@ commands; its build checks that they still appear here.
   `origin`. The location is the input location when there is one, and
   otherwise the reader spec location; any part may be `None`. `str(error)` is
   the full diagnostic and `error.to_json()` the canonical error document.
-  Errors pickle.
+  `call_site` is a `CallSite(filename, line, function)` for a spec built
+  with `gecode_iris.build`, naming the code that added the failing statement,
+  and `None` otherwise. Errors pickle.
 - Host failures raise built-in exceptions and have no error code: `OSError`
   subclasses such as `FileNotFoundError` for file access, `ValueError` for a
   source too large to parse, `NotImplementedError` for an unimplemented
@@ -91,6 +94,67 @@ commands; its build checks that they still appear here.
 The reader releases the GIL, and one `Spec` can be shared between threads.
 The Rust `Spec` must stay on one thread, so the Python `Spec` keeps the spec
 source and parses it again for each read, which takes microseconds.
+
+## Spec builders
+
+`gecode_iris.build`, imported as `ib` by convention, writes a reader spec
+from Python code. It follows the [builder design brief](../docs/builders.md)
+and the Rust `gecode_iris::build` module statement for statement:
+`b.source()` returns the emitted text, and `b.build()` parses it into an
+ordinary `Spec`. [`examples/build_jobshop.py`](examples/build_jobshop.py)
+builds the job shop format of the format library and reads two of its cases.
+
+```python
+import gecode_iris.build as ib
+
+b = ib.SpecBuilder("pairs")
+n = b.read("n", ib.at_least(0))
+with b.repeat(n) as pair:
+    left = pair.read("left", ib.int_)
+    right = pair.read("right", ib.int_)
+    pair.check(left <= right, "a pair is ordered")
+data = b.build().read(b"2  1 2  3 5")
+data[right]  # [2, 5], typed list[int]
+```
+
+- Each statement is a method of a scope, and a block is a `with` statement:
+  `repeat`, `if_`, `sections` and `instances` return a guard whose `with`
+  gives the scope of the block's body. `else_if` and `else_` follow an `if_`
+  in the same scope.
+- Each definition returns a handle: `IntField[V]`, `FloatField[V]`,
+  `NumField[V]` or `StrField[V]`, where `V` is what `data[handle]` returns.
+  Each enclosing repeat and each dimension adds a `list[...]`, and a
+  definition that may not run, such as one inside an `if_` or an optional
+  section arm, adds `| None`. Scopes carry their depth in their class,
+  `Scope0` to `Scope3`; deeper than three repeats, `ScopeN` gives `DynField`
+  handles, whose value is `Value | None`.
+- Handles are expressions, and Python operators build Iris expressions.
+  Iris division truncates, so `/`, `//`, `%` and `**` raise `TypeError`
+  pointing to `ib.div`, `ib.rem` and `ib.pow`. `and`, `or` and `not` cannot
+  build expressions; use `&`, `|` and `~`. Since `==` builds an expression,
+  compare handles with `is`.
+- A line pattern is a t-string on Python 3.14 and later, `t"{n} {m}"`, and a
+  tuple of text and parts on every version, `(n, " ", m)`. A capture handle
+  appears bare; `ib.bind(handle, ty)` binds a forward or defined handle.
+- `forward(name, ib.IntField[int])` declares a name before its definition,
+  with the handle type that its definitions must match. `set(handle, value)`
+  is `let` through a handle and keeps its type; `let(handle, value)` may
+  change the type and returns a `DynField`.
+- A statement that breaks a builder rule raises `ib.BuildError` at once:
+  a handle used outside its scope or from another builder, a name defined
+  twice, or text that cannot be printed. `b.build()` raises that error
+  again, checks that every capture and forward handle is bound where its
+  uses can see it, and wraps a language error from parsing the emitted text
+  in a `BuildError` of kind `"spec"`. `error.call_site` names the caller's
+  line. Frames inside `gecode_iris.build` and functions decorated with
+  `@ib.track_caller` are skipped, so a helper that adds statements can
+  report its caller.
+- `data[handle]`, `handle in data`, `data.ints(handle, ...)` and
+  `data.array(handle, ...)` read the entry the handle defined, and type
+  checkers see the type the handle promises.
+
+Type checkers read the handle types from the stub
+`python/gecode_iris/build/__init__.pyi`.
 
 ## The `iris` command
 
@@ -222,6 +286,24 @@ uv run --no-sync --with numpy pyright tests/typecheck/data_misuse.py
 
 The last two commands exit with status 1. Each reports errors on every
 marked line and on no other line.
+
+The builder's handle types have the same pair of files, `build_usage.py`,
+whose `assert_type` calls pin the type of each value type, depth and
+presence, and `build_misuse.py`. `build_tstrings.py` uses t-strings, so the
+checkers read it as Python 3.14:
+
+```sh
+uv run --no-sync --with numpy mypy tests/typecheck/build_usage.py
+uv run --no-sync --with numpy pyright tests/typecheck/build_usage.py
+uv run --no-sync --with numpy mypy tests/typecheck/build_misuse.py
+uv run --no-sync --with numpy pyright tests/typecheck/build_misuse.py
+uv run --no-sync --with numpy mypy --python-version 3.14 tests/typecheck/build_tstrings.py
+uv run --no-sync --with numpy pyright --pythonversion 3.14 tests/typecheck/build_tstrings.py
+```
+
+ty skips the misuse files and the t-string files; check the t-string files
+with `uv run --no-sync ty check --python-version 3.14
+tests/test_build_tstrings.py tests/typecheck/build_tstrings.py`.
 
 Check the Rust crate from the repository root:
 

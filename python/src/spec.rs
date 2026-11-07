@@ -18,6 +18,10 @@ use std::path::{Path, PathBuf};
 pub struct PySpec {
     source: Box<[u8]>,
     origin: String,
+    /// The call sites of a built spec's statements, an object whose
+    /// `at(offset)` returns the call site of the statement holding a byte, or
+    /// `None` for a spec parsed from text.
+    call_sites: Option<Py<PyAny>>,
 }
 
 /// Spec text: a `str` is encoded as UTF-8, and `bytes` are used as given, so
@@ -61,7 +65,25 @@ impl PySpec {
             SpecText::Text(text) => text.as_bytes(),
             SpecText::Bytes(bytes) => bytes.as_ref(),
         };
-        Self::checked(py, source.into(), origin)
+        Self::checked(py, source.into(), origin, None)
+    }
+
+    /// Parses the text of a built spec, whose errors name the call sites that
+    /// `call_sites` maps statements to. `gecode_iris.build` calls this.
+    #[staticmethod]
+    fn _parse_built(
+        py: Python<'_>,
+        text: PyBackedStr,
+        origin: String,
+        call_sites: Py<PyAny>,
+    ) -> PyResult<Self> {
+        Self::checked(py, text.as_bytes().into(), origin, Some(call_sites))
+    }
+
+    /// The call sites of a built spec, or `None`.
+    #[getter]
+    fn _call_sites(&self, py: Python<'_>) -> Option<Py<PyAny>> {
+        self.call_sites.as_ref().map(|sites| sites.clone_ref(py))
     }
 
     /// Reads and parses a reader spec file; the path is the error origin.
@@ -70,7 +92,7 @@ impl PySpec {
         let source = py
             .detach(|| std::fs::read(&path))
             .map_err(|e| error::io_error(py, e, Some(&path)))?;
-        Self::checked(py, source.into(), path.to_string_lossy().into_owned())
+        Self::checked(py, source.into(), path.to_string_lossy().into_owned(), None)
     }
 
     /// Reads one instance from input bytes or from a path.
@@ -100,11 +122,20 @@ impl PySpec {
 
 impl PySpec {
     /// Parses once so that errors surface now; operations parse again.
-    fn checked(py: Python<'_>, source: Box<[u8]>, origin: String) -> PyResult<Self> {
+    fn checked(
+        py: Python<'_>,
+        source: Box<[u8]>,
+        origin: String,
+        call_sites: Option<Py<PyAny>>,
+    ) -> PyResult<Self> {
         // The parsed spec cannot leave this thread, so it is dropped here.
         py.detach(|| Spec::parse(&source, &origin).map(drop))
-            .map_err(|failure| error::failure_to_err(py, failure, None))?;
-        Ok(Self { source, origin })
+            .map_err(|failure| error::failure_to_err(py, failure, None, call_sites.as_ref()))?;
+        Ok(Self {
+            source,
+            origin,
+            call_sites,
+        })
     }
 
     fn run(
@@ -125,7 +156,9 @@ impl PySpec {
             operation.apply(&spec, &source, &params)
         })
         .map(PyData::from)
-        .map_err(|failure| error::failure_to_err(py, failure, source.path()))
+        .map_err(|failure| {
+            error::failure_to_err(py, failure, source.path(), self.call_sites.as_ref())
+        })
     }
 }
 
