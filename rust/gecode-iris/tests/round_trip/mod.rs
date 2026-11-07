@@ -34,8 +34,9 @@ pub fn corpus(repo: &Path) -> BTreeSet<PathBuf> {
 }
 
 /// Lengths of names and text for every layout form, on either side of the widths
-/// where a call, then a line, is full.
-const LAYOUT_LENGTHS: &[usize] = &[33, 56, 96];
+/// where a call, then a line, is full: 16 is below the longest C++ identifier,
+/// and 72 is where a C++ string constant takes a second line.
+const LAYOUT_LENGTHS: &[usize] = &[16, 33, 56, 72, 96];
 /// The forms whose closures end a block with a value, which is where
 /// `clippy::let_and_return` looks, with every length up to this.
 const BLOCK_ENDS: (&[&str], usize) = (
@@ -85,21 +86,127 @@ pub fn extra_specs() -> Vec<(String, String)> {
     }
     specs.push(("reserved_names".to_owned(), reserved_names()));
     specs.push(("helper_types".to_owned(), helper_types()));
+    specs.push(("host_constants".to_owned(), host_constants()));
     specs
 }
 
-/// Names that Python reserves or the generated programs use, also inside a
-/// block deep enough for a helper function, as values, types and comprehension
-/// variables.
+/// The host constants in every position where `iris check` accepts one: as
+/// operands beside each kind of value, and as the arrays, domains and bounds
+/// that need an expression, such as `size(gecode.int_max)`.
+fn host_constants() -> String {
+    const OPERATORS: &[&str] = &[
+        "+", "-", "*", "/", "%", "^", "==", "!=", "<", "<=", ">", ">=", "&&", "||",
+    ];
+    // An integer, a string, a float, an integer handle, an array and a host
+    // constant, on either side.
+    const PARTNERS: &[&str] = &["1", "\"s\"", "1.5", "x", "a", "H"];
+    let mut expressions = vec![
+        "-H".to_owned(),
+        "!H".to_owned(),
+        "-(-H)".to_owned(),
+        "H[0]".to_owned(),
+        "a[H]".to_owned(),
+        "H[H]".to_owned(),
+        "size(H)".to_owned(),
+        "count(H)".to_owned(),
+    ];
+    for operator in OPERATORS {
+        for partner in PARTNERS {
+            expressions.push(format!("H {operator} {partner}"));
+            if *partner != "H" {
+                expressions.push(format!("{partner} {operator} H"));
+            }
+        }
+    }
+    for function in ["min", "max", "sum", "distinct"] {
+        expressions.extend([
+            format!("{function}(H)"),
+            format!("{function}(H, 1)"),
+            format!("{function}(1, H)"),
+        ]);
+    }
+    for comprehension in ["sum", "count", "all", "any"] {
+        expressions.extend([
+            format!("{comprehension}(v in H: v)"),
+            format!("{comprehension}(v in a: H)"),
+            format!("{comprehension}(v in H: v == H)"),
+            format!("{comprehension}(v in H: v[0])"),
+            format!("{comprehension}(v in a: sum(w in H: v + w))"),
+        ]);
+    }
+    let statements = [
+        "check H \"m\"",
+        "check H",
+        "if H {\n  } else if H {\n  }",
+        "repeat H {\n  }",
+        "t[H]: int",
+        "u: H..",
+        "u: 0..<H",
+        "u: H..H",
+        "type tt = H..H",
+    ];
+    // Alternate the two constants, so that each meets the other.
+    let mut next = 0;
+    let mut host = |text: &str| {
+        text.split('H')
+            .enumerate()
+            .map(|(index, piece)| {
+                if index == 0 {
+                    piece.to_owned()
+                } else {
+                    next += 1;
+                    let name = ["gecode.int_max", "gecode.int_min"][next % 2];
+                    format!("{name}{piece}")
+                }
+            })
+            .collect::<String>()
+    };
+    let mut text = String::from("param p = gecode.int_max\nx: int\na[2]: int\nrepeat 2 {\n");
+    for (index, expression) in expressions.iter().enumerate() {
+        text.push_str(&format!("  let h{index} = {}\n", host(expression)));
+    }
+    for statement in statements {
+        text.push_str(&format!("  {}\n", host(statement)));
+    }
+    text.push_str("}\n");
+    text
+}
+
+/// Names that Python or C++ reserves or the generated programs use, also
+/// inside a block deep enough for a helper function, as values, types and
+/// comprehension variables.
 fn reserved_names() -> String {
     let names = [
-        "list", "match", "case", "int", "print", "str", "ib", "b", "s1",
+        "list",
+        "match",
+        "case",
+        "int",
+        "print",
+        "str",
+        "ib",
+        "b",
+        "s1",
+        "auto",
+        "else",
+        "e1",
+        "a2",
+        "c1",
+        "t1",
+        "block_1",
+        "body_1",
+        "std",
+        "main",
+        "namespace",
+        "unix",
+        "b_2",
     ];
     let mut text: String = names.iter().map(|name| format!("{name}: int\n")).collect();
-    text.push_str("type range = 1..9\ntype len = range\n");
+    text.push_str("type range = 1..9\ntype len = range\ntype double = len\ntype t2 = double\n");
     let body = "let x = count(sum in list: sum > 0)\n\
                 let y = sum(dict in list: sum(id in list: dict + id))\n\
-                z: len\n";
+                let w = all(e2 in list: any(s3 in list: e2 == s3))\n\
+                z: len\n\
+                u: t2\n";
     text.push_str(&format!(
         "{}{body}{}",
         "repeat 1 {\n".repeat(21),

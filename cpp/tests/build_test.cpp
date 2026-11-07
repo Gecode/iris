@@ -1100,6 +1100,27 @@ void literals() {
   expect_expression([](F, F, F) { return -host::int_min; }, "-gecode.int_min");
 }
 
+void host_constants_convert_to_expressions() {
+  expect_expression([](F, F, F) { return lit(host::int_max); },
+                    "gecode.int_max");
+  expect_expression([](F, F, F) { return lit(host::int_min) * 2; },
+                    "gecode.int_min * 2");
+  expect_expression([](F, F, F) { return size(host::int_max.dynamic()); },
+                    "size(gecode.int_max)");
+  expect_expression([](F, F, F) { return count(host::int_min.dynamic()); },
+                    "count(gecode.int_min)");
+  expect_expression([](F, F, F) { return host::int_max.dynamic()[0]; },
+                    "gecode.int_max[0]");
+  expect_expression([](F, F, F) { return host::int_max.dynamic() == "s"; },
+                    R"(gecode.int_max == "s")");
+  expect_expression(
+      [](F, F, F) {
+        return sum(over(host::int_max.dynamic()).named("e"),
+                   [](const auto &e) { return e; });
+      },
+      "sum(e in gecode.int_max: e)");
+}
+
 void parentheses_follow_the_precedence_levels() {
   expect_expression([](F x, F y, F z) { return x + y + z; }, "x + y + z");
   expect_expression([](F x, F y, F z) { return x + (y + z); }, "x + (y + z)");
@@ -1855,6 +1876,7 @@ int main() {
     let_and_check();
     instances_and_a_later_format();
     literals();
+    host_constants_convert_to_expressions();
     parentheses_follow_the_precedence_levels();
     powers_bind_tighter_than_unary_on_the_left_only();
     operators_take_literals_on_either_side();

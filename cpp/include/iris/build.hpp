@@ -509,6 +509,9 @@ public:
       : name_(name) {}
   /// Return the name of the constant, without the prefix
   [[nodiscard]] constexpr std::string_view name() const { return name_; }
+  /// This constant with its type forgotten, as an expression; `lit(c)`
+  /// keeps the type
+  [[nodiscard]] Expr<Dynamic, Scalar> dynamic() const;
 
 private:
   std::string_view name_;
@@ -1553,7 +1556,7 @@ concept Body = std::is_invocable_v<T>;
 
 struct LitFn {
   template <Operand T>
-    requires(!BuilderOperand<T>)
+    requires(!BuilderOperand<T> || std::same_as<Bare<T>, Host>)
   Expr<ValueOf<T>> operator()(T &&value) const {
     return Access::expr<ValueOf<T>, Scalar>(ops_of(std::forward<T>(value)));
   }
@@ -1939,7 +1942,8 @@ std::invoke_result_t<F, S &> enter(const std::shared_ptr<State> &state,
 
 } // namespace detail
 
-/// A literal as an expression, as in `lit(1)`
+/// A literal or host constant as an expression, as in `lit(1)` or
+/// `lit(host::int_max)`
 inline constexpr detail::LitFn lit{};
 /// `pow(a, b)`, which Iris spells `a ^ b`
 inline constexpr detail::PowFn pow{};
@@ -2613,6 +2617,10 @@ template <class F, std::size_t H, Presence P>
   requires std::same_as<S, Open> || std::same_as<V, Dynamic>
 Expr<F, Open> Expr<V, S>::get(const Field<F, H, P> &field) && {
   return Expr<F, Open>(detail::member_ops(std::move(ops_), field));
+}
+
+inline Expr<Dynamic, Scalar> Host::dynamic() const {
+  return detail::Access::expr<Dynamic, Scalar>(detail::ops_of(*this));
 }
 
 template <class V, std::size_t D, Presence P>

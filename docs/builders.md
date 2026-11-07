@@ -537,7 +537,10 @@ under `-Wshadow`. The free functions (`sum`, `distinct`, `pattern`, the type
 constants `int_`, `float_`, `num`, `word`, `rest`, and so on) are function
 objects, so argument-dependent lookup never replaces them with functions of
 the same name, such as `std::min`. `host::int_max` prints `gecode.int_max`;
-the public headers never name Gecode. `else_if` and `else_` are calls on the
+the public headers never name Gecode. A host constant is an integer operand;
+`lit(host::int_max)` makes it an `Expr<std::int64_t>`, and
+`host::int_max.dynamic()` an `Expr<Dynamic>` that can be indexed or iterated,
+as in `size(host::int_max.dynamic())`. `else_if` and `else_` are calls on the
 object that `if_` returns, and an optional arm is `optional_arm`. Copying an
 expression copies its whole operation list, so a long chain built in a loop
 should move it: `total = std::move(total) + x`.
@@ -921,8 +924,13 @@ Each implementation's builder is tested in four ways:
    runs the generated programs in each language and compares their output
    with the original, as syntax trees. Whitespace, comments, redundant
    parentheses, and generated record names do not count as differences.
-   Rust and Python have generators so far, and the generated Python must
-   pass `ruff format`, `ruff check` and ty unchanged before it runs.
+   Rust, Python and C++ have generators so far. The generated code must
+   pass the language's own tools unchanged before it runs: rustfmt and
+   Clippy for Rust; `ruff format`, `ruff check` and ty for Python; and
+   clang-format and clang-tidy 22.1.8, with the `.clang-format` and
+   `.clang-tidy` of `cpp/`, for C++, which then builds with the warnings
+   of `cpp/` as errors. The C++ round trip also runs as the CTest test
+   `builder-round-trip`, with the compiler and flags of the CTest build.
    This proves that the builder covers the language and that its printer is
    right. The comparison is a new `gecode-iris-conformance` subcommand. The
    generator doubles as a migration tool for users who want to move a text

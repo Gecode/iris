@@ -19,8 +19,8 @@ let code = builder_code(&parsed, &analysis, Language::Rust)?;
 ```
 
 A new language adds a `Language` variant, a backend module and one match arm in
-`builder_code`. There are backends for Rust and Python. `Language::has_view`
-says whether a language also has a view printer; Python has none yet.
+`builder_code`. There are backends for Rust, Python and C++. `Language::has_view`
+says whether a language also has a view printer; Python and C++ have none yet.
 
 ## The Rust backend
 
@@ -100,6 +100,69 @@ print:
 ```sh
 IRIS_PYTHON="$PWD/../python/.venv/bin/python" cargo test --locked -p gecode-iris --test python_round_trip -- --ignored --nocapture
 ```
+
+## The C++ backend
+
+The program is a complete file that includes `<iris/build.hpp>`. Its
+`builder` function, in an anonymous namespace with `using namespace
+iris::build`, returns the `SpecBuilder`, and its `main` prints the spec, or the
+error and exit status 1. It targets C++23 and compiles without warnings under
+the flags of `cpp/`. The output passes, unchanged, clang-format 22.1.8 with
+`cpp/.clang-format` and clang-tidy 22.1.8 with `cpp/.clang-tidy`. It writes
+clang-format's layout itself: each statement's candidate layouts are measured,
+and the one with the fewest lines wins, as in clang-format's penalties for this
+code.
+
+- Every handle is declared first, as `auto x = b.forward<DynField>("x");` or
+  `b.forward_record("job", "jobs")`, so that a statement may name a handle
+  defined later in the spec.
+- Blocks are lambdas taking `auto &` scopes. A block whose statements would be
+  indented deeper than 10 levels becomes a helper lambda, such as
+  `auto block_1 = [&](Scope<10, Presence::Required> &s10) { ... };`, before the
+  statements of `builder`. A helper takes each type of another helper that it
+  uses as a `const auto &` parameter after its scope.
+- An `if` with an `else` binds its chain, as in `auto c1 = s1.if_(...)`, and
+  continues with `c1.else_if`, `c1.else_` or `c1.else_read_if`.
+- A comprehension body is a lambda that returns it, and a body too deep for its
+  line becomes a helper lambda `body_1`.
+- A literal on the left of an operator goes through `lit`, and `pow` is
+  written `iris::build::pow`.
+- A value too wide for its place goes into `auto e1 = ...;`, and a long string
+  into a `constexpr std::string_view` constant `t1` at the top of the anonymous
+  namespace, split into pieces that each fit a line.
+
+Identifiers are lower snake case, as clang-tidy's naming check asks. A name that
+is a C++ keyword, a name of the program or of `iris::build`, a common macro of the
+C and POSIX headers, a numbered name such as `e1` or `block_1`, or the identifier
+of another name gets a numeric suffix: `if` binds `if_2`. C++ has one namespace for
+local variables, so `type b` binds `b_2`. A name stops at 24 columns and a
+comprehension variable at 12; the spelling in the spec stays whole in the string
+that the builder prints. String literals are ASCII, with every other byte as a
+three-digit octal escape, and a string with a NUL is a `std::string_view`
+literal.
+
+The C++ round trip needs clang-format 22.1.8, CMake 3.28 or newer, and a C++23
+compiler. It generates every builder, checks it with clang-format and, when
+`IRIS_CLANG_TIDY` names clang-tidy 22.1.8, with clang-tidy, builds them against
+`cpp/` with the warnings as errors, runs them and compares the specs they print.
+CMake finds the compiler, so `CXX` and `CMAKE_GENERATOR` choose it, and
+`IRIS_CMAKE` names CMake. `IRIS_CXX_FLAGS` and `IRIS_EXE_LINKER_FLAGS`, when
+set, replace the build's compile and link flags, those of its Debug
+configuration included. From `rust/`, with uv:
+
+```sh
+IRIS_CLANG_FORMAT="$(uvx --from clang-format==22.1.8 which clang-format)" \
+IRIS_CLANG_TIDY="$(uvx --from clang-tidy==22.1.8 which clang-tidy)" \
+  cargo test --locked -p gecode-iris --test builder_round_trip_cpp -- --ignored --nocapture
+```
+
+On macOS, export `SDKROOT="$(xcrun --show-sdk-path)"` for clang-tidy. The
+programs build in shards of 24 under `target/tmp/cpp-round-trip`, in one build
+directory per compiler and set of flags, so a second run compiles only what
+changed. The `builder-round-trip` test of `cpp/` runs it with that build's
+compiler and its compile and link flags, those of its configuration
+included, so that the `asan` preset builds the programs under ASan and
+UBSan.
 
 ## Views
 

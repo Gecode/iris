@@ -8,6 +8,7 @@
 //! [`view`](view::view) turns a checked spec into a language-independent
 //! [`View`](view::View) of typed handles, and [`view_code`] prints it for a
 //! language whose [`Language::has_view`] is true.
+mod cpp;
 mod lower;
 pub mod program;
 mod python;
@@ -29,17 +30,19 @@ use program::Program;
 pub enum Language {
     Rust,
     Python,
+    Cpp,
 }
 
 impl Language {
     /// Every language with a backend.
-    pub const ALL: &'static [Language] = &[Language::Rust, Language::Python];
+    pub const ALL: &'static [Language] = &[Language::Rust, Language::Python, Language::Cpp];
 
     /// The language's name on the command line.
     pub fn name(self) -> &'static str {
         match self {
             Self::Rust => "rust",
             Self::Python => "python",
+            Self::Cpp => "cpp",
         }
     }
 
@@ -47,7 +50,7 @@ impl Language {
     pub fn has_view(self) -> bool {
         match self {
             Self::Rust => true,
-            Self::Python => false,
+            Self::Python | Self::Cpp => false,
         }
     }
 }
@@ -91,6 +94,7 @@ pub fn builder_code(
     Ok(match language {
         Language::Rust => rust::RustBackend.render(&program),
         Language::Python => python::PythonBackend.render(&program),
+        Language::Cpp => cpp::CppBackend.render(&program),
     })
 }
 
@@ -129,6 +133,6 @@ impl From<gecode_iris_sema::Error> for ViewError {
 pub fn view_code(analysis: &Analysis, language: Language) -> Result<String, ViewError> {
     match language {
         Language::Rust => Ok(rust::view::render(&view::view(analysis)?)),
-        Language::Python => Err(ViewError::NoPrinter(language)),
+        Language::Python | Language::Cpp => Err(ViewError::NoPrinter(language)),
     }
 }

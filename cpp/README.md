@@ -152,7 +152,7 @@ cmake --build --preset dev
 ctest --preset dev
 ```
 
-`ctest` runs forty-five tests. `spec-api` and `data-api` check the public
+`ctest` runs forty-eight tests. `spec-api` and `data-api` check the public
 API; `data-api` also checks the driver's JSON of data, and both outputs
 under every rounding mode. `budget` checks the exact budget limits that no
 conformance case reaches. `memory` checks the allocation hook: it replaces
@@ -187,7 +187,17 @@ every case of their operation in `conformance/cases/0.1` and `formats`, and
 fail unless all of them pass. `fuzz-replay-parse` and `fuzz-replay-read`
 run the two fuzz targets (see [Fuzzing](#fuzzing)) over every file in
 `formats`. `example-read` and the other `example-` tests run the guide's
-examples (see [Guide examples](#guide-examples)). Run one alone with, for
+examples (see [Guide examples](#guide-examples)). `builder-round-trip` runs
+the C++ builder round trip of `rust/` with this build's compiler and its
+compile and link flags, those of its configuration included: it
+generates a builder program with `iris gen builder --lang cpp` for every
+accepted spec in `conformance/cases/0.1` and `formats`, checks it with
+clang-format and clang-tidy, builds it against this source tree with the
+warnings as errors, and compares the spec it prints with the original (see
+[gecode-iris-gen](../rust/iris-gen/README.md#the-c-backend)). It needs
+clang-format 22.1.8 and is skipped without it; configure with
+`-DIRIS_CLANG_FORMAT=PATH` and `-DIRIS_CLANG_TIDY=PATH` to name the tools,
+and it skips clang-tidy unless that is 22.1.8 too. Run one alone with, for
 example, `ctest --preset dev -R read-conformance`. The first conformance run builds the
 runner with Cargo.
 
@@ -379,6 +389,8 @@ the `dev` preset and runs `ctest`, including the four conformance tests,
 with GCC 14 and Clang 20 on Ubuntu 24.04, Apple Clang on macOS, and MSVC on
 Windows; runs the `asan` preset with Clang 20 and the `tsan` preset with
 GCC 14 on Ubuntu;
+runs the builder round trip with GCC 14 and Clang 20, with clang-format
+and clang-tidy 22.1.8;
 runs each fuzz target for two minutes with Clang 20; compares the Rust
 driver with the `asan` driver for five minutes, seeded with the run's ID;
 and checks the formatting, runs clang-tidy as above and builds `iris-docs`. A failing fuzz or
@@ -421,4 +433,5 @@ come from PyPI through uv.
   the programs the builder must reject; `conformance.cmake`, which
   selects the cases of one operation and runs them in batches;
   `example.cmake`, which runs an example and compares its output;
+  `builder-round-trip.cmake`, which runs the builder round trip;
   `no-gecode.cmake`; and `consumer/`, a project that uses the library.

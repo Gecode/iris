@@ -25,7 +25,8 @@ concurrency:
 
 # The test, msvc and sanitizers jobs run ctest, whose conformance tests run
 # the whole suite through the driver with the runner in rust/, so each needs
-# Rust. The differential job needs it too; lint and fuzz do not.
+# Rust. The builder round trip and differential jobs need it too; lint and
+# fuzz do not.
 jobs:
   test:
     name: Test (${{ matrix.compiler }})
@@ -210,6 +211,59 @@ jobs:
         run: git ls-files 'cpp/*.cpp' | xargs uvx clang-tidy==22.1.8 -p cpp/build/dev --quiet
       - name: Build the API reference
         run: cmake --build cpp/build/dev --target iris-docs
+
+  # Generates a C++ builder program for every accepted corpus spec, checks it
+  # with clang-format and clang-tidy, builds it with the warnings as errors,
+  # and compares the spec it prints with the original.
+  builder-round-trip:
+    name: Builder round trip (${{ matrix.compiler }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: GCC 14
+            packages: g++-14
+            cxx: g++-14
+          - compiler: Clang 20
+            packages: clang-20 g++-14
+            cxx: clang++-20
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install compiler
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ${{ matrix.packages }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: astral-sh/setup-uv@v7
+      - name: Install CMake, Ninja, clang-format and clang-tidy
+        run: |
+          uv tool install cmake==4.4.4
+          uv tool install ninja==1.13.0
+          uv tool install clang-format==22.1.8
+          uv tool install clang-tidy==22.1.8
+          uv tool dir --bin >> "$GITHUB_PATH"
+      - name: Cache Cargo artifacts
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: cpp-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ hashFiles('rust/**/*.rs', 'rust/**/Cargo.toml') }}
+          restore-keys: |
+            cpp-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+      - name: Round-trip the corpus
+        env:
+          CXX: ${{ matrix.cxx }}
+          CMAKE_GENERATOR: Ninja
+        run: |
+          IRIS_CLANG_FORMAT="$(command -v clang-format)" \
+          IRIS_CLANG_TIDY="$(command -v clang-tidy)" \
+            cargo test --locked -p gecode-iris --test builder_round_trip_cpp -- --ignored --nocapture
 
   fuzz:
     name: Fuzz (${{ matrix.target }})

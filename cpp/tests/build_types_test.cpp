@@ -95,6 +95,17 @@ static_assert(std::is_object_v<std::remove_cvref_t<decltype(ref)>>);
 static_assert(std::is_object_v<std::remove_cvref_t<decltype(int_)>>);
 } // namespace adl
 
+// A host constant becomes an expression of its type through lit, and one
+// with no type through dynamic(), as an array or record operand needs.
+namespace hosts {
+using namespace iris::build;
+static_assert(std::same_as<decltype(lit(host::int_max)), Expr<Int>>);
+static_assert(std::same_as<decltype(host::int_min.dynamic()), Expr<Dynamic>>);
+static_assert(
+    std::same_as<decltype(host::int_max.dynamic()[0]), Expr<Dynamic, Open>>);
+static_assert(std::same_as<decltype(size(host::int_max.dynamic())), Expr<Int>>);
+} // namespace hosts
+
 /// Whether `a + b` is an expression
 template <class A, class B>
 concept Addable = requires(A a, B b) { a + b; };

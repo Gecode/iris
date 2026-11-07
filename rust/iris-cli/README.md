@@ -171,15 +171,16 @@ temporary directory cannot affect results.
 
 `iris gen builder --lang LANGUAGE SPEC` prints a program that builds the reader
 spec with the spec builder of that language, through
-[gecode-iris-gen](../iris-gen/README.md). Rust is the only language so far. The program
-is a complete file: its `builder` function returns the `SpecBuilder`, and its
-`main` prints the spec's source.
+[gecode-iris-gen](../iris-gen/README.md). The languages are `rust`, `python` and
+`cpp`. The program is a complete file: its `builder` function returns the
+`SpecBuilder`, and running it prints the spec's source.
 
 A spec that `iris check` rejects exits 1 with the same message on standard error
 and nothing on standard output. A file that cannot be read also exits 1, and an
 unknown language or a missing `--lang` is a usage error with exit 2.
-`tests/fixtures/jobshop-builder.rs` records the output for the jobshop format;
-after an intended change to the generated code, write the new output there.
+`tests/fixtures/jobshop-builder.rs`, `jobshop-builder.py` and
+`jobshop-builder.cpp` record the output for the jobshop format; after an
+intended change to the generated code, write the new output there.
 
 The round trip checks what the programs do, from `rust/`:
 
@@ -194,7 +195,8 @@ that `iris check` accepts and `skipped` is the files that it rejects, so the two
 add up to the whole corpus; nothing else is skipped. `extra` is the specs beyond
 the corpus, which go through the same steps: the layout forms at several widths
 and the operands of `clippy::eq_op`. The limit specs of Specification §5.12 run
-too, outside all of these counts.
+too, outside all of these counts. The Python and C++ round trips report the
+same counts; see [gecode-iris-gen](../iris-gen/README.md) for their commands.
 
 ## Generating views
 

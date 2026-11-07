@@ -24,6 +24,10 @@
 - Add `Language::has_view` and `ViewError`. `view_code` returns a `ViewError`:
   the spec's first error, or `ViewError::NoPrinter` for a language without a
   view printer, such as Python.
+- Add a C++ backend to gecode-iris-gen, `Language::Cpp`, whose programs use
+  `<iris/build.hpp>`, compile without warnings under the flags of `cpp/`, and
+  pass clang-format and clang-tidy 22.1.8 unchanged, and a test that
+  round-trips every accepted corpus spec through it.
 
 ### CLI
 
@@ -33,6 +37,8 @@
 - Add `iris gen builder --lang python SPEC`, which prints a Python builder
   program. `iris gen --lang` accepts only languages with a view printer, and
   `iris gen --lang python` says that Python has no view generator yet.
+- Add `iris gen builder --lang cpp SPEC`, which prints a C++ builder program.
+  `iris gen --lang cpp` says that C++ has no view generator yet.
 
 ## 0.1.0 - 2026-11-06
 
