@@ -274,3 +274,35 @@ jobs:
               /tmp/env/bin/iris --version
               /tmp/env/bin/iris check ../formats/dimacs-cnf/dimacs-cnf.iris
             '
+
+  # Every accepted corpus spec through the generated Python builder, which must
+  # pass ruff and ty unchanged; the round trip prints its counts.
+  builder-round-trip:
+    name: Builder round trip (Python ${{ matrix.python }})
+    needs: wheel
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.15']
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: astral-sh/setup-uv@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: wheel-manylinux-x86_64
+          path: dist
+      - name: Install wheel with ruff and ty
+        working-directory: python
+        run: |
+          uv venv --python "${{ matrix.python }}" "$RUNNER_TEMP/iris-env"
+          uv pip install --python "$RUNNER_TEMP/iris-env/bin/python" ../dist/*.whl --group lint
+      - name: Round-trip the corpus through the Python builder
+        working-directory: rust
+        run: |
+          IRIS_PYTHON="$RUNNER_TEMP/iris-env/bin/python" \
+            cargo test --locked -p gecode-iris --test python_round_trip -- --ignored --nocapture

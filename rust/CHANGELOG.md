@@ -18,12 +18,21 @@
 - Fix gecode-iris-build printing a capture whose type uses a record or a
   comprehension: the builder panicked, or omitted the repeat's `each` or `as`
   name. Such a type now names them like any other expression.
+- Add a Python backend to gecode-iris-gen, `Language::Python`, whose programs
+  use `gecode_iris.build` and pass `ruff format`, `ruff check` and ty
+  unchanged, and a test that round-trips every accepted corpus spec through it.
+- Add `Language::has_view` and `ViewError`. `view_code` returns a `ViewError`:
+  the spec's first error, or `ViewError::NoPrinter` for a language without a
+  view printer, such as Python.
 
 ### CLI
 
 - Add `iris gen --lang rust SPEC`, which prints a module of declared handles of
   a text spec, of the types the spec builder returns. A name without one value
   type and depth gets a `DynField`.
+- Add `iris gen builder --lang python SPEC`, which prints a Python builder
+  program. `iris gen --lang` accepts only languages with a view printer, and
+  `iris gen --lang python` says that Python has no view generator yet.
 
 ## 0.1.0 - 2026-11-06
 

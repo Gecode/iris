@@ -189,6 +189,8 @@ def types_and_patterns() -> None:
     assert_type(small, ib.IntType[int])
     x = b.read("x", small.dim(2).layout(1).offset(0))
     assert_type(x, ib.IntField[list[int]])
+    m = b.read("m", ib.float_.dim(2).dim(2).layout("LOWER_COL"))
+    assert_type(m, ib.FloatField[list[list[float]]])
     w = b.forward("w", ib.StrField[str])
     y = b.capture("y", ib.word)
     b.line(("x ", ib.ref(x), " ", ib.bind(w, ib.word), " ", y, ib.rest_of_line))

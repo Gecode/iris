@@ -37,6 +37,17 @@ fn the_jobshop_builder_matches_its_recording() {
 }
 
 #[test]
+fn the_jobshop_python_builder_matches_its_recording() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let spec = root.join("../../formats/jobshop/jobshop.iris");
+    let output = iris(&["gen", "builder", "--lang", "python", spec.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    assert_eq!(stderr(&output), "");
+    let recording = fs::read_to_string(root.join("tests/fixtures/jobshop-builder.py")).unwrap();
+    assert_eq!(String::from_utf8(output.stdout).unwrap(), recording);
+}
+
+#[test]
 fn a_rejected_spec_fails_as_the_check_does() {
     let directory = tempfile::tempdir().unwrap();
     let spec = write_spec(directory.path(), b"let x = nothing(1)\n");
@@ -75,6 +86,7 @@ fn an_unknown_language_is_a_usage_error_that_names_the_choices() {
     assert_eq!(output.status.code(), Some(2));
     assert_eq!(output.stdout, b"");
     assert!(stderr(&output).contains("rust"), "{}", stderr(&output));
+    assert!(stderr(&output).contains("python"), "{}", stderr(&output));
 }
 
 #[test]
@@ -131,4 +143,29 @@ fn a_view_needs_a_language_and_a_spec() {
         assert_eq!(output.status.code(), Some(2), "{arguments:?}");
         assert_eq!(output.stdout, b"", "{arguments:?}");
     }
+}
+
+#[test]
+fn python_has_no_view_generator_yet() {
+    let output = iris(&["gen", "--lang", "python", "spec.iris"]);
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(output.stdout, b"");
+    assert!(
+        stderr(&output).contains("python has no view generator yet"),
+        "{}",
+        stderr(&output)
+    );
+    assert!(
+        stderr(&output).contains("iris gen builder --lang python SPEC"),
+        "{}",
+        stderr(&output)
+    );
+}
+
+#[test]
+fn an_unknown_view_language_names_only_languages_with_views() {
+    let output = iris(&["gen", "--lang", "cobol", "spec.iris"]);
+    assert_eq!(output.status.code(), Some(2));
+    let message = stderr(&output);
+    assert!(message.contains("[possible values: rust]"), "{message}");
 }

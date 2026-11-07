@@ -15,3 +15,5 @@
 - Let `data[handle]`, `handle in data`, `Data.ints` and `Data.array` take a
   builder handle, typed by the handle, and add `Error.call_site` and
   `CallSite` for errors while reading a built spec.
+- Type the `layout` option of `gecode_iris.build` reading types as any operand,
+  so that a matrix layout name such as `"LOWER_COL"` type-checks.

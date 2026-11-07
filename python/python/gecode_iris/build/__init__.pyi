@@ -342,8 +342,8 @@ class IntType(Type[_U]):
     def dims(self, first: _Int, second: _Int, third: _Int, /) -> IntType[list[list[list[_U]]]]: ...
     @overload
     def dims(self, *sizes: _Int) -> IntType[Any]: ...
-    def layout(self, layout: _Int) -> IntType[_U]:
-        """``layout expression``."""
+    def layout(self, layout: _Operand) -> IntType[_U]:
+        """``layout expression``: a matrix layout name such as ``"LOWER_COL"``."""
 
     def offset(self, offset: _Int) -> IntType[_U]:
         """``offset expression``."""
@@ -367,8 +367,8 @@ class FloatType(Type[_U]):
     ) -> FloatType[list[list[list[_U]]]]: ...
     @overload
     def dims(self, *sizes: _Int) -> FloatType[Any]: ...
-    def layout(self, layout: _Int) -> FloatType[_U]:
-        """``layout expression``."""
+    def layout(self, layout: _Operand) -> FloatType[_U]:
+        """``layout expression``: a matrix layout name such as ``"LOWER_COL"``."""
 
     def offset(self, offset: _Int) -> FloatType[_U]:
         """``offset expression``."""
@@ -390,8 +390,8 @@ class NumType(Type[_U]):
     def dims(self, first: _Int, second: _Int, third: _Int, /) -> NumType[list[list[list[_U]]]]: ...
     @overload
     def dims(self, *sizes: _Int) -> NumType[Any]: ...
-    def layout(self, layout: _Int) -> NumType[_U]:
-        """``layout expression``."""
+    def layout(self, layout: _Operand) -> NumType[_U]:
+        """``layout expression``: a matrix layout name such as ``"LOWER_COL"``."""
 
     def offset(self, offset: _Int) -> NumType[_U]:
         """``offset expression``."""
@@ -413,8 +413,8 @@ class StrType(Type[_U]):
     def dims(self, first: _Int, second: _Int, third: _Int, /) -> StrType[list[list[list[_U]]]]: ...
     @overload
     def dims(self, *sizes: _Int) -> StrType[Any]: ...
-    def layout(self, layout: _Int) -> StrType[_U]:
-        """``layout expression``."""
+    def layout(self, layout: _Operand) -> StrType[_U]:
+        """``layout expression``: a matrix layout name such as ``"LOWER_COL"``."""
 
     def offset(self, offset: _Int) -> StrType[_U]:
         """``offset expression``."""

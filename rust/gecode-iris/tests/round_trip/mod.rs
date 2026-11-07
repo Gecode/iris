@@ -1,0 +1,251 @@
+//! What the builder round trips share: the corpus, the specs beyond it, and
+//! the comparison of a printed spec with its original.
+#[path = "../../../iris-gen/tests/equal_operands/mod.rs"]
+mod equal_operands;
+#[path = "../../../iris-gen/tests/layout_forms/mod.rs"]
+mod layout_forms;
+
+use gecode_iris_cli::check_spec;
+use gecode_iris_conformance::compare::compare;
+use std::{
+    collections::BTreeSet,
+    fs,
+    path::{Path, PathBuf},
+};
+
+/// Every distinct `.iris` file of the conformance cases and format library.
+pub fn corpus(repo: &Path) -> BTreeSet<PathBuf> {
+    let mut pending = vec![repo.join("conformance/cases/0.1"), repo.join("formats")];
+    let mut specs = BTreeSet::new();
+    while let Some(directory) = pending.pop() {
+        for entry in fs::read_dir(directory).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                pending.push(path);
+            } else if path
+                .extension()
+                .is_some_and(|extension| extension == "iris")
+            {
+                specs.insert(fs::canonicalize(path).unwrap());
+            }
+        }
+    }
+    specs
+}
+
+/// Lengths of names and text for every layout form, on either side of the widths
+/// where a call, then a line, is full.
+const LAYOUT_LENGTHS: &[usize] = &[33, 56, 96];
+/// The forms whose closures end a block with a value, which is where
+/// `clippy::let_and_return` looks, with every length up to this.
+const BLOCK_ENDS: (&[&str], usize) = (
+    &[
+        "comprehension-binary",
+        "comprehension-block",
+        "comprehension-nested-domain",
+        "comprehension-tail",
+    ],
+    100,
+);
+
+/// Specs beyond the corpus: every layout form at a few widths, the ends of
+/// closures at every width, the operands of `clippy::eq_op`, and the names and
+/// types that a backend must handle, by name.
+pub fn extra_specs() -> Vec<(String, String)> {
+    let mut specs = Vec::new();
+    let mut add = |title: &str, form: &str, length: usize, depth: usize| {
+        let (name, text) = ("n".repeat(length), "t".repeat(length));
+        let module = format!("{}_{depth}_{length}", title.replace('-', "_"));
+        specs.push((module, layout_forms::spec(form, &name, &text, depth)));
+    };
+    for (title, form) in layout_forms::FORMS {
+        let (ends, longest) = BLOCK_ENDS;
+        for depth in [0, 4, 7] {
+            if depth > 0 && !layout_forms::nests(form) {
+                continue;
+            }
+            for &length in LAYOUT_LENGTHS {
+                add(title, form, length, depth);
+            }
+            if ends.contains(title) && depth < 7 {
+                (1..=longest)
+                    .filter(|length| !LAYOUT_LENGTHS.contains(length))
+                    .for_each(|length| add(title, form, length, depth));
+            }
+        }
+    }
+    let operands = [
+        ("equal", equal_operands::EQUAL),
+        ("different", equal_operands::DIFFERENT),
+    ];
+    for (title, expressions) in operands {
+        for (index, expression) in expressions.iter().enumerate() {
+            specs.push((format!("{title}_{index}"), equal_operands::spec(expression)));
+        }
+    }
+    specs.push(("reserved_names".to_owned(), reserved_names()));
+    specs.push(("helper_types".to_owned(), helper_types()));
+    specs
+}
+
+/// Names that Python reserves or the generated programs use, also inside a
+/// block deep enough for a helper function, as values, types and comprehension
+/// variables.
+fn reserved_names() -> String {
+    let names = [
+        "list", "match", "case", "int", "print", "str", "ib", "b", "s1",
+    ];
+    let mut text: String = names.iter().map(|name| format!("{name}: int\n")).collect();
+    text.push_str("type range = 1..9\ntype len = range\n");
+    let body = "let x = count(sum in list: sum > 0)\n\
+                let y = sum(dict in list: sum(id in list: dict + id))\n\
+                z: len\n";
+    text.push_str(&format!(
+        "{}{body}{}",
+        "repeat 1 {\n".repeat(21),
+        "}\n".repeat(21)
+    ));
+    text
+}
+
+/// Named types that blocks deep enough for helper functions define and use:
+/// within one helper, passed from one helper to the next, and from the
+/// outermost function, for every base type and an alphabet.
+fn helper_types() -> String {
+    let repeats = |count: usize| "repeat 1 {\n".repeat(count);
+    format!(
+        "type top = 0..9\n{}\
+         type a = 1..9\ntype f = float\ntype n = num\ntype w = word\n\
+         type al = alphabet \"ab\"\n{}\
+         type b = a\ntype al2 = al\n{}\
+         x: b\ny: f\nz: n\nv: w\nq[1][2]: al2\nk: top\n\
+         type own = 1..3\ntype own2 = own\nlocal: own2\n{}",
+        repeats(18),
+        repeats(20),
+        repeats(20),
+        "}\n".repeat(58)
+    )
+}
+
+/// Specs at the limits of Specification §5.12, by name. None of them is in the
+/// corpus count, and the deep ones show that generation needs no stack of its
+/// own and that the generated program still compiles.
+pub fn limit_specs() -> Vec<(&'static str, String)> {
+    let nested = |open: &str, inner: &str, close: &str, count: usize| {
+        format!("{}{inner}{}", open.repeat(count), close.repeat(count))
+    };
+    let else_ifs: String = (1..=255)
+        .map(|arm| format!("else if x == {arm} {{\n  skip line\n}}\n"))
+        .collect();
+    let comprehension_levels = 255;
+    let comprehensions: String = (0..comprehension_levels)
+        .map(|level| format!("sum(v{level} in a: "))
+        .collect();
+    // Each level holds the next one's list, so the chain resolves at every step.
+    // A field of a repeat needs an index first, so the longest chain that name
+    // resolution accepts alternates the two suffixes and stops at 254 of them.
+    let record_levels = 127;
+    let mut records = String::new();
+    let mut chain = String::from("r0");
+    for level in 0..record_levels {
+        records.push_str(&format!("repeat 1 as r{level} {{\n"));
+        if level > 0 {
+            chain.push_str(&format!("[0].r{level}"));
+        }
+    }
+    records.push_str("v: int\n");
+    records.push_str(&"}\n".repeat(record_levels));
+    vec![
+        (
+            "limit_repeat",
+            nested("repeat 1 {\n", "v: int\n", "}\n", 256),
+        ),
+        (
+            "limit_if",
+            format!("x: int\n{}", nested("if x > 0 {\n", "y: int\n", "}\n", 256)),
+        ),
+        (
+            "limit_arm",
+            nested("sections {\n\"a\" {\n", "v: int\n", "}\n}\n", 256),
+        ),
+        (
+            "limit_else_if",
+            format!("x: int\nif x == 0 {{\n  skip line\n}}\n{else_ifs}"),
+        ),
+        (
+            "limit_parentheses",
+            format!("let x = {}\n", nested("(", "1", ")", 255)),
+        ),
+        ("limit_unary", format!("let x = {}1\n", "-".repeat(255))),
+        (
+            "limit_additions",
+            format!("let x = 1{}\n", "+1".repeat(255)),
+        ),
+        ("limit_powers", format!("let x = 1{}\n", "^1".repeat(255))),
+        (
+            "limit_indices",
+            format!("x: int\nlet y = x{}\n", "[0]".repeat(254)),
+        ),
+        ("limit_fields", format!("{records}let x = {chain}[0].v\n")),
+        (
+            "limit_comprehensions",
+            format!(
+                "let a = 1\nlet x = {comprehensions}v0{}\n",
+                ")".repeat(comprehension_levels)
+            ),
+        ),
+    ]
+}
+
+/// Whether the builder `name` ran and printed a spec equal to `original`: it
+/// left `out/NAME.iris`, or `out/NAME.error` saying why not.
+pub fn round_trip(out: &Path, original: &[u8], name: &str) -> Result<(), String> {
+    let error = out.join(format!("{name}.error"));
+    if error.exists() {
+        return Err(format!("builder: {}", fs::read_to_string(error).unwrap()));
+    }
+    let printed = fs::read(out.join(format!("{name}.iris")))
+        .map_err(|error| format!("no printed spec: {error}"))?;
+    check_spec(&printed, name).map_err(|error| format!("the printed spec is rejected: {error}"))?;
+    match compare(original, &printed) {
+        Ok(None) => Ok(()),
+        Ok(Some(difference)) => Err(difference.to_string()),
+        Err(failure) => Err(failure.to_string()),
+    }
+}
+
+/// The counts of a round trip.
+pub struct Tally {
+    /// Corpus specs that went through the builder.
+    pub compared: usize,
+    /// Corpus specs that `iris check` rejects.
+    pub skipped: usize,
+    /// Specs beyond the corpus that went through the builder.
+    pub extra: usize,
+    /// The size of the corpus.
+    pub corpus: usize,
+}
+
+impl Tally {
+    /// Print the counts and the differences, and fail on any difference, on a
+    /// corpus spec that went nowhere, or on too few compared specs.
+    pub fn report(&self, label: &str, differences: &[String]) {
+        println!(
+            "{label} round trip: compared {}, skipped {}, extra {}, differences {}",
+            self.compared,
+            self.skipped,
+            self.extra,
+            differences.len()
+        );
+        for difference in differences {
+            println!("DIFF {difference}");
+        }
+        assert_eq!(self.compared + self.skipped, self.corpus);
+        assert!(
+            self.compared >= 770,
+            "too few accepted specs: {}",
+            self.compared
+        );
+        assert!(differences.is_empty(), "{} differences", differences.len());
+    }
+}

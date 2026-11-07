@@ -6,9 +6,11 @@
 //! [`builder_code`].
 //!
 //! [`view`](view::view) turns a checked spec into a language-independent
-//! [`View`](view::View) of typed handles, and [`view_code`] prints it.
+//! [`View`](view::View) of typed handles, and [`view_code`] prints it for a
+//! language whose [`Language::has_view`] is true.
 mod lower;
 pub mod program;
+mod python;
 mod rust;
 pub mod view;
 
@@ -26,16 +28,26 @@ use program::Program;
 #[non_exhaustive]
 pub enum Language {
     Rust,
+    Python,
 }
 
 impl Language {
     /// Every language with a backend.
-    pub const ALL: &'static [Language] = &[Language::Rust];
+    pub const ALL: &'static [Language] = &[Language::Rust, Language::Python];
 
     /// The language's name on the command line.
     pub fn name(self) -> &'static str {
         match self {
             Self::Rust => "rust",
+            Self::Python => "python",
+        }
+    }
+
+    /// Whether [`view_code`] has a printer for the language.
+    pub fn has_view(self) -> bool {
+        match self {
+            Self::Rust => true,
+            Self::Python => false,
         }
     }
 }
@@ -78,17 +90,45 @@ pub fn builder_code(
     let program = lower(parsed, analysis)?;
     Ok(match language {
         Language::Rust => rust::RustBackend.render(&program),
+        Language::Python => python::PythonBackend.render(&program),
     })
 }
 
-/// A module of the spec's typed handles, or the first error that `iris check`
-/// reports.
-pub fn view_code(
-    analysis: &Analysis,
-    language: Language,
-) -> Result<String, gecode_iris_sema::Error> {
-    let view = view::view(analysis)?;
-    Ok(match language {
-        Language::Rust => rust::view::render(&view),
-    })
+/// Why [`view_code`] printed nothing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ViewError {
+    /// The first error that `iris check` reports.
+    Spec(gecode_iris_sema::Error),
+    /// The language has no view printer; see [`Language::has_view`].
+    NoPrinter(Language),
+}
+
+impl fmt::Display for ViewError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Spec(error) => write!(formatter, "{error}"),
+            Self::NoPrinter(language) => {
+                write!(formatter, "{} has no view generator yet", language.name())
+            }
+        }
+    }
+}
+
+impl std::error::Error for ViewError {}
+
+impl From<gecode_iris_sema::Error> for ViewError {
+    fn from(error: gecode_iris_sema::Error) -> Self {
+        Self::Spec(error)
+    }
+}
+
+/// A module of the spec's typed handles. A spec that `iris check` rejects gives
+/// its first error, and a language without a printer gives
+/// [`ViewError::NoPrinter`].
+pub fn view_code(analysis: &Analysis, language: Language) -> Result<String, ViewError> {
+    match language {
+        Language::Rust => Ok(rust::view::render(&view::view(analysis)?)),
+        Language::Python => Err(ViewError::NoPrinter(language)),
+    }
 }

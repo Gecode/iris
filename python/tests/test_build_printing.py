@@ -116,6 +116,18 @@ def test_declarations() -> None:
     )
 
 
+def test_a_layout_is_a_string_or_any_expression() -> None:
+    def build(b: ib.SpecBuilder) -> None:
+        name = b.let("name", "UPPER_ROW")
+        b.read("a", ib.int_.dim(2).dim(2).layout("LOWER_COL"))
+        b.read("b", ib.float_.dim(2).dim(2).layout(name))
+
+    assert_prints(
+        build,
+        'let name = "UPPER_ROW"\na[2][2]: int layout "LOWER_COL"\nb[2][2]: float layout name\n',
+    )
+
+
 def test_ranges() -> None:
     def build(b: ib.SpecBuilder) -> None:
         n = b.read("n", ib.int_)

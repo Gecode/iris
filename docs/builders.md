@@ -877,6 +877,8 @@ Each implementation's builder is tested in four ways:
    runs the generated programs in each language and compares their output
    with the original, as syntax trees. Whitespace, comments, redundant
    parentheses, and generated record names do not count as differences.
+   Rust and Python have generators so far, and the generated Python must
+   pass `ruff format`, `ruff check` and ty unchanged before it runs.
    This proves that the builder covers the language and that its printer is
    right. The comparison is a new `gecode-iris-conformance` subcommand. The
    generator doubles as a migration tool for users who want to move a text
