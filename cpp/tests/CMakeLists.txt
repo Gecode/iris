@@ -47,9 +47,69 @@ iris_set_warnings(iris-headers)
 add_test(NAME headers-compile-alone
   COMMAND "${CMAKE_COMMAND}" --build "${PROJECT_BINARY_DIR}" --target iris-headers
     --config $<CONFIG>)
+set_tests_properties(headers-compile-alone PROPERTIES RESOURCE_LOCK iris-build-tree)
 add_test(NAME headers-name-no-gecode
   COMMAND "${CMAKE_COMMAND}" "-DHEADERS=${iris_headers}"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/no-gecode.cmake")
+
+# The spec builder: its checks, call sites, text and typed reads, and the
+# types it gives, which the second test checks at compile time.
+add_executable(iris-build-test build_test.cpp)
+target_link_libraries(iris-build-test PRIVATE iris::iris Threads::Threads)
+set_target_properties(iris-build-test PROPERTIES CXX_EXTENSIONS OFF)
+target_compile_definitions(iris-build-test PRIVATE
+  "IRIS_REPOSITORY=\"${PROJECT_SOURCE_DIR}/..\"")
+iris_set_warnings(iris-build-test)
+add_test(NAME build-api COMMAND iris-build-test)
+add_executable(iris-build-types-test build_types_test.cpp)
+target_link_libraries(iris-build-types-test PRIVATE iris::iris)
+set_target_properties(iris-build-types-test PROPERTIES CXX_EXTENSIONS OFF)
+iris_set_warnings(iris-build-types-test)
+add_test(NAME build-types COMMAND iris-build-types-test)
+
+# Programs the builder rejects at compile time. Each file compiles as it is,
+# and fails with IRIS_EXPECT_FAILURE defined, with a diagnostic that matches
+# its pattern: either test builds one object target in this build tree.
+set(iris_compile_failures
+  "set_wrong_type|no matching.*set|C2672"
+  "operator_wrong_type|invalid operands|no match for .operator|C267[0-9]"
+  "get_wrong_type|conversion|cannot convert|C2440"
+  "set_wrong_depth|no matching.*set|C2672"
+  "param_wrong_type|no matching.*set|C2672"
+  "get_wrong_depth|conversion|cannot convert|C2440"
+  "pattern_too_few|pattern_placeholders_do_not_match_its_arguments"
+  "pattern_too_many|pattern_placeholders_do_not_match_its_arguments"
+  "pattern_literal_placeholder|pattern_placeholders_do_not_match_its_arguments"
+  "pattern_unpaired_brace|pattern_has_an_unpaired_brace"
+  "pattern_rest_of_line|pattern_spells_rest_of_line_as_text")
+foreach(entry IN LISTS iris_compile_failures)
+  string(FIND "${entry}" "|" bar)
+  string(SUBSTRING "${entry}" 0 ${bar} case)
+  math(EXPR start "${bar} + 1")
+  string(SUBSTRING "${entry}" ${start} -1 diagnostic)
+  set(source "${CMAKE_CURRENT_SOURCE_DIR}/compile_fail/${case}.cpp")
+  add_library(iris-compiles-${case} OBJECT EXCLUDE_FROM_ALL "${source}")
+  add_library(iris-compile-fails-${case} OBJECT EXCLUDE_FROM_ALL "${source}")
+  target_compile_definitions(iris-compile-fails-${case} PRIVATE IRIS_EXPECT_FAILURE)
+  # clang-tidy reads the file as it compiles, without the failure.
+  set_target_properties(iris-compile-fails-${case} PROPERTIES
+    EXPORT_COMPILE_COMMANDS OFF)
+  foreach(target IN ITEMS iris-compiles-${case} iris-compile-fails-${case})
+    target_link_libraries(${target} PRIVATE iris::iris)
+    set_target_properties(${target} PROPERTIES CXX_EXTENSIONS OFF)
+    iris_set_warnings(${target})
+  endforeach()
+  add_test(NAME compiles-${case}
+    COMMAND "${CMAKE_COMMAND}" --build "${PROJECT_BINARY_DIR}"
+      --target iris-compiles-${case} --config $<CONFIG>)
+  add_test(NAME compile-fails-${case}
+    COMMAND "${CMAKE_COMMAND}" --build "${PROJECT_BINARY_DIR}"
+      --target iris-compile-fails-${case} --config $<CONFIG>)
+  set_tests_properties(compile-fails-${case} PROPERTIES
+    PASS_REGULAR_EXPRESSION "${diagnostic}")
+  set_tests_properties(compiles-${case} compile-fails-${case} PROPERTIES
+    RESOURCE_LOCK iris-build-tree)
+endforeach()
 
 # The consumer project builds and runs against an installed copy, through
 # find_package(iris), and through FetchContent of this source tree. Both

@@ -16,6 +16,7 @@ namespace iris {
 namespace detail {
 class Value;
 struct DataImpl;
+struct TypedAccess;
 } // namespace detail
 
 class Spec;
@@ -75,6 +76,7 @@ public:
 
 private:
   friend class Data;
+  friend struct detail::TypedAccess;
   /// View list or leaf `pos` at level `level` of `value` (see
   /// detail::Value::locate)
   ValueRef(const detail::Value &value, std::size_t level, std::size_t pos)
@@ -141,6 +143,16 @@ public:
   /// Return the floats of the one-dimensional array that `path` selects
   [[nodiscard]] std::span<const double>
   floats(std::string_view name, std::span<const std::size_t> path = {}) const;
+
+  /// Return the entry that `handle` names, typed by the handle: for an
+  /// iris::Field, the iris::View of its value type, depth and presence.
+  /// Throws AccessError if a required entry is missing, or if the entry has
+  /// another type or depth than the handle promises.
+  template <class Handle>
+  [[nodiscard]] auto get(const Handle &handle) const
+      -> decltype(handle.view(*this)) {
+    return handle.view(*this);
+  }
 
   /// The same as at() with a braced path, as in `data.at("clause", {3})`
   [[nodiscard]] ValueRef at(std::string_view name,

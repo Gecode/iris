@@ -7,7 +7,7 @@ OUTPUT_DIRECTORY = $(IRIS_DOXYGEN_OUTPUT)
 INPUT = include/iris
 FILE_PATTERNS = *.hpp
 STRIP_FROM_INC_PATH = include
-EXCLUDE_SYMBOLS = iris::detail
+EXCLUDE_SYMBOLS = iris::detail iris::build::detail
 # The same file names on every file system
 CASE_SENSE_NAMES = NO
 

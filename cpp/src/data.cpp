@@ -35,16 +35,29 @@
 // 599f977b7855dba2a1a5f67db1892722372067d3.
 
 #include <iris/data.hpp>
+#include <iris/handle.hpp>
 #include <iris/params.hpp>
 
+#include "numbers.hpp"
 #include "value.hpp"
 
+#include <cmath>
 #include <string>
 #include <utility>
 
 namespace iris {
 
 namespace detail {
+
+/*
+ * Typed access
+ */
+
+std::size_t TypedAccess::leaves(const ValueRef &v) {
+  return v.value_->leaves();
+}
+
+void throw_access(const char *message) { throw AccessError(message); }
 
 /*
  * Values
@@ -441,6 +454,16 @@ void Params::set(std::string_view name, std::string_view value) {
   // string with an equal allocator does not throw.
   values.names.push_back(std::move(owned_name));
   values.values.push_back(std::move(owned_value));
+}
+
+void Params::set_float(std::string_view name, double value) {
+  if (std::isfinite(value)) {
+    detail::FloatBuffer buffer{};
+    set(name, detail::write_float(value, buffer));
+    return;
+  }
+  // The texts that section 9.2's float conversion rejects, as in Rust
+  set(name, std::isnan(value) ? "NaN" : (value > 0 ? "inf" : "-inf"));
 }
 
 namespace {

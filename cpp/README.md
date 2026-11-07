@@ -53,6 +53,21 @@ Specification §9.6: the entries `instances`, `name` and `failed`.
 `Data::dzn()` returns the entries as MiniZinc data, in the bytes of
 appendix B. Reading and cataloging enforce the work budgets of chapter 10.
 
+Typed handles (`iris::Field<V, D, P>` in `handle.hpp`) name an entry with
+its value type, depth and presence, and `data.get(handle)` returns the entry
+as the matching view: `std::int64_t`, `std::span<const std::int64_t>`,
+`iris::Array<std::int64_t, 2>`, or a `std::optional` of one of them.
+`params.set(handle, value)` sets a parameter through its handle with a
+value of the handle's type, formatted as Specification §9.2 converts it.
+
+`<iris/build.hpp>` is the spec builder. `iris::build::SpecBuilder` writes a
+reader spec from C++ statements in nested lambdas, which return handles.
+Expressions use the operators, `pattern("{} {}", a, b)` checks its
+placeholders at compile time, and `build()` prints the spec and parses it.
+A mistake throws `iris::build::BuildError`, with the `std::source_location`
+of the statement that made it. [`docs/builders.md`](../docs/builders.md)
+describes the design.
+
 ## Allocation
 
 Every allocation the library makes comes from a `std::pmr::memory_resource`.
@@ -136,7 +151,7 @@ cmake --build --preset dev
 ctest --preset dev
 ```
 
-`ctest` runs twenty-two tests. `spec-api` and `data-api` check the public
+`ctest` runs forty-four tests. `spec-api` and `data-api` check the public
 API; `data-api` also checks the driver's JSON of data, and both outputs
 under every rounding mode. `budget` checks the exact budget limits that no
 conformance case reaches. `memory` checks the allocation hook: it replaces
@@ -144,7 +159,18 @@ the global `operator new` and checks that parsing, loading, reading,
 cataloging and rendering with a counting resource allocate from it alone,
 also on several threads and with the default resource, and return all of
 it. `headers-compile-alone` compiles each public header by itself, and
-`headers-name-no-gecode` checks that none names Gecode. `consumer-install`
+`headers-name-no-gecode` checks that none names Gecode. `build-api` checks
+the spec builder: its scope, provenance, redefinition, printability and
+capture checks, the call site of each error, the text it prints, and the
+data it reads, including the jobshop example against every jobshop case.
+`build-types` checks with `static_assert` the types that `get`, the
+statements and the expressions give, and the values a parameter handle
+takes. Each `compiles-NAME` test builds a
+file in `tests/compile_fail`, and its `compile-fails-NAME` test builds it
+with `IRIS_EXPECT_FAILURE` defined and passes only when the compiler
+rejects it with the expected diagnostic: a value of the wrong type or
+depth, a parameter value of the wrong type, and a pattern whose placeholders do not match its arguments.
+`consumer-install`
 installs the build to `build/dev/tests/consumer/prefix`;
 `consumer-find-package` then builds and runs the project in
 `tests/consumer` against it with `find_package(iris)`, and
@@ -355,9 +381,9 @@ come from PyPI through uv.
 
 ## Layout
 
-- `include/iris/`: the public headers. `iris.hpp` includes the others:
-  `spec.hpp`, `data.hpp`, `params.hpp` and `error.hpp`. None depends on
-  Gecode.
+- `include/iris/`: the public headers. `iris.hpp` includes `spec.hpp`,
+  `data.hpp`, `handle.hpp`, `params.hpp` and `error.hpp`; `build.hpp`, the
+  spec builder, is included on its own. None depends on Gecode.
 - `Doxyfile`: the settings of the API reference.
 - `cmake/`: the template of the package's `iris-config.cmake`.
 - `src/`: the library. `lexer.cpp`, `parser.cpp` and `resolve.cpp` port
@@ -372,13 +398,19 @@ come from PyPI through uv.
   10. `text.cpp` checks UTF-8, and `numbers.cpp` converts number literals.
   The entry points in `spec.cpp` round to nearest whatever the caller's
   rounding mode, and `dzn.cpp` spells floats with integer arithmetic.
+  `builder/` is the spec builder: `state.hpp` and `state.cpp` hold the
+  statements a builder records and the checks made as they are written,
+  `builder.cpp` holds the statement methods, `check.cpp` runs the checks
+  made at `build()`, and `print.cpp` prints the text and maps each line to
+  a call site.
 - `driver/`: `iris-driver`, the conformance driver. It speaks the protocol
   in [`conformance/README.md`](../conformance/README.md).
 - `fuzz/`: the libFuzzer targets `parse.cpp` and `read.cpp`, the
   dictionary `iris.dict`, and `replay.cpp`, which runs a target without
   libFuzzer.
 - `examples/`: the guide's examples and their recorded output.
-- `tests/`: the API, budget and memory tests; `conformance.cmake`, which
+- `tests/`: the API, builder, budget and memory tests; `compile_fail/`,
+  the programs the builder must reject; `conformance.cmake`, which
   selects the cases of one operation and runs them in batches;
   `example.cmake`, which runs an example and compares its output;
   `no-gecode.cmake`; and `consumer/`, a project that uses the library.

@@ -33,6 +33,10 @@ add_library(iris)
 add_library(iris::iris ALIAS iris)
 target_sources(iris
   PRIVATE
+    src/builder/builder.cpp
+    src/builder/check.cpp
+    src/builder/print.cpp
+    src/builder/state.cpp
     src/data.cpp
     src/dzn.cpp
     src/error.cpp
@@ -48,8 +52,10 @@ target_sources(iris
     FILE_SET HEADERS
     BASE_DIRS include
     FILES
+      include/iris/build.hpp
       include/iris/data.hpp
       include/iris/error.hpp
+      include/iris/handle.hpp
       include/iris/iris.hpp
       include/iris/params.hpp
       include/iris/spec.hpp)

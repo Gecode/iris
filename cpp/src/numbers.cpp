@@ -37,6 +37,7 @@
 #include "numbers.hpp"
 
 #include <algorithm>
+#include <array>
 #include <charconv>
 #include <cmath>
 #include <limits>
@@ -97,6 +98,47 @@ std::optional<double> parse_float(std::string_view t) {
   if ((std::fpclassify(v) == FP_SUBNORMAL) || ((v == 0.0) && !is_exact_zero(t)))
     return std::nullopt;
   return v;
+}
+
+std::string_view write_float(double value, FloatBuffer &buffer) {
+  const double magnitude = std::fabs(value);
+  if (value != 0 && (magnitude < 1e-4 || magnitude >= 1e16)) {
+    // to_chars writes a sign and at least two digits in the exponent, as
+    // in 1e+16 and 1.5e-05, where Rust writes 1e16 and 1.5e-5
+    FloatBuffer scientific{};
+    const auto result =
+        std::to_chars(scientific.data(), scientific.data() + scientific.size(),
+                      value, std::chars_format::scientific);
+    const std::string_view text(scientific.data(), result.ptr);
+    const std::size_t e = text.find('e');
+    std::string_view exponent = text.substr(e + 1);
+    const bool negative = exponent.starts_with('-');
+    if (negative || exponent.starts_with('+'))
+      exponent.remove_prefix(1);
+    const std::size_t nonzero = exponent.find_first_not_of('0');
+    exponent = nonzero == std::string_view::npos ? std::string_view("0")
+                                                 : exponent.substr(nonzero);
+    std::size_t length = text.copy(buffer.data(), e);
+    buffer.at(length++) = 'e';
+    if (negative)
+      buffer.at(length++) = '-';
+    length += exponent.copy(buffer.data() + length, buffer.size() - length);
+    return {buffer.data(), length};
+  }
+  const auto result =
+      std::to_chars(buffer.data(), buffer.data() + buffer.size(), value,
+                    std::chars_format::fixed);
+  auto length = static_cast<std::size_t>(result.ptr - buffer.data());
+  if (!std::string_view(buffer.data(), length).contains('.')) {
+    buffer.at(length++) = '.';
+    buffer.at(length++) = '0';
+  }
+  return {buffer.data(), length};
+}
+
+std::string float_text(double value) {
+  FloatBuffer buffer{};
+  return std::string(write_float(value, buffer));
 }
 
 namespace {

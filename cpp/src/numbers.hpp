@@ -38,10 +38,12 @@
 
 #include "text.hpp"
 
+#include <array>
 #include <cfenv>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <string_view>
 
 namespace iris::detail {
@@ -84,6 +86,25 @@ std::optional<std::int64_t> parse_int(std::string_view t);
  * to zero, is not representable (Specification §4.5).
  */
 std::optional<double> parse_float(std::string_view t);
+
+/// Room for the spelling of any finite double that write_float writes
+using FloatBuffer = std::array<char, 64>;
+
+/**
+ * Write the spelling of finite `value` that Rust's `{:?}` gives into
+ * `buffer`, and return it as a view of `buffer`
+ *
+ * It is the shortest text that parse_float reads back as the same number,
+ * in scientific notation below 1e-4 and from 1e16 on, and with `.0` on a
+ * whole number, so that it reads as a float and not an integer. It
+ * allocates nothing, so that Params can format typed parameter values
+ * without leaving its memory resource.
+ */
+std::string_view write_float(double value, FloatBuffer &buffer);
+
+/// Return the spelling of finite `value` that write_float writes. The
+/// builder prints float literals with it.
+std::string float_text(double value);
 
 /**
  * Round to nearest, ties to even, while this object exists

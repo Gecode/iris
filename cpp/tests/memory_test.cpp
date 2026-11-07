@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <memory_resource>
 #include <new>
 #include <source_location>
@@ -208,6 +209,11 @@ void reads_with_resource() {
         iris::Spec::parse(mixed_spec, "mixed.iris", memory);
     iris::Params scale(memory);
     scale.set("scale", "2");
+    // A typed float value is formatted without leaving the resource
+    iris::Params ratio(memory);
+    ratio.set(iris::Field<double>("ratio"),
+              -std::numeric_limits<double>::max());
+    check(ratio.get("ratio") == "-1.7976931348623157e308", "typed float");
     const auto read = mixed.try_read_text(mixed_input, "mixed", scale);
     check(read.has_value(), "mixed read");
     if (read) {

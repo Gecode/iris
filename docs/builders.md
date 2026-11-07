@@ -81,7 +81,7 @@ language encodes this as cheaply as it can:
 | Language | Encoding |
 |---|---|
 | Rust | Phantom depth types `D0`, `D1`, ... with a successor trait. Impls go up to a fixed depth, and deeper entries get a dynamic handle. |
-| C++ | A `std::size_t` template parameter: `field<std::int64_t, 2>`. |
+| C++ | A `std::size_t` template parameter: `Field<std::int64_t, 2>`. |
 | TypeScript | A depth parameter, `Field<"int", 2>`, mapped to the data type by conditional types. Keep the type-level arithmetic shallow for checker speed. |
 | Java, Kotlin | The data view type as the parameter, `IntField<List<long[]>>`, with one generic `get`. Java declares handles with factories that fix the depth (`int2`), and `build()` checks them. Kotlin scopes come in depth-specific receiver classes up to depth 3, and deeper entries are dynamic. |
 | Python | The data view type as the parameter, `IntField[list[list[int]]]`, in the type stubs. Scopes come in depth-specific classes, `Scope0` to `Scope3`, and deeper entries are `DynField`. |
@@ -242,7 +242,7 @@ there.
 | `== !=` | `eq()`, `ne()` | operators | operators | infix `eq`, `ne` | methods | methods |
 | `&& \|\| !` | `& \| !` | operators | `& \| ~` | infix `and`, `or`, `!` | methods | methods |
 | `x[i]` | `at()` | `[]` | `[]` | `[]` | `at()` | `at()` |
-| record field | `get()` | `[]` | `[]` | `[]` | `get()` | `get()` |
+| record field | `get()` | `get()` | `[]` | `[]` | `get()` | `get()` |
 
 Language notes:
 
@@ -264,7 +264,7 @@ Iris `lo..<hi`, and Rust's `lo..=hi` prints as Iris `lo..hi`. That is right
 for Rust users, but the API guide must point out that the spellings
 cross. The other languages name the bound: `atLeast(lo)` and `range(lo).below(hi)`
 in Java and TypeScript, `int_range(lo, below=hi)` in Python, and
-`range{.from = lo, .below = hi}` in C++.
+`Range{.from = lo, .below = hi}` in C++.
 
 ### 7. Patterns use the host's interpolation idiom
 
@@ -495,31 +495,34 @@ it while the library targets C++23.
 #include <iris/build.hpp>
 using namespace iris::build;
 
-spec_builder b{"jobshop"};
+SpecBuilder b("jobshop");
 b.comment({"#", "+++"});
-auto [name, n_jobs, n_machines, machine, duration] = b.instances([&](auto& i) {
+auto handles = b.instances([](auto& i) {
   auto name = i.optional_capture("name", word);
-  auto n_jobs = i.capture("n_jobs", range{.from = 1});
-  auto n_machines = i.capture("n_machines", range{.from = 1});
-  auto [job, machine, duration] = i.sections({.skip_other = true}, [&](auto& s) {
-    s.arm(pattern("instance {}", name), {.optional = true});
+  auto n_jobs = i.capture("n_jobs", Range{.from = 1});
+  auto n_machines = i.capture("n_machines", Range{.from = 1});
+  auto jobs = i.sections({.skip_other = true}, [&](auto& s) {
+    s.optional_arm(pattern("instance {}", name));
     return s.arm(pattern("{} {}", n_jobs, n_machines), {.last = true}, [&](auto& a) {
-      a.check(n_jobs <= (gecode::int_max - 2) / 2 / n_machines,
+      a.check(n_jobs <= (host::int_max - 2) / 2 / n_machines,
               "there are too many jobs and machines");
       return a.repeat(n_jobs, [&](auto& job) {
         auto [machine, duration] = job.repeat(n_machines, [&](auto& step) {
-          return std::tuple{step.read("machine", range{.from = 0, .below = n_machines}),
-                            step.read("duration", range{.from = 0})};
+          return std::tuple{step.read("machine", Range{.from = 0, .below = n_machines}),
+                            step.read("duration", Range{.from = 0})};
         });
         return std::tuple{job.record(), machine, duration};
       });
     });
   });
-  i.check(distinct(job[machine]), MSG_DISTINCT);
-  i.check(sum(job, [&](auto j) { return sum(j[duration]); }) <= gecode::int_max, MSG_TOTAL);
+  auto [job, machine, duration] = jobs;
+  i.check(distinct(job.get(machine)), msg_distinct);
+  i.check(sum(job, [&](const auto& j) { return sum(j.get(duration)); }) <= host::int_max,
+          msg_total);
   return std::tuple{name, n_jobs, n_machines, machine, duration};
 });
-iris::Spec spec = b.build(); // throws iris::Error; try_build returns std::expected
+auto [name, n_jobs, n_machines, machine, duration] = handles;
+iris::Spec spec = b.build(); // throws iris::build::BuildError; try_build returns std::expected
 
 auto data = spec.read("jobshop1.txt", {{"instance", "la01"}});
 std::int64_t jobs = data.get(n_jobs);
@@ -527,15 +530,38 @@ std::span<const std::int64_t> first_job = data.get(machine)[0];
 std::optional<std::string_view> label = data.get(name);
 ```
 
+`cpp/tests/build_test.cpp` builds this program, compares its text with the
+text spec, and reads every jobshop case with it. The handles are bound
+after each block returns, so that names inside a block do not shadow them
+under `-Wshadow`. The free functions (`sum`, `distinct`, `pattern`, the type
+constants `int_`, `float_`, `num`, `word`, `rest`, and so on) are function
+objects, so argument-dependent lookup never replaces them with functions of
+the same name, such as `std::min`. `host::int_max` prints `gecode.int_max`;
+the public headers never name Gecode. `else_if` and `else_` are calls on the
+object that `if_` returns, and an optional arm is `optional_arm`. Copying an
+expression copies its whole operation list, so a long chain built in a loop
+should move it: `total = std::move(total) + x`.
+
+A `BuildError` has a kind, the language error if there is one, the emitted
+text and line, and the `std::source_location` of the host call. Call sites
+are mapped by emitted line: an error gets the call site of the statement
+that starts its line.
+
+A parameter handle also sets its parameter: after
+`auto scale = b.param("scale", 3)`, `params.set(scale, 3)` writes the
+integer in decimal, and a float handle's value in the shortest form that
+reads back as the same float, with `.0` on a whole number. A value of
+another type, or a handle to an array, does not compile.
+
 The dynamic forms:
 
 ```cpp
-auto x = s.forward<std::int64_t>("x");
-s.read(x, int_());                  // the first definition binds it
-auto again = s.read(x, float_());   // redefined: returns a dynamic handle
+auto x = s.forward<Field<std::int64_t>>("x");
+s.read(x, int_);                   // the first definition binds it
+auto again = s.read(x, float_);    // redefined: returns a DynField
 auto mixed = (lit("1").dynamic() == 1);
 auto zz = s.undefined("zz");
-auto end = s.forward<std::string>("_"); // only a store binds it
+auto end = s.forward<Field<std::string>>("_"); // only a store binds it
 ```
 
 ### Python
