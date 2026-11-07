@@ -582,6 +582,12 @@ impl<V: ValueType, S: ExprShape> Expr<V, S> {
 
 impl Host {
     named_operators!(Int);
+
+    /// This constant as an expression, as a range bound beside another
+    /// expression requires: `lit(0)..=gecode::INT_MAX.ex()`.
+    pub fn ex(self) -> Expr<Int> {
+        self.into_expr()
+    }
 }
 
 fn index_ops<V, I: Operand>(mut ops: Vec<Op>, index: I) -> Expr<V, Open> {

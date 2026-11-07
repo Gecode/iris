@@ -7,6 +7,7 @@ import { collectCppExamples, cppPages } from './cpp-examples.mjs';
 import { collectJavaExamples, javaPages } from './java-examples.mjs';
 import { collectLearningExamples, learningPages } from './learning-examples.mjs';
 import { collectPythonExamples, pythonPages } from './python-examples.mjs';
+import { collectRustExamples, rustBuilderExamples } from './rust-examples.mjs';
 import { collectTypescriptExamples, typescriptPages } from './typescript-examples.mjs';
 
 export const documentationPages = {
@@ -15,11 +16,11 @@ export const documentationPages = {
   ...typescriptPages,
   ...cppPages,
   ...javaPages,
-  'tools/cli/index.html': ['build-cli', 'check', 'read-default', 'read-summary', 'read-json', 'read-dzn', 'read-param', 'list', 'list-dzn', 'fmt', 'fmt-check', 'fmt-diff', 'build-driver', 'conformance'],
+  'tools/cli/index.html': ['install-binary', 'install-cargo', 'build-cli', 'check', 'read-default', 'read-summary', 'read-json', 'read-dzn', 'read-param', 'list', 'list-dzn', 'fmt', 'fmt-check', 'fmt-diff', 'build-driver', 'conformance'],
   'tools/formatter/index.html': ['format-before', 'format-after', 'format-stdin'],
   'tools/lsp/index.html': ['sample-directive'],
   'tools/editors/index.html': ['build-jetbrains'],
-  'using/rust/index.html': ['rust-dependency', 'rust-example', 'rust-doctest'],
+  'using/rust/index.html': ['rust-dependency', 'rust-example', 'rust-doctest', ...rustBuilderExamples],
 };
 
 // Called by the format collector: one build, one set of generated files, one check.
@@ -73,9 +74,12 @@ export async function collectDocumentationExamples({ tools, formats, execute, co
   // rustdoc compiles and executes this exact body, including its hidden Ok line.
   execute('cargo', ['test', '--locked', '-p', 'gecode-iris', '--doc', '--quiet'], 0, true, { cwd: resolve(repository, 'rust') });
   add('rust-dependency', '[dependencies]\ngecode-iris = "0.1"', 'toml');
+  add('install-binary', 'curl -LsSf https://github.com/Gecode/iris/releases/download/rust-v0.1.0/rust-installer.sh | sh');
+  add('install-cargo', 'cargo install gecode-iris-cli --locked');
   Object.assign(examples, await collectLearningExamples({ tools, execute, command }));
   Object.assign(examples, await collectPythonExamples({ tools, execute }));
   Object.assign(examples, await collectTypescriptExamples());
+  Object.assign(examples, await collectRustExamples());
   Object.assign(examples, await collectCppExamples());
   Object.assign(examples, await collectJavaExamples());
   return examples;

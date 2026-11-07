@@ -16,17 +16,13 @@ runs the shared conformance suite.
 Binary releases cover Linux, macOS and Windows. On Linux or macOS, the installer
 downloads the `iris` executable for your platform:
 
-```sh
-curl -LsSf https://github.com/Gecode/iris/releases/download/rust-v0.1.0/rust-installer.sh | sh
-```
+<CheckedExample id="install-binary" />
 
 The [release page](https://github.com/Gecode/iris/releases/tag/rust-v0.1.0) has the
 archives with their checksums and a PowerShell installer. With Rust 1.88 or newer,
 Cargo also builds it from crates.io:
 
-```sh
-cargo install gecode-iris-cli --locked
-```
+<CheckedExample id="install-cargo" />
 
 ## Build from source
 

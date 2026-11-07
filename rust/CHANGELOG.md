@@ -8,6 +8,11 @@
   output entry's depth, value type, possible absence and definitions.
 - Add `gecode_iris_gen::view` and `view_code`, which turn a reader spec into a
   list of typed handles and print it, with a Rust printer.
+- Add `Host::ex` to gecode-iris-build, so that a host constant can bound a range
+  beside another expression: `lit(0)..=gecode::INT_MAX.ex()`.
+- Add a hand-written spec builder for each format in the format library, as
+  gecode-iris examples. A test reads every case of each format through its
+  builder and judges the result as the conformance runner does.
 
 ### CLI
 

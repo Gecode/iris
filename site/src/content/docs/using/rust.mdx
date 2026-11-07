@@ -74,3 +74,84 @@ For more detail, read the
 and [core API guide](https://github.com/Gecode/iris/blob/main/rust/iris-core/README.md).
 Publication on docs.rs is planned; until then, `cargo doc` in the workspace
 builds the API documentation locally.
+
+## Build a reader spec in code
+
+`gecode_iris::build` writes a reader spec from Rust calls. Every statement that
+defines an entry returns a typed handle, so a misspelled entry or a wrong value
+type fails when the program compiles, not when data is read. A builder adds no
+features of its own: `build()` prints Iris text and parses it with `Spec::parse`,
+so the language's checks decide what is valid, and `source()` returns the text.
+
+The examples below are in
+[`rust/gecode-iris/examples`](https://github.com/Gecode/iris/tree/main/rust/gecode-iris/examples),
+one builder for each format in the [format library](/formats/). A test reads every
+case of each format through its builder and compares the data with the case's
+expected results, then runs each program and compares its output with the
+output shown here. The programs read files from the format library, so run them
+from the root of an Iris checkout, as in
+`cargo run --manifest-path rust/Cargo.toml --example jobshop`.
+
+### The job shop builder
+
+This builder writes the [job shop](/formats/job-shop/) reader spec. `main` reads
+an instance selected by name, then a file whose check fails.
+
+<CheckedExample id="rust-build-jobshop" title="jobshop.rs" />
+
+Blocks are closures that take the open scope and return the handles defined in
+them. A capture is declared before the pattern that binds it, so `pattern!` can
+interpolate it the way `format!` interpolates a variable. `job.record()` is the
+handle of a repeat's records: `job.get(machine)` prints `job.machine`, and
+`sum_over(job, ...)` prints a comprehension over the jobs. The builder names
+records itself; `as_name("jobs")` gives the records a name for error messages.
+
+Rust's `a..b` excludes `b`, so it prints as Iris `a..<b`, and `a..=b` prints as
+Iris `a..b`. A handle or a host constant beside another bound needs `.ex()`, as
+in `lit(0)..n_machines.ex()`.
+
+### Typed data
+
+`data.get(handle)` returns the Rust type of the entry's value type and depth: an
+`i64` for `n_jobs`, an `Option<&str>` for the `name`, which only some files
+give, and rows of `&[i64]` for `machine` and `duration`, which have one value
+per step of each job. These are borrowed views of the data, without copies, and a lookup through
+a handle cannot fail on a name or a type.
+
+### Errors name your code
+
+Every statement records the line of the call that wrote it. When a check fails
+while reading, the error shows the input line, the line of the built text
+(`spec: builder.iris:17`) and a `call site:` line that names the `distinct`
+check in `jobshop.rs`. A `BuildError` from `build()` has the same call site
+line. A statement in a helper function records the line in the helper, unless
+the helper has `#[track_caller]`, as `clue_lines` below does.
+
+### A helper used twice
+
+A function that takes a scope and returns handles is a reusable piece of a
+reader spec. The nonogram builder reads the clues of the rows and the columns
+with one helper, and builds two pairs of checks with two expression helpers.
+
+<CheckedExample id="rust-build-nonogram" title="nonogram.rs" />
+
+A builder rejects a second definition of a name, so a helper called twice by
+mistake fails `build()` instead of quietly replacing an entry. That is why
+`clue_lines` takes the entry name from its caller. The TSPLIB builder below
+uses the same idea for its two coordinate sections.
+
+### The other formats
+
+<CheckedExample id="rust-build-dimacs_cnf" title="dimacs_cnf.rs" />
+
+<CheckedExample id="rust-build-sudoku" title="sudoku.rs" />
+
+`define_type` gives a named type, used here for both ends of a time window:
+
+<CheckedExample id="rust-build-tsptw" title="tsptw.rs" />
+
+A TSPLIB file gives either a distance matrix or coordinates. `s.set` gives an
+optional entry a default while keeping its handle's type, and `if_` and `else_`
+take the checks that apply to each kind of file:
+
+<CheckedExample id="rust-build-tsplib" title="tsplib.rs" />

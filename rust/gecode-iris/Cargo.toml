@@ -11,6 +11,8 @@ readme = "README.md"
 documentation = "https://docs.rs/gecode-iris"
 keywords.workspace = true
 categories = ["parsing"]
+# The examples read formats/ from the repository root, so they stay out of the package.
+exclude = ["examples/"]
 
 [lints]
 workspace = true

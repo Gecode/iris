@@ -48,11 +48,22 @@ Handles are `Copy` and outlive their builder, so the crate interns names as
 process, including the names of dropped builders. A host that generates names
 without limit therefore grows without limit.
 
+[gecode-iris/examples](../gecode-iris/examples/) has a hand-written builder for
+each format in the [format library](../../formats/README.md); the Rust guide on
+the site shows them. Run one from the repository root, as
+`cargo run --manifest-path rust/Cargo.toml --example jobshop`.
+
 From `rust/`:
 
 ```sh
 cargo test --locked -p gecode-iris-build
 cargo test --locked -p gecode-iris --test build_jobshop --test build_corpus --test build_types
+cargo test --locked -p gecode-iris --test format_builders -- --nocapture
 ```
+
+`format_builders` reads every case of each format through its builder and
+compares the outcome with the case's expectation, using the conformance runner's
+case loading and comparison. It also runs each example and compares its output
+with the `.out` recording beside it.
 
 Bless the `build_types` snapshots with `TRYBUILD=overwrite`.

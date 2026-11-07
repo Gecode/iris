@@ -426,11 +426,13 @@ s.repeat_until("END").store(end);
 ```
 
 `.ex()` turns a handle into a scalar expression, as a range bound requires.
-It only asserts that the value is a scalar, and nothing checks the assertion:
-on an array, `s.let_("v", a.ex())` returns a scalar-typed handle, and
+On a handle it only asserts that the value is a scalar, and nothing checks the
+assertion: on an array, `s.let_("v", a.ex())` returns a scalar-typed handle, and
 `s.set(x, a.ex())` compiles. A wrong assertion passes `build()` and reading.
 `data.try_get` then reports the mismatch and `data.get` panics, so it never
-yields a wrong value. Use `.ex()` only where the value is a scalar.
+yields a wrong value. Use `.ex()` only where the value is a scalar. A host
+constant has `.ex()` too, so that it can bound a range beside another
+expression: `lit(0)..=gecode::INT_MAX.ex()`.
 
 Every statement method takes `#[track_caller]`, so each statement records the
 line that called it. A `BuildError` displays the language error code and

@@ -189,6 +189,17 @@ pages, including diagnostics and the canonical error document in the errors
 guide. To add an example, register its required markers in `learningPages`,
 collect its sources and command result, then render them with `CheckedExample`.
 
+## Rust guide
+
+`/using/rust/` shows the umbrella crate's doc-tested example, collected as above,
+and the spec builders in `rust/gecode-iris/examples` with their recorded output,
+collected by `scripts/rust-examples.mjs` with the shared
+`scripts/example-files.mjs`. The collector requires every file in that directory
+to appear on the page. The site build compiles none of them: the
+`format_builders` test in `rust/` runs each program and compares its output, and
+reads every format case through each builder; see the
+[gecode-iris-build README](../rust/iris-build/README.md).
+
 ## Python guide and API reference
 
 `/using/python/` renders the examples in `python/examples` with their recorded

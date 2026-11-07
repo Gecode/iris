@@ -136,8 +136,10 @@ fn ranges() {
             b.read("f", lit(0)..n.ex());
             b.read("g", ty(0..10).dim(n));
             b.read("h", (n + 1).dynamic()..);
+            b.read("i", gecode::INT_MIN.ex()..=gecode::INT_MAX.ex());
         },
-        "n: int\na: 0..<10\nb: 0..10\nc: 0..\nd: ..<10\ne: ..10\nf: 0..<n\ng[n]: 0..<10\nh: n + 1..\n",
+        "n: int\na: 0..<10\nb: 0..10\nc: 0..\nd: ..<10\ne: ..10\nf: 0..<n\ng[n]: 0..<10\nh: n + 1..\n\
+         i: gecode.int_min..gecode.int_max\n",
     );
 }
 
