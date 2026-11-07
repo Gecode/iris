@@ -68,6 +68,21 @@ public final class Data {
     return value;
   }
 
+  /**
+   * Gets an entry through its handle, as the Java type that the handle promises: {@code long} for
+   * an {@code IntField<Long>}, {@code List<long[]>} for an {@code IntField<List<long[]>>}, and null
+   * for an absent entry of an optional handle.
+   *
+   * @param <V> the type of the entry's value
+   * @param field the handle of the entry
+   * @return its value
+   * @throws IllegalStateException if the entry is missing, or has another type or depth than the
+   *     handle promises
+   */
+  public <V extends @Nullable Object> V get(Field<V> field) {
+    return field.readFrom(this);
+  }
+
   /** {@return the canonical data document (§3.3), with its final newline} */
   public String toJson() {
     return CanonicalJson.data(stored);

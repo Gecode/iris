@@ -718,16 +718,21 @@ has three consequences:
 - A statement made outside any open block throws `IllegalStateException`,
   naming the statement. That happens when a body lambda is kept and run
   later, or run on another thread.
+- A statement that its block does not take, such as an arm outside
+  `sections` or a setting inside a block, throws `BuildException` of kind
+  `SCOPE` at that call. Java cannot reject it at compile time without a
+  receiver per block, as Kotlin has.
 
 **Handles are declared, and one generic `get` reads them.** Java has no
 tuples, and lambdas cannot assign local variables, so handles cannot
 easily come back out of nested blocks. Java therefore declares them, in the
 style of jOOQ's fields and the JPA static metamodel. A factory fixes the
-value type and depth: `int0`, `int2`, `string0`, ..., and `intN(depth)` for
-a dynamic handle. The statements define the handles. `build()` checks
-that each handle is defined exactly once, at the depth and optionality it
-declares. The type argument is the data view type, so a single
-`<V extends @Nullable Object> V get(Field<V>)` returns `long`, `long[]`,
+value type and depth: `int0`, `int2`, `string0`, ..., and `intN("x", depth)`
+for a handle of any depth that reads a `Value`. The statements define the
+handles. `build()` checks that each handle the spec uses is defined, at the
+value type, depth and optionality it declares, and that no two handles name
+one entry. The type argument is the data view type, so a single
+`<V extends @Nullable Object> V get(Field<V>)` returns `Long`, `long[]`,
 or `List<long[]>` without overloading, and erasure does not matter.
 Subtypes by value type (`IntField<V>`, `StringField<V>`, ...) carry the
 expression methods. JSpecify annotations on type arguments put absence
@@ -738,7 +743,8 @@ they stand for, not in constant case. Handles for a spec built at run time are
 locals (`var weight = int2("weight");`), which lambdas can capture because
 they are effectively final.
 
-**Records receive data.** `spec.reader(Shop.class, MethodHandles.lookup())`
+**Records receive data.** This part is not implemented yet.
+`spec.reader(Shop.class, MethodHandles.lookup())`
 maps entries to the components of a record. Components match entries by
 name, and `@Entry("n_jobs")` renames one. The method checks every
 component's type against the entry's value type, depth, and optionality
@@ -749,63 +755,115 @@ values (`num`, and parameters without a default) are sealed interfaces of
 records, so an exhaustive `switch` with record patterns takes them apart.
 A 1.0 variant type would read the same way.
 
+`dev.gecode.iris.build` implements the builder, and google-java-format lays
+out the code. The handle constants and the spec are static members of a
+class, so the spec is built when the class is initialized:
+
 ```java
-import module dev.gecode.iris;
 import static dev.gecode.iris.build.Iris.*;
 
-final class Jobshop {
-    static final StringField<@Nullable String> name = string0("name").optional();
-    static final IntField<Long> nJobs = int0("n_jobs"), nMachines = int0("n_machines");
-    static final IntField<List<long[]>> machine = int2("machine"), duration = int2("duration");
-    static final RecordName job = recordName();
+import dev.gecode.iris.Data;
+import dev.gecode.iris.Params;
+import dev.gecode.iris.Spec;
+import dev.gecode.iris.build.*;
+import java.util.List;
+import org.jspecify.annotations.Nullable;
 
-    static final Spec spec = spec("jobshop", () -> {
-        comment("#", "+++");
-        instances(() -> {
-            sections(skipOther(), () -> {
-                arm(pattern("instance ", capture(name, word())), optional());
-                arm(pattern(capture(nJobs, atLeast(1)), " ", capture(nMachines, atLeast(1))), last(), () -> {
-                    check(nJobs.le(Gecode.intMax.minus(2).div(2).div(nMachines)),
-                          "there are too many jobs and machines");
-                    repeat(nJobs, job, () ->
-                        repeat(nMachines, () -> {
-                            read(machine, range(0).below(nMachines));
-                            read(duration, atLeast(0));
-                        }));
-                });
+final class Jobshop {
+  static final StringField<@Nullable String> name = string0("name").optional();
+  static final IntField<Long> nJobs = int0("n_jobs"), nMachines = int0("n_machines");
+  static final IntField<List<long[]>> machine = int2("machine"), duration = int2("duration");
+  static final RecordName job = recordName();
+
+  static final Spec spec =
+      spec(
+          "jobshop",
+          () -> {
+            comment("#", "+++");
+            instances(() -> {
+              sections(
+                  skipOther(),
+                  () -> {
+                    arm(pattern("instance ", capture(name, word())), optional());
+                    arm(
+                        pattern(capture(nJobs, atLeast(1)), " ", capture(nMachines, atLeast(1))),
+                        last(),
+                        () -> {
+                          check(
+                              nJobs.le(Gecode.intMax.minus(2).div(2).div(nMachines)),
+                              "there are too many jobs and machines");
+                          repeat(
+                              nJobs,
+                              job,
+                              () ->
+                                  repeat(
+                                      nMachines,
+                                      () -> {
+                                        read(machine, range(0).below(nMachines));
+                                        read(duration, atLeast(0));
+                                      }));
+                        });
+                  });
+              check(distinct(job.get(machine)), MSG_DISTINCT);
+              check(sum(job, j -> sum(j.get(duration))).le(Gecode.intMax), MSG_TOTAL);
             });
-            check(distinct(job.get(machine)), msgDistinct);
-            check(sum(job, j -> sum(j.get(duration))).le(Gecode.intMax), msgTotal);
-        });
-    });
+          });
 }
 
 // Through handles
-var data = Jobshop.spec.read(path, Params.of("instance", "la01"));
+Data data = Jobshop.spec.read(input, "input", Params.of("instance", "la01"));
 long jobs = data.get(Jobshop.nJobs);
 long[] firstJob = data.get(Jobshop.machine).getFirst();
 @Nullable String label = data.get(Jobshop.name);
 
-// Into a record
+// Into a record (not implemented yet)
 record Shop(@Nullable String name, @Entry("n_jobs") long nJobs,
             @Entry("n_machines") long nMachines, List<long[]> machine, List<long[]> duration) {}
 var reader = Jobshop.spec.reader(Shop.class, MethodHandles.lookup());
 Shop shop = reader.read(path, Params.of("instance", "la01"));
 ```
 
+Java has no operator overloading, so expressions are method chains:
+`plus`, `minus`, `times`, `div`, `mod`, `pow`, `and`, `or` and `not` on
+integers, the comparisons `lt`, `le`, `gt`, `ge`, `eq` and `ne` on numbers
+and strings, and `neg`. `lit` starts a chain where the first operand is a
+literal, as in `lit(2).pow(x)`. A handle used as a pattern part reads a
+word, as `{x}` does, and `capture(x, type)` gives `{x:type}`.
+`Builder.source()` returns the text, and `spec(...)` is
+`builder(...).build()`. A `BuildException` names the failed check with
+`kind()`, and `callSite()` is the `StackTraceElement` of the statement:
+the first frame on the stack outside the builder, found with
+`StackWalker`. A statement in a helper method therefore names the helper's
+line. When the language rejects the text, `failure()` gives the
+`IrisException`, `text()` the emitted text, and `emittedLine()` the line
+that the error names.
+
 The dynamic forms:
 
 ```java
 var x = forward("x", Int.class);
-read(x, intType());                 // the first definition binds it
-var again = read(x, floatType());   // redefined: returns a dynamic handle
-var mixed = lit("1").dynamic().eq(1);
+read(x, intType()); // the first definition binds it
+var again = read(x, floatType()); // redefined: returns a dynamic handle
+var mixed = lit("1").dynamic().eq(lit(1).dynamic());
 var zz = undefined("zz");
-var end = forward("_", Str.class);  // only a store binds it
+var end = forward("_", Str.class); // only a store binds it
 ```
+
+`forward` takes a kind token, `Int`, `Real`, `Num`, `Str` or `Dyn`. It
+declares the name in the open builder, so its handle belongs to that
+builder and reads a required value. The float token is `Real` because a
+`Float` token would clash with `java.lang.Float`, which every compilation
+unit imports on demand: beside `import dev.gecode.iris.build.*` the name
+is ambiguous, and under `import module` the `java.lang` class wins. A
+handle that a factory declares belongs to no builder, and `.optional()`
+makes it optional.
 
 `import module` (JEP 511, final in Java 25) imports every package the
 module exports. Static members still need the static import of `Iris.*`.
+A compact source file also imports `java.base`, whose `java.lang.reflect.Field`,
+`java.lang.reflect.Type` and `java.util.regex.Pattern` make those three
+simple names ambiguous. A file that names one of them adds a single-type
+import, such as `import dev.gecode.iris.Field;`.
 The site's Java examples can be compact source files (JEP 512, final in
 Java 25): a bare `void main()` run with `java Jobshop.java`.
 

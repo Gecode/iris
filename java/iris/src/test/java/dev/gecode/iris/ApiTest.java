@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import dev.gecode.iris.build.Iris;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -34,6 +35,8 @@ import org.junit.jupiter.api.Test;
 /** The shape of the exported package, and the parts of it that no other test reaches. */
 class ApiTest {
   private static final String PACKAGE = "dev.gecode.iris";
+  private static final String BUILD = PACKAGE + ".build";
+  private static final Set<String> EXPORTED = Set.of(PACKAGE, BUILD);
 
   private static Path classes() throws URISyntaxException {
     return Path.of(Spec.class.getProtectionDomain().getCodeSource().getLocation().toURI());
@@ -43,18 +46,20 @@ class ApiTest {
     return ModuleFinder.of(classes()).find(PACKAGE).orElseThrow().descriptor();
   }
 
-  /** Returns every public class of the exported package, nested ones included. */
+  /** Returns every public class of the exported packages, nested ones included. */
   private static List<Class<?>> publicClasses()
       throws IOException, URISyntaxException, ClassNotFoundException {
     List<Class<?>> found = new ArrayList<>();
-    try (Stream<Path> files = Files.list(classes().resolve(PACKAGE.replace('.', '/')))) {
-      for (Path file : files.toList()) {
-        String name = file.getFileName().toString();
-        if (name.endsWith(".class") && !name.equals("package-info.class")) {
-          Class<?> candidate =
-              Class.forName(PACKAGE + "." + name.substring(0, name.length() - ".class".length()));
-          if (Modifier.isPublic(candidate.getModifiers())) {
-            found.add(candidate);
+    for (String exported : EXPORTED) {
+      try (Stream<Path> files = Files.list(classes().resolve(exported.replace('.', '/')))) {
+        for (Path file : files.toList()) {
+          String name = file.getFileName().toString();
+          if (name.endsWith(".class") && !name.equals("package-info.class")) {
+            String binary = name.substring(0, name.length() - ".class".length());
+            Class<?> candidate = Class.forName(exported + "." + binary);
+            if (Modifier.isPublic(candidate.getModifiers())) {
+              found.add(candidate);
+            }
           }
         }
       }
@@ -72,17 +77,17 @@ class ApiTest {
   }
 
   @Test
-  void theModuleExportsOnlyThePublicPackage() throws URISyntaxException {
+  void theModuleExportsOnlyThePublicPackages() throws URISyntaxException {
     ModuleDescriptor module = module();
     assertEquals(
-        Set.of(PACKAGE),
+        EXPORTED,
         module.exports().stream()
             .map(ModuleDescriptor.Exports::source)
             .collect(Collectors.toSet()));
     assertTrue(module.exports().stream().noneMatch(ModuleDescriptor.Exports::isQualified));
     assertTrue(module.opens().isEmpty());
     for (String name : module.packages()) {
-      assertTrue(name.equals(PACKAGE) || name.startsWith(PACKAGE + ".internal."), name);
+      assertTrue(EXPORTED.contains(name) || name.startsWith(PACKAGE + ".internal."), name);
     }
   }
 
@@ -99,8 +104,9 @@ class ApiTest {
   }
 
   @Test
-  void theExportedPackageIsNullMarked() {
+  void theExportedPackagesAreNullMarked() {
     assertTrue(Spec.class.getPackage().isAnnotationPresent(NullMarked.class));
+    assertTrue(Iris.class.getPackage().isAnnotationPresent(NullMarked.class));
   }
 
   /** Checks erased parameter and return types; type arguments are not inspected. */
@@ -126,7 +132,7 @@ class ApiTest {
     assertTrue(
         element.isPrimitive()
             || element.getPackageName().startsWith("java.")
-            || element.getPackageName().equals(PACKAGE),
+            || EXPORTED.contains(element.getPackageName()),
         member.toString());
   }
 

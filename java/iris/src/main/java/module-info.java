@@ -6,4 +6,5 @@ module dev.gecode.iris {
   requires static transitive org.jspecify;
 
   exports dev.gecode.iris;
+  exports dev.gecode.iris.build;
 }

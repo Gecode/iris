@@ -50,6 +50,45 @@ value of any depth can be compared and hashed.
 `dev.gecode.iris` and the module are both `@NullMarked`: the package annotation
 covers tools that do not read `module-info`, such as those on the class path.
 
+## Building reader specs
+
+The exported package `dev.gecode.iris.build` builds reader specs from Java code
+and reads their data through typed handles, as the Java section of
+[docs/builders.md](../docs/builders.md#java) describes. A factory such as
+`int2("machine")` declares a handle, the static methods of `Iris` add statements
+to the innermost open block, which a scoped value holds, and one generic
+`Data.get(Field<V>)` returns the handle's Java type:
+
+```java
+import static dev.gecode.iris.build.Iris.*;
+
+import dev.gecode.iris.Data;
+import dev.gecode.iris.Spec;
+import dev.gecode.iris.build.IntField;
+
+IntField<Long> n = int0("n");
+IntField<long[]> x = int1("x");
+Spec spec =
+    spec(
+        "numbers",
+        () -> {
+          read(n, atLeast(0));
+          repeat(n, () -> read(x, intType()));
+        });
+Data data = spec.read("2 7 9");
+long count = data.get(n);  // 2
+long[] values = data.get(x);  // {7, 9}
+```
+
+The builder prints Iris text, which `builder(...).source()` returns, and parses
+it with `Spec.parse`. A mistake throws `BuildException`, whose `kind()` names
+the check (`SCOPE`, `PROVENANCE`, `REDEFINITION`, `UNPRINTABLE`, `BINDING`, or
+`SPEC` when the language rejects the text) and whose `callSite()` is the line
+of the calling code that made the statement, found with `StackWalker`. Builder
+checks that one statement shows throw at that call, and the others from
+`build()` or `source()`. Mapping a read-time failure back to the statement is
+not implemented yet, and neither is the record reader.
+
 ## Using it from another project
 
 `dev.gecode:iris` and `dev.gecode:iris-kotlin` are not on Maven Central yet. To
@@ -122,7 +161,7 @@ and the site check compares them with this file, so change both together.
 
 | Path | Contents |
 |---|---|
-| `iris/` | The library. Only `dev.gecode.iris` is exported; `dev.gecode.iris.internal.syntax` holds the lexer, parser and resolver, and `dev.gecode.iris.internal.read` the reader. |
+| `iris/` | The library. `dev.gecode.iris` and the spec builder `dev.gecode.iris.build` are exported; `dev.gecode.iris.internal.syntax` holds the lexer, parser and resolver, and `dev.gecode.iris.internal.read` the reader. |
 | `iris-driver/` | The conformance driver, which is not published. It implements `parse`, `read`, `catalog` (`--format json|dzn`) and `dzn`. The JVM decodes arguments in the locale's encoding before `main` runs, so outside a UTF-8 locale the driver answers exit status 3 for non-ASCII `--params` instead of reading changed values; JSON escapes work in any locale. [Windows](#windows) has a narrower guarantee. |
 | `iris-examples/` | The examples of the site's [Java and Kotlin guide](../site/src/content/docs/using/java.mdx), which are not published: sources in `src/main/java/examples` and `src/main/kotlin/examples`, each with its recorded `.out` beside it. |
 | `iris-jmh/` | The JMH benchmarks, which are not published. Nothing else depends on this module, so JMH stays out of `dev.gecode:iris`. |
@@ -166,6 +205,7 @@ fails rather than skips without `cargo`.
 ./gradlew :iris-kotlin:dokkaGenerate  # the Kotlin API reference, in iris-kotlin/build/dokka/html
 ./gradlew :iris-examples:test  # run the guide's examples and compare their output
 ./gradlew :iris:test --tests dev.gecode.iris.BudgetLimitsTest
+./gradlew :iris:test --tests 'dev.gecode.iris.build.*'  # the spec builder
 ./gradlew :iris:test --tests dev.gecode.iris.FloatDifferentialTest
 ./gradlew :iris-kotlin:check  # the Kotlin tests, detekt and the dependency check
 ./gradlew jmh            # the benchmarks, which take about 3 minutes
@@ -174,15 +214,27 @@ fails rather than skips without `cargo`.
 `-Xlint:all -Werror` applies to main and test sources. Error Prone and NullAway
 run inside `compileJava`, so they have no task of their own: any Error Prone
 warning fails the build through `-Werror`, and NullAway reports at error level
-for `@NullMarked` code, which is all of `dev.gecode.iris`.
+for `@NullMarked` code, which is all of `dev.gecode.iris`. NullAway runs in
+JSpecify mode, so it checks the `@Nullable` type arguments of the builder's
+optional handles.
 
 `iris-kotlin` compiles with `allWarningsAsErrors`, and detekt and ktfmt run in
 `check`; [its README](iris-kotlin/README.md) has the details.
 
-`:iris:javadoc` documents only the exported package and fails on any warning, a
+`:iris:javadoc` documents only the exported packages and fails on any warning, a
 missing comment included. The build runs it through `check`. `ApiTest` checks the
 module descriptor, that public signatures name no internal type, and the error
 fields.
+
+The tests of `dev.gecode.iris.build` follow "Testing builders" in
+[docs/builders.md](../docs/builders.md#testing-builders). `ChecksTest` covers
+the builder checks and asserts the caller's line of each failure,
+`PrintingTest` the text of every statement and expression, `ReadingTest` what
+`get` returns, and `JobshopTest` the running example against the cases of
+`formats/jobshop`. `CompileTest` compiles user code with javac: the type of
+`get` for each handle, the wrong types and depths that javac rejects, and, by
+running the toolchain's `javac` with Error Prone and NullAway in JSpecify mode,
+the dereference of an optional entry.
 
 `:iris-kotlin:dokkaGenerate` also fails on any warning and runs through `check`.
 The site build runs both tasks and publishes the result in its own pages (see

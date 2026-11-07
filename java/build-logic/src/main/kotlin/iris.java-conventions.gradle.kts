@@ -30,7 +30,10 @@ tasks.withType<JavaCompile>().configureEach {
   options.release = 27
   options.encoding = "UTF-8"
   options.compilerArgs.addAll(listOf("-Xlint:all", "-Werror"))
-  options.errorprone.nullaway { error() }
+  options.errorprone.nullaway {
+    error()
+    jspecifyMode = true
+  }
 }
 
 tasks.withType<Test>().configureEach {

@@ -17,6 +17,14 @@ tasks.javadoc {
 
 tasks.check { dependsOn(tasks.javadoc) }
 
+// Error Prone and NullAway for the compilation tests of dev.gecode.iris.build, which run javac.
+val nullawayCheck: Configuration by configurations.creating
+
+dependencies {
+  nullawayCheck(libs.errorprone.core)
+  nullawayCheck(libs.nullaway)
+}
+
 val repository = rootDir.parentFile
 val installedDriver = project(":iris-driver").layout.buildDirectory.dir("install/iris-driver")
 
@@ -24,6 +32,10 @@ tasks.withType<Test>().configureEach {
   dependsOn(":iris-driver:installDist")
   systemProperty("iris.driverHome", installedDriver.get().asFile.path)
   systemProperty("iris.repository", repository.path)
+  inputs.files(nullawayCheck).withNormalizer(ClasspathNormalizer::class)
+  jvmArgumentProviders.add(
+      CommandLineArgumentProvider { listOf("-Diris.errorprone=${nullawayCheck.asPath}") }
+  )
   providers.gradleProperty("irisFloatValues").orNull?.let { systemProperty("iris.floatValues", it) }
   providers.gradleProperty("irisCli").orNull?.let { systemProperty("iris.cli", it) }
   inputs.dir(installedDriver).withPathSensitivity(PathSensitivity.RELATIVE)
