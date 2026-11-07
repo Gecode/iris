@@ -1,6 +1,7 @@
 package dev.gecode.iris.build;
 
 import dev.gecode.iris.IrisException;
+import dev.gecode.iris.internal.access.CallSites;
 import java.io.Serial;
 import org.jspecify.annotations.Nullable;
 
@@ -136,36 +137,16 @@ public final class BuildException extends RuntimeException {
     if (kind == Kind.SPEC && failure != null) {
       out.append(failure.code().code()).append(": ");
     }
-    out.append(kind == Kind.SPEC ? reason : escapeControls(reason));
+    out.append(kind == Kind.SPEC ? reason : CallSites.escapeControls(reason));
     String line = emittedLine(text, failure);
     Integer number = failure == null ? null : failure.line();
     if (line != null && number != null) {
       out.append('\n').append(String.format("%6d", number)).append(" | ");
-      out.append(escapeControls(line));
+      out.append(CallSites.escapeControls(line));
     }
     if (callSite != null) {
-      out.append("\ncall site: ").append(escapeControls(callSite.toString()));
+      out.append("\ncall site: ").append(CallSites.escapeControls(callSite.toString()));
     }
-    return out.toString();
-  }
-
-  /** Escape control characters as the Rust reader does, so that a terminal never acts on them. */
-  static String escapeControls(String text) {
-    StringBuilder out = new StringBuilder(text.length());
-    text.codePoints()
-        .forEach(c -> {
-          if (Character.getType(c) != Character.CONTROL) {
-            out.appendCodePoint(c);
-          } else if (c == '\t') {
-            out.append("\\t");
-          } else if (c == '\r') {
-            out.append("\\r");
-          } else if (c == '\n') {
-            out.append("\\n");
-          } else {
-            out.append("\\u{").append(Integer.toHexString(c)).append('}');
-          }
-        });
     return out.toString();
   }
 }

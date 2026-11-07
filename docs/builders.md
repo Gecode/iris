@@ -838,6 +838,20 @@ line. When the language rejects the text, `failure()` gives the
 `IrisException`, `text()` the emitted text, and `emittedLine()` the line
 that the error names.
 
+The spec that `build()` returns keeps the call site of each emitted line,
+so an `IrisException` from reading or cataloging names its statement as
+well: `callSite()` returns an `Optional<StackTraceElement>`, and the
+message ends with a `call site:` line. As in Rust and C++, a failure that
+names no statement, such as `E-TRAILING-INPUT`, has no call site, nor does
+a catalog rejection, which is a summary in the data, nor a spec parsed
+from text. Java errors locate the reader spec by line, as C++ errors do,
+so call sites are mapped by line with the same rules: a line gets the call
+site of the first statement that starts on it, else of the call that wrote
+the block a `}` closes, and the parser, resolver and reader record the line
+of the statement an error belongs to where the error lies past it.
+Statements that share a line, such as an `if` with an empty block and the
+`else` after it, share the first one's call site.
+
 The dynamic forms:
 
 ```java

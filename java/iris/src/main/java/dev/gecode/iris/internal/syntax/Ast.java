@@ -278,12 +278,13 @@ public final class Ast {
   /**
    * An arm of a sections statement.
    *
+   * @param line the line of its pattern in the reader spec, which owns the errors of the arm
    * @param pattern the line pattern
    * @param optional whether the input may lack a line matching the arm
    * @param last whether the sections statement ends after this arm
    * @param body the statements run after the line matched
    */
-  public record Arm(Pattern pattern, boolean optional, boolean last, List<Stmt> body) {}
+  public record Arm(int line, Pattern pattern, boolean optional, boolean last, List<Stmt> body) {}
 
   /** A statement. */
   public sealed interface Stmt {

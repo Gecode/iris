@@ -86,8 +86,13 @@ the check (`SCOPE`, `PROVENANCE`, `REDEFINITION`, `UNPRINTABLE`, `BINDING`, or
 `SPEC` when the language rejects the text) and whose `callSite()` is the line
 of the calling code that made the statement, found with `StackWalker`. Builder
 checks that one statement shows throw at that call, and the others from
-`build()` or `source()`. Mapping a read-time failure back to the statement is
-not implemented yet, and neither is the record reader.
+`build()` or `source()`. The spec that `build()` returns keeps the call site of
+each emitted line, so an `IrisException` from parsing, reading or cataloging
+names the statement too: `callSite()` returns it, and the message ends with a
+`call site:` line. An error that belongs to no statement, such as
+`E-TRAILING-INPUT`, has none, and neither has a catalog rejection, which is a
+summary in the data, or a spec parsed from text. The record reader is not
+implemented yet.
 
 ## Using it from another project
 
@@ -229,6 +234,8 @@ fields.
 The tests of `dev.gecode.iris.build` follow "Testing builders" in
 [docs/builders.md](../docs/builders.md#testing-builders). `ChecksTest` covers
 the builder checks and asserts the caller's line of each failure,
+`CallSitesTest` the call sites of the language's errors from parsing, reading
+and cataloging a built spec, a port of `rust/iris-build/tests/call_sites.rs`,
 `PrintingTest` the text of every statement and expression, `ReadingTest` what
 `get` returns, and `JobshopTest` the running example against the cases of
 `formats/jobshop`. `CompileTest` compiles user code with javac: the type of

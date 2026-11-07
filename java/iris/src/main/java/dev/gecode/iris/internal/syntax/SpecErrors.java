@@ -4,6 +4,7 @@ import dev.gecode.iris.ErrorCode;
 import dev.gecode.iris.IrisError;
 import dev.gecode.iris.IrisException;
 import dev.gecode.iris.Location;
+import dev.gecode.iris.internal.access.Access;
 import org.jspecify.annotations.Nullable;
 
 /** Creates the exceptions of parse-time errors. */
@@ -14,6 +15,16 @@ public final class SpecErrors {
   static IrisException at(ErrorCode code, @Nullable String origin, int line, String message) {
     return new IrisException(
         new IrisError.SpecError(code, message, new Location(origin, line, null)));
+  }
+
+  /**
+   * Returns the error {@code code} on {@code line}, which belongs to the statement or sections arm
+   * on {@code ownerLine}.
+   */
+  static IrisException inStatement(
+      ErrorCode code, @Nullable String origin, int line, int ownerLine, String message) {
+    return Access.failure(
+        new IrisError.SpecError(code, message, new Location(origin, line, null)), ownerLine);
   }
 
   /** Returns {@code E-SPEC-UTF8} at byte {@code offset} of {@code source} (§5.1). */

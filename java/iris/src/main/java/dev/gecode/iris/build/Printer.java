@@ -1,5 +1,7 @@
 package dev.gecode.iris.build;
 
+import static java.util.Objects.requireNonNull;
+
 import dev.gecode.iris.build.BuildException.Kind;
 import dev.gecode.iris.build.Declared.AlphabetBase;
 import dev.gecode.iris.build.Declared.AlphabetBlank;
@@ -9,6 +11,7 @@ import dev.gecode.iris.build.Declared.AlphabetStrip;
 import dev.gecode.iris.build.Declared.BaseSpec;
 import dev.gecode.iris.build.Declared.NamedSpec;
 import dev.gecode.iris.build.Declared.RangeSpec;
+import dev.gecode.iris.internal.access.CallSites;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -26,25 +29,19 @@ final class Printer {
    * The emitted text, and where each of its statements came from.
    *
    * @param text the text
-   * @param lines the line, counted from 1, on which each marked statement starts
-   * @param sites the call site of each marked statement
+   * @param sites the call site of each line of the text
    */
-  record Printed(String text, List<Integer> lines, List<StackTraceElement> sites) {
-    /** The call site of the first statement that starts on {@code line}, or before it. */
-    @Nullable StackTraceElement siteOfLine(int line) {
-      StackTraceElement before = null;
-      for (int k = 0; k < lines.size(); k++) {
-        if (lines.get(k) == line) {
-          return sites.get(k);
-        }
-        if (lines.get(k) > line) {
-          break;
-        }
-        before = sites.get(k);
-      }
-      return before;
-    }
-  }
+  record Printed(String text, CallSites sites) {}
+
+  /**
+   * Where a statement's text starts and who called it.
+   *
+   * @param start the offset of its text
+   * @param site its call site
+   * @param isClose whether it is the {@code }} of a block, whose call site is the call that wrote
+   *     the block
+   */
+  private record Mark(int start, StackTraceElement site, boolean isClose) {}
 
   /**
    * The words that end a range with no upper bound, from the Specification's {@code upper bound
@@ -350,8 +347,7 @@ final class Printer {
   private final State state;
   private final Names names;
   private final StringBuilder out = new StringBuilder();
-  private final List<Integer> starts = new ArrayList<>();
-  private final List<StackTraceElement> sites = new ArrayList<>();
+  private final List<Mark> marks = new ArrayList<>();
   private int current;
   private int indent;
   private @Nullable BuildException issue;
@@ -369,18 +365,39 @@ final class Printer {
       throw printer.issue;
     }
     String text = printer.out.toString();
-    List<Integer> lines = new ArrayList<>(printer.starts.size());
-    int line = 1;
-    int position = 0;
-    for (int start : printer.starts) {
-      for (; position < start; position++) {
-        if (text.charAt(position) == '\n') {
-          line++;
+    return new Printed(text, lineSites(text, printer.marks));
+  }
+
+  /**
+   * Returns the call site of each line of {@code text}: the first statement that starts on the line
+   * and is not a {@code }}, else the first that starts there, else the statement that holds the
+   * line, as for an {@code each} line. Statements that the text joins on one line, such as {@code }
+   * else if}, so share the first one's call site.
+   */
+  private static CallSites lineSites(String text, List<Mark> marks) {
+    List<StackTraceElement> lines = new ArrayList<>();
+    @Nullable StackTraceElement holder = null;
+    int next = 0;
+    for (int start = 0; start < text.length(); ) {
+      int newline = text.indexOf('\n', start);
+      int end = newline < 0 ? text.length() : newline + 1;
+      for (; next < marks.size() && marks.get(next).start() < start; next++) {
+        holder = marks.get(next).site();
+      }
+      @Nullable StackTraceElement statement = null;
+      @Nullable StackTraceElement close = null;
+      for (int k = next; k < marks.size() && marks.get(k).start() < end; k++) {
+        Mark mark = marks.get(k);
+        if (!mark.isClose() && statement == null) {
+          statement = mark.site();
+        } else if (mark.isClose() && close == null) {
+          close = mark.site();
         }
       }
-      lines.add(line);
+      lines.add(statement != null ? statement : close != null ? close : requireNonNull(holder));
+      start = end;
     }
-    return new Printed(text, List.copyOf(lines), List.copyOf(printer.sites));
+    return new CallSites(lines);
   }
 
   private void write(String text) {
@@ -388,8 +405,9 @@ final class Printer {
   }
 
   private void markSite(int index) {
-    starts.add(out.length());
-    sites.add(state.sites.get(index));
+    marks.add(
+        new Mark(
+            out.length(), state.sites.get(index), state.stmts.get(index) instanceof Stmt.Close));
   }
 
   private void unprintable(String message) {

@@ -1,5 +1,7 @@
 package dev.gecode.iris;
 
+import dev.gecode.iris.internal.access.Access;
+import dev.gecode.iris.internal.access.CallSites;
 import dev.gecode.iris.internal.read.Interpreter;
 import dev.gecode.iris.internal.read.Stored;
 import dev.gecode.iris.internal.syntax.Ast;
@@ -19,14 +21,47 @@ import java.util.SequencedMap;
 import java.util.function.Function;
 import org.jspecify.annotations.Nullable;
 
-/** A parsed reader spec, checked against every parse-time rule of the Specification. */
+/**
+ * A parsed reader spec, checked against every parse-time rule of the Specification.
+ *
+ * <p>A spec is immutable, so threads can share it.
+ */
 public final class Spec {
+  static {
+    Access.grant(
+        new Access.Grants() {
+          @Override
+          public IrisException failure(IrisError error, int ownerLine) {
+            return IrisException.owned(error, ownerLine);
+          }
+
+          @Override
+          public int ownerLine(IrisException failure) {
+            return failure.ownerLine();
+          }
+
+          @Override
+          public Spec parse(String text, String origin, CallSites sites) {
+            return parseBuilt(text, origin, sites);
+          }
+
+          @Override
+          public CallSites callSites(Spec spec) {
+            return spec.callSites;
+          }
+        });
+  }
+
   private final Parsed parsed;
   private final @Nullable String origin;
 
-  private Spec(Parsed parsed, @Nullable String origin) {
+  /** The call site of each line, for a reader spec from a spec builder. */
+  private final CallSites callSites;
+
+  private Spec(Parsed parsed, @Nullable String origin, CallSites callSites) {
     this.parsed = parsed;
     this.origin = origin;
+    this.callSites = callSites;
   }
 
   private record Parsed(Ast.Program program, Resolution resolution) {}
@@ -39,7 +74,7 @@ public final class Spec {
    * @throws IrisException for the first parse-time error
    */
   public static Spec parse(byte[] source) {
-    return parseBytes(source, null);
+    return parseBytes(source, null, CallSites.NONE);
   }
 
   /**
@@ -51,7 +86,7 @@ public final class Spec {
    * @throws IrisException for the first parse-time error
    */
   public static Spec parse(byte[] source, String origin) {
-    return parseBytes(source, origin);
+    return parseBytes(source, origin, CallSites.NONE);
   }
 
   /**
@@ -62,7 +97,7 @@ public final class Spec {
    * @throws IrisException for the first parse-time error
    */
   public static Spec parse(String source) {
-    return parseText(source, null);
+    return parseText(source, null, CallSites.NONE);
   }
 
   /**
@@ -74,15 +109,27 @@ public final class Spec {
    * @throws IrisException for the first parse-time error
    */
   public static Spec parse(String source, String origin) {
-    return parseText(source, origin);
+    return parseText(source, origin, CallSites.NONE);
   }
 
-  private static Spec parseBytes(byte[] source, @Nullable String origin) {
+  private static Spec parseBytes(byte[] source, @Nullable String origin, CallSites sites) {
     int invalid = Utf8.firstInvalid(source);
     if (invalid >= 0) {
       throw SpecErrors.invalidUtf8(source, invalid, origin);
     }
-    return new Spec(LargeStack.call(() -> parseValid(source, origin)), origin);
+    return new Spec(LargeStack.call(() -> parseValid(source, origin)), origin, sites);
+  }
+
+  /**
+   * Parses the text of a spec builder and keeps the call sites of its lines. A parse error names
+   * the call site of its statement.
+   */
+  private static Spec parseBuilt(String text, String origin, CallSites sites) {
+    try {
+      return parseText(text, origin, sites);
+    } catch (IrisException failure) {
+      throw failure.located(sites);
+    }
   }
 
   private static Parsed parseValid(byte[] source, @Nullable String origin) {
@@ -329,7 +376,11 @@ public final class Spec {
     Interpreter interpreter =
         new Interpreter(
             parsed.program(), parsed.resolution(), origin, input, inputOrigin, params.values());
-    return new Data(LargeStack.call(() -> operation.apply(interpreter)));
+    try {
+      return new Data(LargeStack.call(() -> operation.apply(interpreter)));
+    } catch (IrisException failure) {
+      throw failure.located(callSites);
+    }
   }
 
   private static byte[] encode(String input) {
@@ -344,10 +395,10 @@ public final class Spec {
    * Parses text whose encoding would hide an unpaired surrogate: {@link String#getBytes} replaces
    * one with {@code ?}.
    */
-  private static Spec parseText(String source, @Nullable String origin) {
+  private static Spec parseText(String source, @Nullable String origin, CallSites sites) {
     int surrogate = firstUnpairedSurrogate(source);
     if (surrogate < 0) {
-      return parseBytes(source.getBytes(StandardCharsets.UTF_8), origin);
+      return parseBytes(source.getBytes(StandardCharsets.UTF_8), origin, sites);
     }
     byte[] prefix = source.substring(0, surrogate).getBytes(StandardCharsets.UTF_8);
     throw SpecErrors.invalidUtf8(prefix, prefix.length, origin);

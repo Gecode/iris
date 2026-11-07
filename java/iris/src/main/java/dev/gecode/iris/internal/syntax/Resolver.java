@@ -55,6 +55,10 @@ public final class Resolver {
 
   private final Resolution resolution;
   private int line = 0;
+
+  /** The line of the sections arm whose pattern is visited, or 0. */
+  private int armLine = 0;
+
   private boolean inCheck = false;
 
   private Resolver(Program program, @Nullable String origin) {
@@ -97,8 +101,13 @@ public final class Resolver {
     visit(program.body());
   }
 
+  /**
+   * Returns the error {@code code} at the statement visited, in the sections arm visited if any.
+   */
   private IrisException failure(ErrorCode code, String message) {
-    return failureAt(code, line, message);
+    return armLine > 0
+        ? SpecErrors.inStatement(code, origin, line, armLine, message)
+        : failureAt(code, line, message);
   }
 
   private IrisException failureAt(ErrorCode code, int at, String message) {
@@ -293,7 +302,11 @@ public final class Resolver {
       }
       case Stmt.Repeat s -> visitRepeat(s);
       case Stmt.Sections s -> {
-        s.arms().forEach(arm -> captureBounds(arm.pattern()));
+        for (Arm arm : s.arms()) {
+          armLine = arm.line();
+          captureBounds(arm.pattern());
+        }
+        armLine = 0;
         s.arms().forEach(arm -> visit(arm.body()));
       }
       case Stmt.If s -> {

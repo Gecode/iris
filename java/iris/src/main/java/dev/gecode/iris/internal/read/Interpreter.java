@@ -597,6 +597,8 @@ public final class Interpreter {
       starts.add((long) input.nextData());
       int start = input.position();
       run(s.body());
+      // The errors after the body keep the line of its last statement and belong to the repeat.
+      execution.setOwnerLine(s.line());
       if (input.position() == start) {
         if (count < 0) {
           throw execution.failure(
@@ -671,6 +673,7 @@ public final class Interpreter {
       }
       int found = matchingArm(arms);
       if (found < 0) {
+        execution.setOwnerLine(0);
         if (s.skipOther()) {
           input.toEndOfLine();
           continue;
@@ -709,8 +712,13 @@ public final class Interpreter {
     requireArms(arms, seen, end, endAt);
   }
 
+  /**
+   * Returns the index of the first arm whose pattern matches the line, or -1. An arm owns the
+   * errors of matching its pattern and, if it matches, of taking the captures.
+   */
   private int matchingArm(List<Arm> arms) {
     for (int k = 0; k < arms.size(); k++) {
+      execution.setOwnerLine(arms.get(k).line());
       if (matcher.matches(arms.get(k).pattern())) {
         return k;
       }
@@ -730,6 +738,7 @@ public final class Interpreter {
     for (int k = 0; k < arms.size(); k++) {
       Arm arm = arms.get(k);
       if (!arm.optional() && seen[k] == 0) {
+        execution.setOwnerLine(arm.line());
         String source = arm.pattern().source();
         Supplier<IrisException> error =
             () ->

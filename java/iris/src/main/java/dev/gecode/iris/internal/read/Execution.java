@@ -4,6 +4,7 @@ import dev.gecode.iris.ErrorCode;
 import dev.gecode.iris.IrisError;
 import dev.gecode.iris.IrisException;
 import dev.gecode.iris.Location;
+import dev.gecode.iris.internal.access.Access;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,6 +25,12 @@ final class Execution {
 
   private final List<Context> contexts = new ArrayList<>();
   private int specLine = 0;
+
+  /**
+   * The line of the statement or sections arm that errors belong to, when it is not the one on
+   * {@link #specLine}, or 0.
+   */
+  private int ownerLine = 0;
 
   /**
    * A statement being executed, for errors.
@@ -59,8 +66,18 @@ final class Execution {
    * Where the read is
    */
 
+  /** Makes the statement on {@code line} the one that runs and that errors belong to. */
   void setSpecLine(int line) {
     specLine = line;
+    ownerLine = 0;
+  }
+
+  /**
+   * Makes errors belong to the statement or sections arm on {@code line}, until the next {@link
+   * #setSpecLine}, while they keep the location of the statement that runs.
+   */
+  void setOwnerLine(int line) {
+    ownerLine = line;
   }
 
   void enter(Context context) {
@@ -113,9 +130,10 @@ final class Execution {
 
   /** Returns the error {@code code} at {@code at} (§11.2 profile R). */
   IrisException located(ErrorCode code, String message, Place at) {
-    return new IrisException(
+    return Access.failure(
         new IrisError.ReadError(
-            code, message, inputLocation(at), specLine > 0 ? specLocation() : null, contextPath()));
+            code, message, inputLocation(at), specLine > 0 ? specLocation() : null, contextPath()),
+        ownerLine);
   }
 
   /** Returns the error of a shape error of the value of {@code name}. */
@@ -125,14 +143,15 @@ final class Execution {
 
   /** Returns the failed check {@code message} at {@code at} with the witness {@code path}. */
   IrisException checkFailure(String message, Place at, List<Integer> path) {
-    return new IrisException(
+    return Access.failure(
         new IrisError.CheckError(
             ErrorCode.CHECK_FAILED,
             message,
             inputLocation(at),
             specLocation(),
             contextPath(),
-            path));
+            path),
+        ownerLine);
   }
 
   /** Returns the error {@code code} at the current position, with no location in the spec. */

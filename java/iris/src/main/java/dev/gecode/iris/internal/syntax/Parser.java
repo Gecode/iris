@@ -101,6 +101,12 @@ public final class Parser {
   /** Whether the statement being parsed may be {@code each}. */
   private boolean eachAllowed = false;
 
+  /**
+   * The line of the innermost statement or sections arm being parsed, which the errors found in it
+   * belong to wherever they are found.
+   */
+  private int ownerLine = 0;
+
   private final List<String> enclosingBindings = new ArrayList<>();
   private final List<Binding> completedBindings = new ArrayList<>();
 
@@ -185,7 +191,7 @@ public final class Parser {
   }
 
   private IrisException failureAt(ErrorCode code, int line, String message) {
-    return SpecErrors.at(code, origin, line, message);
+    return SpecErrors.inStatement(code, origin, line, ownerLine, message);
   }
 
   private static String describe(Token token) {
@@ -360,7 +366,16 @@ public final class Parser {
     return index;
   }
 
+  /** Parses a statement, which owns the errors found while parsing it. */
   private Stmt statement() {
+    int outer = ownerLine;
+    ownerLine = peek().line();
+    Stmt statement = statementContents();
+    ownerLine = outer;
+    return statement;
+  }
+
+  private Stmt statementContents() {
     Token first = peek();
     eachAllowed = atRepeatStart;
     atRepeatStart = false;
@@ -568,10 +583,15 @@ public final class Parser {
       if (peek().kind() == Token.Kind.END) {
         throw failure(ErrorCode.SPEC_SYNTAX, "missing '}'");
       }
+      // The arm owns the errors found while parsing it.
+      int line = peek().line();
+      int outer = ownerLine;
+      ownerLine = line;
       Pattern pattern = pattern();
       boolean optional = accept("optional");
       boolean last = accept("last");
-      arms.add(new Arm(pattern, optional, last, atPunctuation("{") ? block() : List.of()));
+      arms.add(new Arm(line, pattern, optional, last, atPunctuation("{") ? block() : List.of()));
+      ownerLine = outer;
     }
     next();
     return List.copyOf(arms);
