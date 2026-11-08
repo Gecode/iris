@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.0 - 2026-11-08
+
 - Add the `gecode-iris` package, imported as `gecode_iris`, which binds the Rust
   reference implementation with PyO3 and adds no reader behavior of its own.
 - Ship abi3 wheels for Python 3.10 and later on Linux (manylinux and musllinux,
