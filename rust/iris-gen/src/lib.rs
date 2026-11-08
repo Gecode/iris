@@ -9,6 +9,7 @@
 //! [`View`](view::View) of typed handles, and [`view_code`] prints it for a
 //! language whose [`Language::has_view`] is true.
 mod cpp;
+mod java;
 mod lower;
 pub mod program;
 mod python;
@@ -31,11 +32,17 @@ pub enum Language {
     Rust,
     Python,
     Cpp,
+    Java,
 }
 
 impl Language {
     /// Every language with a backend.
-    pub const ALL: &'static [Language] = &[Language::Rust, Language::Python, Language::Cpp];
+    pub const ALL: &'static [Language] = &[
+        Language::Rust,
+        Language::Python,
+        Language::Cpp,
+        Language::Java,
+    ];
 
     /// The language's name on the command line.
     pub fn name(self) -> &'static str {
@@ -43,6 +50,7 @@ impl Language {
             Self::Rust => "rust",
             Self::Python => "python",
             Self::Cpp => "cpp",
+            Self::Java => "java",
         }
     }
 
@@ -50,7 +58,7 @@ impl Language {
     pub fn has_view(self) -> bool {
         match self {
             Self::Rust => true,
-            Self::Python | Self::Cpp => false,
+            Self::Python | Self::Cpp | Self::Java => false,
         }
     }
 }
@@ -95,6 +103,7 @@ pub fn builder_code(
         Language::Rust => rust::RustBackend.render(&program),
         Language::Python => python::PythonBackend.render(&program),
         Language::Cpp => cpp::CppBackend.render(&program),
+        Language::Java => java::JavaBackend.render(&program),
     })
 }
 
@@ -133,6 +142,6 @@ impl From<gecode_iris_sema::Error> for ViewError {
 pub fn view_code(analysis: &Analysis, language: Language) -> Result<String, ViewError> {
     match language {
         Language::Rust => Ok(rust::view::render(&view::view(analysis)?)),
-        Language::Python | Language::Cpp => Err(ViewError::NoPrinter(language)),
+        Language::Python | Language::Cpp | Language::Java => Err(ViewError::NoPrinter(language)),
     }
 }

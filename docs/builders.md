@@ -1006,13 +1006,16 @@ Each implementation's builder is tested in four ways:
    runs the generated programs in each language and compares their output
    with the original, as syntax trees. Whitespace, comments, redundant
    parentheses, and generated record names do not count as differences.
-   Rust, Python and C++ have generators so far. The generated code must
-   pass the language's own tools unchanged before it runs: rustfmt and
-   Clippy for Rust; `ruff format`, `ruff check` and ty for Python; and
+   Rust, Python, C++ and Java have generators so far. The generated code
+   must pass the language's own tools unchanged before it runs: rustfmt and
+   Clippy for Rust; `ruff format`, `ruff check` and ty for Python;
    clang-format and clang-tidy 22.1.8, with the `.clang-format` and
    `.clang-tidy` of `cpp/`, for C++, which then builds with the warnings
-   of `cpp/` as errors. The C++ round trip also runs as the CTest test
-   `builder-round-trip`, with the compiler and flags of the CTest build.
+   of `cpp/` as errors; and google-java-format, through the Spotless
+   check of `java/`, for Java, which then compiles in one javac run with
+   the flags of `java/`, Error Prone and NullAway included. The C++ round
+   trip also runs as the CTest test `builder-round-trip`, with the
+   compiler and flags of the CTest build.
    This proves that the builder covers the language and that its printer is
    right. The comparison is a new `gecode-iris-conformance` subcommand. The
    generator doubles as a migration tool for users who want to move a text

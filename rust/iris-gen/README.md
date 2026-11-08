@@ -19,8 +19,9 @@ let code = builder_code(&parsed, &analysis, Language::Rust)?;
 ```
 
 A new language adds a `Language` variant, a backend module and one match arm in
-`builder_code`. There are backends for Rust, Python and C++. `Language::has_view`
-says whether a language also has a view printer; Python and C++ have none yet.
+`builder_code`. There are backends for Rust, Python, C++ and Java.
+`Language::has_view` says whether a language also has a view printer; Python,
+C++ and Java have none yet.
 
 ## The Rust backend
 
@@ -163,6 +164,67 @@ changed. The `builder-round-trip` test of `cpp/` runs it with that build's
 compiler and its compile and link flags, those of its configuration
 included, so that the `asan` preset builds the programs under ASan and
 UBSan.
+
+## The Java backend
+
+The program is a complete file without a package declaration, which the caller
+adds. It holds `final class SpecBuilder`, whose `static Builder specBuilder()`
+returns the builder and whose `main` prints the spec. It uses the static
+methods of `dev.gecode.iris.build.Iris`, compiles under the flags of `java/`
+(`-Xlint:all -Werror`, Error Prone and NullAway) and passes google-java-format
+unchanged, as Spotless runs it in `java/`. It writes google-java-format's
+layout itself: a call goes on one line if it fits, and otherwise breaks after
+its opening parenthesis and puts its arguments on one line, fills lines with
+them when each is at most 9 columns, or puts each on a line of its own. An
+assignment breaks after `=` first, and a block lambda that is the only argument
+stays on the call's line.
+
+- Every handle is a field, such as
+  `private static final DynField x = dynamic("x");` or
+  `private static final RecordName job = recordName("job", "jobs");`, so that a
+  statement may name a handle defined later in the spec. A name that the spec
+  never defines is a local `var x = undefined("x");`, and `_` as a name is
+  `forward("_", Dyn.class)`.
+- Blocks are `Runnable` lambdas. A block whose statements would start beyond
+  column 36 becomes a method, such as `private static void block1(IntType t)`,
+  that takes each type and undefined name from an enclosing method that it
+  uses.
+- A type that a statement uses is a local `var t = defineType("t", ...);`.
+- An `if` chain is a sequence of statements: `ifThen`, then `elseIf`,
+  `otherwise` or `elseReadIf`.
+- A comprehension is `sum(over(xs).named("v"), v -> body)`, with `_ ->` when the
+  body does not use its variable. A body that does not fit on its line becomes
+  a method `private static Expr body1(DynExpr v)` that takes the
+  comprehension variable and any outer variables it uses.
+- A Java number or string on the left of an operator goes through `lit`, and an
+  operand that the types of `dev.gecode.iris.build` refuse goes through
+  `.dynamic()`, such as both sides of `1 == "b"`. `gecode.int_max` is
+  `Gecode.intMax`. More than three `sections` clauses go in a `List.of`.
+- A value too wide for its place goes into `var e1 = ...;`, and a long string
+  into a constant `private static final String T1`, split into pieces that each
+  fit a line.
+
+Identifiers are lower camel case, as the Google Java style asks: `n_jobs` binds
+`nJobs`. A name that is a Java keyword, literal, contextual keyword or `_`, the
+program's `args`, or the identifier of another name gets a numeric suffix: `if`
+binds `if2`. A name like a temporary gets a `v` first, so `e1` binds `e1v`.
+Fields and locals share the suffixes, so `type record` binds `record2`. A name
+stops at 24 columns and a comprehension variable at 12; the spelling in the
+spec stays whole in the string that the builder prints. String literals are
+ASCII, with everything else as `\uNNNN` escapes of UTF-16 units.
+
+The Java round trip needs Java 27, on `PATH` or in `JAVA_HOME`. It writes every
+builder in a package of its own under `target/tmp/java-round-trip` and passes
+them to the `iris-round-trip` module of `java/`, whose Gradle build checks them
+with Spotless, compiles them in one javac run with the runner, and runs the
+runner, which writes what each program prints. From `rust/`:
+
+```sh
+cargo test --locked -p gecode-iris --test builder_round_trip_java -- --ignored --nocapture
+```
+
+Gradle's output goes to `target/tmp/java-round-trip/gradle.log`, which a
+failure prints.
 
 ## Views
 

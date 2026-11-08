@@ -171,15 +171,15 @@ temporary directory cannot affect results.
 
 `iris gen builder --lang LANGUAGE SPEC` prints a program that builds the reader
 spec with the spec builder of that language, through
-[gecode-iris-gen](../iris-gen/README.md). The languages are `rust`, `python` and
-`cpp`. The program is a complete file: its `builder` function returns the
+[gecode-iris-gen](../iris-gen/README.md). The languages are `rust`, `python`,
+`cpp` and `java`. The program is a complete file: its `builder` function returns the
 `SpecBuilder`, and running it prints the spec's source.
 
 A spec that `iris check` rejects exits 1 with the same message on standard error
 and nothing on standard output. A file that cannot be read also exits 1, and an
 unknown language or a missing `--lang` is a usage error with exit 2.
-`tests/fixtures/jobshop-builder.rs`, `jobshop-builder.py` and
-`jobshop-builder.cpp` record the output for the jobshop format; after an
+`tests/fixtures/jobshop-builder.rs`, `jobshop-builder.py`,
+`jobshop-builder.cpp` and `jobshop-builder.java` record the output for the jobshop format; after an
 intended change to the generated code, write the new output there.
 
 The round trip checks what the programs do, from `rust/`:

@@ -76,3 +76,40 @@ jobs:
         with:
           name: java-test-reports-${{ matrix.os }}
           path: java/*/build/reports/tests/
+
+  # Generates a Java builder program for every accepted corpus spec, checks it
+  # with google-java-format through Spotless, compiles every program in one
+  # javac run with Error Prone and the warnings as errors, runs them, and
+  # compares the spec each prints with the original.
+  builder-round-trip:
+    name: Builder round trip
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '27'
+          cache: gradle
+          cache-dependency-path: |
+            java/**/*.gradle.kts
+            java/gradle/libs.versions.toml
+            java/gradle/wrapper/gradle-wrapper.properties
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache Cargo artifacts
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: java-round-trip-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ hashFiles('rust/**/*.rs', 'rust/**/Cargo.toml') }}
+          restore-keys: |
+            java-round-trip-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+      - name: Round trip
+        run: cargo test --locked -p gecode-iris --test builder_round_trip_java -- --ignored --nocapture

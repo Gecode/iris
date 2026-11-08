@@ -28,6 +28,10 @@
   `<iris/build.hpp>`, compile without warnings under the flags of `cpp/`, and
   pass clang-format and clang-tidy 22.1.8 unchanged, and a test that
   round-trips every accepted corpus spec through it.
+- Add a Java backend to gecode-iris-gen, `Language::Java`, whose programs use
+  `dev.gecode.iris.build`, compile without warnings under the flags of `java/`,
+  Error Prone and NullAway included, and pass google-java-format unchanged, and
+  a test that round-trips every accepted corpus spec through it.
 
 ### CLI
 
@@ -39,6 +43,8 @@
   `iris gen --lang python` says that Python has no view generator yet.
 - Add `iris gen builder --lang cpp SPEC`, which prints a C++ builder program.
   `iris gen --lang cpp` says that C++ has no view generator yet.
+- Add `iris gen builder --lang java SPEC`, which prints a Java builder program.
+  `iris gen --lang java` says that Java has no view generator yet.
 
 ## 0.1.0 - 2026-11-06
 

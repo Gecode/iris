@@ -193,6 +193,7 @@ and the site check compares them with this file, so change both together.
 | `iris/` | The library. `dev.gecode.iris` and the spec builder `dev.gecode.iris.build` are exported; `dev.gecode.iris.internal.syntax` holds the lexer, parser, resolver and output entries, and `dev.gecode.iris.internal.read` the reader. |
 | `iris-driver/` | The conformance driver, which is not published. It implements `parse`, `read`, `catalog` (`--format json|dzn`) and `dzn`. The JVM decodes arguments in the locale's encoding before `main` runs, so outside a UTF-8 locale the driver answers exit status 3 for non-ASCII `--params` instead of reading changed values; JSON escapes work in any locale. [Windows](#windows) has a narrower guarantee. |
 | `iris-examples/` | The examples of the site's [Java and Kotlin guide](../site/src/content/docs/using/java.mdx), which are not published: sources in `src/main/java/examples` and `src/main/kotlin/examples`, each with its recorded `.out` beside it. |
+| `iris-round-trip/` | The runner of the Java builder round trip, which is not published. Its `roundTrip` task copies the builder programs that `iris gen builder --lang java` printed into the build, checks them with Spotless, compiles them with the runner and records what each prints; without `-PirisRoundTripSources` the module holds only the runner. |
 | `iris-jmh/` | The JMH benchmarks, which are not published. Nothing else depends on this module, so JMH stays out of `dev.gecode:iris`. |
 | `iris-kotlin/` | The Kotlin extensions, in the exported package `dev.gecode.iris.kotlin` of the module of that name. |
 | `build-logic/` | The convention plugins `iris.java-conventions`, shared by the modules, `iris.kotlin-conventions`, `iris.kotlin-docs` for Dokka, and `iris.published` for the two published modules. |
@@ -305,6 +306,17 @@ and `iris read --dzn` byte for byte on a million floats from a fixed seed, and
 checks that each printed value parses to the same double. `-PirisFloatValues=N` sets the number
 and `-PirisCli=PATH` runs a given `iris` binary instead of `cargo run`.
 
+The Java builder round trip generates a builder program for every reader spec
+in `conformance/cases/0.1` and `formats` that `iris check` accepts, checks each
+with google-java-format through Spotless, compiles them all in one javac run
+with Error Prone and NullAway, runs them and compares the spec each prints with
+the original. It runs from `rust/`, and drives the `iris-round-trip` module
+through this wrapper:
+
+```sh
+cargo test --locked -p gecode-iris --test builder_round_trip_java -- --ignored --nocapture
+```
+
 By hand from the root, after `./gradlew :iris-driver:installDist` in `java/`:
 
 ```sh
@@ -317,9 +329,10 @@ Unix shell script; see [Windows](#windows).
 ## Continuous integration
 
 [`java.yml`](../.github/workflows/java.yml) runs `./gradlew build` on Ubuntu,
-macOS and Windows with Temurin 27 and stable Rust. It runs when `java/`,
-`conformance/`, `formats/`, `rust/` or the workflow changes, and it uploads the test
-reports of a failed build. Lint it from the root:
+macOS and Windows with Temurin 27 and stable Rust, and the Java builder round
+trip on Ubuntu. It runs when `java/`, `conformance/`, `formats/`, `rust/` or the
+workflow changes, and it uploads the test reports of a failed build. Lint it from
+the root:
 
 ```sh
 /tmp/iris-zdev/actionlint .github/workflows/java.yml
