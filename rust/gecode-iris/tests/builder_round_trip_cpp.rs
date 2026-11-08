@@ -13,7 +13,7 @@
 mod cpp_build;
 mod round_trip;
 
-use cpp_build::{CmakeProject, cmake_path, expect_success, regex_escape};
+use cpp_build::{CmakeProject, cmake_path, expect_success, regex_escape, repository};
 use gecode_iris_cli::check_spec;
 use gecode_iris_gen::{Language, builder_code};
 use round_trip::{Tally, corpus, extra_specs, limit_specs};
@@ -50,7 +50,7 @@ fn accepted_specs_round_trip_through_the_cpp_builder() {
     let clang_format =
         std::env::var_os("IRIS_CLANG_FORMAT").expect("IRIS_CLANG_FORMAT names clang-format 22.1.8");
     let clang_tidy = std::env::var_os("IRIS_CLANG_TIDY");
-    let repo = fs::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")).unwrap();
+    let repo = repository();
     let specs = corpus(&repo);
     let project = Project::new(&repo);
 

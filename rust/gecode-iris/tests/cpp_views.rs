@@ -18,7 +18,7 @@
 //! `generated-views` passes on a build's compiler and flags.
 mod cpp_build;
 
-use cpp_build::{CmakeProject, cmake_path, expect_success, regex_escape};
+use cpp_build::{CmakeProject, cmake_path, expect_success, regex_escape, repository};
 use gecode_iris_cli::check_spec;
 use gecode_iris_conformance::canonical::Outcome;
 use gecode_iris_conformance::case::{Case, Operation, discover};
@@ -105,7 +105,7 @@ fn layout_spec() -> String {
 #[test]
 #[ignore = "needs CMake and a C++23 compiler"]
 fn cpp_views_compile_and_read_the_same_data_as_untyped_access() {
-    let repo = fs::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")).unwrap();
+    let repo = repository();
     let project = Project::new(&repo);
     let mut headers = Vec::new();
     let mut reads = Vec::new();

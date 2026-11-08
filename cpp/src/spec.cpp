@@ -149,11 +149,13 @@ auto locating(const detail::CallSites &sites, F operation)
 }
 
 /// Parse and check the reader spec `text` from `origin`, allocating from
-/// `memory`, and keep a copy of the call sites `sites` of its lines, which
-/// is allocated from `memory` too
+/// `memory`, and keep a copy of the call sites `sites` of its lines, if
+/// any, which is allocated from `memory` too. The empty call sites of a
+/// spec without them are made inside the scope as well, since a standard
+/// library may allocate for an empty container.
 std::shared_ptr<const detail::SpecImpl>
 parse_spec(std::string_view text, std::string_view origin,
-           std::pmr::memory_resource &memory, const detail::CallSites &sites) {
+           std::pmr::memory_resource &memory, const detail::CallSites *sites) {
   const detail::MemoryScope scope(memory);
   const detail::NearestRounding rounding;
   detail::String name(origin);
@@ -161,13 +163,14 @@ parse_spec(std::string_view text, std::string_view origin,
   detail::ParsedSpec parsed =
       detail::parse_tokens(detail::lex(text, name), name);
   detail::resolve(parsed.body, name);
-  return detail::make_shared<const detail::SpecImpl>(
-      detail::SpecImpl{.memory = &memory,
-                       .origin = std::move(name),
-                       .name = std::move(parsed.name),
-                       .body = std::move(parsed.body),
-                       // A copy takes the resource of the scope
-                       .call_sites = sites});
+  return detail::make_shared<const detail::SpecImpl>(detail::SpecImpl{
+      .memory = &memory,
+      .origin = std::move(name),
+      .name = std::move(parsed.name),
+      .body = std::move(parsed.body),
+      // A copy takes the resource of the scope
+      .call_sites = (sites != nullptr) ? detail::CallSites(*sites)
+                                       : detail::CallSites()});
 }
 
 } // namespace
@@ -179,7 +182,7 @@ std::expected<Spec, Error> SpecAccess::try_parse(std::string_view text,
                                                  CallSites sites) {
   return expected([&] {
     return Spec(
-        parse_spec(text, origin, *std::pmr::get_default_resource(), sites));
+        parse_spec(text, origin, *std::pmr::get_default_resource(), &sites));
   });
 }
 
@@ -194,7 +197,7 @@ Spec::Spec(std::shared_ptr<const detail::SpecImpl> impl)
 
 Spec Spec::parse(std::string_view text, std::string_view origin,
                  std::pmr::memory_resource &memory) {
-  return Spec(parse_spec(text, origin, memory, {}));
+  return Spec(parse_spec(text, origin, memory, nullptr));
 }
 
 std::expected<Spec, Error> Spec::try_parse(std::string_view text,

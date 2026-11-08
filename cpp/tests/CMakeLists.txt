@@ -87,7 +87,7 @@ set(iris_compile_failures
   "operator_wrong_type|invalid operands|no match for .*operator|C267[0-9]"
   "get_wrong_type|conversion|cannot convert|C2440"
   "set_wrong_depth|no matching.*set|C2672"
-  "param_wrong_type|no matching.*set|C2672"
+  "param_wrong_type|no matching.*set|C2672|C2664"
   "get_wrong_depth|conversion|cannot convert|C2440"
   "pattern_too_few|pattern_placeholders_do_not_match_its_arguments"
   "pattern_too_many|pattern_placeholders_do_not_match_its_arguments"

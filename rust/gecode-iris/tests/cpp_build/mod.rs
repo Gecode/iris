@@ -149,6 +149,20 @@ pub fn cmake_path(path: &Path) -> String {
     path.display().to_string().replace('\\', "/")
 }
 
+/// The repository's root as an absolute path that CMake and the compilers
+/// take: on Windows, without the `\\?\` prefix of a canonical path.
+pub fn repository() -> PathBuf {
+    let canonical =
+        std::fs::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")).unwrap();
+    match canonical
+        .to_str()
+        .and_then(|text| text.strip_prefix(r"\\?\"))
+    {
+        Some(local) if !local.starts_with(r"UNC\") => PathBuf::from(local),
+        _ => canonical,
+    }
+}
+
 /// Runs `command` and returns its standard output, or fails with both outputs.
 pub fn expect_success(mut command: Command, name: &str) -> String {
     let output = command.output().unwrap();
