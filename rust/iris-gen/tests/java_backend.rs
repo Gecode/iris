@@ -1,6 +1,6 @@
 //! The Java text of each production, each identifier rule and each layout rule
 //! that the backend takes from google-java-format.
-use gecode_iris_gen::{Language, ViewError, builder_code, view_code};
+use gecode_iris_gen::{Language, builder_code, view_code};
 use gecode_iris_sema::analyze;
 use gecode_iris_syntax::{LanguageVersion, parse};
 
@@ -733,14 +733,11 @@ fn strings_are_ascii_and_long_ones_are_constants() {
 }
 
 #[test]
-fn java_has_builders_but_no_view_printer() {
-    assert!(!Language::Java.has_view());
+fn java_has_builders_and_a_view_printer() {
+    assert!(Language::Java.has_view());
     assert_eq!(Language::Java.name(), "java");
     assert_eq!("java".parse::<Language>(), Ok(Language::Java));
     let parsed = parse(b"x: int\n", "test.iris", LanguageVersion::V0_1).unwrap();
     let analysis = analyze(&parsed);
-    assert!(matches!(
-        view_code(&parsed, &analysis, Language::Java),
-        Err(ViewError::NoPrinter(Language::Java))
-    ));
+    assert!(view_code(&parsed, &analysis, Language::Java).is_ok());
 }

@@ -63,6 +63,37 @@ fn reserved(name: &str) -> bool {
     KEYWORDS.contains(&name) || SCOPE_PROPERTIES.contains(&name) || is_numbered(name)
 }
 
+/// The factory functions that a view's initializers call, which its handles
+/// leave free so that each call finds the function.
+const VIEW_NAMES: &[&str] = &[
+    "dynamic", "float0", "float1", "float2", "float3", "floatN", "int0", "int1", "int2", "int3",
+    "intN", "num0", "num1", "num2", "num3", "numN", "string0", "string1", "string2", "string3",
+    "stringN",
+];
+
+/// Whether a view may not use `name` for a handle.
+fn reserved_in_view(name: &str) -> bool {
+    KEYWORDS.contains(&name) || VIEW_NAMES.contains(&name)
+}
+
+/// The simple names of the types that a view names, which its object may not
+/// take.
+const VIEW_TYPES: &[&str] = &[
+    "Double",
+    "DoubleArray",
+    "DynField",
+    "FloatField",
+    "IntField",
+    "List",
+    "Long",
+    "LongArray",
+    "Number",
+    "NumField",
+    "String",
+    "StringField",
+    "Value",
+];
+
 /// The widest identifier of a value, record or type before any suffix. A
 /// longer name stays whole in the string that the builder prints.
 const WIDEST_NAME: usize = 24;
@@ -123,6 +154,9 @@ fn camel_case(name: &str, fallback: &str) -> String {
 /// Gives every name a Kotlin identifier that nothing else has.
 #[derive(Debug, Default)]
 pub(super) struct Identifiers {
+    /// Whether the identifiers name a view's handles, which need no temporaries
+    /// and leave the names of [`VIEW_NAMES`] free.
+    handles_only: bool,
     taken: HashSet<String>,
     /// The first suffix of each base that `unused` has not tried.
     next_suffixes: HashMap<String, usize>,
@@ -130,6 +164,22 @@ pub(super) struct Identifiers {
 }
 
 impl Identifiers {
+    /// Identifiers for the handles of a view.
+    pub(super) fn for_handles() -> Self {
+        Self {
+            handles_only: true,
+            ..Self::default()
+        }
+    }
+
+    fn reserved(&self, name: &str) -> bool {
+        if self.handles_only {
+            reserved_in_view(name)
+        } else {
+            reserved(name)
+        }
+    }
+
     /// The identifier of `name`, the same one each time.
     pub(super) fn named(&mut self, role: Role, name: &str) -> String {
         if let Some(identifier) = self.assigned.get(&(role, name.to_owned())) {
@@ -157,22 +207,22 @@ impl Identifiers {
     fn unused(&mut self, base: String) -> String {
         // Every name of the form `e1`, `e12` is a temporary's, so no suffix
         // frees one.
-        let base = if is_numbered(&base) {
+        let base = if !self.handles_only && is_numbered(&base) {
             format!("{base}v")
         } else {
             base
         };
-        if !reserved(&base) && !self.taken.contains(&base) {
+        if !self.reserved(&base) && !self.taken.contains(&base) {
             self.taken.insert(base.clone());
             return base;
         }
         // Every suffix of `e` makes a temporary's name.
-        if base == TEMPORARY {
+        if !self.handles_only && base == TEMPORARY {
             return self.unused(format!("{base}v"));
         }
         let mut number = self.next_suffixes.get(&base).copied().unwrap_or(2);
         let mut candidate = format!("{base}{number}");
-        while reserved(&candidate) || self.taken.contains(&candidate) {
+        while self.reserved(&candidate) || self.taken.contains(&candidate) {
             number += 1;
             candidate = format!("{base}{number}");
         }
@@ -180,6 +230,41 @@ impl Identifiers {
         self.taken.insert(candidate.clone());
         candidate
     }
+}
+
+/// The object of a view of the spec read from `origin`: its file name without
+/// the extension, in upper camel case, as Kotlin's coding conventions want an
+/// object's name. A name that a view's types take gets a number.
+pub(super) fn view_object(origin: &str) -> String {
+    let object = upper_camel_case(&file_stem(origin));
+    if !VIEW_TYPES.contains(&object.as_str()) {
+        return object;
+    }
+    let mut number = 2;
+    while VIEW_TYPES.contains(&format!("{object}{number}").as_str()) {
+        number += 1;
+    }
+    format!("{object}{number}")
+}
+
+/// The file name of `origin` without its extension. A Windows path separates
+/// with a backslash, which `Path` sees only on Windows.
+fn file_stem(origin: &str) -> String {
+    let file = origin.rsplit(['/', '\\']).next().unwrap_or(origin);
+    match file.rsplit_once('.') {
+        Some((stem, _)) if !stem.is_empty() => stem.to_owned(),
+        _ => file.to_owned(),
+    }
+}
+
+/// `name` in upper camel case, with `Spec` before a name that would start with
+/// a digit or be empty.
+fn upper_camel_case(name: &str) -> String {
+    let lower = camel_case(name, "spec");
+    let mut letters = lower.chars();
+    letters.next().map_or_else(String::new, |first| {
+        first.to_ascii_uppercase().to_string() + letters.as_str()
+    })
 }
 
 /// `base` cut to `widest` characters.
@@ -246,5 +331,27 @@ mod tests {
         ];
         assert_eq!(names, ["e", "ev", "ev2", "ev3", "ev4"]);
         assert!(!names.iter().any(|name| reserved(name)), "{names:?}");
+    }
+
+    #[test]
+    fn handles_leave_only_keywords_and_factories_free() {
+        let mut identifiers = Identifiers::for_handles();
+        assert_eq!(identifiers.named(Role::Value, "e"), "e");
+        assert_eq!(identifiers.named(Role::Value, "e1"), "e1");
+        assert_eq!(identifiers.named(Role::Value, "record"), "record");
+        assert_eq!(identifiers.named(Role::Value, "val"), "val2");
+        assert_eq!(identifiers.named(Role::Value, "int0"), "int02");
+        assert_eq!(identifiers.named(Role::Value, "dynamic"), "dynamic2");
+    }
+
+    #[test]
+    fn objects_are_named_after_the_file() {
+        assert_eq!(view_object("formats/jobshop/jobshop.iris"), "Jobshop");
+        assert_eq!(view_object("C:\\specs\\dimacs-cnf.iris"), "DimacsCnf");
+        assert_eq!(view_object("<stdin>"), "Stdin");
+        assert_eq!(view_object("9.iris"), "Spec9");
+        assert_eq!(view_object(".iris"), "Iris");
+        assert_eq!(view_object("value.iris"), "Value2");
+        assert_eq!(view_object("long_array.iris"), "LongArray2");
     }
 }

@@ -1051,14 +1051,18 @@ absence. That is enough to generate the same handles a builder returns:
 - **`iris gen --lang L SPEC`** prints a module of declared handles, in the
   style of the Java section, for Rust, Python, C++, Java, Kotlin, or
   TypeScript. A name whose facts are not a single value type and depth
-  gets a dynamic handle. Rust, Python and C++ have printers so far. Rust
+  gets a dynamic handle. All but TypeScript have printers so far. Rust
   prints one `pub const` per entry, named like the entry, to use by path
   (`jobshop::n_jobs`). Python prints one module-level handle per entry,
   `machine = ib.declared("machine", ib.IntField[list[list[int]]])`, read as
   `data[jobshop.machine]`; a declared handle reads data, but no builder
   accepts it. C++ prints a header of `inline constexpr` handles in a
   namespace named after the spec's file, read as
-  `data.get(jobshop::machine)`. A name redefined with another value type, a
+  `data.get(jobshop::machine)`. Java prints a class of `public static
+  final` handles named after the spec's file, read as
+  `data.get(Jobshop.machine)`, and Kotlin an object of the same handles,
+  read as `data[Jobshop.machine]`; above depth 3 their handles read a
+  `Value`. A name redefined with another value type, a
   depth that varies, and a parameter without a default are all dynamic, and
   so is a depth above 8 in Rust and Python; C++ templates take any depth. A name is `Maybe` when it is not always in the output,
   as in the builder. `repeat 0 {if 0 {x:int}}` runs no definition of `x`, but
@@ -1078,7 +1082,9 @@ absence. That is enough to generate the same handles a builder returns:
   ```
 - **In Java, an annotation processor** does the same at compile time.
   `@IrisSpec("jobshop.iris")` on a class generates its handle constants
-  and a matching record.
+  and a matching record. `dev.gecode:iris-processor` is that processor; its
+  handles are those of `iris gen --lang java`, beside the parsed spec and a
+  record reader.
 - **Deserialization** into user types is the third route: serde in Rust and
   kotlinx.serialization in Kotlin, both planned, and records in Java (see
   the Java section). Rust and Kotlin check shapes when they read. Java
@@ -1122,9 +1128,11 @@ Each implementation's builder is tested in four ways:
 2. **Idiomatic format builders.** Each format in `formats/` gets a
    hand-written builder in every language. These are the site's examples.
    Their tests read the format's cases and compare the data with the
-   expected results. Rust, Python and C++ have them so far; the C++ ones are
-   headers in `cpp/examples`, which the CTest test `format-builders` runs
-   on every format case.
+   expected results. Rust, Python, C++, Java and Kotlin have them so far;
+   the C++ ones are headers in `cpp/examples`, which the CTest test
+   `format-builders` runs on every format case, and the Java and Kotlin
+   ones are in `java/iris-examples`, whose `FormatBuildersTest` does the
+   same inside `./gradlew build`.
 3. **Type tests.** Accesses must have the expected types, and misuse must
    fail to compile: Rust `trybuild`, TypeScript `@ts-expect-error` with
    a local type-equality helper, Python `assert_type` under pyright and mypy, C++

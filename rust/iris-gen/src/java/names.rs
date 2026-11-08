@@ -103,6 +103,49 @@ fn reserved(name: &str) -> bool {
     KEYWORDS.contains(&name) || PROGRAM_NAMES.contains(&name) || is_numbered(name)
 }
 
+/// The names that a view's handles leave free: the members that the annotation
+/// processor adds beside them, `spec` and `reader`, the names that a record
+/// component may not have, since the processor's record takes the handles'
+/// identifiers, and `java`, which would hide the package of the qualified
+/// names that the processor's class uses in expressions. `iris gen --lang
+/// java` and the processor give a spec the same identifiers.
+const VIEW_NAMES: &[&str] = &[
+    "clone",
+    "finalize",
+    "getClass",
+    "hashCode",
+    "java",
+    "notify",
+    "notifyAll",
+    "reader",
+    "spec",
+    "toString",
+    "wait",
+];
+
+/// Whether a view may not use `name` for a handle.
+fn reserved_in_view(name: &str) -> bool {
+    KEYWORDS.contains(&name) || VIEW_NAMES.contains(&name)
+}
+
+/// The simple names of the types that a view names, which its class may not
+/// take: `java.lang`'s value types, and the imported ones.
+const VIEW_TYPES: &[&str] = &[
+    "Double",
+    "DynField",
+    "FloatField",
+    "IntField",
+    "List",
+    "Long",
+    "Nullable",
+    "NumField",
+    "Number",
+    "Object",
+    "String",
+    "StringField",
+    "Value",
+];
+
 /// The widest identifier of a value, record or type before any suffix. A
 /// longer name stays whole in the string that the builder prints.
 const WIDEST_NAME: usize = 24;
@@ -163,6 +206,9 @@ fn camel_case(name: &str, fallback: &str) -> String {
 /// Gives every name a Java identifier that nothing else has.
 #[derive(Debug, Default)]
 pub(super) struct Identifiers {
+    /// Whether the identifiers name a view's handles, which need no temporaries
+    /// and leave the names of [`VIEW_NAMES`] free.
+    handles_only: bool,
     taken: HashSet<String>,
     /// The first suffix of each base that `unused` has not tried.
     next_suffixes: HashMap<String, usize>,
@@ -170,6 +216,22 @@ pub(super) struct Identifiers {
 }
 
 impl Identifiers {
+    /// Identifiers for the handles of a view.
+    pub(super) fn for_handles() -> Self {
+        Self {
+            handles_only: true,
+            ..Self::default()
+        }
+    }
+
+    fn reserved(&self, name: &str) -> bool {
+        if self.handles_only {
+            reserved_in_view(name)
+        } else {
+            reserved(name)
+        }
+    }
+
     /// The identifier of `name`, the same one each time.
     pub(super) fn named(&mut self, role: Role, name: &str) -> String {
         if let Some(identifier) = self.assigned.get(&(role, name.to_owned())) {
@@ -197,22 +259,22 @@ impl Identifiers {
     fn unused(&mut self, base: String) -> String {
         // Every name of the form `e1`, `e12` is a temporary's, so no suffix
         // frees one.
-        let base = if is_numbered(&base) {
+        let base = if !self.handles_only && is_numbered(&base) {
             format!("{base}v")
         } else {
             base
         };
-        if !reserved(&base) && !self.taken.contains(&base) {
+        if !self.reserved(&base) && !self.taken.contains(&base) {
             self.taken.insert(base.clone());
             return base;
         }
         // Every suffix of `e` makes a temporary's name.
-        if base == TEMPORARY {
+        if !self.handles_only && base == TEMPORARY {
             return self.unused(format!("{base}v"));
         }
         let mut number = self.next_suffixes.get(&base).copied().unwrap_or(2);
         let mut candidate = format!("{base}{number}");
-        while reserved(&candidate) || self.taken.contains(&candidate) {
+        while self.reserved(&candidate) || self.taken.contains(&candidate) {
             number += 1;
             candidate = format!("{base}{number}");
         }
@@ -220,6 +282,41 @@ impl Identifiers {
         self.taken.insert(candidate.clone());
         candidate
     }
+}
+
+/// The class of a view of the spec read from `origin`: its file name without
+/// the extension, in upper camel case, as the Google Java style wants a class
+/// name. A name that a view's types take gets a number.
+pub(super) fn view_class(origin: &str) -> String {
+    let class = upper_camel_case(&file_stem(origin));
+    if !VIEW_TYPES.contains(&class.as_str()) {
+        return class;
+    }
+    let mut number = 2;
+    while VIEW_TYPES.contains(&format!("{class}{number}").as_str()) {
+        number += 1;
+    }
+    format!("{class}{number}")
+}
+
+/// The file name of `origin` without its extension. A Windows path separates
+/// with `\`, which `Path` sees only on Windows.
+fn file_stem(origin: &str) -> String {
+    let file = origin.rsplit(['/', '\\']).next().unwrap_or(origin);
+    match file.rsplit_once('.') {
+        Some((stem, _)) if !stem.is_empty() => stem.to_owned(),
+        _ => file.to_owned(),
+    }
+}
+
+/// `name` in upper camel case, with `Spec` before a name that would start with
+/// a digit or be empty.
+fn upper_camel_case(name: &str) -> String {
+    let lower = camel_case(name, "spec");
+    let mut letters = lower.chars();
+    letters.next().map_or_else(String::new, |first| {
+        first.to_ascii_uppercase().to_string() + letters.as_str()
+    })
 }
 
 /// `base` cut to `widest` characters.
@@ -285,5 +382,30 @@ mod tests {
         ];
         assert_eq!(names, ["e", "ev", "ev2", "ev3", "ev4"]);
         assert!(!names.iter().any(|name| reserved(name)), "{names:?}");
+    }
+
+    #[test]
+    fn handles_leave_keywords_and_the_processor_members_free() {
+        let mut identifiers = Identifiers::for_handles();
+        assert_eq!(identifiers.named(Role::Value, "e"), "e");
+        assert_eq!(identifiers.named(Role::Value, "e1"), "e1");
+        assert_eq!(identifiers.named(Role::Value, "args"), "args");
+        assert_eq!(identifiers.named(Role::Value, "var"), "var2");
+        assert_eq!(identifiers.named(Role::Value, "spec"), "spec2");
+        assert_eq!(identifiers.named(Role::Value, "reader"), "reader2");
+        assert_eq!(identifiers.named(Role::Value, "java"), "java2");
+        assert_eq!(identifiers.named(Role::Value, "hash_code"), "hashCode2");
+        assert_eq!(identifiers.named(Role::Value, "hashCode"), "hashCode3");
+    }
+
+    #[test]
+    fn classes_are_named_after_the_file() {
+        assert_eq!(view_class("formats/jobshop/jobshop.iris"), "Jobshop");
+        assert_eq!(view_class("C:\\specs\\dimacs-cnf.iris"), "DimacsCnf");
+        assert_eq!(view_class("<stdin>"), "Stdin");
+        assert_eq!(view_class("9.iris"), "Spec9");
+        assert_eq!(view_class(".iris"), "Iris");
+        assert_eq!(view_class("value.iris"), "Value2");
+        assert_eq!(view_class("list"), "List2");
     }
 }

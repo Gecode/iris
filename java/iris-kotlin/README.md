@@ -95,7 +95,16 @@ and `.dynamic()` are the dynamic forms.
 [docs/builders.md](../../docs/builders.md#kotlin) has the full example.
 
 `iris gen builder --lang kotlin SPEC` prints a program that builds a text spec
-with this builder.
+with this builder, and `iris gen --lang kotlin SPEC` prints an object with a
+typed handle for each entry of a text spec, such as
+`public val machine: IntField<List<LongArray>> = int2("machine")`, read as
+`data[Jobshop.machine]`. The factories it calls, `int0` to `int3`, `intN`,
+`dynamic` and their kin, are in this package. `java/iris-views` compiles the
+objects of every format and reads each case through them.
+
+`java/iris-examples` has a builder for each format in `formats/`, in
+`src/main/kotlin/examples`, beside the Java ones; `FormatBuildersTest` reads
+every case of each format through them.
 
 The kotlinx.serialization decoder of §8.3 comes later.
 

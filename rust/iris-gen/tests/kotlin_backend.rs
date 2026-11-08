@@ -1,6 +1,6 @@
 //! The Kotlin text of each production, each identifier rule and each layout
 //! rule that the backend takes from ktfmt's kotlinlang style.
-use gecode_iris_gen::{Language, ViewError, builder_code, view_code};
+use gecode_iris_gen::{Language, builder_code, view_code};
 use gecode_iris_sema::analyze;
 use gecode_iris_syntax::{LanguageVersion, parse};
 
@@ -778,16 +778,13 @@ fn strings_are_ascii_with_their_templates_escaped() {
 }
 
 #[test]
-fn kotlin_has_builders_but_no_view_printer() {
-    assert!(!Language::Kotlin.has_view());
+fn kotlin_has_builders_and_a_view_printer() {
+    assert!(Language::Kotlin.has_view());
     assert_eq!(Language::Kotlin.name(), "kotlin");
     assert_eq!("kotlin".parse::<Language>(), Ok(Language::Kotlin));
     let parsed = parse(b"x: int\n", "test.iris", LanguageVersion::V0_1).unwrap();
     let analysis = analyze(&parsed);
-    assert!(matches!(
-        view_code(&parsed, &analysis, Language::Kotlin),
-        Err(ViewError::NoPrinter(Language::Kotlin))
-    ));
+    assert!(view_code(&parsed, &analysis, Language::Kotlin).is_ok());
 }
 
 /// detekt refuses a wildcard import and ktfmt removes an unused one, so the

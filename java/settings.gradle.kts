@@ -11,5 +11,7 @@ include(
     "iris-jmh",
     "iris-kotlin",
     "iris-kotlin-round-trip",
+    "iris-processor",
     "iris-round-trip",
+    "iris-views",
 )

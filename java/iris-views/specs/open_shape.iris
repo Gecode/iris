@@ -1,0 +1,7 @@
+n: int
+param p
+a[1]: int
+param q = a
+repeat n {
+  let r = a
+}

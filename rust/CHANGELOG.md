@@ -13,6 +13,9 @@
 
 ### Library
 
+- Add Java and Kotlin printers to `gecode_iris_gen::view_code`;
+  `Language::has_view` is true for Java and Kotlin, and false only for
+  TypeScript.
 - Add a C++ printer to `gecode_iris_gen::view_code`; `Language::has_view` is
   true for C++. `view_code` now takes the `Parse` beside the `Analysis`, since
   the C++ header's namespace is named after the spec's origin.
@@ -78,9 +81,17 @@
   namespace named after the spec's file, laid out as clang-format 22.1.8
   writes them. Every depth gets a typed handle.
 - Add `iris gen builder --lang java SPEC`, which prints a Java builder program.
-  `iris gen --lang java` says that Java has no view generator yet.
 - Add `iris gen builder --lang kotlin SPEC`, which prints a Kotlin builder
-  program. `iris gen --lang kotlin` says that Kotlin has no view generator yet.
+  program.
+- Add `iris gen --lang java SPEC`, which prints a Java class of
+  `public static final` handles of the types the Java spec builder returns,
+  named after the spec's file in upper camel case, without a package, laid out
+  as google-java-format writes it. Above depth 3 a handle reads a `Value`.
+  The types of `java.lang` are qualified, so that classes of the same name in
+  the user's package cannot take their place.
+- Add `iris gen --lang kotlin SPEC`, which prints a Kotlin object of the same
+  handles, laid out as ktfmt writes it in kotlinlang style. It imports the
+  standard library types it names, for the same reason.
 - Add `iris gen builder --lang typescript SPEC`, which prints a TypeScript
   builder program. `iris gen --lang typescript` says that TypeScript has no
   view generator yet.

@@ -16,8 +16,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/** Answers one request of the driver protocol in {@code conformance/README.md}. */
-final class Driver {
+/**
+ * Answers one request of the driver protocol in {@code conformance/README.md}.
+ *
+ * <p>A driver that answers with a spec of its own, such as one that a builder builds, passes a
+ * {@link SpecLoader} in place of the one that parses the request's spec file.
+ */
+public final class Driver {
   private static final int LANGUAGE_ERROR = 1;
   private static final int MISUSE = 2;
   private static final int HOST_FAILURE = 3;
@@ -31,8 +36,24 @@ final class Driver {
    * @return the exit status of the protocol
    */
   static int run(String[] args, OutputStream out, PrintStream err) {
+    return run(args, out, err, path -> Spec.parse(readFile(path), path));
+  }
+
+  /**
+   * Runs the request {@code args} with the spec that {@code loader} gives for the request's spec
+   * path, writing a document to {@code out} and diagnostics to {@code err}. An {@link
+   * IrisException} from the loader answers as a language error, and an {@link IOException} as a
+   * host failure.
+   *
+   * @param args the driver command and its arguments
+   * @param out where the document goes
+   * @param err where diagnostics go
+   * @param loader gives the spec for the request's spec path
+   * @return the exit status of the protocol
+   */
+  public static int run(String[] args, OutputStream out, PrintStream err, SpecLoader loader) {
     try {
-      Response response = respond(Request.of(args));
+      Response response = respond(Request.of(args), loader);
       out.write(response.document().getBytes(UTF_8));
       out.flush();
       return response.status();
@@ -64,10 +85,9 @@ final class Driver {
   /** A document for standard output, with the exit status of the request. */
   private record Response(String document, int status) {}
 
-  private static Response respond(Request request) throws IOException {
-    byte[] source = readFile(request.spec());
+  private static Response respond(Request request, SpecLoader loader) throws IOException {
     try {
-      Spec spec = Spec.parse(source, request.spec());
+      Spec spec = loader.load(request.spec());
       return switch (request.operation()) {
         case PARSE -> new Response(Json.PARSED, 0);
         case READ -> new Response(read(spec, request).toJson(), 0);

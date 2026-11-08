@@ -16,6 +16,7 @@ mod imports;
 mod layout;
 mod names;
 mod types;
+pub(crate) mod view;
 
 use std::collections::BTreeSet;
 

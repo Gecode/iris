@@ -39,6 +39,10 @@ const javaRequired = {
     'numeric-expr', 'over', 'part', 'pattern', 'range', 'real', 'record-expr', 'record-list', 'record-name', 'section-clause', 'str', 'string-expr',
     'string-field', 'string-type', 'textual-expr', 'track-caller', 'type', 'until',
   ].map(name => [`build/${name}`, []])),
+  // The annotation processor of dev.gecode:iris-processor.
+  processor: [],
+  'processor/iris-spec': ['value'],
+  'processor/iris-spec-processor': ['ROOT_OPTION', 'process(Set, RoundEnvironment)'],
 };
 const kotlinRequired = ['get', 'to-int-array', 'to-long-array', 'to-double-array', 'as-sequence', 'leaves', 'to-params'];
 
@@ -55,12 +59,12 @@ for (const page of java.pages) {
 }
 
 const linksTo = href => node => node.tagName === 'a' && attrs(node).href?.startsWith(href);
-checkReachable(java, 'using/java/api', Object.keys(javaRequired));
+checkReachable(java, 'using/java/api', Object.keys(javaRequired), ['', 'processor']);
 checkIndex(kotlin, 'using/java/kotlin-api', kotlinRequired);
 const extensions = parseFragment(kotlin.pages.find(page => page.slug === 'get').html);
 ok(descendants(extensions).some(linksTo('/using/java/api/value/')), 'using/java/kotlin-api/get: Value does not link the Java reference');
 const guide = parse(await readFile(new URL('using/java/index.html', buildDirectory), 'utf8'));
-for (const href of ['/using/java/api/', '/using/java/kotlin-api/']) ok(descendants(guide).some(linksTo(href)), `using/java: missing the link to ${href}`);
+for (const href of ['/using/java/api/', '/using/java/api/processor/', '/using/java/kotlin-api/']) ok(descendants(guide).some(linksTo(href)), `using/java: missing the link to ${href}`);
 console.log(`Java API reference: ${java.pages.length} pages and ${members} members agree with Javadoc ${java.javadoc} output; ${kotlin.pages.length} Kotlin pages agree with Dokka ${kotlin.dokka} output.`);
 
 async function checkPages(name, path, marker, slugs) {
@@ -78,10 +82,11 @@ async function checkPages(name, path, marker, slugs) {
   return reference;
 }
 
-// Every page can be found from the index through the links of published pages.
-function checkReachable(reference, path, slugs) {
+// Every page can be found from a root, an index that the guide links, through
+// the links of published pages.
+function checkReachable(reference, path, slugs, roots) {
   const pages = new Map(reference.pages.map(page => [page.slug, page]));
-  const reached = new Set(['']);
+  const reached = new Set(roots);
   for (const slug of reached) {
     for (const node of descendants(parseFragment(pages.get(slug).html)).filter(linksTo(`/${path}/`))) {
       reached.add(attrs(node).href.slice(`/${path}/`.length).replace(/\/?(?:#.*)?$/, ''));

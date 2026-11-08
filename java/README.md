@@ -1,8 +1,9 @@
 # java
 
-The pure-Java library `dev.gecode:iris` (Java 27, module `dev.gecode.iris`)
-and the Kotlin extensions module `dev.gecode:iris-kotlin`. `PLAN.md` §8.3
-describes both; milestone M4d builds them.
+The pure-Java library `dev.gecode:iris` (Java 27, module `dev.gecode.iris`),
+the Kotlin extensions module `dev.gecode:iris-kotlin`, and the annotation
+processor `dev.gecode:iris-processor`. `PLAN.md` §8.3 describes them; milestone
+M4d builds them.
 
 The library parses reader specs, applies every parse-time check of the
 Specification, reads input into columnar data under the work budgets of chapter
@@ -118,6 +119,19 @@ Shop shop = reader.read(Path.of("ft06.txt"));
 The value type, depth and optionality of each entry come from a port of
 `gecode-iris-sema`'s output entries in `dev.gecode.iris.internal.syntax`.
 
+## Typed handles for a text spec
+
+`iris gen --lang java SPEC` prints a class with a typed handle for each entry
+of a text spec, named after its file: `public static final IntField<List<long[]>>
+machine = int2("machine");` for the jobshop format's `Jobshop`, read as
+`data.get(Jobshop.machine)`. `iris gen --lang kotlin SPEC` prints an object of
+the same handles. The annotation processor `dev.gecode:iris-processor` writes
+the same handles while javac compiles: `@IrisSpec("jobshop.iris")` on a
+top-level type `Jobshop` gives `JobshopHandles`, with the parsed spec, the
+handles and a record reader, and the record `JobshopData`.
+[Its README](iris-processor/README.md) shows the Gradle setup. Neither adds a
+dependency to `dev.gecode:iris`.
+
 ## Using it from another project
 
 `dev.gecode:iris` and `dev.gecode:iris-kotlin` are not on Maven Central yet. To
@@ -192,12 +206,14 @@ and the site check compares them with this file, so change both together.
 |---|---|
 | `iris/` | The library. `dev.gecode.iris` and the spec builder `dev.gecode.iris.build` are exported; `dev.gecode.iris.internal.syntax` holds the lexer, parser, resolver and output entries, and `dev.gecode.iris.internal.read` the reader. |
 | `iris-driver/` | The conformance driver, which is not published. It implements `parse`, `read`, `catalog` (`--format json|dzn`) and `dzn`. The JVM decodes arguments in the locale's encoding before `main` runs, so outside a UTF-8 locale the driver answers exit status 3 for non-ASCII `--params` instead of reading changed values; JSON escapes work in any locale. [Windows](#windows) has a narrower guarantee. |
-| `iris-examples/` | The examples of the site's [Java and Kotlin guide](../site/src/content/docs/using/java.mdx), which are not published: sources in `src/main/java/examples` and `src/main/kotlin/examples`, each with its recorded `.out` beside it. |
+| `iris-examples/` | The examples of the site's [Java and Kotlin guide](../site/src/content/docs/using/java.mdx), which are not published: sources in `src/main/java/examples` and `src/main/kotlin/examples`, each with its recorded `.out` beside it, among them a Java and a Kotlin builder for each format in `formats/`, and the `iris gen` commands of the views as `view.sh`. |
+| `iris-processor/` | The annotation processor `dev.gecode:iris-processor`, which writes the handles of `iris gen --lang java`, the parsed spec and a record for `@IrisSpec`. It has no module descriptor, since it reads the library's internal syntax packages. |
+| `iris-views/` | The tests of the views, which are not published: the views that `iris gen --lang java` and `--lang kotlin` print for every format and the specs in `specs/`, generated into the build, and the classes iris-processor writes for the same specs. |
 | `iris-round-trip/` | The runner of the Java builder round trip, which is not published. Its `roundTrip` task copies the builder programs that `iris gen builder --lang java` printed into the build, checks them with Spotless, compiles them with the runner and records what each prints; without `-PirisRoundTripSources` the module holds only the runner. |
 | `iris-kotlin-round-trip/` | The runner of the Kotlin builder round trip, which is not published. Its `roundTrip` task does for the programs of `iris gen builder --lang kotlin` what the Java one does, with ktfmt, detekt and kotlinc. |
 | `iris-jmh/` | The JMH benchmarks, which are not published. Nothing else depends on this module, so JMH stays out of `dev.gecode:iris`. |
 | `iris-kotlin/` | The Kotlin extensions, in the exported package `dev.gecode.iris.kotlin` of the module of that name, and the Kotlin spec builder in `dev.gecode.iris.kotlin.build`. |
-| `build-logic/` | The convention plugins `iris.java-conventions`, shared by the modules, `iris.kotlin-conventions`, `iris.kotlin-docs` for Dokka, and `iris.published` for the two published modules. |
+| `build-logic/` | The convention plugins `iris.java-conventions`, shared by the modules, `iris.kotlin-conventions`, `iris.kotlin-docs` for Dokka, and `iris.published` for the three published modules. |
 | `gradle/libs.versions.toml` | The pinned versions. |
 | `detekt.yml` | The detekt configuration: what differs from the default rules. |
 
@@ -235,6 +251,9 @@ fails rather than skips without `cargo`.
 ./gradlew :iris:javadoc  # the API reference, in iris/build/docs/javadoc
 ./gradlew :iris-kotlin:dokkaGenerate  # the Kotlin API reference, in iris-kotlin/build/dokka/html
 ./gradlew :iris-examples:test  # run the guide's examples and compare their output
+./gradlew :iris-examples:test --tests examples.FormatBuildersTest  # every format case, both builders
+./gradlew :iris-processor:build  # the annotation processor, its tests and its javadoc
+./gradlew :iris-views:test  # read every case through the generated views
 ./gradlew :iris:test --tests dev.gecode.iris.BudgetLimitsTest
 ./gradlew :iris:test --tests 'dev.gecode.iris.build.*'  # the spec builder
 ./gradlew :iris:test --tests dev.gecode.iris.FloatDifferentialTest
@@ -290,6 +309,32 @@ entry in `site/scripts/java-examples.mjs`: the site check fails on a file the
 guide does not show. `iris-examples` has the same compiler, Error Prone, NullAway,
 Spotless, ktfmt and detekt checks as the library, except for Kotlin's explicit
 API mode, which a program does not need.
+
+`FormatBuildersTest` runs the conformance runner on each directory of `formats/`
+with `FormatBuilderDriver`, the driver of `iris-driver` with a `SpecLoader` that
+answers the format's spec path with the spec of its builder, once with the Java
+builder and once with the Kotlin one. Every case must pass, its errors included,
+and it prints the counts per format and language. It builds the Rust runner with
+Cargo, as the conformance test does.
+
+`iris-views` runs `iris gen --lang java` and `--lang kotlin`, built with Cargo,
+on every format, on the specs in `iris-views/specs` and on a sweep of
+declaration widths, adds a package line, and compiles the output with the
+build's checks: Error Prone, NullAway, detekt with the exceptions in
+`iris-views/detekt.yml`, google-java-format and ktfmt. Each spec also has a
+type annotated with `@IrisSpec` in `dev.gecode.iris.views.processed`, so the
+same compilation runs iris-processor. The Java views go in
+`dev.gecode.iris.views.java` and the Kotlin views in
+`dev.gecode.iris.views.kotlin`; those packages and the processor's declare
+classes named after the platform types that the generated code uses, such as
+`Long`, `String` and `List`, so the compilation fails if generated code
+resolves a type to a class of its package. `ViewsTest` pins every handle's type
+against the library's output entries, checks that the processor's handles have
+the CLI view's identifiers and types, and reads each format case with data and
+the input beside each spec through the Java view, the Kotlin view, the
+processor's handles and its record, comparing every entry with untyped access.
+It prints the counts of views, handles, reads and values. The processor's own
+tests compile annotated sources in process with javac and check its errors.
 
 `./gradlew conformance` selects every case in `conformance/cases/0.1` and
 `formats`, runs them with the installed driver's classes through the Rust runner, and

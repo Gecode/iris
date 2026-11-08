@@ -226,37 +226,25 @@ fn the_cpp_jobshop_view_matches_its_recording() {
 }
 
 #[test]
-fn java_has_no_view_generator_yet() {
-    let output = iris(&["gen", "--lang", "java", "spec.iris"]);
-    assert_eq!(output.status.code(), Some(2));
-    assert_eq!(output.stdout, b"");
-    assert!(
-        stderr(&output).contains("java has no view generator yet"),
-        "{}",
-        stderr(&output)
-    );
-    assert!(
-        stderr(&output).contains("iris gen builder --lang java SPEC"),
-        "{}",
-        stderr(&output)
-    );
+fn the_java_jobshop_view_matches_its_recording() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let spec = root.join("../../formats/jobshop/jobshop.iris");
+    let output = iris(&["gen", "--lang", "java", spec.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    assert_eq!(stderr(&output), "");
+    let recording = fs::read_to_string(root.join("tests/fixtures/jobshop-view.java")).unwrap();
+    assert_eq!(String::from_utf8(output.stdout).unwrap(), recording);
 }
 
 #[test]
-fn kotlin_has_no_view_generator_yet() {
-    let output = iris(&["gen", "--lang", "kotlin", "spec.iris"]);
-    assert_eq!(output.status.code(), Some(2));
-    assert_eq!(output.stdout, b"");
-    assert!(
-        stderr(&output).contains("kotlin has no view generator yet"),
-        "{}",
-        stderr(&output)
-    );
-    assert!(
-        stderr(&output).contains("iris gen builder --lang kotlin SPEC"),
-        "{}",
-        stderr(&output)
-    );
+fn the_kotlin_jobshop_view_matches_its_recording() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let spec = root.join("../../formats/jobshop/jobshop.iris");
+    let output = iris(&["gen", "--lang", "kotlin", spec.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    assert_eq!(stderr(&output), "");
+    let recording = fs::read_to_string(root.join("tests/fixtures/jobshop-view.kt")).unwrap();
+    assert_eq!(String::from_utf8(output.stdout).unwrap(), recording);
 }
 
 #[test]
@@ -282,7 +270,7 @@ fn an_unknown_view_language_names_only_languages_with_views() {
     assert_eq!(output.status.code(), Some(2));
     let message = stderr(&output);
     assert!(
-        message.contains("[possible values: rust, python, cpp]"),
+        message.contains("[possible values: rust, python, cpp, java, kotlin]"),
         "{message}"
     );
 }

@@ -1,0 +1,4 @@
+3 nodes
+node 0: open 0..20, distances [0, 2, 4]
+node 1: open 2..8, distances [3, 0, 2]
+node 2: open 5..12, distances [4, 3, 0]

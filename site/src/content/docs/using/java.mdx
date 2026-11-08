@@ -159,3 +159,171 @@ throws.
 `IrisError` is sealed in Kotlin as well, so a `when` over it needs no `else`:
 
 <CheckedExample id="kotlin-Errors" title="Errors.kt" />
+
+## Build a reader spec
+
+`dev.gecode.iris.build` writes a reader spec from Java. A handle names an entry
+with its value type and depth: `int0("n_jobs")` is an `IntField<Long>` and
+`int2("machine")` an `IntField<List<long[]>>`. Statements use the handles, and
+after a read `data.get(handle)` returns the entry as the handle's type. A
+builder adds no features of its own: `spec(...)` prints Iris text and parses it
+as `Spec.parse` does, so the language's checks decide what is valid, and
+`builder(...).source()` returns the text.
+
+The builders below are in
+[`java/iris-examples`](https://github.com/Gecode/iris/tree/main/java/iris-examples),
+one for each format in the [format library](/formats/), in Java and in Kotlin,
+each with a program that reads a case. A test reads every case of each format
+through both builders and compares the data or the error with the case's
+expected results, and the example tests run each program and compare its output
+with the output shown here.
+
+### The job shop builder
+
+This builder writes the [job shop](/formats/job-shop/) reader spec, and its
+program reads an instance selected by name, then the same entries into a
+record, then a file whose check fails:
+
+<CheckedExample id="java-BuildJobshop" title="BuildJobshop.java" />
+
+The handles are constants, and `spec` is a constant built from them. With
+`import static dev.gecode.iris.build.Iris.*`, the statements read like the
+spec: blocks take a lambda, and the statements it makes go into the block, so
+`instances`, `sections`, `arm` and `repeat` nest as their Iris blocks do.
+`capture(nJobs, atLeast(1))` puts a field into a pattern, and
+`range(0).below(nMachines)` is Iris `0..<n_machines`. Methods such as `le`,
+`minus` and `div` build expressions, and `Gecode.intMax` is Gecode's largest
+integer.
+
+`recordName("job", "jobs")` names each record of a repeat and the list of
+records, as in `repeat n_jobs as jobs` with `each job`, for error messages and
+comprehensions: `job.get(machine)` looks up a field of each record, and
+`sum(job, j -> ...)` writes a comprehension over them.
+
+### Typed data and records
+
+`data.get` returns what the handle's type says: a `Long` for `nJobs`, a
+nullable `String` for `name`, which only some files give, and a `List<long[]>`
+for `machine` and `duration`, with a `long[]` for each job. A lookup checks the
+entry's value type, depth and presence, and throws `IllegalStateException` if
+they differ from the handle's.
+
+`spec.reader(Shop.class, MethodHandles.lookup())` reads the same entries into a
+record. Each component names its entry, or takes the name from `@Entry`, and
+its type decides the value as a handle's does; a `long` component reads a
+required integer. `reader` checks the components against the spec's entries,
+and throws `IllegalArgumentException` for one that names no entry or does not
+fit its entry, so a read can fail only as `spec.read` does.
+
+### Errors name your code
+
+A builder records where each statement was made. When a check fails while
+reading, the error has the input location, and `error.callSite()` names the
+line of the check in `BuildJobshop.java`, in your code rather than in the
+library. A `BuildException` from `spec(...)` has the same call site. A statement
+made in a helper method records the line in the helper.
+
+### A helper used twice
+
+A method that makes statements is a reusable piece of a reader spec. The
+nonogram builder reads the clues of the rows and of the columns with one helper,
+`clueLines`, and builds two pairs of checks with two expression helpers:
+
+<CheckedExample id="java-BuildNonogram" title="BuildNonogram.java" />
+
+A builder rejects a second definition of a name, so a helper called twice by
+mistake fails `spec(...)` instead of quietly replacing an entry. That is why
+`clueLines` takes its handle from its caller. The TSPLIB builder below uses the
+same idea for its two coordinate sections.
+
+### The other formats
+
+<CheckedExample id="java-BuildDimacsCnf" title="BuildDimacsCnf.java" />
+
+<CheckedExample id="java-BuildSudoku" title="BuildSudoku.java" />
+
+`defineType` gives a named type, used here for both ends of a time window:
+
+<CheckedExample id="java-BuildTsptw" title="BuildTsptw.java" />
+
+A TSPLIB file gives either a distance matrix or coordinates. `set` gives an
+optional entry a default while keeping its handle's type, `ifThen` and
+`otherwise` take the checks that apply to each kind of file, and `oneOf` is an
+ordinary method that builds an expression:
+
+<CheckedExample id="java-BuildTsplib" title="BuildTsplib.java" />
+
+### In Kotlin
+
+`dev.gecode.iris.kotlin.build` gives the builder Kotlin's syntax: blocks are
+trailing lambdas, infix functions such as `le` and operators such as `-` and
+`/` build expressions, and a
+property delegate such as `val nJobs by capture(atLeast(1), name = "n_jobs")`
+defines an entry and its handle at once. `irisSpec` returns the spec with what
+its lambda returns, here a class of handles, and the pair destructures as
+`val (spec, shop) = jobshop`. `data[shop.machine]` calls the Java `get` as an
+operator, and the Java types become Kotlin's: `List<LongArray>` for `machine`
+and `String?` for `name`.
+
+<CheckedExample id="kotlin-BuildJobshop" title="BuildJobshop.kt" />
+
+<CheckedExample id="kotlin-BuildNonogram" title="BuildNonogram.kt" />
+
+<CheckedExample id="kotlin-BuildDimacsCnf" title="BuildDimacsCnf.kt" />
+
+<CheckedExample id="kotlin-BuildSudoku" title="BuildSudoku.kt" />
+
+<CheckedExample id="kotlin-BuildTsptw" title="BuildTsptw.kt" />
+
+<CheckedExample id="kotlin-BuildTsplib" title="BuildTsplib.kt" />
+
+### Typed handles for a text spec
+
+A reader spec written as an `.iris` file has no builder, but `iris gen --lang
+java SPEC` prints a class with a typed handle for each of its entries, named
+after the spec's file:
+
+<CheckedExample id="java-view" />
+
+Save it in your package, such as `Jobshop.java` with a `package` line after the
+first comment, and read data with `data.get(Jobshop.machine)` as with a
+builder's handles. An entry whose value type or depth differs between the places
+that define it gets a `DynField`, which returns a `Value`, and an entry deeper
+than three levels returns a `Value` too. The class qualifies the types of
+`java.lang`, such as `java.lang.Long`, so that a class named `Long` or `String`
+in your package cannot take their place. `iris gen --lang kotlin SPEC` prints an
+object of the same handles for Kotlin, which imports the standard library's
+types for the same reason:
+
+<CheckedExample id="kotlin-view" />
+
+### Handles at compile time
+
+The annotation processor `dev.gecode:iris-processor` writes the same handles
+while javac compiles, so they follow the `.iris` file without a step of their
+own. It is needed only to compile:
+
+<CheckedExample id="java-processor-gradle" title="build.gradle.kts" />
+
+`-Airis.root` names the directory that relative paths start from; without it,
+a path starts at the directory of the annotated source file. Declaring the
+specs as inputs, here a directory `specs`, recompiles when one changes. The
+processor leaves the annotation unclaimed, so a build with `-Xlint:all
+-Werror` adds `-Xlint:-processing`. In Maven, the processor goes in the
+compiler plugin's `annotationProcessorPaths`.
+
+On a top-level type annotated with `@IrisSpec`, the processor checks the spec
+and writes two classes beside the type: `JobshopHandles`, with the parsed spec
+as `spec`, the handles that `iris gen --lang java` prints, and a record reader
+as `reader`, and `JobshopData`, the record that `reader` reads. An invalid spec
+fails the compilation with the diagnostic at the annotation. A spec whose
+entries take more than 253 parameter slots in a record, where a `long` or
+`double` component takes two, gets the handles but no record or reader, since
+`RecordReader` could not call the record's constructor; the processor notes
+it.
+
+<CheckedExample id="java-Jobshop" title="Jobshop.java" />
+
+The [processor's reference](/using/java/api/processor/) lists the annotation and
+its options. The processor runs in javac, so Kotlin code uses the handles of an
+annotated Java type, or the object that `iris gen --lang kotlin` prints.

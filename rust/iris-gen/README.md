@@ -21,8 +21,8 @@ let code = builder_code(&parsed, &analysis, Language::Rust)?;
 A new language adds a `Language` variant, a backend module and one match arm in
 `builder_code`. There are backends for Rust, Python, C++, Java, Kotlin and
 TypeScript. `Language::has_view` says whether a language also has a view
-printer: Rust, Python and C++ have one, and Java, Kotlin and TypeScript have
-none yet.
+printer: Rust, Python, C++, Java and Kotlin have one, and TypeScript has none
+yet.
 
 ## The Rust backend
 
@@ -423,6 +423,30 @@ style of `cpp/.clang-format`; a literal too wide for every layout would make
 clang-format split it, so that declaration stays on one line between
 `// clang-format off` and `// clang-format on`.
 
+The Java printer writes a class named after the file name of the spec's origin
+in upper camel case, so `dimacs-cnf.iris` gives `DimacsCnf`, without a package
+line, which the user adds after the first comment. It declares one
+`public static final` handle per entry with the factories of
+`dev.gecode.iris.build.Iris`, such as
+`public static final IntField<List<long[]>> machine = int2("machine");`, with
+`.optional()` and JSpecify's `@Nullable` for an entry that may be absent. The
+factories type depths 0 to 3; above, `intN("v", 9)` and its kin read a `Value`.
+Identifiers follow the builder program's rules, including the 24-column cut,
+without its temporary names, and avoid the keywords, the members every class
+has, `spec` and `reader`, which iris-processor adds to its handles class, and
+`java`, which would hide the package of the qualified names in that class. A
+declaration takes the layout google-java-format gives it. The types of
+`java.lang` are qualified, as in `IntField<java.lang.Long>`, so that a class
+of the same simple name in the user's package cannot take their place;
+google-java-format would remove an import of them. The Kotlin printer writes an
+`object` of the same handles, such as
+`public val machine: IntField<List<LongArray>> = int2("machine")`, with the
+factories of `dev.gecode.iris.kotlin.build`, Kotlin's names for its keywords and
+those factories, and the layouts ktfmt gives in kotlinlang style. It imports
+the standard library's types that it names, such as `kotlin.Long`, since a
+class of the same name in the user's package would take the place of a default
+import but not of an explicit one.
+
 `rust_view` gives the Rust declarations as data, a `RustView` of the imports
 from `gecode_iris::build` and one `RustHandle` per entry, with its identifier,
 type text and entry name. The printer writes it, and the `iris!` macro of
@@ -469,6 +493,18 @@ clang-format 22.1.8 the views must be what it writes, and with
 `IRIS_CLANG_TIDY` clang-tidy 22.1.8 must accept them. It prints `C++ views: V
 views, R reads, E entries compared`, and runs as the CTest test
 `generated-views` of `cpp/` with that build's compiler and flags.
+
+`tests/java_view.rs` and `tests/kotlin_view.rs` check the Java and Kotlin
+text of each handle type, the class or object name, the identifiers and the
+layouts. From `java/`, `./gradlew :iris-views:test` prints the views of every
+format and of specs that exercise redefinitions, parameters, absence, reserved
+names, a depth of 9 and line widths with the CLI, compiles them with the build's
+flags, Error Prone, NullAway, detekt, google-java-format and ktfmt, and compiles
+the classes iris-processor writes for the same specs. It pins every handle's type
+against the Java library's entries, checks that the processor's handles have
+the CLI's identifiers and types, and reads each format case and a case of each
+spec through the Java view, the Kotlin view, the processor's handles and its
+record, comparing every entry with untyped access. `./gradlew build` runs it.
 
 Both round trips print `compared C, skipped S, extra E, differences D`. They
 fail on any difference, when compared and skipped specs do not add up to the

@@ -7,8 +7,8 @@
 //!
 //! [`view`](view::view) turns a checked spec into a language-independent
 //! [`View`](view::View) of typed handles, and [`view_code`] prints it for a
-//! language whose [`Language::has_view`] is true: Rust, Python and C++. [`rust_view`] gives the
-//! Rust declarations that `view_code` prints as data, for the `iris!` macro.
+//! language whose [`Language::has_view`] is true: Rust, Python, C++, Java and
+//! Kotlin. [`rust_view`] gives the Rust declarations that `view_code` prints as data, for the `iris!` macro.
 mod cpp;
 mod java;
 mod kotlin;
@@ -67,8 +67,8 @@ impl Language {
     /// Whether [`view_code`] has a printer for the language.
     pub fn has_view(self) -> bool {
         match self {
-            Self::Rust | Self::Python | Self::Cpp => true,
-            Self::Java | Self::Kotlin | Self::TypeScript => false,
+            Self::Rust | Self::Python | Self::Cpp | Self::Java | Self::Kotlin => true,
+            Self::TypeScript => false,
         }
     }
 }
@@ -154,7 +154,9 @@ impl From<gecode_iris_sema::Error> for ViewError {
 ///
 /// A Rust or Python module takes its name from the file it is saved in. A C++
 /// header puts its handles in a namespace named after the spec's file, the
-/// origin of `parsed`: `formats/jobshop/jobshop.iris` gives `jobshop`.
+/// origin of `parsed`: `formats/jobshop/jobshop.iris` gives `jobshop`. A Java
+/// class and a Kotlin object take the same name in upper camel case,
+/// `Jobshop`, and have no package.
 pub fn view_code(
     parsed: &Parse,
     analysis: &Analysis,
@@ -164,9 +166,12 @@ pub fn view_code(
         Language::Rust => Ok(rust::view::render(&rust_view(analysis)?)),
         Language::Python => Ok(python::view::render(&view::view(analysis)?)),
         Language::Cpp => Ok(cpp::view::render(&view::view(analysis)?, parsed.origin())),
-        Language::Java | Language::Kotlin | Language::TypeScript => {
-            Err(ViewError::NoPrinter(language))
-        }
+        Language::Java => Ok(java::view::render(&view::view(analysis)?, parsed.origin())),
+        Language::Kotlin => Ok(kotlin::view::render(
+            &view::view(analysis)?,
+            parsed.origin(),
+        )),
+        Language::TypeScript => Err(ViewError::NoPrinter(language)),
     }
 }
 

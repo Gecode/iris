@@ -1,0 +1,11 @@
+# Exceptions for the generated views only, on top of java/detekt.yml. Each rule here measures the
+# spec rather than the printer, so a view could pass it only by leaving out entries.
+complexity:
+  # The width sweep's spec has hundreds of entries, and its object a property for each.
+  LargeClass:
+    excludes: ['**/build/generated/views/**']
+style:
+  # The width sweep's names reach 130 characters, so their string literals pass the line length,
+  # which ktfmt cannot break.
+  MaxLineLength:
+    excludes: ['**/build/generated/views/kotlin/dev/gecode/iris/views/kotlin/Widths.kt']

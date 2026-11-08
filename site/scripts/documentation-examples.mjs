@@ -81,7 +81,7 @@ export async function collectDocumentationExamples({ tools, formats, execute, co
   Object.assign(examples, await collectTypescriptExamples());
   Object.assign(examples, await collectRustExamples());
   Object.assign(examples, await collectCppExamples({ tools, execute }));
-  Object.assign(examples, await collectJavaExamples());
+  Object.assign(examples, await collectJavaExamples({ tools, execute }));
   return examples;
 
   async function addReadmeCommand(id, path, code) {

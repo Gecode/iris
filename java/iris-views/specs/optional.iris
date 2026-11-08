@@ -1,0 +1,7 @@
+x: int
+if x {
+  y: float
+  s[1]: word
+}
+u: num
+v[1]: num
