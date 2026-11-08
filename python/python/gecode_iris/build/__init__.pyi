@@ -215,6 +215,14 @@ class StrField(StrLookup, Field[_T_co]):
 class DynField(DynExpr, Field[Value | None]):
     """A handle whose value type or depth is open."""
 
+def declared(name: str, kind: type[_F]) -> _F:
+    """A handle for the entry ``name`` of a text spec, of the handle type
+    ``kind``, such as ``ib.IntField[list[int]]`` or ``ib.DynField``.
+
+    ``iris gen --lang python SPEC`` prints one per entry. The handle reads data
+    as a builder's handle does, but no builder accepts it, since it comes from
+    none."""
+
 @overload
 def lit(value: int) -> IntExpr: ...  # pyright: ignore[reportOverlappingOverload]
 @overload

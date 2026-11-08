@@ -1,6 +1,6 @@
 //! The Python text of each production, each identifier rule and each layout
 //! rule that the backend takes from `ruff format` and ruff's default lints.
-use gecode_iris_gen::{Language, ViewError, builder_code, view_code};
+use gecode_iris_gen::{Language, builder_code};
 use gecode_iris_sema::analyze;
 use gecode_iris_syntax::{LanguageVersion, parse};
 
@@ -642,16 +642,4 @@ fn strings_are_ascii() {
         ("comment \"\u{20ac}\"\n", &["b.comment(\"\\u20ac\")"]),
         ("comment \"say \\\"hi\\\"\"\n", &["b.comment('say \"hi\"')"]),
     ]);
-}
-
-#[test]
-fn python_has_no_view_printer() {
-    assert!(Language::Rust.has_view());
-    assert!(!Language::Python.has_view());
-    let parsed = parse(b"x: int\n", "test.iris", LanguageVersion::V0_1).unwrap();
-    let analysis = analyze(&parsed);
-    let error = view_code(&analysis, Language::Python).unwrap_err();
-    assert_eq!(error, ViewError::NoPrinter(Language::Python));
-    assert_eq!(error.to_string(), "python has no view generator yet");
-    assert!(view_code(&analysis, Language::Rust).is_ok());
 }

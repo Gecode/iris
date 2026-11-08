@@ -26,6 +26,7 @@ b.check(n % 2 == 0)  # error: Iris remainder is rem()
 b.repeat("n")  # error: the count is an int expression
 b.line([n])  # error: a pattern is a tuple, not a list
 b.forward("f", int)  # error: the kind is a field type
+ib.declared("f", int)  # error: the kind is a field type
 b.set(n, 1, 2)  # error: set takes one value
 b.sections(until="END", stop=True)  # error: no such keyword
 ib.div(1.5, 2)  # error: div() takes ints

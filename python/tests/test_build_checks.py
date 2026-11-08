@@ -98,6 +98,15 @@ def test_a_handle_from_another_builder_is_rejected() -> None:
     failure_of(lambda b: b.capture("x", named), "provenance")
 
 
+def test_a_declared_handle_reads_but_does_not_build() -> None:
+    x = ib.declared("x", ib.IntField[int])
+    failure_of(lambda b: b.let("y", x), "provenance")
+    with pytest.raises(TypeError, match="declared takes a handle type"):
+        ib.declared("x", cast(Any, int))
+    with pytest.raises(TypeError, match="does not match its value type"):
+        ib.declared("x", ib.IntField[str])
+
+
 def test_defining_a_name_twice_needs_the_handle() -> None:
     def twice(b: ib.SpecBuilder) -> None:
         b.read("x", ib.int_)

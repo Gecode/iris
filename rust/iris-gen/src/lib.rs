@@ -7,7 +7,7 @@
 //!
 //! [`view`](view::view) turns a checked spec into a language-independent
 //! [`View`](view::View) of typed handles, and [`view_code`] prints it for a
-//! language whose [`Language::has_view`] is true. [`rust_view`] gives the Rust
+//! language whose [`Language::has_view`] is true: Rust and Python. [`rust_view`] gives the Rust
 //! declarations that `view_code` prints as data, for the `iris!` macro.
 mod cpp;
 mod java;
@@ -67,8 +67,8 @@ impl Language {
     /// Whether [`view_code`] has a printer for the language.
     pub fn has_view(self) -> bool {
         match self {
-            Self::Rust => true,
-            Self::Python | Self::Cpp | Self::Java | Self::Kotlin | Self::TypeScript => false,
+            Self::Rust | Self::Python => true,
+            Self::Cpp | Self::Java | Self::Kotlin | Self::TypeScript => false,
         }
     }
 }
@@ -154,11 +154,10 @@ impl From<gecode_iris_sema::Error> for ViewError {
 pub fn view_code(analysis: &Analysis, language: Language) -> Result<String, ViewError> {
     match language {
         Language::Rust => Ok(rust::view::render(&rust_view(analysis)?)),
-        Language::Python
-        | Language::Cpp
-        | Language::Java
-        | Language::Kotlin
-        | Language::TypeScript => Err(ViewError::NoPrinter(language)),
+        Language::Python => Ok(python::view::render(&view::view(analysis)?)),
+        Language::Cpp | Language::Java | Language::Kotlin | Language::TypeScript => {
+            Err(ViewError::NoPrinter(language))
+        }
     }
 }
 

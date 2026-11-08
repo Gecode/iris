@@ -93,6 +93,7 @@ from gecode_iris.build._scope import (
     ScopeN,
     SectionsGuard,
     SpecBuilder,
+    declared,
 )
 from gecode_iris.build._site import track_caller
 from gecode_iris.build._types import (
@@ -174,6 +175,7 @@ __all__ = [
     "bind",
     "blank",
     "count",
+    "declared",
     "defined",
     "discard",
     "discard_as",

@@ -101,8 +101,9 @@ source and parses it again for each read, which takes microseconds.
 from Python code. It follows the [builder design brief](../docs/builders.md)
 and the Rust `gecode_iris::build` module statement for statement:
 `b.source()` returns the emitted text, and `b.build()` parses it into an
-ordinary `Spec`. [`examples/build_jobshop.py`](examples/build_jobshop.py)
-builds the job shop format of the format library and reads two of its cases.
+ordinary `Spec`. `examples/` holds a builder for each format of the format
+library, such as [`examples/build_jobshop.py`](examples/build_jobshop.py),
+which builds the job shop format and reads two of its cases.
 
 ```python
 import gecode_iris.build as ib
@@ -155,6 +156,20 @@ data[right]  # [2, 5], typed list[int]
 
 Type checkers read the handle types from the stub
 `python/gecode_iris/build/__init__.pyi`.
+
+A text spec gets the same handles from `iris gen --lang python SPEC`, which
+prints a module with one handle per entry, made by `ib.declared(name, handle
+type)`:
+
+```python
+machine = ib.declared("machine", ib.IntField[list[list[int]]])
+```
+
+`data[jobshop.machine]` then reads and types the entry as a builder's handle
+does. A declared handle comes from no builder, so no builder accepts it.
+`rust/gecode-iris`'s ignored `python_views` test checks the generated views of
+every format with ruff, ty, pyright and mypy, and reads each case through them;
+see [gecode-iris-gen](../rust/iris-gen/README.md#views) for its command.
 
 ## The `iris` command
 
@@ -344,6 +359,16 @@ The site renders each file with its recorded output, and its build fails when
 a file in `examples/` does not appear in the guide or a `.sh` recording
 differs from the Rust CLI. After changing an example, run it from the
 repository root and update its `.out` file.
+
+The `build_*.py` examples are the format builders, one per directory in
+`formats/`. `tests/test_format_builders.py` (part of pytest) runs the installed
+`iris conformance` on each format directory with
+`tests/format_builder_driver.py`, a conformance driver that answers with the
+spec the format's builder builds in place of the case's own. The runner judges
+every case as it judges any driver, so the builder must give each case's
+expected data or error with its parameters and operation, as the Rust test
+`rust/gecode-iris/tests/format_builders.rs` requires of the Rust builders.
+Run it alone with `uv run --no-sync pytest tests/test_format_builders.py`.
 
 ## API reference
 

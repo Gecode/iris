@@ -21,7 +21,8 @@ let code = builder_code(&parsed, &analysis, Language::Rust)?;
 A new language adds a `Language` variant, a backend module and one match arm in
 `builder_code`. There are backends for Rust, Python, C++, Java, Kotlin and
 TypeScript. `Language::has_view` says whether a language also has a view
-printer; Python, C++, Java, Kotlin and TypeScript have none yet.
+printer: Rust and Python have one, and C++, Java, Kotlin and TypeScript have
+none yet.
 
 ## The Rust backend
 
@@ -398,6 +399,18 @@ so an entry `spec` is `spec_2` in both. An identifier stops at 40 columns, which
 gives a declaration three layouts. A new language adds a printer, not a change
 to `View`.
 
+The Python printer writes a module that imports `gecode_iris.build as ib` and
+declares one handle per entry with `ib.declared(name, handle type)`, such as
+`machine = ib.declared("machine", ib.IntField[list[list[int]]])`, with
+`| None` inside the brackets for an entry that may be absent. It also maps a
+depth above 8 to `ib.DynField`, because the widest handle type one level deeper
+no longer fits on a line of its own. Identifiers follow the builder program's
+rules, including its reserved names and its 24-column cut, without a leading
+underscore, which would make a handle private to the module. A declaration has
+the three layouts `ruff format` gives a call of two arguments. The output
+passes `ruff format --check`, `ruff check` with B, I and UP, and ty, and its
+handles type-check under pyright and mypy.
+
 `rust_view` gives the Rust declarations as data, a `RustView` of the imports
 from `gecode_iris::build` and one `RustHandle` per entry, with its identifier,
 type text and entry name. The printer writes it, and the `iris!` macro of
@@ -411,6 +424,21 @@ cargo test --locked -p gecode-iris-gen
 cargo test --locked -p gecode-iris --test view_formats --test view_soundness -- --nocapture
 cargo test --locked -p gecode-iris --test builder_round_trip -- --nocapture
 ```
+
+`tests/python_view.rs` checks the Python text of each handle type, the
+identifiers and the layouts. With `IRIS_PYTHON` naming an interpreter with
+`gecode_iris` and its lint group installed, as for the Python round trip,
+
+```sh
+IRIS_PYTHON="$PWD/../python/.venv/bin/python" cargo test --locked -p gecode-iris --test python_views -- --ignored --nocapture
+```
+
+writes Python views of every format and of specs that exercise redefinitions,
+reserved names, depths and line widths, checks them with ruff and ty, checks
+`data[handle]` of every handle with pyright and mypy in strict mode, and reads
+each format case and a case of each spec through its view, comparing every
+entry with untyped access. It prints `Python views: M modules, R reads, E
+entries compared`.
 
 Both round trips print `compared C, skipped S, extra E, differences D`. They
 fail on any difference, when compared and skipped specs do not add up to the

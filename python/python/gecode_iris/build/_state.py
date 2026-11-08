@@ -30,7 +30,10 @@ from gecode_iris.build._pattern import (
 from gecode_iris.build._site import caller
 from gecode_iris.build._types import Declared, NamedSpec, RangeSpec
 
-_owners = count(1)
+NO_BUILDER = 0
+"""The owner of a handle that no builder made, such as a declared one."""
+
+_owners = count(NO_BUILDER + 1)
 
 
 def next_owner() -> int:

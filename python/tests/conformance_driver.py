@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import gecode_iris as iris
@@ -40,13 +41,15 @@ class Request:
     dzn: bool
 
 
-def main(args: list[str]) -> int:
+def main(args: list[str], load: Callable[[str], iris.Spec] = iris.Spec.load) -> int:
+    """Answer the request in ``args``, with ``load`` turning its spec path into a
+    spec; tests/format_builder_driver.py builds the spec instead."""
     try:
         request = parse_request(args)
     except Misuse as error:
         return report(EXIT_MISUSE, str(error))
     try:
-        status, document = outcome(request)
+        status, document = outcome(request, load)
         write(document)
     except NotImplementedError as error:
         return report(EXIT_MISUSE, str(error))
@@ -55,17 +58,17 @@ def main(args: list[str]) -> int:
     return status
 
 
-def outcome(request: Request) -> tuple[int, str]:
+def outcome(request: Request, load: Callable[[str], iris.Spec]) -> tuple[int, str]:
     """Return the exit status and its document; a language error is a result."""
     try:
-        return EXIT_SUCCESS, success_document(request)
+        return EXIT_SUCCESS, success_document(request, load)
     except iris.Error as error:
         return EXIT_LANGUAGE_ERROR, error.to_json()
 
 
-def success_document(request: Request) -> str:
+def success_document(request: Request, load: Callable[[str], iris.Spec]) -> str:
     """Return the success document: parse JSON, data JSON or dzn text."""
-    spec = iris.Spec.load(request.spec)
+    spec = load(request.spec)
     if request.input is None:
         return PARSE_SUCCESS
     if request.operation == "catalog":

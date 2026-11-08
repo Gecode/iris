@@ -9,6 +9,7 @@
 mod expr;
 mod names;
 mod types;
+pub(crate) mod view;
 
 use std::collections::HashMap;
 

@@ -29,6 +29,7 @@ from gecode_iris.build._pattern import Discard, capture_spec, capture_tag, patte
 from gecode_iris.build._print import Printed, print_spec
 from gecode_iris.build._site import caller
 from gecode_iris.build._state import (
+    NO_BUILDER,
     ROOT_BLOCK,
     Arm,
     Capture,
@@ -252,7 +253,7 @@ class Scope(Generic[N]):
         precedes it. ``forward("_", ib.StrField[str])`` is the handle of the
         entry that ``store _`` keeps.
         """
-        handle_type, shape = forward_kind(kind)
+        handle_type, shape = handle_kind(kind, "forward")
         state = self._state
         name = state.declare(state.spelled_name(name), Forward(shape))
         return handle_type(name, state.id, shape.levels, shape.required)
@@ -746,16 +747,17 @@ def _members(view: object) -> set[object]:
     return set(typing.get_args(view)) if typing.get_origin(view) in _UNIONS else {view}
 
 
-def forward_kind(kind: object) -> tuple[type[Field[Any]], Shape]:
+def handle_kind(kind: object, taker: str) -> tuple[type[Field[Any]], Shape]:
     """The handle class and shape that a handle type such as
-    ``ib.IntField[list[int] | None]`` promises."""
+    ``ib.IntField[list[int] | None]`` promises; ``taker`` names the function
+    that takes it, for the error."""
     if kind is DynField:
         return DynField, Shape("dyn", None, False)
     origin = typing.get_origin(kind)
     arguments = typing.get_args(kind)
     if origin not in _KINDS or len(arguments) != 1:
         raise TypeError(
-            "forward takes a handle type with its view, such as ib.IntField[int] or "
+            f"{taker} takes a handle type with its view, such as ib.IntField[int] or "
             f"ib.StrField[list[str] | None], or ib.DynField, not {kind!r}"
         )
     tag = _KINDS[origin]
@@ -774,3 +776,15 @@ def forward_kind(kind: object) -> tuple[type[Field[Any]], Shape]:
     elif _LEAVES.get(frozenset(members)) != tag:
         raise TypeError(f"the view of {kind!r} does not match its value type {describe(tag)}")
     return cast("type[Field[Any]]", origin), Shape(tag, levels, required)
+
+
+def declared(name: str, kind: type[Any]) -> Any:
+    """A handle for the entry ``name`` of a text spec, of the handle type
+    ``kind``, such as ``ib.IntField[list[int]]`` or ``ib.DynField``.
+
+    ``iris gen --lang python SPEC`` prints one per entry. The handle reads data
+    as a builder's handle does, but no builder accepts it, since it comes from
+    none.
+    """
+    handle_type, shape = handle_kind(kind, "declared")
+    return handle_type(name, NO_BUILDER, shape.levels, shape.required)

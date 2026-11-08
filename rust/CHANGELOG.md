@@ -25,6 +25,8 @@
   beside another expression: `lit(0)..=gecode::INT_MAX.ex()`.
 - Add `Error::owner` to gecode-iris-core: where the statement an error belongs
   to starts, so that a host can find its call site as `CallSites::locate` does.
+- Add a Python printer to `gecode_iris_gen::view_code`; `Language::has_view`
+  is true for Python.
 - Add a hand-written spec builder for each format in the format library, as
   gecode-iris examples. A test reads every case of each format through its
   builder and judges the result as the conformance runner does.
@@ -61,8 +63,11 @@
   type and depth gets a `DynField`. No handle is named `spec`, the field of
   `iris!` that holds the `Spec`, so an entry `spec` is `spec_2`.
 - Add `iris gen builder --lang python SPEC`, which prints a Python builder
-  program. `iris gen --lang` accepts only languages with a view printer, and
-  `iris gen --lang python` says that Python has no view generator yet.
+  program. `iris gen --lang` accepts only languages with a view printer.
+- Add `iris gen --lang python SPEC`, which prints a Python module of handles
+  declared with `gecode_iris.build.declared`, of the types the Python spec
+  builder returns. Identifiers follow the builder program's rules without a
+  leading underscore, and a depth above 8 gets an `ib.DynField`.
 - Add `iris gen builder --lang cpp SPEC`, which prints a C++ builder program.
   `iris gen --lang cpp` says that C++ has no view generator yet.
 - Add `iris gen builder --lang java SPEC`, which prints a Java builder program.

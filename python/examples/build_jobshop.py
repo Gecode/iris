@@ -51,25 +51,30 @@ def jobshop() -> Jobshop:
     return Jobshop(b.build(), name, n_jobs, n_machines, machine, duration)
 
 
-shop = jobshop()
-data = shop.spec.read(
-    "formats/jobshop/cases/or-library/input.txt", params={"instance": "handmade-or"}
-)
-name = data[shop.name] or "unnamed"
-print(f"{name}: {data[shop.n_jobs]} jobs on {data[shop.n_machines]} machines")
-steps = zip(data[shop.machine], data[shop.duration], strict=True)
-for job, (machines, durations) in enumerate(steps):
-    print(f"job {job}: machines {machines}, durations {durations}")
-
-try:
-    shop.spec.read(
-        "formats/jobshop/cases/duplicate-machine/input.txt",
-        params={"instance": "handmade-invalid"},
+def main() -> None:
+    shop = jobshop()
+    data = shop.spec.read(
+        "formats/jobshop/cases/or-library/input.txt", params={"instance": "handmade-or"}
     )
-except iris.Error as error:
-    print(f"\n{error.code} at {error.origin}:{error.line}:{error.column}")
-    print(error.message)
-    # The statement's call site: the line of the i.check call above.
-    site = error.call_site
-    assert site is not None
-    print(f"call site: {Path(site.filename).name}:{site.line}, in {site.function}()")
+    name = data[shop.name] or "unnamed"
+    print(f"{name}: {data[shop.n_jobs]} jobs on {data[shop.n_machines]} machines")
+    steps = zip(data[shop.machine], data[shop.duration], strict=True)
+    for job, (machines, durations) in enumerate(steps):
+        print(f"job {job}: machines {machines}, durations {durations}")
+
+    try:
+        shop.spec.read(
+            "formats/jobshop/cases/duplicate-machine/input.txt",
+            params={"instance": "handmade-invalid"},
+        )
+    except iris.Error as error:
+        print(f"\n{error.code} at {error.origin}:{error.line}:{error.column}")
+        print(error.message)
+        # The statement's call site: the line of the i.check call above.
+        site = error.call_site
+        assert site is not None
+        print(f"call site: {Path(site.filename).name}:{site.line}, in {site.function}()")
+
+
+if __name__ == "__main__":
+    main()

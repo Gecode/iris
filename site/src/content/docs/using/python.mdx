@@ -108,14 +108,111 @@ integer parameter value, raise `TypeError`.
 
 ## Build a reader spec
 
-`gecode_iris.build` writes a reader spec from Python. Each statement returns a
-typed handle, and `data[handle]` returns the entry with the handle's type, so a
-type checker sees `int` for `n_jobs` and `list[list[int]]` for `machine`.
-`build()` prints the spec and parses it. A failure while reading names the
-reader spec location and, as `error.call_site`, the line of the builder
-statement that wrote it.
+`gecode_iris.build` writes a reader spec from Python. Every statement that
+defines an entry returns a typed handle, and `data[handle]` returns the entry
+with the handle's type, so a type checker such as pyright or mypy sees `int`
+for `n_jobs` and `list[list[int]]` for `machine`, and flags a misspelled handle.
+A builder adds no features of its own: `build()` prints Iris text and parses it
+as `Spec.parse` does, so the language's checks decide what is valid, and
+`source()` returns the text.
+
+The examples below are in
+[`python/examples`](https://github.com/Gecode/iris/tree/main/python/examples),
+one builder for each format in the [format library](/formats/). A test reads
+every case of each format through its builder and compares the data or the
+error with the case's expected results, then runs each program and compares its
+output with the output shown here. The programs read files from the format
+library, so run them from the root of an Iris checkout, as in
+`python python/examples/build_jobshop.py`.
+
+### The job shop builder
+
+This builder writes the [job shop](/formats/job-shop/) reader spec. `main` reads
+an instance selected by name, then a file whose check fails.
 
 <CheckedExample id="python-build_jobshop" title="build_jobshop.py" />
+
+Blocks are `with` statements: `b.instances()`, `i.sections()` and
+`a.repeat(n_jobs)` each open a scope, and the statements inside the `with` go
+into it. A pattern is a tuple of text and handles, as in
+`(n_jobs, " ", n_machines)`. `job.record` is the handle of each record of a
+repeat, which the builder names itself with `each record_1`: `jobs[machine]`
+looks up a field and prints `record_1.machine`, and
+`ib.sum(jobs, lambda j: ...)` prints a comprehension over the records.
+`job.as_name("jobs")` names the list of records, as in `repeat n_jobs as jobs`,
+for error messages.
+
+Python operators build expressions: `<=`, `==`, `+` and `*` work on handles as
+they do in Iris, and `&`, `|` and `~` stand for `&&`, `||` and `!`, since
+Python's `and`, `or` and `not` cannot be overloaded. A range is
+`ib.int_range(0, below=n_machines)` for Iris `0..<n_machines`, or
+`ib.int_range(0, n)` for `0..n`.
+
+### Typed data
+
+`data[handle]` returns the Python type of the entry's value type and depth: an
+`int` for `n_jobs`, a `str | None` for the `name`, which only some files give,
+and a `list[list[int]]` for `machine` and `duration`, which have one value per
+step of each job. A handle names its entry, value type and depth, so a lookup
+cannot read the wrong entry, and a handle from a different spec whose entry has
+another type raises `TypeError` instead of returning the wrong type.
+
+Collecting the handles in a `NamedTuple` with the spec, as `Jobshop` does, gives
+the rest of a program one typed object to read with.
+
+### Errors name your code
+
+Every statement records the line of the call that wrote it. When a check fails
+while reading, the error has the input location, and `error.call_site` names the
+`i.check` line in `build_jobshop.py`, with its file name and function. A
+`gecode_iris.build.BuildError` from `build()` has the same call site. A
+statement in a helper function records the line in the helper, unless the
+helper has the `@ib.track_caller` decorator, as `clue_lines` below does.
+
+### A helper used twice
+
+A function that takes a scope and returns handles is a reusable piece of a
+reader spec. The nonogram builder reads the clues of the rows and the columns
+with one helper, and builds two pairs of checks with two expression helpers.
+
+<CheckedExample id="python-build_nonogram" title="build_nonogram.py" />
+
+A builder rejects a second definition of a name, so a helper called twice by
+mistake fails `build()` instead of quietly replacing an entry. That is why
+`clue_lines` takes the entry name from its caller. The TSPLIB builder below
+uses the same idea for its two coordinate sections.
+
+### The other formats
+
+<CheckedExample id="python-build_dimacs_cnf" title="build_dimacs_cnf.py" />
+
+<CheckedExample id="python-build_sudoku" title="build_sudoku.py" />
+
+`define_type` gives a named type, used here for both ends of a time window:
+
+<CheckedExample id="python-build_tsptw" title="build_tsptw.py" />
+
+A TSPLIB file gives either a distance matrix or coordinates. `t.set` gives an
+optional entry a default while keeping its handle's type, `b.if_` and
+`b.else_` take the checks that apply to each kind of file, and `one_of` is an
+ordinary Python function that builds an expression:
+
+<CheckedExample id="python-build_tsplib" title="build_tsplib.py" />
+
+### Typed handles for a text spec
+
+A reader spec written as an `.iris` file has no builder, but `iris gen --lang
+python SPEC` prints a module with a typed handle for each of its entries:
+
+<CheckedExample id="python-view" />
+
+Save the output as a module, such as `jobshop_view.py`, and read data with
+`data[jobshop_view.machine]` as with a builder's handles; a type checker sees
+the same types. `ib.declared` makes each handle from the entry's name and its
+handle type. An entry whose value type or depth differs between the places that
+define it gets `ib.DynField`, which returns any value or `None`. A declared
+handle reads data from any spec with that entry, and a lookup checks the value
+type and depth, but no builder accepts it, since no builder made it.
 
 ## The iris command
 

@@ -25,17 +25,9 @@ RENAMED = {
         "three_hundred_dimensions_read",
         "Python reads nested lists, not value references",
     ),
-    "a_declared_handle_reports_what_went_wrong": (
-        "a_handle_of_another_spec_reports_what_went_wrong",
-        "Python has no declared handles; a handle of another spec meets the same errors",
-    ),
     "get_panics_with_a_pointer_to_try_get": (
         "a_handle_of_another_spec_reports_what_went_wrong",
         "Python raises KeyError or TypeError instead of panicking",
-    ),
-    "a_declared_handle_reads_but_does_not_build": (
-        "a_handle_from_another_builder_is_rejected",
-        "Python has no declared handles; a foreign handle meets the same check",
     ),
 }
 

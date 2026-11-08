@@ -91,6 +91,19 @@ def test_a_handle_of_another_spec_reports_what_went_wrong() -> None:
     assert wrong_depth.name == "x2"
 
 
+def test_a_declared_handle_reports_what_went_wrong() -> None:
+    data = read(lambda b: b.read("x", ib.int_), b"1")
+    assert data[ib.declared("x", ib.IntField[int])] == 1
+    with pytest.raises(KeyError, match="missing"):
+        data[ib.declared("missing", ib.IntField[int])]
+    with pytest.raises(TypeError, match="has value type string, but the entry has int"):
+        data[ib.declared("x", ib.StrField[str])]
+    with pytest.raises(TypeError, match="has depth 1, but the entry has depth 0"):
+        data[ib.declared("x", ib.IntField[list[int]])]
+    assert data[ib.declared("missing", ib.IntField[int | None])] is None
+    assert data[ib.declared("x", ib.DynField)] == 1
+
+
 def test_string_keys_are_unchanged() -> None:
     b = ib.SpecBuilder()
     x = b.read("x", ib.int_)

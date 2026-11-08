@@ -126,6 +126,14 @@ def captures_and_forwards(data: iris.Data) -> None:
     assert_type(data[anything], iris.Value | None)
 
 
+def declared_handles(data: iris.Data) -> None:
+    assert_type(data[ib.declared("n", ib.IntField[int])], int)
+    assert_type(
+        data[ib.declared("x", ib.NumField[list[int | float] | None])], list[int | float] | None
+    )
+    assert_type(data[ib.declared("d", ib.DynField)], iris.Value | None)
+
+
 def definitions(data: iris.Data) -> None:
     b = ib.SpecBuilder()
     n = b.read("n", ib.int_)
