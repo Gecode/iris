@@ -106,6 +106,17 @@ raises `FileNotFoundError`, and other file access failures raise other
 `OSError` subclasses. Python types that the API does not accept, such as an
 integer parameter value, raise `TypeError`.
 
+## Build a reader spec
+
+`gecode_iris.build` writes a reader spec from Python. Each statement returns a
+typed handle, and `data[handle]` returns the entry with the handle's type, so a
+type checker sees `int` for `n_jobs` and `list[list[int]]` for `machine`.
+`build()` prints the spec and parses it. A failure while reading names the
+reader spec location and, as `error.call_site`, the line of the builder
+statement that wrote it.
+
+<CheckedExample id="python-build_jobshop" title="build_jobshop.py" />
+
 ## The iris command
 
 The package installs the `iris` command. It runs the same command line as the

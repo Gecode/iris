@@ -8,6 +8,10 @@ import { repository, siteDirectory } from './format-sources.mjs';
 // Runs Doxygen over the public C++ headers with cpp/Doxyfile, and keeps the
 // content of its namespace, class and main pages for the site's own shell.
 const apiPath = '/using/cpp/api/';
+// The reference publishes no file pages. A link to a header leads to the
+// namespace it declares instead, which lists the same classes and functions;
+// a link to a member of the file page stays unpublished.
+const headerNamespaces = new Map([['build_8hpp.html', 'namespaceiris_1_1build.html']]);
 const obsoleteAttributes = new Set(['align', 'border', 'cellpadding', 'cellspacing', 'valign']);
 const output = resolve(siteDirectory, 'src/generated/cpp-api.json');
 const scratch = await mkdtemp(resolve(tmpdir(), 'iris-cpp-api-'));
@@ -16,6 +20,9 @@ try {
   run(['Doxyfile'], { ...process.env, IRIS_DOXYGEN_OUTPUT: scratch });
   const html = resolve(scratch, 'html');
   const published = (await readdir(html)).filter(file => slug(file) !== undefined).sort();
+  const slugs = published.map(slug);
+  const shared = slugs.find((page, index) => slugs.indexOf(page) !== index);
+  if (shared !== undefined) throw new Error(`Two pages of the C++ API reference at ${shared}`);
   const pages = await Promise.all(published.map(async file => extractPage(file, await readFile(resolve(html, file), 'utf8'), published)));
   await mkdir(resolve(siteDirectory, 'src/generated'), { recursive: true });
   await writeFile(output, JSON.stringify({ doxygen: version, pages }));
@@ -31,13 +38,18 @@ function run(args, env) {
   return result.stdout;
 }
 
-// The URL below the reference of a page to publish; other pages are indexes
-// that the site's navigation replaces.
+// The URL below the reference of a page to publish: the path of a class,
+// struct or concept below iris in kebab case, such as build/spec-builder for
+// iris::build::SpecBuilder, and that of a namespace followed by namespace, such
+// as build/host/namespace for iris::build::host, which may share its name with
+// a class. Other pages are indexes that the site's navigation replaces.
 function slug(file) {
   if (file === 'index.html') return '';
-  if (file === 'namespaceiris.html') return 'namespace';
-  const type = /^(?:class|struct)iris_1_1_(.+)\.html$/.exec(file);
-  return type && !type[1].endsWith('-members') ? type[1].replaceAll('_', '-') : undefined;
+  const page = /^(namespace|class|struct|concept)iris((?:_1_1.+?)?)\.html$/.exec(file);
+  if (!page || page[2].endsWith('-members')) return undefined;
+  // Doxygen writes :: as _1_1 and an uppercase letter as _ and its lowercase.
+  const path = page[2].split('_1_1').slice(1).map(name => name.replace(/^_/, '').replaceAll('_', '-'));
+  return [...path, ...(page[1] === 'namespace' ? ['namespace'] : [])].join('/');
 }
 
 function extractPage(file, source, published) {
@@ -86,8 +98,9 @@ function moveAnchor(anchor) {
 
 function siteHref(href, file, published) {
   if (/^[a-z]+:/.test(href)) return href;
-  const [target, fragment] = href.split('#');
-  if (target === '') return href;
+  const [linked, fragment] = href.split('#');
+  if (linked === '') return href;
+  const target = (fragment === undefined && headerNamespaces.get(linked)) || linked;
   if (!published.includes(target)) throw new Error(`${file}: link to the unpublished ${href}`);
   return `${apiPath}${slug(target) === '' ? '' : `${slug(target)}/`}${fragment === undefined ? '' : `#${fragment}`}`;
 }

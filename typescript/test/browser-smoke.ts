@@ -1,5 +1,6 @@
 // Browser smoke test: serves the package and loads the browser and inline
-// entry points in Chromium under a strict Content-Security-Policy.
+// entry points, and the builder's, in Chromium under a strict
+// Content-Security-Policy.
 //
 //   npm run test:browser
 //
@@ -23,15 +24,31 @@ const MEDIA_TYPES: Readonly<Record<string, string>> = {
 };
 
 interface Page {
-  /** The package path that the import map gives for gecode-iris. */
+  /** The package path that the import map gives for `specifier`. */
   readonly entry: string;
   readonly allowWasm: boolean;
+  /** The import that the page's script resolves to `entry`. */
+  readonly specifier: string;
+  readonly script: string;
 }
 
+const READ_PAGE = { specifier: "gecode-iris", script: "/test/smoke/page.js" };
+const BUILD_PAGE = { specifier: "gecode-iris/build", script: "/test/smoke/build-page.js" };
+
 const PAGES: Readonly<Record<string, Page>> = {
-  "/browser.html": { entry: exportTarget(".", "browser"), allowWasm: true },
-  "/inline.html": { entry: exportTarget("./inline", "default"), allowWasm: true },
-  "/without-wasm-unsafe-eval.html": { entry: exportTarget(".", "browser"), allowWasm: false },
+  "/browser.html": { ...READ_PAGE, entry: exportTarget(".", "browser"), allowWasm: true },
+  "/inline.html": { ...READ_PAGE, entry: exportTarget("./inline", "default"), allowWasm: true },
+  "/without-wasm-unsafe-eval.html": {
+    ...READ_PAGE,
+    entry: exportTarget(".", "browser"),
+    allowWasm: false,
+  },
+  "/build.html": { ...BUILD_PAGE, entry: exportTarget("./build", "browser"), allowWasm: true },
+  "/build-inline.html": {
+    ...BUILD_PAGE,
+    entry: exportTarget("./build/inline", "default"),
+    allowWasm: true,
+  },
 };
 
 const server = createServer((request, response) => {
@@ -64,6 +81,16 @@ test("the inline entry parses at module scope in a page", async () => {
   assert.deepEqual(JSON.parse(await resultOf("/inline.html")), expected);
 });
 
+for (const path of ["/build.html", "/build-inline.html"]) {
+  test(`${path} builds a reader spec whose check names the page's line`, async () => {
+    const result: unknown = JSON.parse(await resultOf(path));
+    assert.equal(Reflect.get(Object(result), "n"), 4);
+    const site: unknown = Reflect.get(Object(result), "site");
+    assert.equal(Reflect.get(Object(site), "file"), `${origin}/test/smoke/build-page.js`);
+    assert.equal(Reflect.get(Object(site), "line"), 7);
+  });
+}
+
 test("a policy without 'wasm-unsafe-eval' blocks the module", async () => {
   await assert.rejects(resultOf("/without-wasm-unsafe-eval.html"), /Content Security Policy/);
 });
@@ -95,7 +122,7 @@ async function serve(request: IncomingMessage, response: ServerResponse): Promis
       "Content-Type": "text/html; charset=utf-8",
       "Content-Security-Policy": `default-src 'self'; script-src ${scripts}`,
     });
-    response.end(pageHtml(page.entry, nonce));
+    response.end(pageHtml(page, nonce));
   } else if (path === "/test/smoke/sudoku.json") {
     response.writeHead(200, { "Content-Type": "application/json" });
     response.end(
@@ -117,13 +144,13 @@ async function serve(request: IncomingMessage, response: ServerResponse): Promis
   }
 }
 
-function pageHtml(entry: string, nonce: string): string {
-  const importMap = JSON.stringify({ imports: { "gecode-iris": entry.slice(1) } });
+function pageHtml(page: Page, nonce: string): string {
+  const importMap = JSON.stringify({ imports: { [page.specifier]: page.entry.slice(1) } });
   return `<!doctype html>
 <meta charset="utf-8">
 <title>gecode-iris smoke test</title>
 <script type="importmap" nonce="${nonce}">${importMap}</script>
-<script type="module" src="/test/smoke/page.js"></script>
+<script type="module" src="${page.script}"></script>
 `;
 }
 

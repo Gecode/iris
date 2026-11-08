@@ -8,8 +8,11 @@
 //! Every failure is a JSON envelope in the `Err` string, which JavaScript
 //! receives as a thrown string:
 //!
-//! - `{"kind":"language","document":D,"diagnostic":T}`, where `D` is the
-//!   canonical error document as text and `T` the error's display text;
+//! - `{"kind":"language","document":D,"diagnostic":T,"statement":S}`, where
+//!   `D` is the canonical error document as text, `T` the error's display
+//!   text, and `S` the byte offset of the statement that owns the error
+//!   ([`Error::owner`](gecode_iris_core::Error::owner), else the start of the
+//!   spec span) or `null`, which the spec builder maps to its call site;
 //! - `{"kind":"host","category":C,"message":M}`, where `C` is `size`,
 //!   `unsupported` or `internal`.
 //!
@@ -128,6 +131,10 @@ fn failure_envelope(failure: Failure) -> String {
                 "kind": "language",
                 "document": String::from_utf8_lossy(&document),
                 "diagnostic": error.to_string(),
+                "statement": error
+                    .owner()
+                    .or_else(|| error.spec_span().map(|span| span.start()))
+                    .map(u32::from),
             })
             .to_string(),
             Err(error) => internal(error),

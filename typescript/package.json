@@ -34,6 +34,22 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./build": {
+      "types": "./dist/build/manual.d.ts",
+      "workerd": "./dist/build/workerd.js",
+      "edge-light": "./dist/build/workerd.js",
+      "node": "./dist/build/node.js",
+      "browser": "./dist/build/browser.js",
+      "default": "./dist/build/browser.js"
+    },
+    "./build/inline": {
+      "types": "./dist/build/manual.d.ts",
+      "default": "./dist/build/inline.js"
+    },
+    "./build/manual": {
+      "types": "./dist/build/manual.d.ts",
+      "default": "./dist/build/manual.js"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {

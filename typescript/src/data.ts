@@ -1,4 +1,5 @@
 import { renderDzn, renderJson } from "./backend.js";
+import type { BigIntViewOf, Handle, HandleValue, ViewOf } from "./handle.js";
 import { decode, type Column, type ValueType } from "./transfer.js";
 
 export type { ValueType };
@@ -32,7 +33,8 @@ export interface ValueOptions {
  * throw `RangeError` for values beyond `Number.MAX_SAFE_INTEGER` in
  * magnitude; the `bigint` accessors are exact. An unknown entry or an index
  * out of bounds throws `RangeError`, and a selection of the wrong value type
- * or depth throws `TypeError`.
+ * or depth throws `TypeError`. `get` reads through a typed handle, such as
+ * one from `gecode-iris/build`.
  */
 export class Data {
   /** The entries in the order their names were defined. */
@@ -131,6 +133,38 @@ export class Data {
   value(name: string, path?: Path, options?: ValueOptions): Value | BigIntValue;
   value(name: string, path: Path = [], options: ValueOptions = {}): Value | BigIntValue {
     return this.#select(name, path).value(options.bigint ?? false);
+  }
+
+  /**
+   * The entry that `handle` names, typed by its promise: a number, string or
+   * nested arrays of them, and `undefined` for an absent entry that the
+   * handle allows to be absent.
+   *
+   * A required entry that is absent throws `RangeError`. An entry whose
+   * depth or value type differs from the handle's throws `TypeError`, which
+   * means the handle belongs to another reader spec. An entry without leaves
+   * matches every value type.
+   */
+  get<H extends Handle>(handle: H, options?: { readonly bigint?: false }): ViewOf<H>;
+  get<H extends Handle>(handle: H, options: { readonly bigint: true }): BigIntViewOf<H>;
+  get(handle: Handle, options?: ValueOptions): unknown;
+  get(handle: Handle, options: ValueOptions = {}): unknown {
+    if (typeof handle !== "object" || handle === null || typeof handle.name !== "string") {
+      throw new TypeError("get takes a handle");
+    }
+    const { name } = handle;
+    const column = this.#columns.get(name);
+    if (column === undefined) {
+      if (handle.presence === "maybe") {
+        return undefined;
+      }
+      throw new RangeError(`unknown entry '${name}'`);
+    }
+    const mismatch = handleMismatch(handle, column);
+    if (mismatch !== undefined) {
+      throw new TypeError(`entry '${name}' does not match its handle: ${mismatch}`);
+    }
+    return new Selection(column, describe(name, [])).value(options.bigint ?? false);
   }
 
   /** All entries as an object from name to value, in entry order. */
@@ -335,6 +369,35 @@ function group(elements: BigIntValue[], offsets: Uint32Array, rows: Range): BigI
     ),
   );
 }
+
+/** Why `column` breaks the promise of `handle`, or `undefined` when it keeps it. */
+function handleMismatch(handle: Handle, column: Column): string | undefined {
+  const depth = column.levels.length;
+  if (handle.depth !== null && handle.depth !== depth) {
+    return `the handle has depth ${handle.depth}, but the entry has depth ${depth}`;
+  }
+  const { valueType, values } = column.leaves;
+  if (values.length > 0 && !HANDLE_LEAVES[handle.valueType].includes(valueType)) {
+    return `the handle holds ${HANDLE_NAMES[handle.valueType]} values, but the entry holds ${LEAF_NAMES[valueType]} values`;
+  }
+  return undefined;
+}
+
+const HANDLE_LEAVES: Readonly<Record<HandleValue, readonly ValueType[]>> = {
+  int: ["int"],
+  float: ["float"],
+  num: ["int", "float"],
+  string: ["string"],
+  dyn: ["int", "float", "string"],
+};
+
+const HANDLE_NAMES: Readonly<Record<HandleValue, string>> = {
+  int: "integer",
+  float: "float",
+  num: "integer or float",
+  string: "string",
+  dyn: "any",
+};
 
 const LEAF_NAMES: Readonly<Record<ValueType, string>> = {
   int: "integer",

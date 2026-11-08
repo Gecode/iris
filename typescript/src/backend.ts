@@ -143,6 +143,15 @@ function trapped(trap: WebAssembly.RuntimeError): IrisInternalError {
   );
 }
 
+/** The byte offset of the statement that owns a language failure, or `null`. */
+function statement(envelope: unknown): number | null {
+  const value: unknown =
+    typeof envelope === "object" && envelope !== null
+      ? Reflect.get(envelope, "statement")
+      : undefined;
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
 function failure(envelope: string): Error {
   const parsed: unknown = JSON.parse(envelope);
   const field = (name: string): string => {
@@ -155,7 +164,7 @@ function failure(envelope: string): Error {
   };
   switch (field("kind")) {
     case "language":
-      return IrisError.fromDocument(field("document"), field("diagnostic"));
+      return IrisError.fromDocument(field("document"), field("diagnostic"), statement(parsed));
     case "host":
       return field("category") === "size"
         ? new RangeError(field("message"))

@@ -3,7 +3,7 @@ import { collectExampleFiles, collectReadmeCommands } from './example-files.mjs'
 
 // python/examples holds the guide's examples and their recorded output;
 // python/tests/test_examples.py runs each one against the built package.
-const examples = ['read', 'files', 'access', 'arrays', 'output', 'errors', 'cli'];
+const examples = ['read', 'files', 'access', 'arrays', 'output', 'errors', 'build_jobshop', 'cli'];
 const installCommands = {
   'python-install': 'uv add gecode-iris\nuv pip install gecode-iris\nuvx --from gecode-iris iris --help',
   'python-install-checkout': 'uv add ../iris/python',

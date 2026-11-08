@@ -17,8 +17,11 @@ all come from gecode-iris-core.
 - `renderJson(data)` and `renderDzn(data)` render transfer bytes through
   gecode-iris-core, so JSON and dzn are produced only when the caller asks for them.
 - A failure is thrown as a JSON envelope string:
-  `{"kind":"language","document":D,"diagnostic":T}` carries the canonical
-  error document `D` as text and the error's display text `T`;
+  `{"kind":"language","document":D,"diagnostic":T,"statement":S}` carries the
+  canonical error document `D` as text, the error's display text `T`, and the
+  byte offset `S` of the statement that owns the error (`Error::owner`, else
+  the start of the spec span) or `null`; the spec builder maps `S` to the call
+  site that wrote the statement;
   `{"kind":"host","category":C,"message":M}` has the category `size`,
   `unsupported` or `internal`. A trap is a `WebAssembly.RuntimeError`, never a
   string.

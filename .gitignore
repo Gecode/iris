@@ -11,6 +11,8 @@ node_modules/
 !/java/iris/src/test/java/dev/gecode/iris/build/
 !/java/iris-kotlin/src/main/kotlin/dev/gecode/iris/kotlin/build/
 !/java/iris-kotlin/src/test/kotlin/dev/gecode/iris/kotlin/build/
+# The TypeScript spec builder module, not build output
+!/typescript/src/build/
 
 # Python
 __pycache__/

@@ -12,3 +12,5 @@ export {
   type ValueType,
 } from "./data.js";
 export { IrisError, IrisInternalError, type Location } from "./errors.js";
+export type { CallSite } from "./call-sites.js";
+export type { BigIntViewOf, Handle, HandleDepth, HandleValue, Presence, ViewOf } from "./handle.js";

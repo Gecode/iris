@@ -1,6 +1,7 @@
 // Packed-package smoke test: packs the package with npm pack, installs the
 // tarball into an isolated consumer, type-checks an import of every entry
-// point with strict settings and skipLibCheck off, and imports each in Node.
+// point with strict settings and skipLibCheck off, imports each in Node, and
+// builds a reader spec through gecode-iris/build.
 // It catches declarations or files that the repository has but the tarball
 // lacks.
 //
@@ -15,7 +16,14 @@ import { fileURLToPath } from "node:url";
 
 const packageDirectory = fileURLToPath(new URL("..", import.meta.url));
 const tsc = join(packageDirectory, "node_modules/typescript/bin/tsc");
-const ENTRY_POINTS = ["gecode-iris", "gecode-iris/inline", "gecode-iris/manual"];
+const ENTRY_POINTS = [
+  "gecode-iris",
+  "gecode-iris/inline",
+  "gecode-iris/manual",
+  "gecode-iris/build",
+  "gecode-iris/build/inline",
+  "gecode-iris/build/manual",
+];
 
 const temporary = mkdtempSync(join(tmpdir(), "gecode-iris-package-"));
 const consumer = join(temporary, "consumer");
@@ -66,6 +74,36 @@ for (const entry of ENTRY_POINTS) {
     run(process.execPath, ["--input-type=module", "-e", `await import("${entry}");`], consumer);
   });
 }
+
+test("the builder entry point builds and reads a reader spec in Node", () => {
+  writeFileSync(
+    join(consumer, "builder.ts"),
+    `import { int, IrisError, spec, type CallSite } from "gecode-iris/build";
+
+const built = spec((b) => {
+  const n = b.read("n", int);
+  b.check(n.gt(0), "n is positive");
+  return n;
+});
+const n: number = built.read("4");
+let site: CallSite | null = null;
+try {
+  built.read("0");
+} catch (error) {
+  if (error instanceof IrisError) {
+    site = error.callSite;
+  }
+}
+console.log(JSON.stringify({ n, site }));
+`,
+  );
+  run(process.execPath, [tsc, "-p", join(consumer, "tsconfig.json")], consumer);
+  const result: unknown = JSON.parse(run(process.execPath, ["builder.ts"], consumer));
+  assert.equal(Reflect.get(Object(result), "n"), 4);
+  const site: unknown = Reflect.get(Object(result), "site");
+  assert.ok(String(Reflect.get(Object(site), "file")).endsWith("/builder.ts"));
+  assert.equal(Reflect.get(Object(site), "line"), 5);
+});
 
 function packedFilename(packed: unknown): string {
   const filename: unknown = Array.isArray(packed)

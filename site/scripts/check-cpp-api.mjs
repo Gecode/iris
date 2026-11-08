@@ -9,15 +9,32 @@ import { siteDirectory } from './format-sources.mjs';
 // prepare:cpp-api, and that it covers the public API the guide relies on.
 const reference = JSON.parse(await readFile(resolve(siteDirectory, 'src/generated/cpp-api.json'), 'utf8'));
 const required = {
-  namespace: ['ErrorCode', 'ValueType', 'code_name()', 'type_name()'],
+  namespace: ['ErrorCode', 'ValueType', 'Presence', 'code_name()', 'type_name()'],
   spec: ['parse()', 'try_parse()', 'load()', 'try_load()', 'name()', 'read()', 'read_text()', 'try_read()', 'try_read_text()', 'catalog()', 'catalog_text()', 'try_catalog()', 'try_catalog_text()'],
-  data: ['size()', 'name()', 'value()', 'find()', 'dzn()', 'at()', 'integer()', 'number()', 'text()', 'ints()', 'floats()'],
+  data: ['size()', 'name()', 'value()', 'find()', 'get()', 'dzn()', 'at()', 'integer()', 'number()', 'text()', 'ints()', 'floats()'],
   'value-ref': ['type()', 'depth()', 'size()', 'operator[]()', 'at()', 'integer()', 'number()', 'text()', 'ints()', 'floats()'],
   params: ['set()', 'size()', 'name()', 'get()'],
-  error: ['code()', 'message()', 'details()', 'input_location()', 'spec_location()', 'excerpt()', 'context()', 'record_path()', 'earlier_rejection()'],
-  'error-details': ['input_location', 'spec_location', 'excerpt', 'context', 'record_path', 'earlier_rejection'],
+  error: ['code()', 'message()', 'details()', 'input_location()', 'spec_location()', 'excerpt()', 'context()', 'record_path()', 'earlier_rejection()', 'call_site()'],
+  'error-details': ['input_location', 'spec_location', 'excerpt', 'context', 'record_path', 'earlier_rejection', 'call_site'],
   location: ['origin', 'line', 'column'],
   'access-error': [],
+  field: ['name()', 'view()', 'dynamic()', 'operator[]()'],
+  array: ['size()', 'empty()', 'operator[]()', 'begin()', 'end()'],
+  'array/iterator': [],
+  dynamic: [],
+  'handle-value': [],
+  // The spec builder of <iris/build.hpp>.
+  'build/namespace': ['BuildErrorKind', 'lit', 'int_', 'float_', 'word', 'all', 'any'],
+  'build/host/namespace': ['int_max', 'int_min'],
+  'build/spec-builder': ['SpecBuilder()', 'build()', 'try_build()', 'source()', 'try_source()', 'format()', 'tokens()', 'separators()', 'comment()', 'instances()', 'stop()', 'ignore_trailing()'],
+  'build/scope': ['read()', 'line()', 'repeat()', 'repeat_until()', 'repeat_until_eof()', 'record()', 'param()', 'let()', 'check()', 'expect()', 'if_()', 'sections()', 'define_type()', 'skip_line()'],
+  'build/build-error': ['kind()', 'message()', 'call_site()', 'language_error()', 'text()', 'emitted_line()'],
+  ...Object.fromEntries([
+    'alphabet', 'arm-options', 'arms', 'base-type', 'blank', 'bound', 'bound-value', 'capture-type', 'definable', 'discard', 'domain', 'dynamic', 'eol',
+    'equatable', 'expr', 'field', 'host', 'if', 'indexing', 'integral', 'list-reading', 'named-type', 'numeric', 'open', 'operand', 'over', 'part', 'pattern',
+    'pattern-arg', 'pattern-part', 'pattern-string', 'range', 'record', 'record-expr', 'record-list', 'rest-of-line', 'scalar', 'sections-options', 'store-target',
+    'strings', 'type-like', 'type-of', 'until-options', 'untyped',
+  ].map(name => [`build/${name}`, []])),
 };
 deepStrictEqual(reference.pages.map(page => page.slug).sort(), ['', ...Object.keys(required)].sort(), 'using/cpp/api: unexpected pages');
 
@@ -39,10 +56,15 @@ for (const page of reference.pages) {
 }
 
 const linksTo = href => node => node.tagName === 'a' && attrs(node).href?.startsWith(href);
-const index = parseFragment(reference.pages.find(page => page.slug === '').html);
-for (const slug of Object.keys(required)) {
-  ok(slug === 'namespace' || descendants(index).some(linksTo(`/using/cpp/api/${slug}/`)), `using/cpp/api: the index does not link ${slug}`);
+// Every page can be found from the index through the links of published pages.
+const pages = new Map(reference.pages.map(page => [page.slug, page]));
+const reached = new Set(['']);
+for (const slug of reached) {
+  for (const node of descendants(parseFragment(pages.get(slug).html)).filter(linksTo('/using/cpp/api/'))) {
+    reached.add(attrs(node).href.slice('/using/cpp/api/'.length).replace(/\/?(?:#.*)?$/, ''));
+  }
 }
+for (const slug of Object.keys(required)) ok(reached.has(slug), `using/cpp/api: no link from the index leads to ${slug}`);
 const guide = parse(await readFile(new URL('using/cpp/index.html', buildDirectory), 'utf8'));
 ok(descendants(guide).some(linksTo('/using/cpp/api/')), 'using/cpp: missing the API reference link');
 console.log(`C++ API reference: ${reference.pages.length} pages and ${members} members agree with Doxygen ${reference.doxygen} output.`);

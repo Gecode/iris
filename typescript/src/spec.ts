@@ -1,5 +1,7 @@
 import { BoundSpec } from "./backend.js";
+import type { CallSites } from "./call-sites.js";
 import { Data } from "./data.js";
+import { IrisError } from "./errors.js";
 
 /** Caller parameters: an object of strings, or name/value pairs applied in order. */
 export type Params = Readonly<Record<string, string>> | Iterable<readonly [string, string]>;
@@ -20,9 +22,11 @@ const utf8 = new TextEncoder();
  */
 export class Spec {
   #bound: BoundSpec | undefined;
+  readonly #sites: CallSites | null;
 
-  private constructor(bound: BoundSpec) {
+  private constructor(bound: BoundSpec, sites: CallSites | null = null) {
     this.#bound = bound;
+    this.#sites = sites;
   }
 
   /** Parses and checks a reader spec given as text or UTF-8 bytes. */
@@ -31,6 +35,14 @@ export class Spec {
     // constructor copies; a subclass's slice, such as Buffer's, may not.
     const source = text instanceof Uint8Array ? new Uint8Array(text) : toBytes(text, "spec text");
     return new Spec(new BoundSpec(source, checkedText(origin, "origin")));
+  }
+
+  /**
+   * @internal Parses the text a spec builder printed. Its errors, and those
+   * of its reads, name the call site of their statement.
+   */
+  static parseBuilt(text: string, origin: string, sites: CallSites): Spec {
+    return located(sites, () => new Spec(new BoundSpec(toBytes(text, "spec text"), origin), sites));
   }
 
   /** Reads one instance from input text or bytes. */
@@ -57,9 +69,21 @@ export class Spec {
     if (this.#bound === undefined) {
       throw new TypeError("the spec has been disposed");
     }
+    const bound = this.#bound;
     const params = flattenParams(options.params);
     const bytes = toBytes(input, "input");
-    return Data.fromTransfer(this.#bound[operation](bytes, checkedText(origin, "origin"), params));
+    const run = (): Data =>
+      Data.fromTransfer(bound[operation](bytes, checkedText(origin, "origin"), params));
+    return this.#sites === null ? run() : located(this.#sites, run);
+  }
+}
+
+/** Runs `operation`, giving a language error the call site of its statement. */
+function located<T>(sites: CallSites, operation: () => T): T {
+  try {
+    return operation();
+  } catch (error) {
+    throw error instanceof IrisError ? error.locate(sites) : error;
   }
 }
 

@@ -112,9 +112,9 @@ The export conditions of `gecode-iris` choose the entry point:
 The `inline` entry point embeds the module as base64 in
 `wasm/iris_js_inline.js` and compiles it synchronously, so it needs no file
 access, `fetch` or bundler support, and it works anywhere that compiles
-WebAssembly from bytes; workerd does not. The embedded module is 783,519
-bytes (765 KiB) raw and 328,573 bytes gzipped, a third more than the 587,623
-bytes (574 KiB) raw and 249,808 bytes gzipped of the `.wasm` file; `npm run
+WebAssembly from bytes; workerd does not. The embedded module is 788,263
+bytes (770 KiB) raw and 330,901 bytes gzipped, a third more than the 591,181
+bytes (577 KiB) raw and 251,419 bytes gzipped of the `.wasm` file; `npm run
 build` prints both. Chrome compiles modules up to 8 MB synchronously on the
 main thread, so the inline entry also works in a page.
 
@@ -205,6 +205,10 @@ from the canonical error document:
 - `recordPath`, the record indices of a failed check over records, or `null`;
 - `diagnostic`, the text `iris read` prints: location, message, input excerpt
   with a caret, context and spec line;
+- `callSite`, for a spec made by the [spec builder](#spec-builder), the
+  `{ file, line, column, function }` of the builder call that wrote the
+  responsible statement, or `null`; the diagnostic then ends with a
+  `call site:` line;
 - `toJSON()`, the canonical error document.
 
 Other failures use built-in errors. An unknown entry or an index out of bounds
@@ -283,6 +287,80 @@ function readWithDeadline(spec: string, input: string, milliseconds: number): Pr
 
 In a browser, use a Web Worker the same way.
 
+## Spec builder
+
+`gecode-iris/build` builds a reader spec in TypeScript instead of in `.iris`
+text. It exports the whole package API too, and has the same export
+conditions as `gecode-iris`; `gecode-iris/build/inline` and
+`gecode-iris/build/manual` pair it with the other loaders. The builder is
+pure TypeScript: it prints the reader spec and parses it with `Spec`.
+
+```ts
+import { atLeast, float, p, spec } from "gecode-iris/build";
+
+const matrix = spec("matrix", (b) => {
+  const rows = b.capture("rows", atLeast(1));
+  const columns = b.capture("columns", atLeast(1));
+  b.line(p`${rows} x ${columns}`);
+  const cells = b.repeat(rows, (r) => r.read("cells", float.dim(columns)));
+  b.check(rows.le(100), "too many rows");
+  return { rows, columns, cells };
+});
+
+const data = matrix.read("2 x 2\n1 2\n3 4\n");
+data.cells; // number[][]
+matrix.source; // the reader spec as Iris text
+```
+
+- Statements are methods of a scope: `read`, `list`, `let`, `set`, `param`,
+  `check`, `line`, `find`, `expect`, `skipLine`, `skipLines`, `index` and
+  `defineType`. Blocks take callbacks: `repeat`, `repeatUntilEof`,
+  `repeatUntil`, `sections` with `arms.arm(...)`, `if` with `elseIf`,
+  `else` and `elseReadIf`, and `instances`. A callback returns the handles
+  it wants to keep, and must not be `async`.
+- A handle is `Field<V, D, P>`: value type `"int"`, `"float"`, `"num"`,
+  `"string"` or `"dyn"`; depth 0 to 8, or `null` past 8; and `"required"`
+  or `"maybe"`. The scope gives the depth, so a `read` in a `repeat`
+  callback returns a handle one level deeper.
+- `data.get(handle)` returns the entry's data with the handle's type, such
+  as `number[][]`, or `undefined` for an absent `"maybe"` entry; add
+  `{ bigint: true }` for `bigint` integers. A handle whose value type or depth
+  differs from the entry's throws `TypeError`. `spec(format?, body)` returns
+  `{ spec, handles, source, read, catalog }`, and its `read` maps the handles
+  that `body` returned to their data. Any object with the shape of the
+  `Handle` interface (`name`, `valueType`, `depth`, `presence`) works as a
+  handle in both.
+- Equality, `eq` and `ne`, compiles for two strings, two numbers, or an
+  operand from `dynamic()`. `set(handle, value)` compiles for a value of the
+  handle's value type and, where both are known, its depth.
+- `forward(name, "int", { depth, optional })` reads the depth and absence
+  from the literal options; options of a wider type, such as a variable
+  typed `ForwardOptions`, give a handle with an open depth that may be
+  absent. Options of an arm work the same way.
+- Types are constants and methods: `int`, `float`, `num`, `word`, `rest`,
+  `eol`, `atLeast(lo)`, `atMost(hi)`, `below(hi)`, `range(lo).below(hi)`,
+  `range(lo, hi)`, `alphabet(...)`, and `.dim(n)`, `.dims(...)` and
+  `.until(...)`. Expressions are methods of handles (`plus`, `lt`, `eq`,
+  `at`, `get`, ...) and functions (`sum`, `count`, `all`, `any`, `distinct`,
+  `div`, `rem`, `pow`, `min`, `max`, `size`, `defined`).
+- Patterns are tagged templates, `` p`instance ${name}` ``, or
+  `pattern(...parts)`. A capture handle becomes a capture; `ref(x)`,
+  `validate(type)`, `discard()`, `blank` and `restOfLine` are the other
+  parts.
+- `forward(name)` and `forward(name, "int", { depth, optional })` name an
+  entry before it is defined; `undefined(name)` refers to a name that is
+  never defined; `forwardRecord`, `eachName`, `asName` and `recordAs`
+  share record names between repeats.
+- A builder check throws `BuildError` at the call that broke it, with a
+  `kind` (`"scope"`, `"provenance"`, `"redefinition"`, `"binding"`,
+  `"unprintable"`, or `"spec"` for text that Iris rejects) and the
+  caller's `callSite`. An `IrisError` from parsing, reading or cataloging a
+  built spec names the builder call of the responsible statement as
+  `callSite`. Wrap a helper that writes statements for its caller in
+  `trackCaller` to record the caller's line instead of the helper's.
+
+The [design brief](../docs/builders.md#typescript) explains the choices.
+
 ## Tests
 
 From this directory, after `npm run build`:
@@ -326,14 +404,27 @@ each one from the repository root and compares its output with the recorded
 After changing an example, record its output from the repository root, for
 example with `node typescript/examples/read.ts > typescript/examples/read.out`.
 The site's build checks that the guide shows every file in `examples/`.
-`npm run test:types` type-checks the sources, the tests and
-[`test/types/api.ts`](test/types/api.ts) against the published declarations in
-`dist/`; each `@ts-expect-error` line in that file must report an error.
+The four `test/build-*.test.ts` files test the spec builder: the text of
+every statement and expression (`build-printing`), the builder checks of
+scope, names, bindings, redefinition, captures and unprintable text
+(`build-checks`), the call site that each statement and each parse, read and
+catalog failure names (`build-call-sites`), and typed reads through handles,
+including a jobshop builder and the jobshop example of the design brief
+judged against [`formats/jobshop`](../formats/jobshop/README.md)
+(`build-reading`).
+`npm run test:types` type-checks the sources, the tests,
+[`test/types/api.ts`](test/types/api.ts) and
+[`test/types/build.ts`](test/types/build.ts) against the published
+declarations in `dist/`; each `@ts-expect-error` line in those files must
+report an error. `build.ts` checks the types of handles and their data and
+rejects misuse of the builder.
 
 `npm run test:package` packs the package with `npm pack`, installs the
 tarball into a temporary consumer, type-checks an import of `gecode-iris`,
-`gecode-iris/inline` and `gecode-iris/manual` with `strict` on and
-`skipLibCheck` off, and imports each in Node. It catches declarations and
+`gecode-iris/inline`, `gecode-iris/manual` and the three `gecode-iris/build`
+entry points with `strict` on and `skipLibCheck` off, imports each in Node,
+and builds and reads a reader spec through `gecode-iris/build`, whose failed
+check must name the consumer's line. It catches declarations and
 files that the repository has but the tarball lacks.
 
 Two smoke tests read the same case outside Node:
@@ -348,12 +439,17 @@ npm run test:workerd
 the pinned Playwright, with an import map that resolves `gecode-iris` to the
 `browser` export and then to the `inline` export. Each page sends a strict
 Content-Security-Policy with `'wasm-unsafe-eval'`; a third page omits it and
-must fail. Set `BROWSER_CHANNEL=chrome` to use an installed Chrome instead of
+must fail. Two more pages resolve `gecode-iris/build` to its `browser` and
+`inline` exports, build a reader spec in
+[`test/smoke/build-page.js`](test/smoke/build-page.js), and check that its
+failed check names that file's line. Set `BROWSER_CHANNEL=chrome` to use an installed Chrome instead of
 Playwright's Chromium. `npm run test:workerd` serves
 [`test/smoke/workerd`](test/smoke/workerd/wrangler.jsonc) with the pinned
 Wrangler's `wrangler dev`, which bundles the package with the `workerd`
 condition and imports the format files as text modules. The worker reads the
-case at module scope; the test fetches its JSON. The configuration turns
+case at module scope, and builds a reader spec through `gecode-iris/build`;
+the test fetches the case's JSON and, from `/build`, the built spec's read
+and call site. The configuration turns
 Wrangler's usage metrics off.
 
 [`test/conformance-driver.ts`](test/conformance-driver.ts) speaks the
@@ -402,4 +498,14 @@ The Rust crate follows the workspace's rustfmt and Clippy settings.
 - `src/transfer.ts` decodes the binary layout documented in
   [`rust/iris-js/src/transfer.rs`](../rust/iris-js/src/transfer.rs).
 - `src/spec.ts`, `src/data.ts` and `src/errors.ts` hold the classes.
+  `src/handle.ts` declares handles and the data types they give, and
+  `src/call-sites.ts` the call sites that errors carry.
+- `src/build/` is the spec builder. `scope.ts` holds the scopes, their
+  statements and `spec()`; `expr.ts`, `types.ts` and `pattern.ts` the
+  expressions, types and patterns; `ops.ts` the expression trees;
+  `statement.ts` and `print.ts` the
+  statement stream and its printing; `check.ts` the binding checks;
+  `site.ts` the call sites; and `error.ts` `BuildError`. `index.ts` is the
+  builder's API, and `node.ts`, `browser.ts`, `workerd.ts`, `inline.ts` and
+  `manual.ts` pair it with each entry point.
 - `examples/` holds the TypeScript guide's examples and their recorded output.

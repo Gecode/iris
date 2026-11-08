@@ -3,8 +3,6 @@
 This guide is the design brief for **spec builders**: APIs that construct a
 reader spec in host-language code instead of in `.iris` text. Every
 implementation gets one: Rust, Python, C++, Java, Kotlin, and TypeScript.
-The TypeScript package itself is still being planned, so its section covers
-only the builder.
 
 People ask for builders to get type safety. A misspelled entry name or a
 wrong value type should fail when the program is compiled, or when its
@@ -15,7 +13,8 @@ produce a fragment, and a loop can produce fields.
 The Rust builder exists, as the `gecode-iris-build` crate re-exported by
 `gecode_iris::build`, and its section below is compiled as a test. The
 Python builder exists too, as the `gecode_iris.build` module, and its section
-shows its API. The other languages' APIs do not exist yet: their code is
+shows its API. So does the TypeScript builder, the `gecode-iris/build` entry
+point, whose jobshop example runs as a test. The other languages' APIs do not exist yet: their code is
 sketches, and the names in it are illustrative. The principles are the part to follow. Each implementation
 chooses final names in its own idiom, and its API guide on the site documents
 them. [PLAN.md §8.15](../PLAN.md#815-spec-builders)
@@ -937,14 +936,16 @@ What the builder does not use:
 ### TypeScript
 
 TypeScript can infer the most, and users expect it to, as Zod, Kysely, and
-Drizzle have taught them. The builder returns the handles it exports, and
-`read` returns a plain object whose type follows from them. The builder is
-pure TypeScript over whatever `Spec.parse` the package provides, whether
-WASM or native. How `int` maps to `number` or `bigint` is the TypeScript
-package's decision, and the builder follows it.
+Drizzle have taught them. The builder is the `gecode-iris/build` entry
+point of the `gecode-iris` package. It is pure TypeScript: it prints the
+reader spec and parses it with the package's `Spec`, which runs the Rust
+reader as WebAssembly. Like the rest of the package, it reads integers as
+`number` and gives `bigint` on request, `data.get(n, { bigint: true })`.
+`test/build-reading.test.ts` in `typescript/` reads every jobshop case
+through this example:
 
 ```ts
-import { spec, p, word, atLeast, range, gecode, div, distinct, sum } from "gecode-iris/build";
+import { atLeast, distinct, div, gecode, p, range, spec, sum, word } from "gecode-iris/build";
 
 const jobshop = spec("jobshop", (b) => {
   b.comment("#", "+++");
@@ -955,15 +956,21 @@ const jobshop = spec("jobshop", (b) => {
     const { job, machine, duration } = i.sections({ skipOther: true }, (s) => {
       s.arm(p`instance ${name}`, { optional: true });
       return s.arm(p`${nJobs} ${nMachines}`, { last: true }, (a) => {
-        a.check(nJobs.le(div(div(gecode.intMax.minus(2), 2), nMachines)),
-          "there are too many jobs and machines");
-        return a.repeat(nJobs, (r) => ({
-          job: r.record,
-          ...r.repeat(nMachines, (step) => ({
-            machine: step.read("machine", range(0).below(nMachines)),
-            duration: step.read("duration", atLeast(0)),
-          })),
-        }));
+        a.check(
+          nJobs.le(div(div(gecode.intMax.minus(2), 2), nMachines)),
+          "there are too many jobs and machines",
+        );
+        return a.repeat(nJobs, (r) => {
+          r.asName("jobs");
+          r.eachName("job");
+          return {
+            job: r.record,
+            ...r.repeat(nMachines, (step) => ({
+              machine: step.read("machine", range(0).below(nMachines)),
+              duration: step.read("duration", atLeast(0)),
+            })),
+          };
+        });
       });
     });
     i.check(distinct(job.get(machine)), MSG_DISTINCT);
@@ -973,24 +980,67 @@ const jobshop = spec("jobshop", (b) => {
 });
 
 const shop = jobshop.read(text, { instance: "la01" });
-shop.nJobs;   // number (or bigint, per the package's integer mapping)
+shop.nJobs; // number
 shop.machine; // number[][]
-shop.name;    // string | undefined
+shop.name; // string | undefined
 ```
 
 Keys of the returned object are host names, and the entries keep their Iris
-names: `shop.nJobs` reads entry `n_jobs`.
+names: `shop.nJobs` reads entry `n_jobs`. `spec()` returns the handles,
+the printed `source`, the `Spec`, and a `read` whose result maps each
+handle to its data and drops the other values. A handle is any object with
+the shape of the exported `Handle` interface, so `read` and `data.get`
+accept handles that the builder did not make. Without `spec()`, a
+`SpecBuilder` builds the same statements, and `data.get(handle)` reads one
+entry with its type.
 
-The dynamic forms:
+A handle is `Field<V, D, P>`: its value type (`"int"`, `"float"`, `"num"`,
+`"string"`, or `"dyn"`), its depth (0 to 8, or `null` past 8), and whether
+it is `"required"` or `"maybe"`. The scope gives the depth, so a callback
+of `repeat` receives a `NestedScope<1>` and a `read` in it returns a handle
+one level deeper. `data.get` throws a `TypeError` when the entry's value
+type or depth differs from the handle's, and returns `undefined` for an
+absent `"maybe"` entry. An entry with no values matches any value type.
+
+A callback must not be `async`: the builder records statements in order
+and rejects a callback that returns a promise. A JavaScript `boolean` is
+not a condition, and an expression is not text: `b.check(true)` and
+`` `${n}` `` throw a `TypeError` that names the fix, and the type checker
+rejects the first.
+
+`int`, `float`, `num`, `word`, `rest`, and `eol` are constants, not
+functions, so `b.read("n", int)` reads as the Iris text does. A typed
+`forward` takes the value type as a string and the depth and absence in an
+options object. The handle's type follows literal options; options of a
+wider type, such as a variable typed `ForwardOptions`, give an open depth
+and a handle that may be absent, and an arm's options likewise. Type
+arguments cannot be inspected at run time, so `forward<number>("x")` could
+not check the first definition:
 
 ```ts
-const x = b.forward<number>("x");
-b.read(x, int()); // the first definition binds it
-const again = b.read(x, float()); // redefined: returns a dynamic handle
+const x = b.forward("x", "int"); // Field<"int", 0, "required">
+b.read(x, int); // the first definition binds it
+const again = b.read(x, float); // redefined: returns a dynamic handle
+const rows = b.forward("rows", "int", { depth: 2, optional: true }); // Field<"int", 2, "maybe">
 const mixed = lit("1").dynamic().eq(1);
 const zz = b.undefined("zz");
-const end = b.forward<string>("_"); // only a store binds it
+const end = b.forward("_", "string"); // only a store binds it
+b.repeatUntil("END", { store: end });
 ```
+
+`eq` and `ne` compile for two strings, two numbers, or an operand from
+`dynamic()`, as `mixed` above does. `set(handle, value)`
+redefines a name with a value of the handle's type and keeps the handle;
+the type checker rejects another value type, and a depth that differs from
+a known depth of the handle. `let(handle, value)` redefines it with any value and
+returns a dynamic handle, as a `read` into an existing handle does.
+
+Errors name the caller. Every statement records the frame of the user's
+call from `Error().stack`. A `BuildError` and an `IrisError` from a built
+spec, whether from parsing, reading, or cataloging, carry it as
+`callSite`, `{ file, line, column, function }`, and its text adds the
+line `call site: FILE:LINE:COLUMN`. A helper wrapped in `trackCaller` passes its own
+caller's frame on to the statements it makes.
 
 ## Type safety for text specs
 
@@ -1057,7 +1107,7 @@ Each implementation's builder is tested in four ways:
    expected results.
 3. **Type tests.** Accesses must have the expected types, and misuse must
    fail to compile: Rust `trybuild`, TypeScript `@ts-expect-error` with
-   `expect-type`, Python `assert_type` under pyright and mypy, C++
+   a local type-equality helper, Python `assert_type` under pyright and mypy, C++
    `static_assert` and compile-failure tests in CTest, Java and Kotlin
    compilation tests.
 4. **Builder checks.** Unit tests cover scope discipline, provenance,

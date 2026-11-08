@@ -1,3 +1,8 @@
+import { formatCallSite, type CallSite, type CallSites } from "./call-sites.js";
+
+/** Separates the call site line from the summary of an earlier rejected instance. */
+const EARLIER_REJECTION = "\n  after an earlier error in the instance: ";
+
 /** A position in a reader spec or an input; each field is `null` when unknown. */
 export interface Location {
   readonly origin: string | null;
@@ -9,7 +14,8 @@ export interface Location {
  * An Iris language error, from parsing a reader spec or from reading an input.
  *
  * The fields come from the canonical error document, which `toJSON()`
- * returns unchanged.
+ * returns unchanged. An error from a spec made with `gecode-iris/build`
+ * also names the call site of its statement.
  */
 export class IrisError extends Error {
   override readonly name = "IrisError" as const;
@@ -23,11 +29,28 @@ export class IrisError extends Error {
   readonly context: string | null;
   /** The record indices of a failed check over records. */
   readonly recordPath: readonly number[] | null;
-  /** The text `iris read` prints: location, message, input excerpt and caret. */
+  /**
+   * The text `iris read` prints: location, message, input excerpt and caret,
+   * then a `call site:` line when there is a call site.
+   */
   readonly diagnostic: string;
+  /**
+   * The host code that wrote the failing statement, for a spec made with
+   * `gecode-iris/build`; otherwise `null`.
+   */
+  readonly callSite: CallSite | null;
   readonly #document: string;
+  readonly #fields: ErrorFields;
+  /** The byte offset of the statement that owns the error, if any. */
+  readonly #statement: number | null;
 
-  private constructor(fields: ErrorFields, document: string, diagnostic: string) {
+  private constructor(
+    fields: ErrorFields,
+    document: string,
+    diagnostic: string,
+    statement: number | null,
+    callSite: CallSite | null,
+  ) {
     super(fields.message);
     this.code = fields.code;
     this.inputLocation = fields.inputLocation;
@@ -35,12 +58,40 @@ export class IrisError extends Error {
     this.context = fields.context;
     this.recordPath = fields.recordPath;
     this.diagnostic = diagnostic;
+    this.callSite = callSite;
     this.#document = document;
+    this.#fields = fields;
+    this.#statement = statement;
   }
 
-  /** @internal Builds the error from the canonical document and its display text. */
-  static fromDocument(document: string, diagnostic: string): IrisError {
-    return new IrisError(parseDocument(document), document, diagnostic);
+  /**
+   * @internal Builds the error from the canonical document, its display text
+   * and the byte offset of the statement that owns it.
+   */
+  static fromDocument(
+    document: string,
+    diagnostic: string,
+    statement: number | null = null,
+  ): IrisError {
+    return new IrisError(parseDocument(document), document, diagnostic, statement, null);
+  }
+
+  /**
+   * @internal This error with the call site of its statement, which goes
+   * before the summary of an earlier rejected instance, as in Rust.
+   */
+  locate(sites: CallSites): IrisError {
+    const site = this.#statement === null ? null : sites.at(this.#statement);
+    if (site === null) {
+      return this;
+    }
+    const line = `\ncall site: ${formatCallSite(site)}`;
+    const at = this.diagnostic.indexOf(EARLIER_REJECTION);
+    const diagnostic =
+      at < 0
+        ? this.diagnostic + line
+        : this.diagnostic.slice(0, at) + line + this.diagnostic.slice(at);
+    return new IrisError(this.#fields, this.#document, diagnostic, this.#statement, site);
   }
 
   /** The canonical JSON error document. */

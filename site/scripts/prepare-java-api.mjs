@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { posix, resolve } from 'node:path';
 import { parse, serialize } from 'parse5';
 import { parse as parseToml } from 'smol-toml';
 import { repository, siteDirectory } from './format-sources.mjs';
@@ -17,7 +17,7 @@ const javadocPages = resolve(java, 'iris/build/docs/javadoc/dev.gecode.iris/dev/
 const dokkaPages = resolve(java, 'iris-kotlin/build/dokka/html/iris-kotlin/dev.gecode.iris.kotlin');
 
 runGradle([':iris:javadoc', ':iris-kotlin:dokkaGenerate']);
-const javaFiles = (await readdir(javadocPages)).filter(file => javaSlug(file) !== undefined).sort();
+const javaFiles = (await readdir(javadocPages, { recursive: true })).filter(file => javaSlug(file) !== undefined).sort();
 const kotlinFiles = (await readdir(dokkaPages)).filter(file => file.endsWith('.html')).sort();
 const sources = await Promise.all(javaFiles.map(file => readFile(resolve(javadocPages, file), 'utf8')));
 const reference = {
@@ -41,11 +41,15 @@ function runGradle(tasks) {
 }
 
 // The URL below the reference of a page to publish, such as value-int-value for
-// Value.IntValue.html; other pages are indexes that the site's navigation replaces.
+// Value.IntValue.html, build/int-field for build/IntField.html and build for
+// the summary of dev.gecode.iris.build; other pages are indexes that the
+// site's navigation replaces.
 function javaSlug(file) {
-  if (file === 'package-summary.html') return '';
-  if (!/^[A-Z][\w.]*\.html$/.test(file)) return undefined;
-  return file.replace(/\.html$/, '').replaceAll('.', '-').replace(/(?<=[a-z])(?=[A-Z])/g, '-').toLowerCase();
+  const packages = posix.dirname(file).split('/').filter(name => name !== '.');
+  const name = posix.basename(file);
+  if (name === 'package-summary.html') return packages.join('/');
+  if (!/^[A-Z][\w.]*\.html$/.test(name)) return undefined;
+  return [...packages, name.replace(/\.html$/, '').replaceAll('.', '-').replace(/(?<=[a-z])(?=[A-Z])/g, '-').toLowerCase()].join('/');
 }
 
 function kotlinSlug(file) { return file === 'index.html' ? '' : file.replace(/\.html$/, ''); }
@@ -104,9 +108,10 @@ function dropNote(link) {
 
 function javaHref(href, file, published) {
   if (/^[a-z]+:/.test(href)) return href;
-  const [target, fragment] = decodeURIComponent(href).split('#');
+  const [relative, fragment] = decodeURIComponent(href).split('#');
   const anchor = fragment ? `#${javadocFragment(fragment)}` : '';
-  if (target === '') return anchor;
+  if (relative === '') return anchor;
+  const target = posix.join(posix.dirname(file), relative);
   if (!published.includes(target)) throw new Error(`${file}: link to the unpublished ${href}`);
   return `${pageUrl(javaPath, javaSlug(target))}${anchor}`;
 }

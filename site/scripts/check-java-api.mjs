@@ -25,6 +25,20 @@ const javaRequired = {
   'iris-error-check-error': [],
   location: [],
   'error-code': ['code()'],
+  entry: [],
+  field: [],
+  'record-reader': [],
+  // The spec builder of dev.gecode.iris.build.
+  build: [],
+  'build/iris': ['builder(Runnable)', 'spec(Runnable)', 'int0(String)', 'string1(String)', 'read(Field, Type)', 'line(Object...)', 'repeat(Expr, Runnable)', 'param(Field)', 'check(Expr)', 'sections(Runnable)', 'lit(long)'],
+  'build/builder': ['source()', 'build()'],
+  'build/build-exception': ['kind()', 'reason()', 'callSite()', 'text()', 'failure()', 'emittedLine()'],
+  ...Object.fromEntries([
+    'alphabet', 'arm-option', 'build-exception-kind', 'discard', 'domain', 'dyn', 'dyn-expr', 'dyn-field', 'expr', 'float-expr', 'float-field', 'float-type',
+    'gecode', 'handle-kind', 'int', 'int-expr', 'int-field', 'int-type', 'integral-expr', 'list-reading', 'num', 'num-expr', 'num-field', 'num-type',
+    'numeric-expr', 'over', 'part', 'pattern', 'range', 'real', 'record-expr', 'record-list', 'record-name', 'section-clause', 'str', 'string-expr',
+    'string-field', 'string-type', 'textual-expr', 'track-caller', 'type', 'until',
+  ].map(name => [`build/${name}`, []])),
 };
 const kotlinRequired = ['get', 'to-int-array', 'to-long-array', 'to-double-array', 'as-sequence', 'leaves', 'to-params'];
 
@@ -41,7 +55,7 @@ for (const page of java.pages) {
 }
 
 const linksTo = href => node => node.tagName === 'a' && attrs(node).href?.startsWith(href);
-checkIndex(java, 'using/java/api', Object.keys(javaRequired));
+checkReachable(java, 'using/java/api', Object.keys(javaRequired));
 checkIndex(kotlin, 'using/java/kotlin-api', kotlinRequired);
 const extensions = parseFragment(kotlin.pages.find(page => page.slug === 'get').html);
 ok(descendants(extensions).some(linksTo('/using/java/api/value/')), 'using/java/kotlin-api/get: Value does not link the Java reference');
@@ -62,6 +76,18 @@ async function checkPages(name, path, marker, slugs) {
     for (const heading of page.headings) ok(ids.has(heading.slug), `${url}: the outline's ${heading.slug} has no target`);
   }
   return reference;
+}
+
+// Every page can be found from the index through the links of published pages.
+function checkReachable(reference, path, slugs) {
+  const pages = new Map(reference.pages.map(page => [page.slug, page]));
+  const reached = new Set(['']);
+  for (const slug of reached) {
+    for (const node of descendants(parseFragment(pages.get(slug).html)).filter(linksTo(`/${path}/`))) {
+      reached.add(attrs(node).href.slice(`/${path}/`.length).replace(/\/?(?:#.*)?$/, ''));
+    }
+  }
+  for (const slug of slugs) ok(reached.has(slug), `${path}: no link from the index leads to ${slug}`);
 }
 
 function checkIndex(reference, path, slugs) {

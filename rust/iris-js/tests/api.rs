@@ -113,6 +113,7 @@ fn language_failures_carry_the_canonical_document_and_diagnostic() {
             .unwrap()
             .starts_with("bad.iris:1:")
     );
+    assert_eq!(error["statement"], 0);
 
     let handle = SpecHandle::parse(b"n: int  repeat n { x: int }  check x == 1", "c.iris").unwrap();
     let error = envelope(handle.read(b"2\n1\n2\n", "c.txt", vec![]).err().unwrap());
@@ -121,6 +122,8 @@ fn language_failures_carry_the_canonical_document_and_diagnostic() {
     assert_eq!(document["record_path"], serde_json::json!([1]));
     assert_eq!(document["input_location"]["origin"], "c.txt");
     assert_eq!(document["spec_location"]["origin"], "c.iris");
+    // The failed check starts at byte 29.
+    assert_eq!(error["statement"], 29);
 }
 
 #[test]
