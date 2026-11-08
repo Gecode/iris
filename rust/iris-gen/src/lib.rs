@@ -15,6 +15,7 @@ mod lower;
 pub mod program;
 mod python;
 mod rust;
+mod typescript;
 pub mod view;
 
 use std::fmt;
@@ -35,6 +36,7 @@ pub enum Language {
     Cpp,
     Java,
     Kotlin,
+    TypeScript,
 }
 
 impl Language {
@@ -45,6 +47,7 @@ impl Language {
         Language::Cpp,
         Language::Java,
         Language::Kotlin,
+        Language::TypeScript,
     ];
 
     /// The language's name on the command line.
@@ -55,6 +58,7 @@ impl Language {
             Self::Cpp => "cpp",
             Self::Java => "java",
             Self::Kotlin => "kotlin",
+            Self::TypeScript => "typescript",
         }
     }
 
@@ -62,7 +66,7 @@ impl Language {
     pub fn has_view(self) -> bool {
         match self {
             Self::Rust => true,
-            Self::Python | Self::Cpp | Self::Java | Self::Kotlin => false,
+            Self::Python | Self::Cpp | Self::Java | Self::Kotlin | Self::TypeScript => false,
         }
     }
 }
@@ -109,6 +113,7 @@ pub fn builder_code(
         Language::Cpp => cpp::CppBackend.render(&program),
         Language::Java => java::JavaBackend.render(&program),
         Language::Kotlin => kotlin::KotlinBackend.render(&program),
+        Language::TypeScript => typescript::TypeScriptBackend.render(&program),
     })
 }
 
@@ -147,8 +152,10 @@ impl From<gecode_iris_sema::Error> for ViewError {
 pub fn view_code(analysis: &Analysis, language: Language) -> Result<String, ViewError> {
     match language {
         Language::Rust => Ok(rust::view::render(&view::view(analysis)?)),
-        Language::Python | Language::Cpp | Language::Java | Language::Kotlin => {
-            Err(ViewError::NoPrinter(language))
-        }
+        Language::Python
+        | Language::Cpp
+        | Language::Java
+        | Language::Kotlin
+        | Language::TypeScript => Err(ViewError::NoPrinter(language)),
     }
 }

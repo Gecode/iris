@@ -90,9 +90,12 @@ const KEYWORDS: &[&str] = &[
 /// free as variable names.
 const PROGRAM_NAMES: &[&str] = &["args"];
 
+/// The prefix of the temporaries `e1`, `e2` and so on.
+const TEMPORARY: &str = "e";
+
 /// Whether `name` is a temporary, such as `e1`.
 fn is_numbered(name: &str) -> bool {
-    name.strip_prefix('e')
+    name.strip_prefix(TEMPORARY)
         .is_some_and(|digits| !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()))
 }
 
@@ -188,7 +191,9 @@ impl Identifiers {
     }
 
     /// `base`, with the first numeric suffix that leaves it free if Java or
-    /// the program reserves it or something has it already.
+    /// the program reserves it or something has it already. A temporary's name,
+    /// or `e` itself, takes a `v` first, so no suffix makes a temporary's name
+    /// and the search ends.
     fn unused(&mut self, base: String) -> String {
         // Every name of the form `e1`, `e12` is a temporary's, so no suffix
         // frees one.
@@ -200,6 +205,10 @@ impl Identifiers {
         if !reserved(&base) && !self.taken.contains(&base) {
             self.taken.insert(base.clone());
             return base;
+        }
+        // Every suffix of `e` makes a temporary's name.
+        if base == TEMPORARY {
+            return self.unused(format!("{base}v"));
         }
         let mut number = self.next_suffixes.get(&base).copied().unwrap_or(2);
         let mut candidate = format!("{base}{number}");
@@ -262,5 +271,19 @@ mod tests {
         }
         assert_eq!(identifiers.fresh("x4", "record"), "x4");
         assert_eq!(identifiers.fresh("x", "record"), "x5");
+    }
+
+    #[test]
+    fn the_temporary_prefix_takes_a_letter_before_a_suffix() {
+        let mut identifiers = Identifiers::default();
+        let names = [
+            identifiers.named(Role::Value, "_e"),
+            identifiers.named(Role::Value, "e"),
+            identifiers.named(Role::Type, "e"),
+            identifiers.named(Role::Variable, "e"),
+            identifiers.fresh("e", "record"),
+        ];
+        assert_eq!(names, ["e", "ev", "ev2", "ev3", "ev4"]);
+        assert!(!names.iter().any(|name| reserved(name)), "{names:?}");
     }
 }

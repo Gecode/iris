@@ -195,6 +195,14 @@ fn is_numbered(name: &str) -> bool {
     })
 }
 
+/// Whether every numeric suffix of `base` makes a numbered program name, as
+/// `block_2` is for `block`.
+fn suffixes_are_numbered(base: &str) -> bool {
+    NUMBERED
+        .iter()
+        .any(|prefix| prefix.strip_suffix('_') == Some(base))
+}
+
 fn reserved(name: &str) -> bool {
     KEYWORDS.contains(&name) || PROGRAM_NAMES.contains(&name) || is_numbered(name)
 }
@@ -274,11 +282,16 @@ impl Identifiers {
 
     /// `base`, with the first numeric suffix that leaves it free if C++ or the
     /// program reserves it or something has it already. clang-tidy's
-    /// `lower_case` refuses a trailing `_`, so there is no `base_`.
+    /// `lower_case` refuses a trailing `_`, so there is no `base_`. A base
+    /// whose every suffix is a numbered name, such as `block`, takes `_v`
+    /// first, so the search ends.
     fn unused(&mut self, base: String) -> String {
         if !reserved(&base) && !self.taken.contains(&base) {
             self.taken.insert(base.clone());
             return base;
+        }
+        if suffixes_are_numbered(&base) {
+            return self.unused(format!("{base}_v"));
         }
         let mut number = self.next_suffixes.get(&base).copied().unwrap_or(2);
         let mut candidate = format!("{base}_{number}");
@@ -342,5 +355,27 @@ mod tests {
         }
         assert_eq!(identifiers.fresh("x_4", "record"), "x_4");
         assert_eq!(identifiers.fresh("x", "record"), "x_5");
+    }
+
+    #[test]
+    fn every_numbered_prefix_leaves_a_suffix_free() {
+        for prefix in NUMBERED {
+            let word = prefix.trim_end_matches('_');
+            let mut identifiers = Identifiers::default();
+            let names = [
+                identifiers.named(Role::Value, &format!("_{word}")),
+                identifiers.named(Role::Value, word),
+                identifiers.named(Role::Type, word),
+                identifiers.named(Role::Variable, word),
+                identifiers.fresh(word, "record"),
+            ];
+            let distinct: HashSet<&String> = names.iter().collect();
+            assert_eq!(distinct.len(), names.len(), "{names:?}");
+            assert!(!names.iter().any(|name| reserved(name)), "{names:?}");
+        }
+        let mut identifiers = Identifiers::default();
+        assert_eq!(identifiers.named(Role::Value, "block"), "block");
+        assert_eq!(identifiers.named(Role::Type, "block"), "block_v");
+        assert_eq!(identifiers.named(Role::Variable, "block"), "block_v_2");
     }
 }

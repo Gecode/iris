@@ -36,6 +36,10 @@
   use `dev.gecode.iris.kotlin.build`, compile without warnings under the flags
   of `java/` and pass ktfmt in kotlinlang style unchanged, and a test that
   round-trips every accepted corpus spec through it.
+- Add a TypeScript backend to gecode-iris-gen, `Language::TypeScript`, whose
+  programs use `gecode-iris/build` and pass oxfmt, oxlint with
+  `--type-aware --deny-warnings` and strict tsc unchanged, and a test that
+  round-trips every accepted corpus spec through it.
 
 ### CLI
 
@@ -51,6 +55,9 @@
   `iris gen --lang java` says that Java has no view generator yet.
 - Add `iris gen builder --lang kotlin SPEC`, which prints a Kotlin builder
   program. `iris gen --lang kotlin` says that Kotlin has no view generator yet.
+- Add `iris gen builder --lang typescript SPEC`, which prints a TypeScript
+  builder program. `iris gen --lang typescript` says that TypeScript has no
+  view generator yet.
 
 ## 0.1.0 - 2026-11-06
 

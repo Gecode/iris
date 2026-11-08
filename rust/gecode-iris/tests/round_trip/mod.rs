@@ -85,6 +85,7 @@ pub fn extra_specs() -> Vec<(String, String)> {
         }
     }
     specs.push(("reserved_names".to_owned(), reserved_names()));
+    specs.push(("numbered_prefixes".to_owned(), numbered_prefixes()));
     specs.push(("helper_types".to_owned(), helper_types()));
     specs.push(("host_constants".to_owned(), host_constants()));
     specs
@@ -209,6 +210,28 @@ fn reserved_names() -> String {
                 u: t2\n";
     text.push_str(&format!(
         "{}{body}{}",
+        "repeat 1 {\n".repeat(21),
+        "}\n".repeat(21)
+    ));
+    text
+}
+
+/// The prefixes of the numbered names that the generated programs make, such
+/// as `e1`, `block1` and `block_1`, each naming two values once a leading
+/// underscore is gone, also inside a block deep enough for a helper function.
+fn numbered_prefixes() -> String {
+    let prefixes = ["e", "s", "a", "t", "c", "block", "body"];
+    let mut text: String = prefixes
+        .iter()
+        .map(|prefix| format!("_{prefix}: int\n{prefix}: int\n"))
+        .collect();
+    let sum = prefixes
+        .iter()
+        .map(|prefix| format!("_{prefix} + {prefix}"))
+        .collect::<Vec<_>>()
+        .join(" + ");
+    text.push_str(&format!(
+        "{}let x = {sum}\n{}",
         "repeat 1 {\n".repeat(21),
         "}\n".repeat(21)
     ));

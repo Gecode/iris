@@ -10,6 +10,32 @@ fn code(source: &str) -> String {
     builder_code(&parsed, &analysis, Language::Cpp).expect("the spec is accepted")
 }
 
+/// The builder of `source`, which must be finished within seconds: an
+/// identifier search that never ends would otherwise hang the test.
+fn code_in_time(source: &str) -> String {
+    let source = source.to_owned();
+    let (sender, receiver) = std::sync::mpsc::channel();
+    std::thread::spawn(move || sender.send(code(&source)));
+    receiver
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .unwrap_or_else(|error| panic!("the builder is not finished: {error}"))
+}
+
+/// The prefixes of the numbered names that some backend makes, such as
+/// `e1`, `s1`, `c1`, `block1` and `block_1`.
+const NUMBERED_PREFIXES: &[&str] = &["e", "s", "a", "t", "c", "block", "body"];
+
+/// Specs where a bare prefix, such as `e`, names two things once a leading
+/// underscore is gone: values, a type and a value, and a comprehension
+/// variable and a value.
+fn prefix_collisions(prefix: &str) -> [String; 3] {
+    [
+        format!("_{prefix}: int\n{prefix}: int\n"),
+        format!("type _{prefix} = int\n{prefix}: _{prefix}\n"),
+        format!("x[2]: int\ncheck all({prefix} in x: {prefix} > 0)\nlet _{prefix} = 1\n"),
+    ]
+}
+
 /// Whether the builder of each spec holds its expected lines, in order, with
 /// their indentation relative to the first of them.
 #[track_caller]
@@ -543,6 +569,24 @@ fn identifiers_are_lower_snake_case_and_never_reserved() {
             ],
         ),
     ]);
+}
+
+#[test]
+fn prefixes_of_numbered_helpers_take_a_letter_before_a_number() {
+    for prefix in NUMBERED_PREFIXES {
+        for source in prefix_collisions(prefix) {
+            code_in_time(&source);
+        }
+    }
+    assert_statements(&[(
+        "_block: int\nblock: int\n_body: int\nbody: int\n",
+        &[
+            "b.read(block, int_);",
+            "b.read(block_v, int_);",
+            "b.read(body, int_);",
+            "b.read(body_v, int_);",
+        ],
+    )]);
 }
 
 #[test]

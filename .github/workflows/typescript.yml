@@ -123,3 +123,53 @@ jobs:
           name: npm-package
           path: ${{ runner.temp }}/package/*.tgz
           if-no-files-found: error
+
+  # Generates a TypeScript builder program for every accepted corpus spec,
+  # checks every program in one run each of oxfmt, oxlint and tsc with the
+  # package's settings, runs them in one Node process against the built
+  # package, and compares the spec each prints with the original.
+  builder-round-trip:
+    name: Builder round trip
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+        working-directory: typescript
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: typescript/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Cache wasm-bindgen CLI
+        id: bindings
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/iris-typescript-tools/wasm-bindgen-0.2.129
+          key: typescript-wasm-bindgen-${{ runner.os }}-${{ runner.arch }}-0.2.129
+      - name: Install wasm-bindgen CLI
+        if: steps.bindings.outputs.cache-hit != 'true'
+        run: cargo install wasm-bindgen-cli --locked --version 0.2.129 --root "$HOME/.cache/iris-typescript-tools/wasm-bindgen-0.2.129"
+      - name: Add wasm-bindgen CLI to PATH
+        run: echo "$HOME/.cache/iris-typescript-tools/wasm-bindgen-0.2.129/bin" >> "$GITHUB_PATH"
+      - name: Cache Cargo artifacts
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: typescript-round-trip-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-${{ hashFiles('rust/**/*.rs', 'rust/**/Cargo.toml') }}
+          restore-keys: |
+            typescript-round-trip-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
+      - run: npm ci
+      - name: Build package
+        run: npm run build
+      - name: Round trip
+        working-directory: rust
+        run: cargo test --locked -p gecode-iris --test builder_round_trip_typescript -- --ignored --nocapture

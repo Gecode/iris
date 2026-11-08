@@ -462,6 +462,15 @@ exemptions:
 (cd rust && cargo run --locked -p gecode-iris-conformance -- run --driver "\"$(command -v node)\" \"$PWD/../typescript/test/conformance-driver.ts\"" ../formats)
 ```
 
+[`test/round-trip-runner.ts`](test/round-trip-runner.ts) runs the programs
+that `iris gen builder --lang typescript` prints for the builder round trip
+of [gecode-iris-gen](../rust/iris-gen/README.md#the-typescript-backend). The
+package does not ship it. After `npm run build`, from the repository root:
+
+```sh
+(cd rust && cargo test --locked -p gecode-iris --test builder_round_trip_typescript -- --ignored --nocapture)
+```
+
 ## Code style
 
 The formatter's output is the style. The package does not build with Vite, so

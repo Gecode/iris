@@ -172,14 +172,15 @@ temporary directory cannot affect results.
 `iris gen builder --lang LANGUAGE SPEC` prints a program that builds the reader
 spec with the spec builder of that language, through
 [gecode-iris-gen](../iris-gen/README.md). The languages are `rust`, `python`,
-`cpp`, `java` and `kotlin`. The program is a complete file: its `builder` function returns the
+`cpp`, `java`, `kotlin` and `typescript`. The program is a complete file: its `builder` function returns the
 `SpecBuilder`, and running it prints the spec's source.
 
 A spec that `iris check` rejects exits 1 with the same message on standard error
 and nothing on standard output. A file that cannot be read also exits 1, and an
 unknown language or a missing `--lang` is a usage error with exit 2.
 `tests/fixtures/jobshop-builder.rs`, `jobshop-builder.py`,
-`jobshop-builder.cpp`, `jobshop-builder.java` and `jobshop-builder.kt` record the output for the jobshop format; after an
+`jobshop-builder.cpp`, `jobshop-builder.java`, `jobshop-builder.kt` and
+`jobshop-builder.ts` record the output for the jobshop format; after an
 intended change to the generated code, write the new output there.
 
 The round trip checks what the programs do, from `rust/`:
@@ -196,7 +197,7 @@ add up to the whole corpus; nothing else is skipped. `extra` is the specs beyond
 the corpus, which go through the same steps: the layout forms at several widths
 and the operands of `clippy::eq_op`. The limit specs of Specification §5.12 run
 too, outside all of these counts. The Python and C++ round trips report the
-same counts, and so do the Java and Kotlin ones; see [gecode-iris-gen](../iris-gen/README.md) for their commands.
+same counts, and so do the Java, Kotlin and TypeScript ones; see [gecode-iris-gen](../iris-gen/README.md) for their commands.
 
 ## Generating views
 

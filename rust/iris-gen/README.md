@@ -19,9 +19,9 @@ let code = builder_code(&parsed, &analysis, Language::Rust)?;
 ```
 
 A new language adds a `Language` variant, a backend module and one match arm in
-`builder_code`. There are backends for Rust, Python, C++, Java and Kotlin.
-`Language::has_view` says whether a language also has a view printer; Python,
-C++, Java and Kotlin have none yet.
+`builder_code`. There are backends for Rust, Python, C++, Java, Kotlin and
+TypeScript. `Language::has_view` says whether a language also has a view
+printer; Python, C++, Java, Kotlin and TypeScript have none yet.
 
 ## The Rust backend
 
@@ -295,6 +295,85 @@ cargo test --locked -p gecode-iris --test builder_round_trip_kotlin -- --ignored
 ```
 
 Gradle's output goes to `target/tmp/kotlin-round-trip/gradle.log`.
+
+## The TypeScript backend
+
+The program is a complete ES module that imports `gecode-iris/build`. Its
+`export function builder(): SpecBuilder` returns the builder, and run as the
+main module it prints the spec. It passes oxfmt, oxlint with `--type-aware
+--deny-warnings`, and tsc in strict mode unchanged, each with the settings of
+`typescript/`. It writes oxfmt's layout itself, at width 100: a call goes on
+one line if it fits, and otherwise puts each argument on a line of its own
+with a trailing comma, unless only its last argument, an object, an array or
+an arrow function with a block, breaks. A chain of two calls stays on one
+line, and a longer one puts each call after the first on a line of its own.
+
+- Every handle is a local at the top of `builder`, such as
+  `const x = b.forward("x")`, so that a statement may name a handle defined
+  later in the spec. A name that the spec never defines is
+  `const q = b.undefined("q")`, and a record that a check outside its block
+  uses is `const r = b.forwardRecord("r", "rs")`; the block of any other
+  record names it with `eachName` and `asName`.
+- A block is an arrow function whose parameter is numbered by depth, `s1`
+  for a scope and `a1` for the arms of `sections`. An empty block is left
+  out where the builder allows it, and is `() => {}` where it does not.
+- A block deeper than 9, or whose statements would start beyond column 36,
+  becomes a module function, such as
+  `function block1(s1: NestedScope<HandleDepth, Presence>, x: DynField, t: Type<"int", 0>): void`,
+  that takes each handle, record and type that it uses. Every function is at
+  module level, since oxlint's `unicorn/consistent-function-scoping` refuses
+  a nested one that captures nothing.
+- A type that a statement uses is `const t = b.defineType("t", ...)`.
+- An `if` chain is one statement, `b.if(c, ...).elseIf(...).else(...)` or
+  `.elseReadIf(if2, int)`. The clauses of `sections` are an options object,
+  `{ until: "X", store: a, skipOther: true }`, or, in any other order, an
+  array of them. An arm's options are an object, `{ optional: true }`.
+- A pattern is a `p` template, with `bind(x)`, `bind(x, int)`, `ref(x)`,
+  `validate(int)`, `blank()` and `discardAs(int)` as its parts.
+- Operators are methods: `plus`, `minus`, `times`, `neg`, comparisons as `lt`,
+  `eq` and the others, and `and`, `or` and `not`. `/`, `%` and `^` are the
+  functions `div`, `rem` and `pow`, and an index is `x.at(i)` and a record
+  field `r.get(k)`. A number or string on the left of an operator goes
+  through `lit`, or `floatLit` for a float, an integer that is not a safe
+  integer is a bigint such as `9007199254740993n`, and an operand that the
+  types refuse goes through `.dynamic()`. `gecode.int_max` is
+  `gecode.intMax`.
+- A comprehension is `const e1 = sum(over(xs, "v"), (v) => body)`, with `()`
+  when the body does not use its variable. A body that does not fit on its
+  line becomes a function `function body1(v: Lookup<"dyn">): Expr` that takes
+  the comprehension variable and any outer variables and handles it uses.
+- A value too wide for its place goes into `const e1 = ...`, with `as const`
+  for an object or an array so that tsc keeps its literal types, and a long
+  string into a module constant `const t1 = ...`, which keeps it whole, as
+  oxfmt does.
+
+The program has one import, which names each value of `gecode-iris/build`
+that it uses and, as `type`, each type in its functions' signatures, since
+oxlint refuses an unused import.
+
+Identifiers keep the spec's spelling, cut to 24 characters, or 12 for a
+comprehension variable, and without an underscore at either end, which
+oxlint's `no-underscore-dangle` refuses. A name that JavaScript reserves, that
+`gecode-iris/build` exports or the program uses, such as `b` or `builder`,
+or that another name has gets a numeric suffix: `if` binds `if2`. Iris keeps
+values, types and comprehension variables apart, but in TypeScript they share
+one scope and oxlint's `no-shadow` refuses an inner one that hides an outer
+one, so each gets an identifier of its own. A name of the form of the
+program's numbered names, such as `e1`, gets a `v`: `e1v`. String literals are
+ASCII, in double quotes unless the text has more of them than single quotes,
+with everything else as `\uNNNN` escapes of UTF-16 units.
+
+The TypeScript round trip needs Node 22.18 or later and `npm ci` and
+`npm run build` in `typescript/`. It writes every builder to
+`target/tmp/typescript-round-trip/src`, beside a `tsconfig.json` that extends
+the one of `typescript/` and a link to it as `gecode-iris`. It checks them in
+batches with oxfmt and oxlint and in one tsc run, and runs them all in one
+Node process with `typescript/test/round-trip-runner.ts`, which the package
+does not ship. From `rust/`:
+
+```sh
+cargo test --locked -p gecode-iris --test builder_round_trip_typescript -- --ignored --nocapture
+```
 
 ## Views
 

@@ -1085,7 +1085,7 @@ Each implementation's builder is tested in four ways:
    runs the generated programs in each language and compares their output
    with the original, as syntax trees. Whitespace, comments, redundant
    parentheses, and generated record names do not count as differences.
-   Rust, Python, C++, Java and Kotlin have generators so far. The generated code
+   Rust, Python, C++, Java, Kotlin and TypeScript have generators so far. The generated code
    must pass the language's own tools unchanged before it runs: rustfmt and
    Clippy for Rust; `ruff format`, `ruff check` and ty for Python;
    clang-format and clang-tidy 22.1.8, with the `.clang-format` and
@@ -1094,7 +1094,10 @@ Each implementation's builder is tested in four ways:
    check of `java/`, for Java, which then compiles in one javac run with
    the flags of `java/`, Error Prone and NullAway included; and ktfmt in
    kotlinlang style, through the same Spotless check, for Kotlin, which then
-   compiles in one kotlinc run with the warnings as errors. The C++ round
+   compiles in one kotlinc run with the warnings as errors; and oxfmt,
+   oxlint with `--type-aware --deny-warnings` and strict tsc, with the
+   settings of `typescript/`, for TypeScript, which then runs in Node
+   against the built package. The C++ round
    trip also runs as the CTest test `builder-round-trip`, with the
    compiler and flags of the CTest build.
    This proves that the builder covers the language and that its printer is
