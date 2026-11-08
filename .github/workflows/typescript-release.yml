@@ -16,10 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Check the tag names the package version
-        run: |
-          version=$(sed -n 's/^  "version": "\(.*\)",$/\1/p' typescript/package.json | head -n 1)
-          test "$GITHUB_REF_NAME" = "typescript-v$version"
+        with:
+          fetch-depth: 0
+      - name: Check the tag against the versions and the Rust release
+        run: python3 -I scripts/versions.py release-check "$GITHUB_REF_NAME"
 
   build:
     name: Build and test
@@ -42,6 +42,9 @@ jobs:
         with:
           name: npm-package
           path: package
+      - name: Check that npm supports trusted publishing
+        run: |
+          node -e 'const [a, b, c] = process.argv[1].split(".").map(Number); process.exit(a > 11 || (a === 11 && (b > 5 || (b === 5 && c >= 1))) ? 0 : 1)' "$(npm --version)"
       - name: Publish with provenance
         run: npm publish package/gecode-iris-*.tgz --provenance --access public
         env:

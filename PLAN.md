@@ -958,7 +958,12 @@ every language. In short:
 - **Versioning:** language versions (0.1, 1.0) and package versions are
   separate. Each package states which language versions it supports
   (`iris --version` prints both). Packages follow semver: 0.x while they
-  implement Iris 0.1, and 1.0.0 with Iris 1.0.
+  implement Iris 0.1, and 1.0.0 with Iris 1.0. The Rust crates and the
+  Python and TypeScript packages, which bind them, share one version and
+  are released together from one commit, so every Python or TypeScript
+  release reads exactly as a Rust release does. The native C++ and Java
+  libraries version independently. `scripts/versions.py` checks and sets
+  the versions, and each release workflow refuses a tag that disagrees.
 - **Releases:** one tag per component (`rust-v0.1.0`, `python-v0.1.0`,
   ...). Releases are automated from tags, and changelogs come from
   conventional commit scopes. History stays linear, with rebase only.

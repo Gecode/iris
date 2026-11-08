@@ -1,0 +1,43 @@
+name: Rust crates release
+
+# Publishes the Rust crates to crates.io for a rust-vVERSION tag, through trusted
+# publishing. The binaries are released by rust-v-release.yml. See RELEASING.md.
+on:
+  push:
+    tags:
+      - 'rust-v*'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check tag and package crates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Check the tag against the versions
+        run: python3 -I scripts/versions.py release-check "$GITHUB_REF_NAME"
+      - name: Package and build every publishable crate
+        working-directory: rust
+        run: cargo publish --dry-run --workspace --locked
+
+  publish:
+    name: Publish to crates.io
+    needs: check
+    runs-on: ubuntu-latest
+    environment: crates-io
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+      - name: Publish in dependency order
+        working-directory: rust
+        run: cargo publish --workspace --locked
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}

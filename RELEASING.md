@@ -14,7 +14,7 @@ tags; [§11](PLAN.md#11-milestones) defines the release milestones.
 
 | Component | Tag | Current release support |
 |---|---|---|
-| Rust crates and CLI binaries | `rust-vVERSION` | Released: 0.1.0 on crates.io and GitHub; crates are published by hand until trusted publishing is set up |
+| Rust crates and CLI binaries | `rust-vVERSION` | Released: 0.1.0 on crates.io and GitHub; the crates.io workflow needs the trusted publishing setup below |
 | Python | `python-vVERSION` | Ready: the release workflow needs the PyPI setup below |
 | TypeScript | `typescript-vVERSION` | Ready: the release workflow needs the npm setup below |
 | Java and Kotlin | `java-vVERSION` | Native library and Kotlin module ready; Maven Central publication planned for M7 |
@@ -23,9 +23,26 @@ tags; [§11](PLAN.md#11-milestones) defines the release milestones.
 | VS Code extension | `vscode-vVERSION` | Not built yet |
 | Documentation site | No version tag; deploys from `main` | Deployment configured; production setup and live verification required |
 
-For the affected component, update its package versions, internal dependency
-requirements, lockfiles, changelog, and current installation and API links
-together. Keep historical measurements at their recorded versions. Maintain an
+The Rust crates and the Python and TypeScript packages share one version,
+because the packages build in the Rust crates from the same commit. Release the
+three together: when a change touches Rust code the packages build in, tag
+`rust-vVERSION` before or at the same commit as `python-vVERSION` and
+`typescript-vVERSION`. The Python and TypeScript workflows refuse a tag when
+the Rust sources they build in changed since `rust-vVERSION`. Java and C++
+version independently.
+
+Set versions with [scripts/versions.py](scripts/versions.py), which rewrites
+every manifest, internal requirement, and lockfile entry, then checks them:
+
+```sh
+python3 -I scripts/versions.py set reader 0.1.1   # rust, python and typescript
+python3 -I scripts/versions.py set java 0.2.0     # or cpp, or one reader component
+python3 -I scripts/versions.py check              # also run by the repository workflow
+python3 -I scripts/versions.py release-check python-v0.1.1
+```
+
+For the affected component, update its changelog and current installation and
+API links together with its versions. Keep historical measurements at their recorded versions. Maintain an
 `Unreleased` section in each releasable component's changelog; Rust's is
 [rust/CHANGELOG.md](rust/CHANGELOG.md). Move its entries into a versioned section
 when preparing that release. Changelog generation from conventional commit
@@ -61,8 +78,16 @@ can be created, so the first publication can stop partway with a 429 response.
 Wait for the time it names, then publish the remaining crates with
 `cargo publish --locked -p NAME ...`, as in
 [Recover after partial publication](#recover-after-partial-publication).
-Registry automation can follow the first publication, because crates.io trusted
-publishing is configured on a crate that already exists.
+
+From 0.1.1 on, the authorized `rust-vVERSION` tag also starts the
+[crates.io workflow](.github/workflows/rust-publish.yml). It runs the release
+check, packages and builds every publishable crate with the dry run above, and
+after approval in the `crates-io` environment publishes them through trusted
+publishing, with no stored token. Set this up once: on crates.io, add a trusted
+publisher to each of the ten crates with owner `Gecode`, repository `iris`,
+workflow `rust-publish.yml` and environment `crates-io`; on GitHub, create the
+`crates-io` environment with a required reviewer. A new crate still needs its
+first version published by hand.
 
 The operational binary path is [Release binaries](rust/README.md#release-binaries):
 use its local cargo-dist checks before an authorized `rust-vVERSION` tag push.
@@ -79,12 +104,8 @@ An authorized `python-vVERSION` tag starts the
 names the version in `python/Cargo.toml`, runs the whole
 [Python workflow](.github/workflows/python.yml) (lint, every wheel, the source
 distribution, conformance) and uploads those exact files to PyPI, through trusted
-publishing with no stored token.
-
-Set this up once before the first tag. On PyPI, add a pending trusted publisher
-for project `gecode-iris`, owner `Gecode`, repository `iris`, workflow
-`python-release.yml` and environment `pypi`. On GitHub, create the `pypi`
-environment and add a required reviewer, so that a tag alone cannot publish.
+publishing with no stored token. The PyPI trusted publisher and the `pypi`
+environment with its required reviewer are set up.
 
 ## TypeScript
 
@@ -95,11 +116,12 @@ tag names the version in `typescript/package.json`, runs the whole
 that workflow packed, with provenance.
 
 npm trusted publishing is configured on a package that already exists, so the
-first release uses a token. Set this up once before the first tag: create the
-`npm` environment on GitHub with a required reviewer, and give it an `NPM_TOKEN`
-secret, a granular access token that can publish new packages. After the first
-release, configure a trusted publisher for `typescript-release.yml` and delete the
-token.
+first release used a granular access token, the `NPM_TOKEN` secret of the `npm`
+environment. After it, on npmjs.com add a trusted publisher to `gecode-iris` with
+owner `Gecode`, repository `iris`, workflow `typescript-release.yml` and
+environment `npm`, then delete the secret. npm 11.5.1 and later use trusted
+publishing whenever it is configured, so the workflow needs no change; it checks
+the npm version.
 
 ## Documentation and future packages
 

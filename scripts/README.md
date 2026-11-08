@@ -101,3 +101,24 @@ An adapter can use the installed CMake package to link all required static
 dependencies: set `CMAKE_PREFIX_PATH` to `GECODE_REFERENCE_PREFIX`, use
 `find_package(Gecode CONFIG REQUIRED COMPONENTS instance)`, and link
 `Gecode::gecodeinstance`.
+
+## Check and set versions
+
+`python3 -I scripts/versions.py check` reads the version of each component
+from every place it is written: the Rust workspace, the internal requirements
+between crates and both Cargo lockfiles, `python/Cargo.toml`,
+`typescript/package.json` and its lockfile, `java/gradle.properties`, and
+`cpp/CMakeLists.txt`. It fails when the copies of one component disagree, or
+when Rust, Python and TypeScript, which share one version, differ. The
+repository workflow runs it. It needs Python 3.9 or newer and Git, and makes no
+network requests.
+
+`set COMPONENT VERSION` rewrites every copy, for `rust`, `python`,
+`typescript`, `java`, `cpp`, or `reader` for the first three together, then
+runs the check. The lockfile entries it rewrites are the workspace's own
+packages, so `--locked` builds keep working without a `cargo update`.
+
+`release-check TAG` checks a `COMPONENT-vVERSION` tag against the source. For
+a Python or TypeScript tag it also requires the `rust-vVERSION` tag, and fails
+when the Rust sources the package builds in changed since it. The release
+workflows run it. [RELEASING.md](../RELEASING.md) describes the procedure.
