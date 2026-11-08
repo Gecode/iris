@@ -878,6 +878,12 @@ concept PatternPart = detail::IsField<std::remove_cvref_t<T>>::value ||
  *
  * pattern() builds one from a string literal checked at compile time; this
  * class builds one from text known only at run time, which build() checks.
+ *
+ * macOS's QuickDraw, which `<ApplicationServices/ApplicationServices.h>`
+ * includes, declares a global type `Pattern`, so under
+ * `using namespace iris::build;` an unqualified `Pattern` is ambiguous where
+ * that header is included. Add `using iris::build::Pattern;` inside a
+ * function or namespace, since at global scope it collides with QuickDraw's.
  */
 class Pattern {
 public:
@@ -1291,11 +1297,24 @@ std::optional<std::size_t> let_levels(const Ops &ops) {
     return in - D;
 }
 
-/// The levels a `param` with a default of operand T defines
-template <Operand T>
-inline constexpr std::optional<std::size_t> scalar_levels =
-    let_depth<T, 0> == dynamic_depth ? std::nullopt
-                                     : std::optional<std::size_t>(0);
+/// The depth of a handle that `param` defines with a default of operand T
+/// in a scope of depth D. A caller's value is a scalar, so the handle keeps
+/// the scope's depth when the default is a scalar there too: a scalar
+/// expression, or a handle of depth 0 outside every repeat. Any other
+/// default gives dynamic_depth.
+template <Operand T, std::size_t D>
+inline constexpr std::size_t param_depth =
+    (!std::same_as<ValueOf<T>, Dynamic> && D != dynamic_depth &&
+     depth_in<T, D> == D)
+        ? D
+        : dynamic_depth;
+
+/// The levels a `param` with a default of operand T defines in a scope of
+/// depth D
+template <Operand T, std::size_t D>
+inline constexpr std::optional<std::size_t> param_levels =
+    param_depth<T, D> == dynamic_depth ? std::nullopt
+                                       : std::optional<std::size_t>(0);
 
 template <class Out, class L, class R>
 Expr<Out, Scalar> binary(L &&left, R &&right, BinaryOp op) {
@@ -1948,7 +1967,8 @@ inline constexpr detail::LitFn lit{};
 /// `pow(a, b)`, which Iris spells `a ^ b`. Where the C library's `::pow` is
 /// declared, as `<math.h>` and MSVC's standard headers declare it,
 /// `using namespace iris::build;` makes an unqualified `pow` ambiguous, so
-/// add `using iris::build::pow;` beside it.
+/// add `using iris::build::pow;` beside it, inside a function or namespace,
+/// since at global scope it collides with `::pow`.
 inline constexpr detail::PowFn pow{};
 /// `min(a, b, ...)`, or `min(row)` over an array; also takes a range of
 /// operands
@@ -1981,7 +2001,12 @@ inline constexpr detail::DefinedFn defined{};
 /// A pattern from a string literal with one `{}` for each part, checked at
 /// compile time, as in `pattern("p cnf {} {}", vars, clauses)`
 inline constexpr detail::PatternFn pattern{};
-/// `{x:type}` in a pattern, which defines the handle's name
+/// `{x:type}` in a pattern, which defines the handle's name. Where the
+/// socket function `::bind` is declared, as POSIX `<sys/socket.h>` and
+/// Windows `<winsock2.h>` declare it, `using namespace iris::build;` makes an
+/// unqualified `bind` ambiguous, so add `using iris::build::bind;` beside it,
+/// inside a function or namespace, since at global scope it collides with
+/// `::bind`.
 inline constexpr detail::BindFn bind{};
 /// `{$x}` in a pattern, which matches the value of the handle's entry
 inline constexpr detail::RefFn ref{};
@@ -2157,15 +2182,18 @@ public:
         detail::ValueTag::Dyn, std::nullopt, std::nullopt, site));
   }
 
-  /// `param target = fallback`
+  /// `param target = fallback`. A scalar default, including a handle of
+  /// depth 0 outside every repeat, keeps the depth of the scope; any other
+  /// default gives dynamic_depth, since a caller's value replaces it with a
+  /// scalar.
   template <class T, Operand E>
-  detail::TargetOut<T, ValueOf<E>, detail::let_depth<E, D>, P>
+  detail::TargetOut<T, ValueOf<E>, detail::param_depth<E, D>, P>
   param(const T &target, E &&fallback,
         std::source_location site = std::source_location::current()) {
-    using Out = detail::TargetOut<T, ValueOf<E>, detail::let_depth<E, D>, P>;
+    using Out = detail::TargetOut<T, ValueOf<E>, detail::param_depth<E, D>, P>;
     return detail::make_handle<Out>(detail::param(
         *state_, block_, detail::TargetTraits<detail::Bare<T>>::target(target),
-        detail::value_tag<ValueOf<E>>(), detail::scalar_levels<E>,
+        detail::value_tag<ValueOf<E>>(), detail::param_levels<E, D>,
         detail::ops_of(std::forward<E>(fallback)), site));
   }
 

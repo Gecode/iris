@@ -68,6 +68,13 @@ placeholders at compile time, and `build()` prints the spec and parses it.
 Iris `a ^ b` is `pow(a, b)`. Where the C library's `::pow` is declared, as
 MSVC's standard headers declare it, `using namespace iris::build;` makes an
 unqualified `pow` ambiguous, so add `using iris::build::pow;` beside it.
+The same holds for `bind`, the `{x:type}` part of a pattern, where the
+socket function `::bind` of `<sys/socket.h>` or `<winsock2.h>` is declared:
+add `using iris::build::bind;`.
+On macOS, `<ApplicationServices/ApplicationServices.h>` declares a QuickDraw
+type `Pattern`: add `using iris::build::Pattern;`. Put each of these
+using-declarations inside a function or namespace, since at global scope it
+collides with the global declaration.
 A mistake throws `iris::build::BuildError`, with the `std::source_location`
 of the statement that made it. [`docs/builders.md`](../docs/builders.md)
 describes the design.
@@ -178,7 +185,7 @@ takes. Each `compiles-NAME` test builds a
 file in `tests/compile_fail`, and its `compile-fails-NAME` test builds it
 with `IRIS_EXPECT_FAILURE` defined and passes only when the compiler
 rejects it with the expected diagnostic: a value of the wrong type or
-depth, a parameter value of the wrong type, and a pattern whose placeholders do not match its arguments.
+depth, a parameter value of the wrong type, a pattern whose placeholders do not match its arguments, and an unqualified `pow` or `bind` that a using-directive makes ambiguous with the C library's `::pow` or the socket function `::bind`.
 `consumer-install`
 installs the build to `build/dev/tests/consumer/prefix`;
 `consumer-find-package` then builds and runs the project in
@@ -418,7 +425,8 @@ to `cpp/`, `conformance/`, `formats/`, `rust/` and the workflow. It builds
 the `dev` preset and runs `ctest`, including the four conformance tests,
 with GCC 14 and Clang 20 on Ubuntu 24.04, Apple Clang on macOS, and MSVC on
 Windows; runs the `asan` preset with Clang 20 and the `tsan` preset with
-GCC 14 on Ubuntu;
+GCC 14 on Ubuntu, where the Apple Clang, MSVC and sanitizer jobs name
+clang-format 22.1.8 so that `ctest` runs `builder-round-trip`;
 runs the builder round trip and the generated views with GCC 14 and Clang
 20, with clang-format and clang-tidy 22.1.8;
 runs each fuzz target for two minutes with Clang 20; compares the Rust

@@ -1634,8 +1634,9 @@ void typed_handles_set_parameters() {
   check(data->get(zero) == 0 && std::signbit(data->get(zero)),
         "a negative zero");
   check(data->get(label) == "a b,c=1", "a string, exactly");
-  const iris::ValueRef as_number = data->get(number);
-  check(as_number.type() == iris::ValueType::Float && as_number.number() == 2.5,
+  const iris::Number as_number = data->get(number);
+  check(std::holds_alternative<double>(as_number) &&
+            std::get<double>(as_number) == 2.5,
         "a num");
   const iris::ValueRef as_float = data->get(inferred_float);
   check(as_float.type() == iris::ValueType::Float && as_float.number() == 2,
@@ -1653,6 +1654,45 @@ void typed_handles_set_parameters() {
                        std::bit_cast<std::uint64_t>(value),
           "the float round trips: " +
               std::string(params.get("ratio").value_or("")));
+  }
+}
+
+void parameters_with_handle_defaults_are_scalars() {
+  SpecBuilder b;
+  auto n = b.read("n", int_);
+  auto x = b.read("x", num);
+  auto w = b.read("w", word);
+  auto limit = b.param("limit", n);
+  auto number = b.param("number", x);
+  auto label = b.param("label", w);
+  check(b.source() ==
+            "n: int\nx: num\nw: word\nparam limit = n\nparam number = x\n"
+            "param label = w\n",
+        "the defaults print as names");
+  const std::optional<Spec> spec = expect_build(b);
+  if (!spec)
+    return;
+  const auto read_with = [&](const iris::Params &values) {
+    std::expected<iris::Data, iris::Error> data =
+        spec->try_read_text("4 2.5 abc", "input", values);
+    check(data.has_value(), data ? "" : data.error().what());
+    return data ? std::optional<iris::Data>(std::move(*data)) : std::nullopt;
+  };
+  if (const std::optional<iris::Data> data = read_with({})) {
+    const std::int64_t value = data->get(limit);
+    check(value == 4, "the default's int");
+    const iris::Number as_number = data->get(number);
+    check(as_number == iris::Number(2.5), "the default's num");
+    check(data->get(label) == "abc", "the default's word");
+  }
+  iris::Params params;
+  params.set(limit, 9);
+  params.set(number, 7.25);
+  params.set(label, "given");
+  if (const std::optional<iris::Data> data = read_with(params)) {
+    check(data->get(limit) == 9, "the caller's int");
+    check(data->get(number) == iris::Number(7.25), "the caller's num");
+    check(data->get(label) == "given", "the caller's string");
   }
 }
 
@@ -1901,6 +1941,7 @@ int main() {
     a_declared_handle_reports_what_went_wrong();
     a_dynamic_handle_checks_what_it_knows();
     typed_handles_set_parameters();
+    parameters_with_handle_defaults_are_scalars();
     concurrent_builders_print_the_same_text();
     the_jobshop_text_differs_only_in_internal_names();
     every_jobshop_case_reads_like_the_text_spec();

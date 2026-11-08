@@ -94,7 +94,8 @@ set(iris_compile_failures
   "pattern_literal_placeholder|pattern_placeholders_do_not_match_its_arguments"
   "pattern_unpaired_brace|pattern_has_an_unpaired_brace"
   "pattern_rest_of_line|pattern_spells_rest_of_line_as_text"
-  "pow_using_directive|is ambiguous|C2872")
+  "pow_using_directive|is ambiguous|C2872"
+  "bind_using_directive|is ambiguous|C2872")
 foreach(entry IN LISTS iris_compile_failures)
   string(FIND "${entry}" "|" bar)
   string(SUBSTRING "${entry}" 0 ${bar} case)

@@ -287,6 +287,9 @@ struct Renderer<'a> {
     constants: Vec<Vec<Line>>,
     /// Whether a string literal has the `sv` suffix.
     views: bool,
+    /// Whether a float literal is one that clang-tidy's
+    /// `modernize-use-std-numbers` takes for a constant of `std::numbers`.
+    near_std_number: bool,
     /// The `if` variable for the branch that follows the current one.
     chain: Option<String>,
 }
@@ -327,6 +330,7 @@ impl<'a> Renderer<'a> {
             helpers: Vec::new(),
             constants: Vec::new(),
             views: false,
+            near_std_number: false,
             chain: None,
         }
     }
@@ -409,9 +413,18 @@ impl<'a> Renderer<'a> {
             }
             text.push('\n');
         }
+        // A builder prints each literal as the spec writes it, so a literal
+        // near a constant of `std::numbers` stays a literal.
+        if self.near_std_number {
+            text.push_str("// NOLINTBEGIN(modernize-use-std-numbers)\n");
+        }
         text.push_str("SpecBuilder builder() {\n");
         write_lines(&mut text, &lines);
-        text.push_str("}\n\n} // namespace\n\n");
+        text.push_str("}\n");
+        if self.near_std_number {
+            text.push_str("// NOLINTEND(modernize-use-std-numbers)\n");
+        }
+        text.push_str("\n} // namespace\n\n");
         text.push_str(
             "int main() {\n  try {\n    std::cout << builder().source();\n  } catch (const \
              std::exception &error) {\n    std::cerr << error.what() << '\\n';\n    return 1;\n  \

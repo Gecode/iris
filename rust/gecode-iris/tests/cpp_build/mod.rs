@@ -30,7 +30,8 @@ pub struct CmakeProject {
 
 impl CmakeProject {
     /// The start of the project's `CMakeLists.txt`, which declares the
-    /// function `program(target sources...)`.
+    /// function `program(target sources...)`. A shard of many programs can
+    /// hold more sections than an MSVC object file does without `/bigobj`.
     pub fn lists_head(&self, project: &str) -> String {
         let mut lists = String::new();
         writeln!(
@@ -45,7 +46,10 @@ impl CmakeProject {
                add_executable(${{target}} ${{ARGN}})\n  \
                target_link_libraries(${{target}} PRIVATE iris::iris)\n  \
                set_target_properties(${{target}} PROPERTIES CXX_EXTENSIONS OFF)\n  \
-               iris_set_warnings(${{target}})\n\
+               iris_set_warnings(${{target}})\n  \
+               if(MSVC)\n    \
+                 target_compile_options(${{target}} PRIVATE /bigobj)\n  \
+               endif()\n\
              endfunction()",
             cmake_path(&self.repo.join("cpp"))
         )

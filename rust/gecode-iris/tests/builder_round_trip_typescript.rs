@@ -187,12 +187,6 @@ fn typescript_specs() -> Vec<(String, String)> {
     vec![
         ("typescript_names".to_owned(), text),
         ("section_clauses".to_owned(), clauses.to_owned()),
-        (
-            "near_constants".to_owned(),
-            "let pi = 3.141592653589793\nlet e = 2.718281828459045\nlet half = -0.7071\n\
-             repeat 1 {\n  let ln = 0.6931 + 2.3026\n  let near = 3.14 + 1.5708\n}\n"
-                .to_owned(),
-        ),
         ("captured_types".to_owned(), captured_types),
         ("comprehension_variables".to_owned(), comprehensions),
         ("else_chains".to_owned(), else_chains),

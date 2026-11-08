@@ -166,7 +166,13 @@ for error messages. C++ operators build expressions, `&&`, `||` and `!`
 included, and `host::int_max` is Gecode's largest integer. Iris `a ^ b` is
 `pow(a, b)`. Where the C library's `::pow` is declared, as MSVC's standard
 headers declare it, `using namespace iris::build;` makes an unqualified `pow`
-ambiguous, so add `using iris::build::pow;` beside it.
+ambiguous, so add `using iris::build::pow;` beside it. The same holds for
+`bind` in a pattern where the socket function `::bind` of `<sys/socket.h>`
+or `<winsock2.h>` is declared: add `using iris::build::bind;`. On macOS,
+`<ApplicationServices/ApplicationServices.h>` declares a QuickDraw type
+`Pattern`: add `using iris::build::Pattern;`. Put each of these
+using-declarations inside a function or namespace, since at global scope it
+collides with the global declaration.
 
 ### Typed data
 

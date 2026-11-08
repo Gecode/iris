@@ -461,6 +461,40 @@ fn float_literal(value: f64) -> String {
     format!("{value:?}")
 }
 
+/// Whether clang-tidy's `modernize-use-std-numbers` takes the literal of
+/// `value` for a constant of `std::numbers`: a literal within its
+/// `DiffThreshold`, 0.001 by default, of one. A minus sign is an operator in
+/// C++, so the check sees the magnitude. The tolerance is a little wider than
+/// the threshold, so that rounding at its edge cannot leave a literal out.
+fn near_std_number(value: f64) -> bool {
+    use std::f64::consts as c;
+    const TOLERANCE: f64 = 0.0011;
+    // std::numbers: e, log2e, log10e, pi, inv_pi, inv_sqrtpi, ln2, ln10,
+    // sqrt2, sqrt3, inv_sqrt3, egamma and phi.
+    const EGAMMA: f64 = 0.577_215_664_901_532_9;
+    const PHI: f64 = 1.618_033_988_749_895;
+    const SQRT_3: f64 = 1.732_050_807_568_877_2;
+    const INV_SQRT_3: f64 = 0.577_350_269_189_625_8;
+    const INV_SQRT_PI: f64 = 0.564_189_583_547_756_3;
+    [
+        c::E,
+        c::LOG2_E,
+        c::LOG10_E,
+        c::PI,
+        c::FRAC_1_PI,
+        INV_SQRT_PI,
+        c::LN_2,
+        c::LN_10,
+        c::SQRT_2,
+        SQRT_3,
+        INV_SQRT_3,
+        EGAMMA,
+        PHI,
+    ]
+    .iter()
+    .any(|constant| (value.abs() - constant).abs() <= TOLERANCE)
+}
+
 /// Operands shorter than this gain nothing from a temporary of their own.
 const SHORTEST_HOIST: usize = 12;
 
@@ -477,7 +511,10 @@ impl Renderer<'_> {
     fn step(&mut self, op: &ExprOp, state: &mut Evaluation) {
         let value = match op {
             ExprOp::Int(value) => Value::literal(value.to_string(), Class::Int),
-            ExprOp::Float(value) => Value::literal(float_literal(*value), Class::Float),
+            ExprOp::Float(value) => {
+                self.near_std_number |= near_std_number(*value);
+                Value::literal(float_literal(*value), Class::Float)
+            }
             ExprOp::Str(text) => self.string_value(text),
             ExprOp::Host(host) => {
                 let text = match host {

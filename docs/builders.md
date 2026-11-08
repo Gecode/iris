@@ -538,6 +538,16 @@ the same name, such as `std::min`. A using-directive makes `iris::build::pow`
 as visible as the C library's `::pow`, which `<math.h>` and MSVC's standard
 headers declare, so an unqualified `pow` is ambiguous unless
 `using iris::build::pow;` stands beside `using namespace iris::build;`.
+`bind` meets the socket function `::bind` of POSIX `<sys/socket.h>` and
+Windows `<winsock2.h>` the same way, and `using iris::build::bind;` settles
+it. The C, C++ and POSIX headers declare no other name of `iris::build`
+globally, but macOS's QuickDraw, which
+`<ApplicationServices/ApplicationServices.h>` includes, declares a global
+type `Pattern`, which `using iris::build::Pattern;` settles. Each of these
+using-declarations goes inside a function or namespace: at global scope it
+collides with the global declaration it is meant to hide.
+`<windows.h>` defines `min` and `max` as macros, which break every
+call of `min` and `max` unless `NOMINMAX` is defined first.
 Generated builders write `iris::build::pow`. `host::int_max` prints `gecode.int_max`;
 the public headers never name Gecode. A host constant is an integer operand;
 `lit(host::int_max)` makes it an `Expr<std::int64_t>`, and

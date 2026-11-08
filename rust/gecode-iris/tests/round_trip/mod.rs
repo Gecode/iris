@@ -50,8 +50,8 @@ const BLOCK_ENDS: (&[&str], usize) = (
 );
 
 /// Specs beyond the corpus: every layout form at a few widths, the ends of
-/// closures at every width, the operands of `clippy::eq_op`, and the names and
-/// types that a backend must handle, by name.
+/// closures at every width, the operands of `clippy::eq_op`, the names and
+/// types that a backend must handle, by name, and literals near constants.
 pub fn extra_specs() -> Vec<(String, String)> {
     let mut specs = Vec::new();
     let mut add = |title: &str, form: &str, length: usize, depth: usize| {
@@ -88,8 +88,17 @@ pub fn extra_specs() -> Vec<(String, String)> {
     specs.push(("numbered_prefixes".to_owned(), numbered_prefixes()));
     specs.push(("helper_types".to_owned(), helper_types()));
     specs.push(("host_constants".to_owned(), host_constants()));
+    specs.push(("near_constants".to_owned(), NEAR_CONSTANTS.to_owned()));
     specs
 }
+
+/// Float literals at or near mathematical constants, which linters such as
+/// clippy's `approx_constant`, clang-tidy's `modernize-use-std-numbers` and
+/// oxlint's `approx-constant` take for the constants. A builder prints them
+/// as the spec writes them.
+const NEAR_CONSTANTS: &str = "let pi = 3.141592653589793\nlet e = 2.718281828459045\n\
+                              let half = -0.7071\nrepeat 1 {\n  let ln = 0.6931 + 2.3026\n  \
+                              let near = 3.14 + 1.5708\n}\n";
 
 /// The host constants in every position where `iris check` accepts one: as
 /// operands beside each kind of value, and as the arrays, domains and bounds

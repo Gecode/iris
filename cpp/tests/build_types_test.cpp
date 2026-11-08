@@ -199,6 +199,27 @@ int main() { // NOLINT(bugprone-exception-escape)
   auto q = b.param("q", 3);
   static_assert(std::same_as<decltype(q), Field<Int>>);
 
+  // A param keeps the scope's depth when its default is a scalar there,
+  // including a handle of depth 0 outside every repeat, since a caller's
+  // value is a scalar too
+  static_assert(std::same_as<decltype(b.param("pn", n)), Field<Int>>);
+  static_assert(std::same_as<decltype(b.param("pu", u)), Field<Number>>);
+  static_assert(std::same_as<decltype(b.param("pf", f)), Field<double>>);
+  static_assert(std::same_as<decltype(b.param("pw", w)), Field<Str>>);
+  static_assert(std::same_as<decltype(b.param("pq", q)), Field<Int>>);
+  static_assert(
+      std::same_as<decltype(b.param("prow", row)), Field<Int, dynamic_depth>>);
+  static_assert(std::same_as<decltype(b.param("pfirst", row[0])),
+                             Field<Int, dynamic_depth>>);
+  static_assert(std::same_as<decltype(b.param("ploose", n.dynamic())),
+                             Field<Dynamic, dynamic_depth>>);
+  auto in_repeat = b.repeat(n, [&](auto &r) {
+    static_assert(
+        std::same_as<decltype(r.param("rn", n)), Field<Int, dynamic_depth>>);
+    return r.param("rs", n + 1);
+  });
+  static_assert(std::same_as<decltype(in_repeat), Field<Int, 1>>);
+
   // Captures, forward handles and undefined names
   auto token = b.capture("token", untyped);
   static_assert(std::same_as<decltype(token), Field<Str>>);

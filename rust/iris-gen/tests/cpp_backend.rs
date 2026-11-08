@@ -609,6 +609,39 @@ fn strings_are_ascii_and_long_ones_are_constants() {
 }
 
 #[test]
+fn literals_near_std_numbers_keep_their_value_under_a_nolint() {
+    const BEGIN: &str = "// NOLINTBEGIN(modernize-use-std-numbers)\nSpecBuilder builder() {\n";
+    const END: &str = "\n}\n// NOLINTEND(modernize-use-std-numbers)\n\n} // namespace\n";
+    // clang-tidy's `modernize-use-std-numbers` refuses a literal within 0.001
+    // of a constant of `std::numbers`, whatever its sign.
+    for (source, near) in [
+        ("let x = 3.141592653589793\n", true),
+        ("let x = 2.718281828459045\n", true),
+        ("let x = 0.6931 + 2.3026\n", true),
+        ("let x = -1.4142\n", true),
+        ("let x = 3.1406\n", true),
+        ("let x = 0.5772\n", true),
+        ("let x = 1.618\n", true),
+        ("n: int\nrepeat n {\n  let x = 1.5708 + 2.7183\n}\n", true),
+        ("let x = 1.5708\n", false),
+        ("let x = -0.7071\n", false),
+        ("let x = 3.14\n", false),
+        ("let x = 2.5\n", false),
+        ("let x = 3\n", false),
+    ] {
+        let code = code(source);
+        assert_eq!(code.contains(BEGIN), near, "{source:?}:\n{code}");
+        assert_eq!(code.contains(END), near, "{source:?}:\n{code}");
+        assert_eq!(code.matches("NOLINT").count(), 2 * usize::from(near));
+    }
+    // The literal keeps its exact value.
+    assert_statements(&[(
+        "let x = 3.141592653589793\nlet y = -0.6931\n",
+        &["b.let(x, 3.141592653589793);", "b.let(y, -lit(0.6931));"],
+    )]);
+}
+
+#[test]
 fn cpp_is_named_cpp() {
     assert_eq!(Language::Cpp.name(), "cpp");
     assert_eq!("cpp".parse::<Language>(), Ok(Language::Cpp));

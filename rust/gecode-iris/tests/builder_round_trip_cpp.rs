@@ -23,12 +23,16 @@ use std::{
     fs,
     path::{Path, PathBuf},
     process::Command,
+    sync::atomic::{AtomicUsize, Ordering},
     thread,
     time::Instant,
 };
 
 /// The number of programs in one shard of the build.
 const SHARD: usize = 24;
+
+/// The most files that one run of clang-format or clang-tidy takes.
+const LONGEST_CHUNK: usize = 200;
 
 /// The headers that every generated program may include, which a shard
 /// includes first so that their include guards keep them out of the
@@ -164,32 +168,40 @@ impl Project {
         fs::write(self.source(name), code).unwrap();
     }
 
-    /// Run `command` on each of `files` in chunks, one for each thread.
+    /// Run `command` on each of `files` in chunks, as many at a time as
+    /// there are threads.
     fn each_chunk(&self, files: &[PathBuf], label: &str, command: impl Fn() -> Command + Sync) {
         let threads = thread::available_parallelism().map_or(4, usize::from);
-        let size = files.len().div_ceil(threads).max(1);
+        // A chunk's paths must fit on a Windows command line of 32,767
+        // characters.
+        let size = files.len().div_ceil(threads).clamp(1, LONGEST_CHUNK);
+        let chunks: Vec<&[PathBuf]> = files.chunks(size).collect();
+        let next = AtomicUsize::new(0);
         let failures: Vec<String> = thread::scope(|scope| {
-            let handles: Vec<_> = files
-                .chunks(size)
-                .map(|chunk| {
-                    let command = &command;
+            let handles: Vec<_> = (0..threads.min(chunks.len()))
+                .map(|_| {
+                    let (command, chunks, next) = (&command, &chunks, &next);
                     scope.spawn(move || {
-                        let mut command = command();
-                        command.args(chunk);
-                        let output = command.output().unwrap();
-                        (!output.status.success()).then(|| {
-                            format!(
-                                "{}{}",
-                                String::from_utf8_lossy(&output.stdout),
-                                String::from_utf8_lossy(&output.stderr)
-                            )
-                        })
+                        let mut failures = Vec::new();
+                        while let Some(chunk) = chunks.get(next.fetch_add(1, Ordering::Relaxed)) {
+                            let mut command = command();
+                            command.args(*chunk);
+                            let output = command.output().unwrap();
+                            if !output.status.success() {
+                                failures.push(format!(
+                                    "{}{}",
+                                    String::from_utf8_lossy(&output.stdout),
+                                    String::from_utf8_lossy(&output.stderr)
+                                ));
+                            }
+                        }
+                        failures
                     })
                 })
                 .collect();
             handles
                 .into_iter()
-                .filter_map(|handle| handle.join().unwrap())
+                .flat_map(|handle| handle.join().unwrap())
                 .collect()
         });
         assert!(
@@ -267,7 +279,17 @@ impl Project {
             .output()
             .unwrap();
         assert!(output.status.success(), "the standalone program failed");
-        fs::write(self.cmake.root.join("out/standalone.iris"), output.stdout).unwrap();
+        // Windows ends the lines of standard output with CRLF; the shards
+        // write their files in binary.
+        let stdout = if cfg!(windows) {
+            String::from_utf8(output.stdout)
+                .expect("the program prints UTF-8")
+                .replace("\r\n", "\n")
+                .into_bytes()
+        } else {
+            output.stdout
+        };
+        fs::write(self.cmake.root.join("out/standalone.iris"), stdout).unwrap();
     }
 
     fn run(&self, shards: usize) {
