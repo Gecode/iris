@@ -174,7 +174,11 @@ With that variable set, an additional test opens
 [`formats/dimacs-cnf/dimacs-cnf.iris`](../../formats/dimacs-cnf/dimacs-cnf.iris)
 directly from the repository. It checks TextMate highlighting and no
 diagnostics, adds an undefined type and waits for its diagnostic, then
-restores the document and waits for the diagnostic to clear. Each wait
+restores the document and waits for the diagnostic to clear. While it adds
+the type, a document listener holds the edit for a second, so the server
+publishes before the document reaches the version that the platform has
+already sent. The plugin applies such a publish after the edit; the
+platform would otherwise discard it. Each wait
 dispatches IDE events and has a bounded timeout. The original document is
 also restored on failure.
 

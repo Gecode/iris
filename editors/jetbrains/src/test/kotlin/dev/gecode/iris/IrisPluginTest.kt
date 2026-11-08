@@ -8,6 +8,9 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 import com.intellij.openapi.command.WriteCommandAction
+import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.editor.event.DocumentEvent
+import com.intellij.openapi.editor.event.DocumentListener
 import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.fileTypes.SyntaxHighlighterFactory
@@ -33,6 +36,7 @@ import org.jetbrains.plugins.textmate.TextMateService
 import org.jetbrains.plugins.textmate.language.syntax.highlighting.TextMateHighlighter
 import java.awt.GraphicsEnvironment
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import javax.swing.JTextField
@@ -230,9 +234,24 @@ class IrisPluginTest : BasePlatformTestCase() {
             assertTrue("TextMate assigns attributes to format",
                 highlighter.getTokenHighlights(requireNotNull(lexer.tokenType)).isNotEmpty())
 
+            // The platform sends an incremental didChange from beforeDocumentChange, with the version
+            // the document reaches only after every listener has run. A slow listener, as on a loaded
+            // CI runner, lets iris lsp publish for that version first; the publish must not be lost.
+            // On the editor multicaster, this listener runs after the platform's listener sends didChange.
+            val slowBeforeChange = AtomicBoolean(false)
+            EditorFactory.getInstance().eventMulticaster.addDocumentListener(object : DocumentListener {
+                override fun beforeDocumentChange(event: DocumentEvent) {
+                    if (slowBeforeChange.get()) Thread.sleep(SLOW_LISTENER_MILLIS)
+                }
+            }, testRootDisposable)
             val beforeError = publications.get()
-            WriteCommandAction.runWriteCommandAction(project) {
-                document.insertString(document.textLength, "\ninvalid: not_defined\n")
+            slowBeforeChange.set(true)
+            try {
+                WriteCommandAction.runWriteCommandAction(project) {
+                    document.insertString(document.textLength, "\ninvalid: not_defined\n")
+                }
+            } finally {
+                slowBeforeChange.set(false)
             }
             PlatformTestUtil.waitWithEventsDispatching("Real iris lsp reports the introduced undefined type", {
                 publications.get() > beforeError &&
@@ -253,6 +272,11 @@ class IrisPluginTest : BasePlatformTestCase() {
                     .none { it.state == LspServerState.Initializing || it.state == LspServerState.Running }
             }, 10)
         }
+    }
+
+    private companion object {
+        // Several times iris lsp's 150 ms diagnostic delay, so the server publishes during the edit.
+        const val SLOW_LISTENER_MILLIS = 1_000L
     }
 
     private fun diagnosticsInEditor(): List<HighlightInfo> =
