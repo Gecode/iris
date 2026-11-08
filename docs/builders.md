@@ -743,17 +743,27 @@ they stand for, not in constant case. Handles for a spec built at run time are
 locals (`var weight = int2("weight");`), which lambdas can capture because
 they are effectively final.
 
-**Records receive data.** This part is not implemented yet.
-`spec.reader(Shop.class, MethodHandles.lookup())`
+**Records receive data.** `spec.reader(Shop.class, MethodHandles.lookup())`
 maps entries to the components of a record. Components match entries by
-name, and `@Entry("n_jobs")` renames one. The method checks every
-component's type against the entry's value type, depth, and optionality
-once, when the reader is created, and then reads through the canonical
-constructor. Passing a `Lookup` lets the library construct records in the
-user's module without the module having to open its packages. Dynamic
-values (`num`, and parameters without a default) are sealed interfaces of
-records, so an exhaustive `switch` with record patterns takes them apart.
-A 1.0 variant type would read the same way.
+name, spelled exactly as the component is, and `@Entry("n_jobs")` renames
+one; no case mapping turns `nJobs` into `n_jobs`. A component has the
+type a handle of its entry reads: `long` or `Long`, `double` or `Double`,
+`String`, and `Number` for `num` at depth 0, `long[]`, `double[]`,
+`List<String>` and `List<Number>` at depth 1, and one more `List` for each
+further level. Any component may instead be a `Value`, and an entry
+without a single value type and depth, which gets a dynamic handle, must
+be one. An entry that may be absent needs a reference type annotated
+`@Nullable`, and reads as null when it is absent. The method checks every
+component against the entry's value type, depth, and optionality once,
+when the reader is created, and throws `IllegalArgumentException` naming
+the component, its type and the types it could have. Then each read goes
+through the canonical constructor. Passing a `Lookup` lets the library
+construct records in the user's module without the module having to open
+its packages. Error Prone warns about `long[]` and `double[]` components
+(`ArrayRecordComponent`), as a record compares arrays by identity.
+`Value` is a sealed interface of records, so an exhaustive `switch` with
+record patterns takes a dynamic entry apart. A 1.0 variant type would
+read the same way.
 
 `dev.gecode.iris.build` implements the builder, and google-java-format lays
 out the code. The handle constants and the spec are static members of a
@@ -816,7 +826,7 @@ long jobs = data.get(Jobshop.nJobs);
 long[] firstJob = data.get(Jobshop.machine).getFirst();
 @Nullable String label = data.get(Jobshop.name);
 
-// Into a record (not implemented yet)
+// Into a record
 record Shop(@Nullable String name, @Entry("n_jobs") long nJobs,
             @Entry("n_machines") long nMachines, List<long[]> machine, List<long[]> duration) {}
 var reader = Jobshop.spec.reader(Shop.class, MethodHandles.lookup());

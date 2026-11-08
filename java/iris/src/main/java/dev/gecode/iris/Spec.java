@@ -7,6 +7,7 @@ import dev.gecode.iris.internal.read.Stored;
 import dev.gecode.iris.internal.syntax.Ast;
 import dev.gecode.iris.internal.syntax.LargeStack;
 import dev.gecode.iris.internal.syntax.Lexer;
+import dev.gecode.iris.internal.syntax.OutputEntries;
 import dev.gecode.iris.internal.syntax.Parser;
 import dev.gecode.iris.internal.syntax.Resolution;
 import dev.gecode.iris.internal.syntax.Resolver;
@@ -14,6 +15,7 @@ import dev.gecode.iris.internal.syntax.SpecErrors;
 import dev.gecode.iris.internal.syntax.Utf8;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.invoke.MethodHandles;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -358,6 +360,50 @@ public final class Spec {
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
+  }
+
+  /**
+   * Makes a reader of data into records of {@code type}, after checking every component against the
+   * entries that a read can produce, so that a mismatch fails here rather than in a read.
+   *
+   * <p>A component reads the entry of its own name, spelled exactly as the component is, or the
+   * entry that its {@link Entry} annotation names. Entries without a component are left out. A
+   * component's type must be what a typed handle of the entry reads:
+   *
+   * <ul>
+   *   <li>at depth 0, {@code long} or {@code Long} for {@code int}, {@code double} or {@code
+   *       Double} for {@code float}, {@code String} for {@code string}, and {@code Number} for
+   *       {@code num}, whose values are int or float as the data decides;
+   *   <li>at depth 1, {@code long[]}, {@code double[]}, {@code List<String>} or {@code
+   *       List<Number>};
+   *   <li>at each further depth, a {@code List} of the type one depth less, as in {@code
+   *       List<long[]>};
+   *   <li>at any value type and depth, {@link Value}, which an entry with no single value type and
+   *       depth needs, such as a parameter without a default.
+   * </ul>
+   *
+   * <p>An entry that a read may leave out needs a reference type annotated {@code @Nullable}, as in
+   * {@code @Nullable String name}, and reads as null when it is absent. JSpecify's annotation does,
+   * and so does any other named {@code Nullable} that the class file keeps for run time.
+   *
+   * <p>The reader constructs records through their canonical constructor, which {@code lookup}
+   * finds, so the record's module need not open its package. Pass {@code MethodHandles.lookup()}
+   * from code that can access the constructor.
+   *
+   * @param <R> the record type
+   * @param type the record class
+   * @param lookup a lookup that can access the canonical constructor of {@code type}
+   * @return the reader
+   * @throws IllegalArgumentException if {@code type} is not a record class, if a component names an
+   *     entry that no read produces or has a type that does not fit its entry, or if {@code lookup}
+   *     cannot access the canonical constructor
+   */
+  public <R extends Record> RecordReader<R> reader(Class<R> type, MethodHandles.Lookup lookup) {
+    return RecordReader.create(
+        this,
+        type,
+        lookup,
+        LargeStack.call(() -> OutputEntries.of(parsed.program(), parsed.resolution())));
   }
 
   private Data readBytes(byte[] input, @Nullable String inputOrigin, Params params) {

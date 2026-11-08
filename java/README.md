@@ -91,8 +91,32 @@ each emitted line, so an `IrisException` from parsing, reading or cataloging
 names the statement too: `callSite()` returns it, and the message ends with a
 `call site:` line. An error that belongs to no statement, such as
 `E-TRAILING-INPUT`, has none, and neither has a catalog rejection, which is a
-summary in the data, or a spec parsed from text. The record reader is not
-implemented yet.
+summary in the data, or a spec parsed from text.
+
+## Reading data into records
+
+`Spec.reader(Class, MethodHandles.Lookup)` returns a `RecordReader` that reads
+data into a record. Each component reads the entry of its exact name, or the
+one that `@Entry` names, as the type a handle of that entry reads, or as a
+`Value`. A component for an entry that may be absent needs `@Nullable`. The
+reader checks every component when it is created and throws
+`IllegalArgumentException` for a mismatch, so a read fails only as
+`Spec.read` does:
+
+```java
+record Shop(
+    @Nullable String name,
+    @Entry("n_jobs") long nJobs,
+    @Entry("n_machines") long nMachines,
+    List<long[]> machine,
+    List<long[]> duration) {}
+
+RecordReader<Shop> reader = spec.reader(Shop.class, MethodHandles.lookup());
+Shop shop = reader.read(Path.of("ft06.txt"));
+```
+
+The value type, depth and optionality of each entry come from a port of
+`gecode-iris-sema`'s output entries in `dev.gecode.iris.internal.syntax`.
 
 ## Using it from another project
 
@@ -166,7 +190,7 @@ and the site check compares them with this file, so change both together.
 
 | Path | Contents |
 |---|---|
-| `iris/` | The library. `dev.gecode.iris` and the spec builder `dev.gecode.iris.build` are exported; `dev.gecode.iris.internal.syntax` holds the lexer, parser and resolver, and `dev.gecode.iris.internal.read` the reader. |
+| `iris/` | The library. `dev.gecode.iris` and the spec builder `dev.gecode.iris.build` are exported; `dev.gecode.iris.internal.syntax` holds the lexer, parser, resolver and output entries, and `dev.gecode.iris.internal.read` the reader. |
 | `iris-driver/` | The conformance driver, which is not published. It implements `parse`, `read`, `catalog` (`--format json|dzn`) and `dzn`. The JVM decodes arguments in the locale's encoding before `main` runs, so outside a UTF-8 locale the driver answers exit status 3 for non-ASCII `--params` instead of reading changed values; JSON escapes work in any locale. [Windows](#windows) has a narrower guarantee. |
 | `iris-examples/` | The examples of the site's [Java and Kotlin guide](../site/src/content/docs/using/java.mdx), which are not published: sources in `src/main/java/examples` and `src/main/kotlin/examples`, each with its recorded `.out` beside it. |
 | `iris-jmh/` | The JMH benchmarks, which are not published. Nothing else depends on this module, so JMH stays out of `dev.gecode:iris`. |
@@ -212,6 +236,8 @@ fails rather than skips without `cargo`.
 ./gradlew :iris:test --tests dev.gecode.iris.BudgetLimitsTest
 ./gradlew :iris:test --tests 'dev.gecode.iris.build.*'  # the spec builder
 ./gradlew :iris:test --tests dev.gecode.iris.FloatDifferentialTest
+./gradlew :iris:test --tests dev.gecode.iris.RecordReaderTest  # the record reader
+./gradlew :iris:test --tests 'dev.gecode.iris.internal.syntax.OutputEntries*'  # entry shapes
 ./gradlew :iris-kotlin:check  # the Kotlin tests, detekt and the dependency check
 ./gradlew jmh            # the benchmarks, which take about 3 minutes
 ```
@@ -242,6 +268,14 @@ and cataloging a built spec, a port of `rust/iris-build/tests/call_sites.rs`,
 `get` for each handle, the wrong types and depths that javac rejects, and, by
 running the toolchain's `javac` with Error Prone and NullAway in JSpecify mode,
 the dereference of an optional entry.
+
+`RecordReaderTest` reads the jobshop format and each value type and depth into
+records and checks the errors of a reader's creation. `OutputEntriesTest` ports
+the output-entry tests of `rust/iris-sema/tests/model.rs`, and
+`OutputEntriesDifferentialTest` compares the value type, depth and optionality
+of every entry of every spec in `conformance/cases/0.1` and `formats` with the
+handles that `iris gen --lang rust` prints. Like `FloatDifferentialTest`, it
+builds `iris` with Cargo, or runs the binary that `-PirisCli=PATH` names.
 
 `:iris-kotlin:dokkaGenerate` also fails on any warning and runs through `check`.
 The site build runs both tasks and publishes the result in its own pages (see

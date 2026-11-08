@@ -3,9 +3,8 @@ package dev.gecode.iris.build;
 import dev.gecode.iris.Data;
 import dev.gecode.iris.Value;
 import dev.gecode.iris.ValueType;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import dev.gecode.iris.internal.access.ViewTypes;
+import dev.gecode.iris.internal.syntax.OutputEntry.Leaf;
 import org.jspecify.annotations.Nullable;
 
 /** Typed access to data through a handle. */
@@ -39,7 +38,7 @@ final class Views {
     if (handle.valueView() || levels == null) {
       return value;
     }
-    return view(value, levels, handle.tag());
+    return ViewTypes.view(value, leaf(handle.tag()), levels);
   }
 
   private static boolean matches(Tag tag, ValueType type) {
@@ -52,41 +51,14 @@ final class Views {
     };
   }
 
-  private static List<Number> numbers(Value value) {
-    List<Number> numbers = new ArrayList<>(value.size());
-    if (value.type() == ValueType.INT) {
-      for (long number : value.longs()) {
-        numbers.add(number);
-      }
-    } else {
-      for (double number : value.doubles()) {
-        numbers.add(number);
-      }
-    }
-    return Collections.unmodifiableList(numbers);
-  }
-
-  private static Object view(Value value, int levels, Tag tag) {
-    if (levels == 0) {
-      return switch (tag) {
-        case INT -> value.asLong();
-        case FLOAT -> value.asDouble();
-        case STR -> value.asString();
-        default -> value.type() == ValueType.INT ? (Object) value.asLong() : value.asDouble();
-      };
-    }
-    if (levels == 1) {
-      return switch (tag) {
-        case INT -> value.longs();
-        case FLOAT -> value.doubles();
-        case STR -> value.strings();
-        default -> numbers(value);
-      };
-    }
-    List<Object> rows = new ArrayList<>(value.size());
-    for (int k = 0; k < value.size(); k++) {
-      rows.add(view(value.get(k), levels - 1, tag));
-    }
-    return Collections.unmodifiableList(rows);
+  /** The value type of a handle with a static type. */
+  private static Leaf leaf(Tag tag) {
+    return switch (tag) {
+      case INT -> Leaf.INT;
+      case FLOAT -> Leaf.FLOAT;
+      case STR -> Leaf.STRING;
+      case NUM -> Leaf.NUM;
+      case DYN -> throw new IllegalArgumentException("a dynamic handle has no value type");
+    };
   }
 }

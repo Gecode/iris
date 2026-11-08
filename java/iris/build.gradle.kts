@@ -39,7 +39,8 @@ tasks.withType<Test>().configureEach {
   providers.gradleProperty("irisFloatValues").orNull?.let { systemProperty("iris.floatValues", it) }
   providers.gradleProperty("irisCli").orNull?.let { systemProperty("iris.cli", it) }
   inputs.dir(installedDriver).withPathSensitivity(PathSensitivity.RELATIVE)
-  for (path in listOf("conformance/cases/0.1", "formats", "rust/iris-conformance")) {
+  val sources = listOf("rust/iris-conformance", "rust/iris-gen", "rust/iris-sema")
+  for (path in listOf("conformance/cases/0.1", "formats") + sources) {
     inputs.dir(repository.resolve(path)).withPathSensitivity(PathSensitivity.RELATIVE)
   }
 }
