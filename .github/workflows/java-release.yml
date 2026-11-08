@@ -17,10 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Check the tag names the package version
-        run: |
-          version=$(sed -n 's/^version=//p' java/gradle.properties)
-          test "$GITHUB_REF_NAME" = "java-v$version"
+      - name: Check the tag against the versions
+        run: python3 -I scripts/versions.py release-check "$GITHUB_REF_NAME"
 
   build:
     name: Build and test
