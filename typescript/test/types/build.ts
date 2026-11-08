@@ -34,12 +34,28 @@ import {
 import { spec as inlineSpec } from "gecode-iris/build/inline";
 import { initialize, spec as manualSpec } from "gecode-iris/build/manual";
 
-/** True when each of `A` and `B` is assignable to the other. */
-type Equal<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+/** True when `T` is `any`. */
+type IsAny<T> = 0 extends 1 & T ? true : false;
+
+/**
+ * True when each of `A` and `B` is assignable to the other and neither is
+ * `any` unless both are, since `any` is assignable both ways to every type.
+ */
+type Equal<A, B> =
+  IsAny<A> extends IsAny<B> ? ([A] extends [B] ? ([B] extends [A] ? true : false) : false) : false;
 
 /** Compiles only when `A` and `B` are the same type. */
 function same<A, B>(check: Equal<A, B>): void {
   void check;
+}
+
+/** `same` itself tells `any` and union members apart from the type. */
+export function sameIsStrict(): void {
+  // @ts-expect-error `any` is not `number`.
+  same<any, number>(true);
+  // @ts-expect-error `number | undefined` is not `number`.
+  same<number | undefined, number>(true);
+  same<number, number>(true);
 }
 
 export function handleTypes(): void {
