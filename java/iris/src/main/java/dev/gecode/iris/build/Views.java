@@ -24,7 +24,10 @@ final class Views {
       return value;
     }
     Integer levels = handle.levels();
-    if (!matches(handle.tag(), value.type()) || (levels != null && levels != value.depth())) {
+    // An array without leaves, such as the column of a repeat without iterations, has the type of
+    // its fallback rather than the type its entry is declared with.
+    boolean typeMismatch = !matches(handle.tag(), value.type()) && ViewTypes.hasLeaves(value);
+    if (typeMismatch || (levels != null && levels != value.depth())) {
       throw new IllegalStateException(
           "the entry '"
               + handle.name()

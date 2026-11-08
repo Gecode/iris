@@ -55,6 +55,25 @@ public final class ViewTypes {
     return Collections.unmodifiableList(rows);
   }
 
+  /**
+   * Tests whether {@code value} holds at least one leaf: it is a single value, or an array with a
+   * leaf somewhere inside.
+   *
+   * @param value a value
+   * @return whether it has a leaf
+   */
+  public static boolean hasLeaves(Value value) {
+    if (value.depth() == 0) {
+      return true;
+    }
+    for (int k = 0; k < value.size(); k++) {
+      if (hasLeaves(value.get(k))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private static List<Number> numbers(Value value) {
     List<Number> numbers = new ArrayList<>(value.size());
     if (value.type() == ValueType.INT) {

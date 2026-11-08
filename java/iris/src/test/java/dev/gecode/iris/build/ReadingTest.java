@@ -73,6 +73,29 @@ class ReadingTest {
   }
 
   @Test
+  void anEmptyColumnReadsAsItsHandleTypeWhateverItsFallback() {
+    var words = string1("words");
+    var rows = float2("rows");
+    var count = int1("count");
+    Spec spec =
+        spec(() -> {
+          repeat(0, () -> let(words, lit("text")));
+          repeat(2, () -> repeat(0, () -> read(rows, floatType())));
+          repeat(1, () -> let(count, lit(3)));
+        });
+    Data data = spec.read("");
+    assertEquals(List.of(), data.get(words));
+    List<double[]> empties = data.get(rows);
+    assertEquals(2, empties.size());
+    assertArrayEquals(new double[0], empties.getFirst());
+    assertArrayEquals(new double[0], empties.getLast());
+    assertArrayEquals(new long[] {3}, data.get(count));
+    var wrong = string1("count");
+    IllegalStateException error = assertThrows(IllegalStateException.class, () -> data.get(wrong));
+    assertTrue(String.valueOf(error.getMessage()).contains("is int at depth 1"));
+  }
+
+  @Test
   void rowsAreUnmodifiable() {
     var m = int2("m");
     List<long[]> rows = spec(() -> read(m, intType().dims(2, 2))).read("1 2 3 4").get(m);
