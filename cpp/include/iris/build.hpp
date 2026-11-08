@@ -1945,7 +1945,10 @@ std::invoke_result_t<F, S &> enter(const std::shared_ptr<State> &state,
 /// A literal or host constant as an expression, as in `lit(1)` or
 /// `lit(host::int_max)`
 inline constexpr detail::LitFn lit{};
-/// `pow(a, b)`, which Iris spells `a ^ b`
+/// `pow(a, b)`, which Iris spells `a ^ b`. Where the C library's `::pow` is
+/// declared, as `<math.h>` and MSVC's standard headers declare it,
+/// `using namespace iris::build;` makes an unqualified `pow` ambiguous, so
+/// add `using iris::build::pow;` beside it.
 inline constexpr detail::PowFn pow{};
 /// `min(a, b, ...)`, or `min(row)` over an array; also takes a range of
 /// operands

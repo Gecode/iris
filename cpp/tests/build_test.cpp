@@ -33,12 +33,12 @@
 namespace {
 
 using namespace iris::build;
-// <cmath> declares ::pow, which the using-directive would make ambiguous.
 using iris::DynField;
 using iris::Field;
 using iris::Number;
 using iris::Presence;
 using iris::Spec;
+// <cmath> declares ::pow, which the using-directive would make ambiguous.
 using iris::build::pow;
 using Line = std::uint_least32_t;
 using Int = std::int64_t;

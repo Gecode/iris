@@ -534,7 +534,11 @@ after each block returns, so that names inside a block do not shadow them
 under `-Wshadow`. The free functions (`sum`, `distinct`, `pattern`, the type
 constants `int_`, `float_`, `num`, `word`, `rest`, and so on) are function
 objects, so argument-dependent lookup never replaces them with functions of
-the same name, such as `std::min`. `host::int_max` prints `gecode.int_max`;
+the same name, such as `std::min`. A using-directive makes `iris::build::pow`
+as visible as the C library's `::pow`, which `<math.h>` and MSVC's standard
+headers declare, so an unqualified `pow` is ambiguous unless
+`using iris::build::pow;` stands beside `using namespace iris::build;`.
+Generated builders write `iris::build::pow`. `host::int_max` prints `gecode.int_max`;
 the public headers never name Gecode. A host constant is an integer operand;
 `lit(host::int_max)` makes it an `Expr<std::int64_t>`, and
 `host::int_max.dynamic()` an `Expr<Dynamic>` that can be indexed or iterated,

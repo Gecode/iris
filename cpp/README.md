@@ -65,6 +65,9 @@ value of the handle's type, formatted as Specification §9.2 converts it.
 reader spec from C++ statements in nested lambdas, which return handles.
 Expressions use the operators, `pattern("{} {}", a, b)` checks its
 placeholders at compile time, and `build()` prints the spec and parses it.
+Iris `a ^ b` is `pow(a, b)`. Where the C library's `::pow` is declared, as
+MSVC's standard headers declare it, `using namespace iris::build;` makes an
+unqualified `pow` ambiguous, so add `using iris::build::pow;` beside it.
 A mistake throws `iris::build::BuildError`, with the `std::source_location`
 of the statement that made it. [`docs/builders.md`](../docs/builders.md)
 describes the design.

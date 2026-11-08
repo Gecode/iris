@@ -163,7 +163,10 @@ arguments. A range is `Range{.from = 0, .below = n_machines}` for Iris
 looks up a field, and `sum(jobs, ...)` writes a comprehension over the records.
 `job.as_name("jobs")` names the list of records, as in `repeat n_jobs as jobs`,
 for error messages. C++ operators build expressions, `&&`, `||` and `!`
-included, and `host::int_max` is Gecode's largest integer.
+included, and `host::int_max` is Gecode's largest integer. Iris `a ^ b` is
+`pow(a, b)`. Where the C library's `::pow` is declared, as MSVC's standard
+headers declare it, `using namespace iris::build;` makes an unqualified `pow`
+ambiguous, so add `using iris::build::pow;` beside it.
 
 ### Typed data
 

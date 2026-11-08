@@ -159,6 +159,9 @@ static_assert(!Settable<Field<Int, 1>, int>);
 // should.
 int main() { // NOLINT(bugprone-exception-escape)
   using namespace iris::build;
+  // The standard headers may declare ::pow, as MSVC's do, which the
+  // using-directive would make ambiguous.
+  using iris::build::pow;
   SpecBuilder b;
 
   // The handles that statements return
