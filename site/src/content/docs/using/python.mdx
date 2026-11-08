@@ -12,7 +12,8 @@ import it as `gecode_iris`. Parsing, reading, errors, JSON and dzn all come
 from the Rust reader, so Python reads every input exactly as the
 [CLI](/tools/cli/) does. The package needs Python 3.10 or newer and includes
 type stubs. The [Python API reference](/using/python/api/) lists every public
-class and method.
+class and method, and the [spec builder reference](/using/python/api/build/)
+lists those of `gecode_iris.build`.
 
 ## Install the package
 
@@ -114,7 +115,9 @@ with the handle's type, so a type checker such as pyright or mypy sees `int`
 for `n_jobs` and `list[list[int]]` for `machine`, and flags a misspelled handle.
 A builder adds no features of its own: `build()` prints Iris text and parses it
 as `Spec.parse` does, so the language's checks decide what is valid, and
-`source()` returns the text.
+`source()` returns the text. The
+[spec builder reference](/using/python/api/build/) lists every statement of a
+[scope](/using/python/api/build/#Scope0) with the typed handle of each overload.
 
 The examples below are in
 [`python/examples`](https://github.com/Gecode/iris/tree/main/python/examples),
@@ -208,11 +211,12 @@ python SPEC` prints a module with a typed handle for each of its entries:
 
 Save the output as a module, such as `jobshop_view.py`, and read data with
 `data[jobshop_view.machine]` as with a builder's handles; a type checker sees
-the same types. `ib.declared` makes each handle from the entry's name and its
-handle type. An entry whose value type or depth differs between the places that
-define it gets `ib.DynField`, which returns any value or `None`. A declared
-handle reads data from any spec with that entry, and a lookup checks the value
-type and depth, but no builder accepts it, since no builder made it.
+the same types. [`ib.declared`](/using/python/api/build/#declared) makes each
+handle from the entry's name and its handle type. An entry whose value type or
+depth differs between the places that define it gets `ib.DynField`, which
+returns any value or `None`. A declared handle reads data from any spec with
+that entry, and a lookup checks the value type and depth, but no builder accepts
+it, since no builder made it.
 
 ## The iris command
 

@@ -12,7 +12,7 @@ is the JSpecify annotations. It passes the same conformance suite as the Rust
 reference implementation, so it reads every input as the [CLI](/tools/cli/)
 does. The [Java API reference](/using/java/api/) lists every public class and
 method, and the [Kotlin API reference](/using/java/kotlin-api/) lists the
-extensions.
+extensions and the [Kotlin spec builder](/using/java/kotlin-api/build/).
 
 ## Add the library to a project
 
@@ -168,7 +168,8 @@ with its value type and depth: `int0("n_jobs")` is an `IntField<Long>` and
 after a read `data.get(handle)` returns the entry as the handle's type. A
 builder adds no features of its own: `spec(...)` prints Iris text and parses it
 as `Spec.parse` does, so the language's checks decide what is valid, and
-`builder(...).source()` returns the text.
+`builder(...).source()` returns the text. The
+[spec builder reference](/using/java/api/build/) lists its classes.
 
 The builders below are in
 [`java/iris-examples`](https://github.com/Gecode/iris/tree/main/java/iris-examples),
@@ -263,7 +264,11 @@ defines an entry and its handle at once. `irisSpec` returns the spec with what
 its lambda returns, here a class of handles, and the pair destructures as
 `val (spec, shop) = jobshop`. `data[shop.machine]` calls the Java `get` as an
 operator, and the Java types become Kotlin's: `List<LongArray>` for `machine`
-and `String?` for `name`.
+and `String?` for `name`. The
+[Kotlin spec builder reference](/using/java/kotlin-api/build/) lists
+[`irisSpec`](/using/java/kotlin-api/build/iris-spec/), the statements of a
+[scope](/using/java/kotlin-api/build/-scope/) and the
+[capture](/using/java/kotlin-api/build/-capture/) delegates.
 
 <CheckedExample id="kotlin-BuildJobshop" title="BuildJobshop.kt" />
 

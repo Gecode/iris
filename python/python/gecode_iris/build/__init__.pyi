@@ -53,6 +53,8 @@ Maybe: TypeAlias = None
 BuildErrorKind: TypeAlias = Literal[
     "scope", "provenance", "redefinition", "unprintable", "binding", "spec"
 ]
+"""The value of ``BuildError.kind``: the builder check that failed, or
+``spec`` when the language rejected the emitted text."""
 
 # Expressions
 

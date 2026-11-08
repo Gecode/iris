@@ -6,26 +6,35 @@ import { parse as parseToml } from 'smol-toml';
 import { repository, siteDirectory } from './format-sources.mjs';
 
 // Runs Javadoc over dev.gecode:iris and dev.gecode:iris-processor and Dokka over
-// dev.gecode:iris-kotlin, and keeps the content of their pages for the site's
-// own shell. As for C++, the
+// dev.gecode:iris-kotlin, its extensions and its spec builder, and keeps the
+// content of their pages for the site's own shell. As for C++, the
 // tools' own pages would bring their navigation, scripts and styles, and they
 // do not pass the site's link, HTML and contrast checks.
 const javaPath = '/using/java/api/';
 const kotlinPath = '/using/java/kotlin-api/';
 const keptAttributes = new Set(['class', 'href', 'id']);
+const blockElements = new Set(['div', 'p', 'h4', 'h5', 'h6', 'hr', 'ul', 'ol', 'dl', 'table', 'pre', 'blockquote']);
 const java = resolve(repository, 'java');
 const javadocPages = resolve(java, 'iris/build/docs/javadoc/dev.gecode.iris/dev/gecode/iris');
 // The processor has no module, so its package sits at the root of its Javadoc;
 // its pages join the reference below processor/, beside build/.
 const processorPages = resolve(java, 'iris-processor/build/docs/javadoc/dev/gecode/iris/processor');
-const dokkaPages = resolve(java, 'iris-kotlin/build/dokka/html/iris-kotlin/dev.gecode.iris.kotlin');
+const dokkaModule = resolve(java, 'iris-kotlin/build/dokka/html/iris-kotlin');
+// Each Kotlin package and the URL below the reference of its pages: the
+// extensions at the root, and the spec builder below build/, beside them as
+// the Java builder is beside the Java API.
+const kotlinPackages = { 'dev.gecode.iris.kotlin': '', 'dev.gecode.iris.kotlin.build': 'build/' };
 
 runGradle([':iris:javadoc', ':iris-processor:javadoc', ':iris-kotlin:dokkaGenerate']);
 const javaFiles = [
   ...await readdir(javadocPages, { recursive: true }),
   ...(await readdir(processorPages)).map(file => `processor/${file}`),
 ].filter(file => javaSlug(file) !== undefined).sort();
-const kotlinFiles = (await readdir(dokkaPages)).filter(file => file.endsWith('.html')).sort();
+// A Kotlin page's file is its path in Dokka's output, such as
+// dev.gecode.iris.kotlin.build/-scope/read.html for Scope.read.
+const kotlinFiles = (await Promise.all(Object.keys(kotlinPackages).map(async name =>
+  (await readdir(resolve(dokkaModule, name), { recursive: true })).filter(file => file.endsWith('.html')).map(file => `${name}/${file}`),
+))).flat().sort();
 const javadocFile = file => file.startsWith('processor/') ? resolve(processorPages, file.slice('processor/'.length)) : resolve(javadocPages, file);
 const sources = await Promise.all(javaFiles.map(file => readFile(javadocFile(file), 'utf8')));
 const reference = {
@@ -35,7 +44,7 @@ const reference = {
   },
   kotlin: {
     dokka: parseToml(await readFile(resolve(java, 'gradle/libs.versions.toml'), 'utf8')).versions.dokka,
-    pages: await Promise.all(kotlinFiles.map(async file => extractDokkaPage(file, await readFile(resolve(dokkaPages, file), 'utf8'), kotlinFiles, javaFiles))),
+    pages: await Promise.all(kotlinFiles.map(async file => extractDokkaPage(file, await readFile(resolve(dokkaModule, file), 'utf8'), kotlinFiles, javaFiles))),
   },
 };
 await mkdir(resolve(siteDirectory, 'src/generated'), { recursive: true });
@@ -60,7 +69,14 @@ function javaSlug(file) {
   return [...packages, name.replace(/\.html$/, '').replaceAll('.', '-').replace(/(?<=[a-z])(?=[A-Z])/g, '-').toLowerCase()].join('/');
 }
 
-function kotlinSlug(file) { return file === 'index.html' ? '' : file.replace(/\.html$/, ''); }
+// The URL below the reference of a Kotlin page, such as get for get.html of the
+// extensions, build for the summary of the builder's package and
+// build/-scope/read for Scope.read. Dokka writes a class Capture as -capture,
+// beside a function capture, and the URLs keep its names.
+function kotlinSlug(file) {
+  const [name, ...path] = file.split('/');
+  return `${kotlinPackages[name]}${path.join('/').replace(/(?:^|\/)index\.html$|\.html$/, '')}`.replace(/\/$/, '');
+}
 
 function pageUrl(root, slug) { return `${root}${slug === '' ? '' : `${slug}/`}`; }
 
@@ -129,15 +145,21 @@ function javaHref(href, file, published) {
 function extractDokkaPage(file, source, published, javaPublished) {
   const contents = find(parse(source), node => attribute(node, 'id') === 'content');
   const heading = text(find(contents, node => node.tagName === 'h1')).trim().replace(/\s+/g, ' ');
-  const title = file === 'index.html' ? 'Package dev.gecode.iris.kotlin' : heading;
-  const dropped = node => ['breadcrumbs', 'cover', 'footer', 'tabs-section', 'anchor-wrapper'].some(name => hasClass(node, name)) || (node.tagName === 'a' && attribute(node, 'href') === undefined);
+  // The breadcrumbs name the module, the package, and the class of a member.
+  const crumbs = descendants(find(contents, node => hasClass(node, 'breadcrumbs'))).filter(node => node.tagName === 'a').map(node => text(node).trim());
+  const title = crumbs.length === 1 ? `Package ${file.split('/')[0]}` : [...crumbs.slice(2), heading].join('.');
+  // The cover holds the page's heading, which the site's shell shows, and on
+  // the page of a class its declaration and description, which stay.
+  const dropped = node => ['breadcrumbs', 'footer', 'tabs-section', 'anchor-wrapper'].some(name => hasClass(node, name)) || (node.tagName === 'h1' && hasClass(node, 'cover')) || (node.tagName === 'a' && attribute(node, 'href') === undefined);
   for (const node of descendants(contents).filter(dropped)) detach(node);
+  for (const node of descendants(contents).filter(node => node.tagName === 'div' && hasClass(node, 'cover'))) unwrap(node);
   const headings = [];
   for (const node of descendants(contents)) {
-    if (attribute(node, 'data-unresolved-link')) linkJavaType(node, file, javaPublished);
+    if (attribute(node, 'data-unresolved-link')) linkUnresolved(node, file, javaPublished);
     else if (node.tagName === 'a') setAttribute(node, 'href', kotlinHref(attribute(node, 'href'), file, published));
-    // Dokka puts blocks in spans, and starts a function's sections at h4.
-    if (node.tagName === 'span' && descendants(node).some(child => child.tagName === 'div')) rename(node, 'div');
+    // Dokka puts blocks in spans, such as the Return section of a function
+    // under a span of kdoc-tag, and starts a function's sections at h4.
+    if (node.tagName === 'span' && descendants(node).some(child => blockElements.has(child.tagName))) rename(node, 'div');
     if (hasClass(node, 'tableheader')) {
       rename(node, 'h2');
       const name = text(node).trim();
@@ -151,18 +173,25 @@ function extractDokkaPage(file, source, published, javaPublished) {
 }
 
 // Dokka cannot resolve a type of dev.gecode:iris, and marks it with its
-// package and class, such as dev.gecode.iris/Value/get/#kotlin.Int/....
-function linkJavaType(node, file, javaPublished) {
-  const [, type] = attribute(node, 'data-unresolved-link').split('/');
-  const target = `${type}.html`;
-  if (!javaPublished.includes(target)) throw new Error(`${file}: link to the unknown Java type ${type}`);
+// package and class, such as dev.gecode.iris/Value/get/#kotlin.Int/... or
+// dev.gecode.iris.build/IntField///...; a link to a member leads to its class.
+// It marks a type or value parameter of the Kotlin API the same way, as
+// ...PointingToGenericParameters(0)/, which stays text.
+function linkUnresolved(node, file, javaPublished) {
+  const link = attribute(node, 'data-unresolved-link');
+  const [name, type] = link.split('/');
+  if (name in kotlinPackages && /\/PointingTo(?:Generic|Callable)Parameters\(\d+\)\/$/.test(link)) return;
+  const directory = name === 'dev.gecode.iris' ? '' : name.startsWith('dev.gecode.iris.') ? `${name.slice('dev.gecode.iris.'.length).replaceAll('.', '/')}/` : undefined;
+  const target = `${directory}${type}.html`;
+  if (directory === undefined || !javaPublished.includes(target)) throw new Error(`${file}: link to the unknown type ${link}`);
   rename(node, 'a');
   setAttribute(node, 'href', pageUrl(javaPath, javaSlug(target)));
 }
 
 function kotlinHref(href, file, published) {
   if (/^[a-z]+:/.test(href)) return href;
-  const [target, fragment] = href.split('#');
+  const [relative, fragment] = href.split('#');
+  const target = posix.join(posix.dirname(file), relative);
   if (!published.includes(target)) throw new Error(`${file}: link to the unpublished ${href}`);
   return `${pageUrl(kotlinPath, kotlinSlug(target))}${fragment === undefined ? '' : `#${fragment}`}`;
 }
@@ -185,6 +214,11 @@ function text(node) { return node.nodeName === '#text' ? node.value : (node.chil
 function attribute(node, name) { return node.attrs?.find(attr => attr.name === name)?.value; }
 function hasClass(node, name) { return (attribute(node, 'class') ?? '').split(/\s+/).includes(name); }
 function detach(node) { node.parentNode.childNodes.splice(node.parentNode.childNodes.indexOf(node), 1); }
+function unwrap(node) {
+  const siblings = node.parentNode.childNodes;
+  for (const child of node.childNodes) child.parentNode = node.parentNode;
+  siblings.splice(siblings.indexOf(node), 1, ...node.childNodes);
+}
 function rename(node, tagName) { node.tagName = node.nodeName = tagName; }
 function setAttribute(node, name, value) {
   node.attrs = [...node.attrs.filter(attr => attr.name !== name), { name, value }];

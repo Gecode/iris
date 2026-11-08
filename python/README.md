@@ -373,10 +373,12 @@ Run it alone with `uv run --no-sync pytest tests/test_format_builders.py`.
 ## API reference
 
 The site hosts an API reference at
-[`/using/python/api/`](https://iris.gecode.dev/using/python/api/), generated
-from the stubs and docstrings by pdoc, which the `docs` group pins. pdoc was
+[`/using/python/api/`](https://iris.gecode.dev/using/python/api/), and one of
+the spec builder `gecode_iris.build` at
+[`/using/python/api/build/`](https://iris.gecode.dev/using/python/api/build/),
+generated from the stubs and docstrings by pdoc, which the `docs` group pins. pdoc was
 chosen over mkdocstrings because it is a library without a site generator:
-`docs/reference.py` renders the package into an HTML fragment with the
+`docs/reference.py` renders each module into an HTML fragment with the
 templates in `docs/templates/`, and the Astro site places the fragment in a
 Starlight page with its own outline and Tailwind styles. mkdocstrings runs
 inside MkDocs, a second site with its own theme, navigation and build.
@@ -388,6 +390,14 @@ the `Value` and `NDArray` aliases in signatures instead of expanding them, and
 reads `Entry` and `Error` from the modules that define them, since the
 package sets their `__module__` to `gecode_iris`. The output does not depend
 on whether numpy is installed.
+
+The builder's stub refers to classes before it defines them, which pdoc's
+import of a stub does not allow, so `reference.py` runs its statements in an
+order that defines each name first. The stub decides what the builder's page
+shows: each overload of a statement, typed by the depth of its scope, a class's
+bases with private ones replaced by theirs, and the members a scope inherits
+from the private `_Statements` and `_Nested` on the page of each scope class.
+A link to a member inherited from a public base leads to that base's section.
 
 `npm run build` in `site/` runs `site/scripts/prepare-python-api.mjs`, which
 builds a wheel with `uvx maturin@1.16.0 build`, installs it with the `docs`

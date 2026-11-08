@@ -1,0 +1,19 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+// Generated during every build by scripts/prepare-python-api.mjs.
+import reference from '../../../../generated/python-api.json';
+---
+<StarlightPage hasSidebar={true} headings={reference.build.headings} frontmatter={{
+  title: 'Python spec builder API reference',
+  description: 'Every public class, function and handle of the gecode_iris.build spec builder.',
+  editUrl: false, prev: false, next: false,
+}}>
+  <p class="max-w-[68ch]">
+    The public API of the spec builder <code>gecode_iris.build</code>, imported in the guide
+    as <code>ib</code>. pdoc {reference.pdoc} generates it during each site build from the
+    builder's type stubs and docstrings, and shows each typed overload of a statement.
+    The <a href="/using/python/#build-a-reader-spec">guide</a> shows the builder in use, and
+    the <a href="/using/python/api/">package reference</a> covers the specs and data it builds.
+  </p>
+  <div class="iris-python-api min-w-0 max-w-[76ch]" data-python-api set:html={reference.build.html} />
+</StarlightPage>

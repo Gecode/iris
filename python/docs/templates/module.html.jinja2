@@ -1,6 +1,9 @@
 {#
 The reference as a fragment of a site page. Top-level members get h2 headings
-and class members h3, which reference.py collects for the page outline.
+and class members h3, which reference.py collects for the page outline. A
+class lists its own members and those it inherits from a private base, and a
+function with overloads in the stub shows the signature of each. A class
+whose constructor takes arguments shows it under the class's signature.
 #}
 {% extends "default/module.html.jinja2" %}
 {% block content %}
@@ -9,9 +12,16 @@ and class members h3, which reference.py collects for the page outline.
         <section class="api-member">
             <h2 id="{{ m.qualname }}">{{ m.qualname }}</h2>
             {{ signature(m) }}
+            {#- A constructor with arguments shows how to call the class; the native
+                classes Spec and Data have none to show. -#}
+            {% if m.kind == "class" %}
+                {% for c in members(m) if c.name == "__init__" and c.signature_without_self.parameters %}
+                    {{ signature(c) }}
+                {% endfor %}
+            {% endif %}
             {{ docstring(m) }}
             {% if m.kind == "class" %}
-                {% for c in m.own_members if c.kind != "class" and c.name != "__init__" and is_public(c) | trim %}
+                {% for c in members(m) if c.kind != "class" and c.name != "__init__" and is_public(c) | trim %}
                     <section class="api-member">
                         <h3 id="{{ c.qualname }}">{{ c.qualname }}</h3>
                         {{ signature(c) }}
@@ -21,17 +31,58 @@ and class members h3, which reference.py collects for the page outline.
             {% endif %}
         </section>
     {% endfor %}
-    <section class="api-member">
-        <h2 id="iris-command">The iris command</h2>
-        {{ docstring(command) }}
-        {{ signature(command.get("main")) }}
-        {{ docstring(command.get("main")) }}
-    </section>
+    {% if appendix == "command" %}
+        <section class="api-member">
+            <h2 id="iris-command">The iris command</h2>
+            {{ docstring(command) }}
+            {{ signature(command.get("main")) }}
+            {{ docstring(command.get("main")) }}
+        </section>
+    {% elif appendix == "gecode" %}
+        <section class="api-member">
+            <h2 id="gecode">gecode</h2>
+            {{ docstring(gecode) }}
+            {% for c in gecode.flattened_own_members if is_public(c) | trim %}
+                <section class="api-member">
+                    <h3 id="gecode.{{ c.qualname }}">gecode.{{ c.qualname }}</h3>
+                    {{ signature(c) }}
+                    {{ docstring(c) }}
+                </section>
+            {% endfor %}
+        </section>
+    {% endif %}
 {% endblock %}
 {% macro signature(doc) %}
-    <div class="api-signature">
-        {%- if doc.kind == "class" %}{{ class(doc) }}
-        {%- elif doc.kind == "function" %}{{ function(doc) }}
-        {%- else %}{{ variable(doc) }}{% endif -%}
-    </div>
+    {% for o in overloads(doc) or [doc] %}
+        <div class="api-signature">
+            {%- if o.kind == "class" %}{{ class(o) }}
+            {%- elif o.kind == "function" %}{{ function(o) }}
+            {%- else %}{{ variable(o) }}{% endif -%}
+        </div>
+    {% endfor %}
+{% endmacro %}
+{#- Each overload has its own signature block, without the decorator. -#}
+{% macro decorators(doc) %}
+    {% for d in doc.decorators if not d.startswith("@_") and d not in ("@overload", "@typing.overload") %}
+        <div class="decorator decorator-{{ d[1:].partition("(")[0] }}">{{ d }}</div>
+    {% endfor %}
+{% endmacro %}
+{#- A value that Python shows only as <Class> tells the reader nothing. -#}
+{% macro default_value(var) -%}
+    {%- if var.default_value_str and not var.default_value_str.startswith("<") %}
+        =
+        <span class="default_value">{{ var.default_value_str | escape | linkify }}</span>
+    {%- endif -%}
+{% endmacro %}
+{#- The bases of a stub's class, without its private ones. -#}
+{% macro bases(cls) %}
+    {%- set shown = class_bases(cls) -%}
+    {%- if shown -%}
+        <wbr>(
+        {%- for base in shown -%}
+            <span class="base">{{ base[:2] | link(text=base[2]) }}</span>
+            {%- if loop.nextitem %}, {% endif %}
+        {%- endfor -%}
+        )
+    {%- endif -%}
 {% endmacro %}

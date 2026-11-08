@@ -216,12 +216,14 @@ Every dev/build runs `scripts/prepare-python-api.mjs`. It builds a wheel from
 installs it with the pinned pdoc of the `docs` dependency group into a
 temporary uv environment on Python 3.15, and runs `python/docs/reference.py`.
 uv downloads Python 3.15 when it is not installed. The ignored
-`src/generated/python-api.json` holds the HTML fragment and its outline;
-`src/pages/using/python/api.astro` places it in a Starlight page, and the
-`.iris-python-api` rules in `src/styles/custom.css` style pdoc's markup.
-`npm run check:python-api`, part of `npm run check`, compares the built page
-with that output and requires the public classes, methods and attributes,
-including the stub signature of `Spec.read`. The
+`src/generated/python-api.json` holds the HTML fragments of the package and of
+its spec builder, `gecode_iris.build`, and their outlines;
+`src/pages/using/python/api.astro` and `api/build.astro` place them in
+Starlight pages, and the `.iris-python-api` rules in `src/styles/custom.css`
+style pdoc's markup. `npm run check:python-api`, part of `npm run check`,
+compares the built pages with that output and requires the public classes,
+methods and attributes, including the stub signature of `Spec.read`, the typed
+overloads of the builder's statements, and the guide's links to both pages. The
 [Python README](../python/README.md#api-reference) records why pdoc was chosen.
 
 ## TypeScript guide
@@ -268,21 +270,27 @@ and compares its output; see the [Java README](../java/README.md#building-and-te
 Every dev/build runs `scripts/prepare-java-api.mjs`. It runs `:iris:javadoc` and
 `:iris-kotlin:dokkaGenerate` through the Gradle wrapper, so a warning from either
 tool fails the build, and so does a missing Java 27. The script keeps the content
-of the package page and each type page of Javadoc, and of the package page and
-each function page of Dokka, and drops the tools' navigation, scripts, styles and
-tabs. It turns member signatures into plain anchors, keeps only `class`, `href`
-and `id`, and points links at the new URLs, such as `/using/java/api/value-type/`
-and `/using/java/kotlin-api/to-int-array/`. Javadoc's serialized form is not
+of the package page and each type page of Javadoc, and of the package, class and
+member pages of Dokka for the extensions and for the spec builder
+`dev.gecode.iris.kotlin.build`, whose pages sit below `build/`, and drops the
+tools' navigation, scripts, styles and tabs. It turns member signatures into
+plain anchors, keeps only `class`, `href` and `id`, and points links at the new
+URLs, such as `/using/java/api/value-type/`,
+`/using/java/kotlin-api/to-int-array/` and
+`/using/java/kotlin-api/build/-scope/read/`, where Dokka's `-scope` for the class
+`Scope` keeps it apart from a function `scope`. Javadoc's serialized form is not
 published, so its notes are dropped; any other link to a dropped page fails the
 build. Dokka cannot resolve the types of `dev.gecode:iris`, so the script links
-them to the Javadoc pages. The ignored `src/generated/java-api.json` and
+them to the Javadoc pages, and a member of one to its type's page; it leaves
+the type and value parameters it marks the same way as text. The ignored `src/generated/java-api.json` and
 `kotlin-api.json` hold the fragments and their outlines, the two
 `[...page].astro` files in `src/pages/using/java/` place each in a Starlight page,
 and the `.iris-java-api` and `.iris-kotlin-api` rules in `src/styles/custom.css`
 style the tools' markup. The pages therefore pass the ordinary link, HTML and
 contrast checks, with no exclusions. `npm run check:java-api`, part of
 `npm run check`, compares the built pages with that output and requires every
-public type, every extension, and the members the guide names.
+public type, every extension, the members the guide names, and the main pages of
+the Kotlin spec builder, all of whose pages its summary must reach.
 
 ## Playground
 
