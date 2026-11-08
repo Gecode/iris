@@ -18,7 +18,10 @@ import org.jspecify.annotations.Nullable;
  * @param identifier the Java identifier of the handle and the component
  * @param entry the entry's name
  * @param handleType the handle's type, such as {@code IntField<List<long[]>>}
- * @param call the factory call, such as {@code int2("machine")}, with {@code .optional()}
+ * @param factory the factory, such as {@code int2}
+ * @param arguments the factory's arguments: the entry's name as a literal, and the depth of an
+ *     {@code N} factory
+ * @param optional whether the entry may be absent, so the handle calls {@code .optional()}
  * @param componentType the record component's type
  * @param slots the JVM parameter slots of the component
  * @param imports the imports of the handle and the component
@@ -27,7 +30,9 @@ record Handle(
     String identifier,
     String entry,
     String handleType,
-    String call,
+    String factory,
+    List<String> arguments,
+    boolean optional,
     String componentType,
     int slots,
     List<String> imports) {
@@ -59,7 +64,9 @@ record Handle(
           identifier,
           entry.name(),
           "DynField",
-          "dynamic(" + name + ")",
+          "dynamic",
+          List.of(name),
+          false,
           nullable("Value", optional),
           1,
           imports);
@@ -75,16 +82,18 @@ record Handle(
         };
     imports.add("dev.gecode.iris.build." + handleClass);
     String prefix = leaf == Leaf.STRING ? "string" : leaf.text();
-    String tail = optional ? ".optional()" : "";
     String viewType;
-    String call;
+    String factory;
+    List<String> arguments;
     if (depth > DEEPEST_VIEW_TYPE) {
       imports.add(VALUE);
       viewType = nullable("Value", optional);
-      call = prefix + "N(" + name + ", " + depth + ")" + tail;
+      factory = prefix + "N";
+      arguments = List.of(name, String.valueOf(depth));
     } else {
       viewType = nullable(viewType(leaf, depth), optional);
-      call = prefix + depth + "(" + name + ")" + tail;
+      factory = prefix + depth;
+      arguments = List.of(name);
     }
     String componentType = componentType(leaf, depth, optional);
     if (componentType.contains("List<") || viewType.contains("List<")) {
@@ -98,7 +107,9 @@ record Handle(
         identifier,
         entry.name(),
         handleClass + "<" + viewType + ">",
-        call,
+        factory,
+        arguments,
+        optional,
         componentType,
         wide ? 2 : 1,
         imports);

@@ -29,6 +29,8 @@ import javax.tools.StandardJavaFileManager;
 import javax.tools.ToolProvider;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Compiles annotated sources with the processor in javac and checks what it generates and reports.
@@ -142,22 +144,24 @@ class IrisSpecProcessorTest {
         import org.jspecify.annotations.Nullable;
 
         /**
-         * The reader spec {@code formats/jobshop/jobshop.iris} and a typed handle for each of its
-         * entries, generated for {@link Jobshop}.
+         * The reader spec {@code formats/jobshop/jobshop.iris} and a typed handle for each of its entries,
+         * generated for {@link Jobshop}.
          */
         public final class JobshopHandles {
           /** The reader spec, parsed from the text that the file had at compile time. */
           public static final Spec spec =
-              Spec.parse(java.lang.String.join(
-                  "",
-                  "format jobshop\\n",
-                  "\\n",
-                  "comment \\"#\\" \\"+++\\"\\n",
+              Spec.parse(
+                  java.lang.String.join(
+                      "",
+                      "format jobshop\\n",
+                      "\\n",
+                      "comment \\"#\\" \\"+++\\"\\n",
         """);
     assertSuffix(
         handles,
         """
-                  "}\\n"), "formats/jobshop/jobshop.iris");
+                      "}\\n"),
+                  "formats/jobshop/jobshop.iris");
 
           /** The entry {@code name}. */
           public static final StringField<java.lang.@Nullable String> name = string0("name").optional();
@@ -191,8 +195,8 @@ class IrisSpecProcessorTest {
         import org.jspecify.annotations.Nullable;
 
         /**
-         * The entries of the reader spec {@code formats/jobshop/jobshop.iris}, as {@link JobshopHandles#reader}
-         * reads them.
+         * The entries of the reader spec {@code formats/jobshop/jobshop.iris}, as {@link
+         * JobshopHandles#reader} reads them.
          */
         @java.lang.SuppressWarnings("ArrayRecordComponent")
         public record JobshopData(
@@ -243,7 +247,8 @@ class IrisSpecProcessorTest {
     assertTrue(
         generated("near/NearHandles.java")
             .contains("  public static final FloatField<double[]> v = float1(\"v\");\n"));
-    assertTrue(generated("near/NearData.java").contains("    long n,\n    double[] v) {}\n"));
+    assertTrue(
+        generated("near/NearData.java").contains("\nrecord NearData(long n, double[] v) {}\n"));
   }
 
   @Test
@@ -341,7 +346,12 @@ class IrisSpecProcessorTest {
             "DynField x = dynamic(\"x\");",
             "StringField<@Nullable List<java.lang.String>> maybe ="
                 + " string1(\"maybe\").optional();")) {
-      assertTrue(handles.contains("  public static final " + declaration + "\n"), declaration);
+      // A declaration too wide for a line breaks after its '='.
+      assertTrue(
+          handles
+              .replaceAll(" =\n +", " = ")
+              .contains("  public static final " + declaration + "\n"),
+          declaration);
     }
     String record = generated("NamesData.java");
     assertTrue(record.contains("    @Entry(\"if\") long if2,\n"), record);
@@ -384,9 +394,14 @@ class IrisSpecProcessorTest {
         new URL[] {scratch.resolve("classes").toUri().toURL()}, getClass().getClassLoader());
   }
 
-  @Test
-  void entriesInTheMostRecordSlotsReadIntoARecord() throws Exception {
-    writeWide(1);
+  /**
+   * 253 slots are the most that a method handle passes to a constructor, and 254 the most that a
+   * constructor takes, which {@code RecordReader} passes through reflection.
+   */
+  @ParameterizedTest
+  @ValueSource(ints = {1, 2})
+  void entriesInTheMostRecordSlotsReadIntoARecord(int words) throws Exception {
+    writeWide(words);
     var compilation = compileWide();
     assertTrue(compilation.success(), compilation.messages().toString());
     assertTrue(compilation.messages().isEmpty(), compilation.messages().toString());
@@ -395,20 +410,20 @@ class IrisSpecProcessorTest {
       var reader = (RecordReader<?>) handles.getField("reader").get(null);
       Record record = reader.read(Files.readAllBytes(scratch.resolve("wide.txt")));
       RecordComponent[] components = record.getClass().getRecordComponents();
-      assertEquals(127, components.length);
+      assertEquals(126 + words, components.length);
       assertEquals(126L, components[125].getAccessor().invoke(record));
-      assertEquals("w", components[126].getAccessor().invoke(record));
+      assertEquals("w", components[125 + words].getAccessor().invoke(record));
     }
   }
 
   @Test
   void entriesBeyondTheMostRecordSlotsGetHandlesWithoutARecord() throws Exception {
-    writeWide(2);
+    writeWide(3);
     var compilation = compileWide();
     assertTrue(compilation.success(), compilation.messages().toString());
     var note = compilation.only(Diagnostic.Kind.NOTE);
     assertEquals(
-        "the entries of 'wide.iris' take more than 253 parameter slots, so WideData and the reader"
+        "the entries of 'wide.iris' take more than 254 parameter slots, so WideData and the reader"
             + " are not generated",
         note.getMessage(Locale.ROOT));
     assertFalse(Files.exists(scratch.resolve("generated/WideData.java")));
@@ -419,7 +434,7 @@ class IrisSpecProcessorTest {
       var spec = (Spec) handles.getField("spec").get(null);
       Data data = spec.read(Files.readAllBytes(scratch.resolve("wide.txt")));
       assertEquals(126L, data.get((Field<?>) handles.getField("v125").get(null)));
-      assertEquals("w", data.get((Field<?>) handles.getField("w1").get(null)));
+      assertEquals("w", data.get((Field<?>) handles.getField("w2").get(null)));
     }
   }
 

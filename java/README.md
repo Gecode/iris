@@ -116,6 +116,13 @@ RecordReader<Shop> reader = spec.reader(Shop.class, MethodHandles.lookup());
 Shop shop = reader.read(Path.of("ft06.txt"));
 ```
 
+The reader calls the canonical constructor through a method handle that the
+lookup finds, so the record's package need not be open. A method handle passes
+at most 253 parameter slots, where a `long` or `double` takes two, so a record
+whose components take 254, the most a constructor takes, is constructed
+through `Constructor.newInstance` with the lookup class as its caller, which
+needs a lookup with original access, as `MethodHandles.lookup()` has.
+
 The value type, depth and optionality of each entry come from a port of
 `gecode-iris-sema`'s output entries in `dev.gecode.iris.internal.syntax`.
 
@@ -291,7 +298,8 @@ running the toolchain's `javac` with Error Prone and NullAway in JSpecify mode,
 the dereference of an optional entry.
 
 `RecordReaderTest` reads the jobshop format and each value type and depth into
-records and checks the errors of a reader's creation. `OutputEntriesTest` ports
+records, reads records of 253 and 254 parameter slots that it compiles with
+javac, and checks the errors of a reader's creation. `OutputEntriesTest` ports
 the output-entry tests of `rust/iris-sema/tests/model.rs`, and
 `OutputEntriesDifferentialTest` compares the value type, depth and optionality
 of every entry of every spec in `conformance/cases/0.1` and `formats` with the

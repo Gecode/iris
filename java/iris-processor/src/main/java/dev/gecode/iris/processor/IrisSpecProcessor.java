@@ -41,9 +41,10 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>A missing or unreadable file, a reader spec that does not parse or check, a nested type, and a
  * generated class that exists already are errors, reported at the annotation's value or at the
- * annotated type. A spec whose entries would take more than 253 parameter slots, the most that a
- * {@code RecordReader} can pass to a record's canonical constructor, gets no record and no reader,
- * with a note; its handles class is generated all the same.
+ * annotated type. A spec whose entries would take more than 254 parameter slots, the most that a
+ * record's canonical constructor can take, gets no record and no reader, with a note; its handles
+ * class is generated all the same. The generated classes are laid out as google-java-format lays
+ * them out.
  *
  * <p>The processor checks the spec with {@code dev.gecode.iris} and finds its entries with that
  * library's internal port of the output entries of {@code iris gen}, so it must run from the
@@ -206,7 +207,7 @@ public final class IrisSpecProcessor extends AbstractProcessor {
   }
 
   /** Returns the entries of a valid reader spec. */
-  private static List<OutputEntry> entries(byte[] source, String origin) {
+  static List<OutputEntry> entries(byte[] source, String origin) {
     Ast.Program program = LargeStack.call(() -> Parser.parse(Lexer.lex(source, origin), origin));
     Resolution resolution = LargeStack.call(() -> Resolver.resolve(program, origin));
     return LargeStack.call(() -> OutputEntries.of(program, resolution));

@@ -388,15 +388,21 @@ public final class Spec {
    *
    * <p>The reader constructs records through their canonical constructor, which {@code lookup}
    * finds, so the record's module need not open its package. Pass {@code MethodHandles.lookup()}
-   * from code that can access the constructor.
+   * from code that can access the constructor. A method handle can pass at most 253 parameter
+   * slots, where a {@code long} or {@code double} takes two, so a record whose components take 254,
+   * the most a constructor can take, is constructed through {@link
+   * java.lang.reflect.Constructor#newInstance} as the lookup class calls it, after the checks that
+   * a method handle's lookup makes, which needs a lookup with original access, as {@code
+   * MethodHandles.lookup()} has.
    *
    * @param <R> the record type
    * @param type the record class
    * @param lookup a lookup that can access the canonical constructor of {@code type}
    * @return the reader
    * @throws IllegalArgumentException if {@code type} is not a record class, if a component names an
-   *     entry that no read produces or has a type that does not fit its entry, or if {@code lookup}
-   *     cannot access the canonical constructor
+   *     entry that no read produces or has a type that does not fit its entry, if {@code lookup}
+   *     cannot access the canonical constructor, or if the components take 254 parameter slots and
+   *     {@code lookup} lacks original access
    */
   public <R extends Record> RecordReader<R> reader(Class<R> type, MethodHandles.Lookup lookup) {
     return RecordReader.create(

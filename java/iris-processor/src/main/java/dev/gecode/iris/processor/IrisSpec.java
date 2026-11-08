@@ -28,9 +28,9 @@ import java.lang.annotation.Target;
  * JobshopData shop = JobshopHandles.reader.read(input);
  * }</pre>
  *
- * <p>A spec whose entries take more than 253 parameter slots in a record, where a {@code long} or
- * {@code double} component takes two, gets no record and no {@code reader}, since {@code
- * RecordReader} could not call the record's constructor; the processor notes it.
+ * <p>A spec whose entries take more than 254 parameter slots in a record, where a {@code long} or
+ * {@code double} component takes two, gets no record and no {@code reader}, since a constructor
+ * takes at most 254; the processor notes it.
  *
  * <p>A relative path resolves against the directory that the processor option {@code iris.root}
  * names, as in {@code -Airis.root=/path/to/project}, or without the option against the directory of

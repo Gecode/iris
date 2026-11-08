@@ -7,7 +7,11 @@ plugins {
 // The processor checks a spec and finds its entries with the library, including its internal
 // syntax packages, so it has no module descriptor: it runs from the processor path, where the
 // library is not a named module. The generated code needs only dev.gecode:iris.
-dependencies { implementation(project(":iris")) }
+dependencies {
+    implementation(project(":iris"))
+    // The tests hold the generated classes to google-java-format's layout.
+    testImplementation(libs.google.java.format)
+}
 
 tasks.jar { manifest { attributes("Automatic-Module-Name" to "dev.gecode.iris.processor") } }
 
@@ -18,5 +22,11 @@ tasks.check { dependsOn(tasks.javadoc) }
 
 tasks.test {
     systemProperty("iris.repository", rootDir.parentFile.path)
+    // google-java-format parses with javac's internal API.
+    jvmArgs(
+        listOf("api", "code", "file", "parser", "tree", "util").map {
+            "--add-exports=jdk.compiler/com.sun.tools.javac.$it=ALL-UNNAMED"
+        }
+    )
     inputs.dir(rootDir.parentFile.resolve("formats")).withPathSensitivity(PathSensitivity.RELATIVE)
 }

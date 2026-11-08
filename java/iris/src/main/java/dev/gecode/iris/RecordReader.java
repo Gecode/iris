@@ -8,6 +8,9 @@ import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.lang.reflect.AccessibleObject;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.RecordComponent;
 import java.lang.reflect.Type;
@@ -30,15 +33,24 @@ import org.jspecify.annotations.Nullable;
  * @param <R> the record type
  */
 public final class RecordReader<R extends Record> {
+  /**
+   * The most JVM parameter slots of a constructor that a method handle can call, where a {@code
+   * long} or {@code double} takes two: a method takes at most 255, a constructor spends one on the
+   * object it constructs, and a method handle's invoker one on the handle, as {@link MethodHandle}
+   * documents. A record whose components take more, which can only be 254, is constructed through
+   * {@link Constructor#newInstance}.
+   */
+  private static final int MOST_METHOD_HANDLE_SLOTS = 253;
+
   private final Spec spec;
   private final Class<R> type;
   private final List<Component> components;
 
-  /** The canonical constructor of {@code R}. */
-  private final MethodHandle constructor;
+  /** Calls the canonical constructor of {@code R}. */
+  private final Construction constructor;
 
   private RecordReader(
-      Spec spec, Class<R> type, List<Component> components, MethodHandle constructor) {
+      Spec spec, Class<R> type, List<Component> components, Construction constructor) {
     this.spec = spec;
     this.type = type;
     this.components = components;
@@ -54,6 +66,12 @@ public final class RecordReader<R extends Record> {
    * @param nullable whether an absent entry reads as null
    */
   private record Component(String entry, Shape.@Nullable Typed view, boolean nullable) {}
+
+  /** Calls a canonical constructor with the value of each component. */
+  @FunctionalInterface
+  private interface Construction {
+    Object construct(@Nullable Object[] arguments) throws Throwable;
+  }
 
   /** Checks the components of {@code type} against {@code entries}, as {@link Spec#reader} says. */
   static <R extends Record> RecordReader<R> create(
@@ -184,15 +202,92 @@ public final class RecordReader<R extends Record> {
     };
   }
 
-  private static MethodHandle canonicalConstructor(Class<?> type, MethodHandles.Lookup lookup) {
+  /**
+   * Returns a call of the canonical constructor of {@code type}: through a method handle, or for a
+   * constructor of more slots than a method handle can call, through {@link
+   * Constructor#newInstance} as the lookup class calls it.
+   */
+  private static Construction canonicalConstructor(Class<?> type, MethodHandles.Lookup lookup) {
+    Class<?>[] componentTypes = componentTypes(type);
+    int slots = 0;
+    for (Class<?> componentType : componentTypes) {
+      slots += componentType == long.class || componentType == double.class ? 2 : 1;
+    }
     try {
-      return lookup.findConstructor(type, MethodType.methodType(void.class, componentTypes(type)));
+      if (slots <= MOST_METHOD_HANDLE_SLOTS) {
+        MethodHandle constructor =
+            lookup.findConstructor(type, MethodType.methodType(void.class, componentTypes));
+        return constructor::invokeWithArguments;
+      }
+      // Reflection checks neither that the lookup's module reads the record's, nor the class's
+      // access, both of which findConstructor checks.
+      lookup.accessClass(type);
+      return reflectiveConstructor(type.getDeclaredConstructor(componentTypes), slots, lookup);
     } catch (IllegalAccessException e) {
       throw new IllegalArgumentException(
           "the lookup cannot access the canonical constructor of " + type.getName(), e);
     } catch (NoSuchMethodException e) {
       throw new IllegalStateException("a record class has a canonical constructor", e);
     }
+  }
+
+  /**
+   * Returns a call of {@code constructor} through {@link Constructor#newInstance}, which checks
+   * access against its caller: a method handle that {@code lookup} finds for it has the lookup
+   * class as its caller, so the record's module need not open its package here either.
+   */
+  private static Construction reflectiveConstructor(
+      Constructor<?> constructor, int slots, MethodHandles.Lookup lookup)
+      throws IllegalAccessException {
+    String name = constructor.getDeclaringClass().getName();
+    MethodHandle canAccess;
+    MethodHandle newInstance;
+    try {
+      canAccess =
+          lookup.findVirtual(
+              AccessibleObject.class,
+              "canAccess",
+              MethodType.methodType(boolean.class, Object.class));
+      newInstance =
+          lookup
+              .findVirtual(
+                  Constructor.class,
+                  "newInstance",
+                  MethodType.methodType(Object.class, Object[].class))
+              .bindTo(constructor)
+              .asFixedArity();
+    } catch (IllegalAccessException e) {
+      throw new IllegalArgumentException(
+          "the components of "
+              + name
+              + " take "
+              + slots
+              + " parameter slots, more than the "
+              + MOST_METHOD_HANDLE_SLOTS
+              + " that a method handle can pass, so the lookup needs original access, as"
+              + " MethodHandles.lookup() has",
+          e);
+    } catch (NoSuchMethodException e) {
+      throw new IllegalStateException("reflection has canAccess and newInstance", e);
+    }
+    boolean accessible;
+    try {
+      accessible = (boolean) canAccess.invokeExact((AccessibleObject) constructor, (Object) null);
+    } catch (Throwable e) {
+      throw new IllegalStateException("canAccess of a constructor does not fail", e);
+    }
+    if (!accessible) {
+      throw new IllegalAccessException(
+          lookup.lookupClass().getName() + " cannot access the canonical constructor of " + name);
+    }
+    return arguments -> {
+      try {
+        return (Object) newInstance.invokeExact(arguments);
+      } catch (InvocationTargetException e) {
+        Throwable thrown = e.getCause();
+        throw thrown == null ? e : thrown;
+      }
+    };
   }
 
   /**
@@ -307,7 +402,7 @@ public final class RecordReader<R extends Record> {
           value == null || view == null ? value : ViewTypes.view(value, view.leaf(), view.depth());
     }
     try {
-      return type.cast(constructor.invokeWithArguments(arguments));
+      return type.cast(constructor.construct(arguments));
     } catch (RuntimeException | Error e) {
       throw e;
     } catch (Throwable e) {

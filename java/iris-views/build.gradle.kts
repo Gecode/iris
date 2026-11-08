@@ -161,3 +161,15 @@ tasks.test {
     inputs.dir(repository.resolve("formats")).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.dir("specs").withPathSensitivity(PathSensitivity.RELATIVE)
 }
+
+// google-java-format checks the classes that iris-processor writes, as it checks the views above.
+val processorOutput = tasks.compileJava.flatMap { it.options.generatedSourceOutputDirectory }
+
+spotless {
+    format("processorOutput", com.diffplug.gradle.spotless.JavaExtension::class.java) {
+        target(processorOutput.map { fileTree(it) { include("**/*.java") } })
+        googleJavaFormat(libs.versions.google.java.format.get())
+    }
+}
+
+tasks.named("spotlessProcessorOutput") { dependsOn(tasks.compileJava) }

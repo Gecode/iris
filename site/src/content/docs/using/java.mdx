@@ -317,10 +317,10 @@ and writes two classes beside the type: `JobshopHandles`, with the parsed spec
 as `spec`, the handles that `iris gen --lang java` prints, and a record reader
 as `reader`, and `JobshopData`, the record that `reader` reads. An invalid spec
 fails the compilation with the diagnostic at the annotation. A spec whose
-entries take more than 253 parameter slots in a record, where a `long` or
+entries take more than 254 parameter slots in a record, where a `long` or
 `double` component takes two, gets the handles but no record or reader, since
-`RecordReader` could not call the record's constructor; the processor notes
-it.
+a constructor takes at most 254; the processor notes it. The generated classes
+are laid out as google-java-format lays them out.
 
 <CheckedExample id="java-Jobshop" title="Jobshop.java" />
 

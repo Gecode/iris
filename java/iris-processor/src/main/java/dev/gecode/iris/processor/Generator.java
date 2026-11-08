@@ -1,5 +1,14 @@
 package dev.gecode.iris.processor;
 
+import static dev.gecode.iris.processor.Layout.MEMBER_COLUMN;
+import static dev.gecode.iris.processor.Layout.at;
+
+import dev.gecode.iris.processor.Layout.Call;
+import dev.gecode.iris.processor.Layout.Component;
+import dev.gecode.iris.processor.Layout.Expression;
+import dev.gecode.iris.processor.Layout.Select;
+import dev.gecode.iris.processor.Layout.Text;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.SequencedSet;
 import java.util.TreeSet;
@@ -7,7 +16,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Writes the classes that {@link IrisSpec} generates for one annotated type: the handles class and
- * the record, as google-java-format would lay out their declarations where they fit on a line.
+ * the record, laid out as google-java-format lays them out, through {@link Layout}.
  *
  * <p>The classes name the types of {@code java.lang} by their qualified names, so that a class of
  * the same simple name in the annotated type's package cannot take their place. No handle is named
@@ -34,13 +43,15 @@ record Generator(
   /** The most literals in one call of {@code String.join}, which keeps a method's code small. */
   private static final int LITERALS_PER_METHOD = 1000;
 
+  /** The method that joins the literals of the spec's text. */
+  private static final String JOIN = "java.lang.String.join";
+
   /**
-   * The most JVM parameter slots that the components of a record may take for {@link
-   * dev.gecode.iris.RecordReader} to construct it. A method takes at most 255 slots; a constructor
-   * spends one on the object it constructs, and the method handle that the reader invokes it
-   * through spends one on itself, as {@link java.lang.invoke.MethodHandle} documents.
+   * The most JVM parameter slots that the components of a record may take: a method takes at most
+   * 255 slots, and a constructor spends one on the object it constructs. {@link
+   * dev.gecode.iris.RecordReader} constructs a record of so many through reflection.
    */
-  static final int MOST_RECORD_SLOTS = 253;
+  static final int MOST_RECORD_SLOTS = 254;
 
   /** {@return the source of the handles class} */
   String handlesSource() {
@@ -55,62 +66,84 @@ record Generator(
       imports.add("dev.gecode.iris.RecordReader");
       imports.add("java.lang.invoke.MethodHandles");
     }
-    var out = header();
+    List<String> out = header();
     if (!handles.isEmpty()) {
-      out.append("import static dev.gecode.iris.build.Iris.*;\n\n");
+      out.add("import static dev.gecode.iris.build.Iris.*;");
+      out.add("");
     }
-    imports.forEach(name -> out.append("import ").append(name).append(";\n"));
-    out.append("\n/**\n * The reader spec {@code ")
-        .append(javadocText(path))
-        .append("} and a typed handle for each of its\n * entries, generated for {@link ")
-        .append(simpleName(annotated))
-        .append("}.\n */\n");
-    out.append(visibility()).append("final class ").append(handlesClass).append(" {\n");
-    out.append(
-        "  /** The reader spec, parsed from the text that the file had at compile time. */\n");
+    imports.forEach(name -> out.add("import " + name + ";"));
+    out.add("");
+    out.addAll(
+        Layout.javadoc(
+            0,
+            "The reader spec {@code "
+                + javadocText(path)
+                + "} and a typed handle for each of its entries, generated for {@link "
+                + simpleName(annotated)
+                + "}."));
+    out.addAll(Layout.modified(0, visibility() + "final ", "class " + handlesClass + " {"));
+    out.addAll(
+        Layout.javadoc(
+            MEMBER_COLUMN,
+            "The reader spec, parsed from the text that the file had at compile time."));
     List<String> literals = Literals.lines(text);
-    out.append("  public static final Spec spec =\n      Spec.parse(");
+    Expression specText;
     if (literals.size() <= LITERALS_PER_METHOD) {
-      join(out, literals, "          ");
+      specText = joined(literals);
     } else {
-      out.append("java.lang.String.join(\"\"");
+      List<Expression> parts = new ArrayList<>();
+      parts.add(new Text("\"\""));
       for (int part = 0; part * LITERALS_PER_METHOD < literals.size(); part++) {
-        out.append(", text").append(part).append("()");
+        parts.add(new Text("text" + part + "()"));
       }
-      out.append(")");
+      specText = new Call(JOIN, parts);
     }
-    out.append(", ").append(Literals.quoted(path)).append(");\n");
+    out.addAll(
+        Layout.field(
+            "public static final ",
+            "Spec",
+            "spec",
+            new Call("Spec.parse", List.of(specText, new Text(Literals.quoted(path))))));
     for (Handle handle : handles) {
-      out.append("\n  /** The entry {@code ").append(javadocText(handle.entry())).append("}. */\n");
-      out.append("  public static final ")
-          .append(handle.handleType())
-          .append(' ')
-          .append(handle.identifier())
-          .append(" = ")
-          .append(handle.call())
-          .append(";\n");
+      out.add("");
+      out.addAll(
+          Layout.javadoc(MEMBER_COLUMN, "The entry {@code " + javadocText(handle.entry()) + "}."));
+      out.addAll(
+          Layout.handle(
+              handle.handleType(),
+              handle.identifier(),
+              handle.factory(),
+              handle.arguments(),
+              handle.optional()));
     }
     if (recordClass != null) {
-      out.append("\n  /** Reads data into {@link ").append(recordClass).append("}. */\n");
-      out.append("  public static final RecordReader<")
-          .append(recordClass)
-          .append("> reader =\n      spec.reader(")
-          .append(recordClass)
-          .append(".class, MethodHandles.lookup());\n");
+      out.add("");
+      out.addAll(Layout.javadoc(MEMBER_COLUMN, "Reads data into {@link " + recordClass + "}."));
+      out.addAll(
+          Layout.field(
+              "public static final ",
+              "RecordReader<" + recordClass + ">",
+              "reader",
+              new Call(
+                  "spec.reader",
+                  List.of(new Select(recordClass, "class"), new Text("MethodHandles.lookup()")))));
     }
-    out.append("\n  private ").append(handlesClass).append("() {}\n");
+    out.add("");
+    out.addAll(Layout.modified(MEMBER_COLUMN, "private ", handlesClass + "() {}"));
     if (literals.size() > LITERALS_PER_METHOD) {
       for (int part = 0; part * LITERALS_PER_METHOD < literals.size(); part++) {
         int from = part * LITERALS_PER_METHOD;
         int to = Math.min(from + LITERALS_PER_METHOD, literals.size());
-        out.append("\n  private static java.lang.String text")
-            .append(part)
-            .append("() {\n    return ");
-        join(out, literals.subList(from, to), "        ");
-        out.append(";\n  }\n");
+        out.add("");
+        out.add(at(MEMBER_COLUMN, "private static java.lang.String text" + part + "() {"));
+        out.addAll(
+            Layout.expression(
+                "return ", joined(literals.subList(from, to)), ";", 2 * MEMBER_COLUMN));
+        out.add(at(MEMBER_COLUMN, "}"));
       }
     }
-    return out.append("}\n").toString();
+    out.add("}");
+    return lines(out);
   }
 
   /** {@return the source of the record} */
@@ -127,28 +160,27 @@ record Generator(
         imports.add("dev.gecode.iris.Entry");
       }
     }
-    var out = header();
-    imports.forEach(name -> out.append("import ").append(name).append(";\n"));
+    List<String> out = header();
+    imports.forEach(name -> out.add("import " + name + ";"));
     if (!imports.isEmpty()) {
-      out.append('\n');
+      out.add("");
     }
-    out.append("/**\n * The entries of the reader spec {@code ")
-        .append(javadocText(path))
-        .append("}, as {@link ")
-        .append(handlesClass)
-        .append("#reader}\n * reads them.\n */\n");
-    out.append("@java.lang.SuppressWarnings(\"ArrayRecordComponent\")\n");
-    out.append(visibility()).append("record ").append(recordClass).append('(');
-    for (int index = 0; index < handles.size(); index++) {
-      Handle handle = handles.get(index);
-      out.append(index == 0 ? "\n    " : ",\n    ");
-      String annotation = handle.entryAnnotation();
-      if (annotation != null) {
-        out.append(annotation).append(' ');
-      }
-      out.append(handle.componentType()).append(' ').append(handle.identifier());
+    out.addAll(
+        Layout.javadoc(
+            0,
+            "The entries of the reader spec {@code "
+                + javadocText(path)
+                + "}, as {@link "
+                + handlesClass
+                + "#reader} reads them."));
+    out.add("@java.lang.SuppressWarnings(\"ArrayRecordComponent\")");
+    List<Component> components = new ArrayList<>();
+    for (Handle handle : handles) {
+      components.add(
+          new Component(handle.entryAnnotation(), handle.componentType(), handle.identifier()));
     }
-    return out.append(") {}\n").toString();
+    out.addAll(Layout.recordHeader(visibility(), recordClass, components));
+    return lines(out);
   }
 
   /** {@return the JVM parameter slots that a record of the entries takes} */
@@ -163,34 +195,46 @@ record Generator(
         .find();
   }
 
-  private StringBuilder header() {
-    var out = new StringBuilder();
-    out.append("// Generated by iris-processor for ")
-        .append(annotated)
-        .append(" from ")
-        .append(Literals.quoted(path))
-        .append(".\n");
+  /** {@return the comment that names the generator, and the package} */
+  private List<String> header() {
+    List<String> out =
+        new ArrayList<>(
+            Layout.lineComment(
+                "// Generated by iris-processor for "
+                    + annotated
+                    + " from "
+                    + Literals.quoted(path)
+                    + "."));
     if (!packageName.isEmpty()) {
-      out.append("package ").append(packageName).append(";\n");
+      out.add("package " + packageName + ";");
     }
-    return out.append('\n');
+    out.add("");
+    return out;
   }
 
   private String visibility() {
     return publicClasses ? "public " : "";
   }
 
-  /** Writes {@code literals} as one expression, each literal on a line of its own. */
-  private static void join(StringBuilder out, List<String> literals, String indent) {
+  /** {@return {@code literals} as one expression: a literal alone, or joined} */
+  private static Expression joined(List<String> literals) {
+    if (literals.isEmpty()) {
+      return new Text("\"\"");
+    }
     if (literals.size() == 1) {
-      out.append(literals.getFirst());
-      return;
+      return new Text(literals.getFirst());
     }
-    out.append("java.lang.String.join(\n").append(indent).append("\"\"");
-    for (String literal : literals) {
-      out.append(",\n").append(indent).append(literal);
-    }
-    out.append(")");
+    List<Expression> arguments = new ArrayList<>();
+    arguments.add(new Text("\"\""));
+    literals.forEach(literal -> arguments.add(new Text(literal)));
+    return new Call(JOIN, arguments);
+  }
+
+  /** {@return {@code lines}, each ended by a line break} */
+  private static String lines(List<String> lines) {
+    var out = new StringBuilder();
+    lines.forEach(line -> out.append(line).append('\n'));
+    return out.toString();
   }
 
   /** {@return {@code text} safe in a Javadoc code span and in a comment} */

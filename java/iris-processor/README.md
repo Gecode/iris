@@ -13,13 +13,13 @@ holds the parsed spec as `spec`, a typed handle for each entry, named and typed
 as `iris gen --lang java` names and types it, and a `RecordReader` as `reader`.
 `JobshopData` is the record that `reader` reads. An invalid spec, or a file the
 processor cannot read, is a compile error at the annotation. A spec whose
-entries take more than 253 parameter slots, where a `long` or `double`
+entries take more than 254 parameter slots, where a `long` or `double`
 component takes two, gets no record or reader, with a note: a method takes at
 most 255 slots, and the record's constructor spends one on the object it
-constructs and the method handle that `RecordReader` calls it through one on
-itself. Its handles class is generated all the same. The generated classes
+constructs. Its handles class is generated all the same. The generated classes
 qualify the types of `java.lang`, so classes such as `Long` or `String` in the
-annotated type's package do not take their place.
+annotated type's package do not take their place, and are laid out as
+google-java-format lays them out.
 
 The processor is needed only to compile, and adds no dependency to
 `dev.gecode:iris` or to the program: the annotation is kept only in the source,
@@ -51,7 +51,12 @@ naming ports the handles mode of `rust/iris-gen/src/java/names.rs`;
 ## Building and testing
 
 From `java/`: `./gradlew :iris-processor:build` compiles the processor, runs
-its tests, which compile annotated sources in process with javac, and builds
-its Javadoc with warnings as errors. `./gradlew :iris-views:test` compiles the
-processor's classes for every format beside the views of `iris gen` and reads
-every case through both.
+its tests, which compile annotated sources in process with javac and compare
+the generated classes with google-java-format's layout of them across the
+widths of names, paths, records and spec lines and the depths of entries, up to
+where every level of a component's type breaks, and builds its Javadoc with
+warnings as errors. `./gradlew :iris-views:test` compiles the processor's
+classes for every format beside the views of `iris gen` and reads every case
+through both, and `./gradlew :iris-views:spotlessProcessorOutputCheck` checks
+those classes with google-java-format through Spotless; `./gradlew build` runs
+both.
