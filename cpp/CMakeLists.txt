@@ -4,7 +4,14 @@ project(iris VERSION 0.1.0 LANGUAGES CXX)
 # The library uses no C++ modules, so skip the dependency scan for them.
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
-option(IRIS_BUILD_TESTS "Build the conformance driver and the tests" ${PROJECT_IS_TOP_LEVEL})
+# A release archive holds the library alone, without tests/, driver/ and
+# fuzz/, so it builds no tests by default.
+if(PROJECT_IS_TOP_LEVEL AND EXISTS "${PROJECT_SOURCE_DIR}/tests/CMakeLists.txt")
+  set(iris_has_tests ON)
+else()
+  set(iris_has_tests OFF)
+endif()
+option(IRIS_BUILD_TESTS "Build the conformance driver and the tests" ${iris_has_tests})
 option(IRIS_INSTALL "Generate the rules that install the library and its package"
   ${PROJECT_IS_TOP_LEVEL})
 if(EXISTS "${PROJECT_SOURCE_DIR}/../conformance/cases")
