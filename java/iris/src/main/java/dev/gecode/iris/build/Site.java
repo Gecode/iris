@@ -29,9 +29,20 @@ final class Site {
           if (name.startsWith("java.") || name.startsWith("jdk.")) {
             return true;
           }
-          return name.equals(PACKAGE) && Objects.equals(location(type), LOCATION);
+          return (name.equals(PACKAGE) && Objects.equals(location(type), LOCATION))
+              || tracksCaller(type);
         }
       };
+
+  /** Whether {@code type} or a class enclosing it carries {@link TrackCaller}. */
+  private static boolean tracksCaller(Class<?> type) {
+    for (Class<?> c = type; c != null; c = c.getEnclosingClass()) {
+      if (c.isAnnotationPresent(TrackCaller.class)) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   private static @Nullable URL location(Class<?> type) {
     CodeSource source = type.getProtectionDomain().getCodeSource();
@@ -39,8 +50,9 @@ final class Site {
   }
 
   /**
-   * The innermost frame outside this package and the platform. A class in this package from another
-   * code source, such as a test, counts as a caller.
+   * The innermost frame outside this package, the platform and the classes marked {@link
+   * TrackCaller}. A class in this package from another code source, such as a test, counts as a
+   * caller.
    */
   static StackTraceElement caller() {
     return WALKER

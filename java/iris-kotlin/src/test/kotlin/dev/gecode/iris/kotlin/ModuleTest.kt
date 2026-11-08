@@ -34,9 +34,11 @@ class ModuleTest {
     }
 
     @Test
-    fun exportsTheExtensions() {
+    fun exportsTheExtensionsAndTheBuilder() {
         val descriptor = ModuleFinder.of(*modulePath()).find(moduleName).get().descriptor()
-        assertEquals(listOf(moduleName), descriptor.exports().map { it.source() })
-        assertTrue(moduleName in descriptor.packages())
+        val packages = setOf(moduleName, "$moduleName.build")
+        assertEquals(packages, descriptor.exports().map { it.source() }.toSet())
+        assertTrue(descriptor.exports().none { it.isQualified })
+        assertEquals(packages, descriptor.packages())
     }
 }

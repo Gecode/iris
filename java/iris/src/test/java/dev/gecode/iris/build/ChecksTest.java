@@ -358,6 +358,38 @@ class ChecksTest {
   }
 
   @Test
+  void anExplicitDeclarationTakesOnlyANewName() {
+    int[] at = new int[1];
+    fails(
+        Kind.REDEFINITION,
+        at,
+        () ->
+            spec(() -> {
+              read(declare(int0("x")), intType());
+              at[0] = next();
+              declare(int0("x"));
+            }));
+    fails(
+        Kind.REDEFINITION,
+        at,
+        () ->
+            spec(() -> {
+              check(int0("x").ge(0));
+              at[0] = next();
+              declare(int0("x"));
+            }));
+    Spec spec =
+        spec(() -> {
+          var x = declare(int0("x"));
+          read(x, intType());
+          read(x, floatType());
+        });
+    assertEquals(2.5, spec.read("1 2.5").get("x").asDouble());
+    assertThrows(
+        IllegalArgumentException.class, () -> spec(() -> declare(forward("y", Int.class))));
+  }
+
+  @Test
   void aRedefinitionNeedsABindingThatAlwaysPrecedesIt() {
     int[] at = new int[1];
     var n = int0("n");
@@ -741,5 +773,42 @@ class ChecksTest {
   private static void helper(int[] at) {
     at[0] = next();
     arm("x");
+  }
+
+  /** A layer marked {@link TrackCaller}, and the classes it encloses, are skipped. */
+  @Test
+  void aTrackedLayerNamesItsCallersLine() {
+    int[] at = new int[1];
+    var failure =
+        fails(
+            Kind.SCOPE,
+            at,
+            () ->
+                spec(() -> {
+                  at[0] = next();
+                  Layer.arm();
+                }));
+    assertTrue(requireNonNull(failure.callSite()).getMethodName().startsWith("lambda$"));
+    fails(
+        Kind.SCOPE,
+        at,
+        () ->
+            spec(() -> {
+              at[0] = next();
+              Layer.Inner.arm();
+            }));
+  }
+
+  @TrackCaller
+  private static final class Layer {
+    static void arm() {
+      Iris.arm("x");
+    }
+
+    private static final class Inner {
+      static void arm() {
+        Layer.arm();
+      }
+    }
   }
 }

@@ -1,0 +1,18 @@
+# Exceptions for the generated builder programs only, on top of java/detekt.yml. Each rule here
+# measures the spec rather than the generator, so a program could pass it only by changing the
+# spec it prints, and a spec of any size must round trip.
+style:
+  # The numbers are the spec's own literals, such as the 3 of `atLeast(3)`: a named constant for
+  # each would hide the text the program prints.
+  MagicNumber:
+    excludes: ['**/build/programs/**']
+complexity:
+  # `specBuilder` holds the spec's statements, so its length is the spec's.
+  LongMethod:
+    excludes: ['**/build/programs/**']
+  # A block function takes the local values that its statements use, such as named types.
+  LongParameterList:
+    excludes: ['**/build/programs/**']
+  # One function for each block too deep for its lambda and each comprehension body too wide.
+  TooManyFunctions:
+    excludes: ['**/build/programs/**']

@@ -23,6 +23,7 @@ tasks.compileJava {
 
 tasks.test {
     dependsOn(tasks.jar)
+    systemProperty("iris.repository", rootDir.parentFile.path)
     systemProperty("iris.kotlinJar", tasks.jar.get().archiveFile.get().asFile.path)
     systemProperty(
         "iris.kotlinArguments",

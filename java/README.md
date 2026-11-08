@@ -194,8 +194,9 @@ and the site check compares them with this file, so change both together.
 | `iris-driver/` | The conformance driver, which is not published. It implements `parse`, `read`, `catalog` (`--format json|dzn`) and `dzn`. The JVM decodes arguments in the locale's encoding before `main` runs, so outside a UTF-8 locale the driver answers exit status 3 for non-ASCII `--params` instead of reading changed values; JSON escapes work in any locale. [Windows](#windows) has a narrower guarantee. |
 | `iris-examples/` | The examples of the site's [Java and Kotlin guide](../site/src/content/docs/using/java.mdx), which are not published: sources in `src/main/java/examples` and `src/main/kotlin/examples`, each with its recorded `.out` beside it. |
 | `iris-round-trip/` | The runner of the Java builder round trip, which is not published. Its `roundTrip` task copies the builder programs that `iris gen builder --lang java` printed into the build, checks them with Spotless, compiles them with the runner and records what each prints; without `-PirisRoundTripSources` the module holds only the runner. |
+| `iris-kotlin-round-trip/` | The runner of the Kotlin builder round trip, which is not published. Its `roundTrip` task does for the programs of `iris gen builder --lang kotlin` what the Java one does, with ktfmt, detekt and kotlinc. |
 | `iris-jmh/` | The JMH benchmarks, which are not published. Nothing else depends on this module, so JMH stays out of `dev.gecode:iris`. |
-| `iris-kotlin/` | The Kotlin extensions, in the exported package `dev.gecode.iris.kotlin` of the module of that name. |
+| `iris-kotlin/` | The Kotlin extensions, in the exported package `dev.gecode.iris.kotlin` of the module of that name, and the Kotlin spec builder in `dev.gecode.iris.kotlin.build`. |
 | `build-logic/` | The convention plugins `iris.java-conventions`, shared by the modules, `iris.kotlin-conventions`, `iris.kotlin-docs` for Dokka, and `iris.published` for the two published modules. |
 | `gradle/libs.versions.toml` | The pinned versions. |
 | `detekt.yml` | The detekt configuration: what differs from the default rules. |
@@ -315,6 +316,16 @@ through this wrapper:
 
 ```sh
 cargo test --locked -p gecode-iris --test builder_round_trip_java -- --ignored --nocapture
+```
+
+The Kotlin builder round trip does the same for Kotlin programs: ktfmt in
+kotlinlang style through Spotless, detekt with the build's rules and the
+exceptions for generated code in `iris-kotlin-round-trip/detekt.yml`, one
+kotlinc run with the warnings as errors, and the `iris-kotlin-round-trip`
+module:
+
+```sh
+cargo test --locked -p gecode-iris --test builder_round_trip_kotlin -- --ignored --nocapture
 ```
 
 By hand from the root, after `./gradlew :iris-driver:installDist` in `java/`:

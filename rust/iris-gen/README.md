@@ -19,9 +19,9 @@ let code = builder_code(&parsed, &analysis, Language::Rust)?;
 ```
 
 A new language adds a `Language` variant, a backend module and one match arm in
-`builder_code`. There are backends for Rust, Python, C++ and Java.
+`builder_code`. There are backends for Rust, Python, C++, Java and Kotlin.
 `Language::has_view` says whether a language also has a view printer; Python,
-C++ and Java have none yet.
+C++, Java and Kotlin have none yet.
 
 ## The Rust backend
 
@@ -225,6 +225,76 @@ cargo test --locked -p gecode-iris --test builder_round_trip_java -- --ignored -
 
 Gradle's output goes to `target/tmp/java-round-trip/gradle.log`, which a
 failure prints.
+
+## The Kotlin backend
+
+The program is a complete file without a package declaration, which the caller
+adds. Its `fun specBuilder(): IrisBuilder<Unit>` returns the builder of
+`dev.gecode.iris.kotlin.build`, and its `main` prints the spec. It compiles under
+the flags of `java/`, warnings as errors, and passes ktfmt in kotlinlang style
+unchanged, as Spotless runs it in `java/`. It writes ktfmt's layout itself: a
+call goes on one line if it fits, and otherwise breaks after its opening
+parenthesis and puts each argument on a line of its own, with a trailing comma
+when there are several; ktfmt never fills a line with arguments. An assignment
+breaks after `=` first, and a block is a trailing lambda, `repeat(n) { ... }`.
+
+- Every handle is a top-level property, such as
+  `private val x = dynamic("x")` or
+  `private val job = recordName("job", "jobs")`, so that a statement may name a
+  handle defined later in the spec. A name that the spec never defines is a
+  local `val x = undefined("x")`, and `_` as a name is `forwardDynamic("_")`,
+  since both are statements of the open scope.
+- A block whose statements would start beyond column 36 becomes an extension
+  function on the class of its scope, such as
+  `private fun DeepScope.block1(t: IntType)`, that takes each type and
+  undefined name from an enclosing function that it uses. The arms of
+  `sections` stay where they are.
+- A type that a statement uses is a local `val t = defineType("t", ...)`.
+- An `if` chain is a sequence of statements: `ifThen`, then `elseIf`,
+  `otherwise` or `elseReadIf`. An arm's options are named arguments,
+  `arm("b", optional = true, last = true)`, and an optional arm with a block is
+  `optionalArm`.
+- Operators are Kotlin's: `+ - * / %` and unary `-` as operators, comparisons
+  and `&& || == !=` as the infix functions `lt`, `and`, `eq` and the others, `!`
+  as an operator, `^` as `pow`, and `lo..hi` and `range(lo).below(hi)` as ranges,
+since ktfmt 0.64 removes the import of `rangeUntil` that `lo..<hi` needs. Every
+  infix call has the same precedence in Kotlin and associates to the left, so
+  an infix operand that is itself an infix call goes in parentheses. A record
+  field is `x[field]` and an index `x.at(i)`.
+- A comprehension is `sum(over(xs).named("v")) { v -> body }`, with `_ ->` when
+  the body does not use its variable, and no parameter for a variable named
+  `it`, which is the lambda's own. A body that does not fit on its line
+  becomes a function `private fun body1(v: DynExpr): Expr` that takes the
+  comprehension variable and any outer variables it uses.
+- A Kotlin number or string on the left of an operator goes through `lit`, and
+  an operand that the types refuse goes through `.dynamic()`, as in Java.
+  `gecode.int_max` is `Gecode.intMax`.
+- A value too wide for its place goes into `val e1 = ...`, and a long string
+  into a constant `private const val T1`, which keeps it whole, as ktfmt does.
+
+The program imports each declaration of `dev.gecode.iris.kotlin.build` that it
+names, the operator functions of `%`, unary `-` and `..` among them,
+since detekt refuses a wildcard import and ktfmt removes an unused one.
+
+Identifiers are lower camel case. A name that is a Kotlin hard keyword or `_`,
+a property of every scope (`depth`, `record`, `session`), or the identifier of
+another name gets a numeric suffix: `val` binds `val2`. Temporaries, lengths and
+other rules are Java's. String literals are ASCII, with `$` escaped and
+everything else as `\uNNNN` escapes of UTF-16 units.
+
+The Kotlin round trip needs Java 27, like the Java one. It writes every builder
+in a package of its own under `target/tmp/kotlin-round-trip` and passes them to
+the `iris-kotlin-round-trip` module of `java/`, whose Gradle build checks them
+with Spotless and detekt, compiles them in one kotlinc run with the runner, and
+runs the runner. detekt uses the build's rules, except four that measure the
+spec rather than the generated code, such as `MagicNumber`; the module's
+`detekt.yml` lists them and says why. From `rust/`:
+
+```sh
+cargo test --locked -p gecode-iris --test builder_round_trip_kotlin -- --ignored --nocapture
+```
+
+Gradle's output goes to `target/tmp/kotlin-round-trip/gradle.log`.
 
 ## Views
 

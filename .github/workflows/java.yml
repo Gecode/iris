@@ -80,7 +80,8 @@ jobs:
   # Generates a Java builder program for every accepted corpus spec, checks it
   # with google-java-format through Spotless, compiles every program in one
   # javac run with Error Prone and the warnings as errors, runs them, and
-  # compares the spec each prints with the original.
+  # compares the spec each prints with the original. The Kotlin round trip
+  # does the same with ktfmt and one kotlinc run.
   builder-round-trip:
     name: Builder round trip
     runs-on: ubuntu-24.04
@@ -113,3 +114,5 @@ jobs:
             java-round-trip-cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock', 'rust/rust-toolchain.toml') }}-
       - name: Round trip
         run: cargo test --locked -p gecode-iris --test builder_round_trip_java -- --ignored --nocapture
+      - name: Kotlin round trip
+        run: cargo test --locked -p gecode-iris --test builder_round_trip_kotlin -- --ignored --nocapture

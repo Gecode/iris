@@ -32,6 +32,10 @@
   `dev.gecode.iris.build`, compile without warnings under the flags of `java/`,
   Error Prone and NullAway included, and pass google-java-format unchanged, and
   a test that round-trips every accepted corpus spec through it.
+- Add a Kotlin backend to gecode-iris-gen, `Language::Kotlin`, whose programs
+  use `dev.gecode.iris.kotlin.build`, compile without warnings under the flags
+  of `java/` and pass ktfmt in kotlinlang style unchanged, and a test that
+  round-trips every accepted corpus spec through it.
 
 ### CLI
 
@@ -45,6 +49,8 @@
   `iris gen --lang cpp` says that C++ has no view generator yet.
 - Add `iris gen builder --lang java SPEC`, which prints a Java builder program.
   `iris gen --lang java` says that Java has no view generator yet.
+- Add `iris gen builder --lang kotlin SPEC`, which prints a Kotlin builder
+  program. `iris gen --lang kotlin` says that Kotlin has no view generator yet.
 
 ## 0.1.0 - 2026-11-06
 

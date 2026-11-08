@@ -530,6 +530,35 @@ public final class Iris {
         new Handle(checked, Tag.DYN, null, false, Handle.Origin.UNDEFINED, state.id, true));
   }
 
+  /**
+   * Declares the name of {@code handle}, a handle from a factory such as {@link #int0}, in the open
+   * builder, and returns the handle. Its first use would declare the name too, but a use accepts a
+   * name that an equal handle declared before; this fails when anything has declared the name.
+   *
+   * <p>A builder whose definitions take a name rather than a handle, such as the Kotlin builder,
+   * declares each name with it, so that a helper called twice with one name is an error rather than
+   * a redefinition. Redefinition goes through the handle.
+   *
+   * @param <H> the handle class
+   * @param handle the handle to declare
+   * @return {@code handle}
+   * @throws BuildException if the name is already declared in this builder
+   * @throws IllegalArgumentException if {@code handle} does not come from a factory
+   */
+  public static <H extends Field<?>> H declare(H handle) {
+    StackTraceElement site = Site.caller();
+    State state = open("declare").state();
+    Handle declared = Exprs.handle(handle);
+    if (declared.origin() != Handle.Origin.DECLARED) {
+      throw new IllegalArgumentException(
+          "the handle `"
+              + declared.name()
+              + "` comes from a builder, not a factory such as `int0`, so it is already declared");
+    }
+    state.declare(declared.name(), new State.Forward(declared.shape(), declared), site);
+    return handle;
+  }
+
   /** {@return a record name, printed with names the builder chooses} */
   public static RecordName recordName() {
     return new RecordName(null, null);

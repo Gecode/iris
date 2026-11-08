@@ -83,7 +83,7 @@ language encodes this as cheaply as it can:
 | Rust | Phantom depth types `D0`, `D1`, ... with a successor trait. Impls go up to a fixed depth, and deeper entries get a dynamic handle. |
 | C++ | A `std::size_t` template parameter: `Field<std::int64_t, 2>`. |
 | TypeScript | A depth parameter, `Field<"int", 2>`, mapped to the data type by conditional types. Keep the type-level arithmetic shallow for checker speed. |
-| Java, Kotlin | The data view type as the parameter, `IntField<List<long[]>>`, with one generic `get`. Java declares handles with factories that fix the depth (`int2`), and `build()` checks them. Kotlin scopes come in depth-specific receiver classes up to depth 3, and deeper entries are dynamic. |
+| Java, Kotlin | The data view type as the parameter, `IntField<List<long[]>>`, with one generic `get`. Java declares handles with factories that fix the depth (`int2`), and `build()` checks them. Kotlin scopes come in depth-specific receiver classes up to depth 3, and deeper entries read a `Value`. |
 | Python | The data view type as the parameter, `IntField[list[list[int]]]`, in the type stubs. Scopes come in depth-specific classes, `Scope0` to `Scope3`, and deeper entries are `DynField`. |
 
 **Absence is in the type.** A definition that may not execute gives an
@@ -241,7 +241,7 @@ there.
 | `< <= > >=` | `lt()` ... | operators | operators | infix `lt` ... | methods | methods |
 | `== !=` | `eq()`, `ne()` | operators | operators | infix `eq`, `ne` | methods | methods |
 | `&& \|\| !` | `& \| !` | operators | `& \| ~` | infix `and`, `or`, `!` | methods | methods |
-| `x[i]` | `at()` | `[]` | `[]` | `[]` | `at()` | `at()` |
+| `x[i]` | `at()` | `[]` | `[]` | `at()` | `at()` | `at()` |
 | record field | `get()` | `get()` | `[]` | `[]` | `get()` | `get()` |
 
 Language notes:
@@ -304,9 +304,8 @@ fragment, for example "read a TSPLIB matrix of size `n`". Iris has no
 abstraction of its own, so this is the main thing builders add besides
 types. Helpers must be safe to call twice, which principle 3's
 redefinition rule ensures, and the API guides show a helper in every
-language. Kotlin can pass the scope as a context parameter (stable since
-Kotlin 2.4), if `iris-kotlin`'s Kotlin baseline allows it. Otherwise
-helpers are extensions on the scope type. Java helpers are plain static
+language. Kotlin helpers take the scope as a context parameter (stable
+since Kotlin 2.4). Java helpers are plain static
 methods, since the open block is a scoped value.
 
 ### 10. Builders follow language versions
@@ -642,57 +641,87 @@ end = b.forward("end", ib.StrField[str | None])  # only a store binds it
 ### Kotlin
 
 `iris-kotlin` wraps the Java builder in a type-safe builder, in the style of
-kotlinx.html and the Gradle Kotlin DSL. It uses lambdas with receivers
-marked `@DslMarker`, so that an inner block cannot call an outer scope's
-methods by accident. Delegated properties name entries. The handle classes
-are Java's, so the class that carries the handles out spells them.
+kotlinx.html and the Gradle Kotlin DSL, in the package
+`dev.gecode.iris.kotlin.build`. It uses lambdas with receivers marked
+`@DslMarker`, so that an inner block cannot call an outer scope's methods by
+accident. Each block's receiver has a class for its depth and optionality,
+from `Scope0` to `Scope3` and `OptionalScope0` to `OptionalScope3`, so a
+read returns a handle of the exact view type. Deeper entries are typed by
+value but read a `Value`. Delegated properties name captures. The handle
+classes are Java's, so the class that carries the handles out spells them.
+The builder adds no semantics of its own: every statement calls the Java
+builder, which makes the checks. A definition that takes a name declares it
+first with `Iris.declare`, which fails if the builder has already declared
+it, so principle 3's redefinition rule holds although Java takes equal
+handles as one.
 
 ```kotlin
 class Shop(
-    val name: StringField<String?>, val nJobs: IntField<Long>, val nMachines: IntField<Long>,
-    val machine: IntField<List<LongArray>>, val duration: IntField<List<LongArray>>,
+    val name: StringField<String?>,
+    val nJobs: IntField<Long>,
+    val nMachines: IntField<Long>,
+    val machine: IntField<List<LongArray>>,
+    val duration: IntField<List<LongArray>>,
 )
 
-val jobshop = irisSpec("jobshop") {
-    comment("#", "+++")
-    instances {
-        val name by optionalCapture(word)
-        val nJobs by capture(atLeast(1), name = "n_jobs")
-        val nMachines by capture(atLeast(1), name = "n_machines")
-        val (job, machine, duration) = sections(skipOther = true) {
-            arm("instance ", name, optional = true)
-            arm(nJobs, " ", nMachines, last = true) {
-                check(nJobs le (gecode.INT_MAX - 2) / 2 / nMachines, "there are too many jobs and machines")
-                repeat(nJobs) {
-                    val (machine, duration) = repeat(nMachines) {
-                        read("machine", 0..<nMachines) to read("duration", atLeast(0))
+val jobshop =
+    irisBuilder("jobshop") {
+        comment("#", "+++")
+        instances {
+            val name by optionalCapture(word())
+            val nJobs by capture(atLeast(1), name = "n_jobs")
+            val nMachines by capture(atLeast(1), name = "n_machines")
+            val (job, machine, duration) =
+                sections(skipOther = true) {
+                    arm("instance ", name, optional = true)
+                    arm(nJobs, " ", nMachines, last = true) {
+                        check(
+                            nJobs le (Gecode.intMax - 2) / 2 / nMachines,
+                            "there are too many jobs and machines",
+                        )
+                        repeat(nJobs) {
+                            val (machine, duration) =
+                                repeat(nMachines) {
+                                    read("machine", 0..<nMachines) to read("duration", atLeast(0))
+                                }
+                            Triple(record, machine, duration)
+                        }
                     }
-                    Triple(record, machine, duration)
                 }
-            }
+            check(distinct(job[machine]), MSG_DISTINCT)
+            check(sum(job) { sum(it[duration]) } le Gecode.intMax, MSG_TOTAL)
+            Shop(name, nJobs, nMachines, machine, duration)
         }
-        check(distinct(job[machine]), MSG_DISTINCT)
-        check(sum(job) { sum(it[duration]) } le gecode.INT_MAX, MSG_TOTAL)
-        Shop(name, nJobs, nMachines, machine, duration)
     }
-}
 
-val shop = jobshop.handles
-val data = jobshop.spec.read(path, params("instance" to "la01"))
+val (spec, shop) = jobshop.build()
+val data = spec.read(input, "la01.txt", Params.of("instance", "la01"))
 val jobs: Long = data[shop.nJobs]
 val firstJob: LongArray = data[shop.machine][0]
 val label: String? = data[shop.name]
 ```
 
+`irisBuilder` returns the text and the handles before anything is parsed,
+and `build()` checks the spec and parses it; `irisSpec` does both at once.
+`x[field]` is a record's field, since the Java `get` is an operator in
+Kotlin, so an index is `x.at(i)`. A helper takes the scope as a context
+parameter and is called like a statement:
+
+```kotlin
+context(scope: Scope0)
+fun matrix(name: String, n: IntField<Long>): IntField<List<LongArray>> =
+    scope.repeat(n) { repeat(n) { read(name, int()) } }
+```
+
 The dynamic forms:
 
 ```kotlin
-val x = forward<Int>("x")
+val x = forwardInt("x")
 read(x, int())                      // the first definition binds it
 val again = read(x, float())        // redefined: returns a dynamic handle
 val mixed = lit("1").dynamic() eq 1
 val zz = undefined("zz")
-val end = forward<String>("_")      // only a store binds it
+val end = forwardString("_")        // only a store binds it
 ```
 
 ### Java
@@ -1006,14 +1035,16 @@ Each implementation's builder is tested in four ways:
    runs the generated programs in each language and compares their output
    with the original, as syntax trees. Whitespace, comments, redundant
    parentheses, and generated record names do not count as differences.
-   Rust, Python, C++ and Java have generators so far. The generated code
+   Rust, Python, C++, Java and Kotlin have generators so far. The generated code
    must pass the language's own tools unchanged before it runs: rustfmt and
    Clippy for Rust; `ruff format`, `ruff check` and ty for Python;
    clang-format and clang-tidy 22.1.8, with the `.clang-format` and
    `.clang-tidy` of `cpp/`, for C++, which then builds with the warnings
    of `cpp/` as errors; and google-java-format, through the Spotless
    check of `java/`, for Java, which then compiles in one javac run with
-   the flags of `java/`, Error Prone and NullAway included. The C++ round
+   the flags of `java/`, Error Prone and NullAway included; and ktfmt in
+   kotlinlang style, through the same Spotless check, for Kotlin, which then
+   compiles in one kotlinc run with the warnings as errors. The C++ round
    trip also runs as the CTest test `builder-round-trip`, with the
    compiler and flags of the CTest build.
    This proves that the builder covers the language and that its printer is

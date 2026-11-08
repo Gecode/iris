@@ -6,9 +6,11 @@ dist/
 node_modules/
 # The Python spec builder package, not build output
 !/python/python/gecode_iris/build/
-# The Java spec builder package and its tests, not build output
+# The Java and Kotlin spec builder packages and their tests, not build output
 !/java/iris/src/main/java/dev/gecode/iris/build/
 !/java/iris/src/test/java/dev/gecode/iris/build/
+!/java/iris-kotlin/src/main/kotlin/dev/gecode/iris/kotlin/build/
+!/java/iris-kotlin/src/test/kotlin/dev/gecode/iris/kotlin/build/
 
 # Python
 __pycache__/

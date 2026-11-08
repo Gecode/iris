@@ -56,7 +56,48 @@ The module has only two direct dependencies, the Kotlin standard library and
 `checkDependencies`, part of `check`, fails on anything else on the compile or
 runtime class path.
 
-Delegated properties and the kotlinx.serialization decoder of §8.3 come later.
+## Spec builder
+
+`dev.gecode.iris.kotlin.build` is a type-safe builder over the Java builder
+`dev.gecode.iris.build`, with lambdas with receivers marked `@DslMarker`:
+
+```kotlin
+import dev.gecode.iris.kotlin.build.*
+
+val (spec, handles) =
+    irisSpec("pairs") {
+        val n = read("n", atLeast(0))
+        val (a, b) = repeat(n) { read("a", int()) to read("b", int()) }
+        check(sum(a) le 100, "the a column is too large")
+        Triple(n, a, b)
+    }
+val (n, a, b) = handles
+val data = spec.read("2 1 2 3 4")
+val first: LongArray = data[a]
+```
+
+Each block's receiver has a class for its depth and optionality, `Scope0` to
+`Scope3`, `OptionalScope0` to `OptionalScope3` and `DeepScope` beyond, so a read
+returns a handle of the exact view type, such as `IntField<LongArray>` in a
+`repeat`. The operators are Kotlin's where they mean the same as in Iris: `+`,
+`-`, `*`, `/`, `%`, unary `-` and `!`, and the ranges `lo..hi` and `lo..<hi`.
+Comparisons and logic are the infix functions `lt`, `le`, `gt`, `ge`, `eq`,
+`ne`, `and` and `or`. `x[field]` is a record's field and `x.at(i)` an index.
+Captures are delegated properties, `val n by capture(int())`. A definition
+that takes a name, such as `read("n", int())`, `let`, `param` or a capture,
+declares it, so a name that the builder has already declared is an error, as
+for a helper called twice with one name; redefinition goes through the handle,
+as in `read(n, float())`. A helper takes the scope as a context parameter. `irisBuilder` returns the text and the
+handles without parsing, and `build()` parses. Every statement calls the Java
+builder, so the checks and their errors are Java's, and an error names the
+caller's line in Kotlin. `forwardInt`, `forwardDynamic`, `undefined`, `dynamic`
+and `.dynamic()` are the dynamic forms.
+[docs/builders.md](../../docs/builders.md#kotlin) has the full example.
+
+`iris gen builder --lang kotlin SPEC` prints a program that builds a text spec
+with this builder.
+
+The kotlinx.serialization decoder of §8.3 comes later.
 
 ## Building and testing
 
