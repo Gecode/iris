@@ -33,6 +33,9 @@ tasks.register<JavaExec>("roundTrip") {
     dependsOn("spotlessCheck", "detektMain")
     classpath = sourceSets.main.get().runtimeClasspath
     mainClass = "dev.gecode.iris.roundtrip.kotlin.MainKt"
+    // The limit specs nest blocks 255 deep, and each block of the builder takes several frames,
+    // more than the default stack holds while the frames are still interpreted.
+    jvmArgs("-Xss256m")
     val out = providers.gradleProperty("irisRoundTripOut")
     doFirst {
         require(sources.isPresent && out.isPresent) {
