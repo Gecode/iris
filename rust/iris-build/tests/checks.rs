@@ -815,6 +815,21 @@ fn a_forward_record_binds_once() {
     let own = b.repeat(1, |r| r.record());
     b.repeat(1, |r| r.record_as(own));
     assert_kind!(failure_of(b), BuildErrorKind::Binding);
+
+    let mut b = SpecBuilder::unnamed();
+    let first = b.forward_record("first", "firsts");
+    let second = b.forward_record("second", "seconds");
+    let mut line = 0;
+    b.repeat(1, |r| {
+        r.record_as(first);
+        line = line!() + 1;
+        r.record_as(second);
+    });
+    b.let_("n", size(first));
+    let error = assert_kind!(failure_of(b), BuildErrorKind::Binding);
+    assert!(error.to_string().contains("already bound"), "{error}");
+    let site = error.call_site().expect("the failure has a call site");
+    assert_eq!((site.file(), site.line()), (file!(), line));
 }
 
 #[test]

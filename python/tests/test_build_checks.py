@@ -1,6 +1,7 @@
 """The builder's own checks: each raises ``BuildError`` at the call that failed
 it, or from ``build()``, which raises the first one again."""
 
+import sys
 from collections.abc import Callable
 from typing import Any, cast
 
@@ -687,6 +688,23 @@ def test_a_forward_record_binds_once() -> None:
             r.record_as(record)
 
     failure_of(own, "binding")
+
+    line = 0
+
+    def a_second_record(b: ib.SpecBuilder) -> None:
+        nonlocal line
+        first = b.forward_record("first", "firsts")
+        second = b.forward_record("second", "seconds")
+        with b.repeat(1) as r:
+            r.record_as(first)
+            line = sys._getframe().f_lineno + 1
+            r.record_as(second)
+        b.let("n", ib.size(first))
+
+    error = failure_of(a_second_record, "binding")
+    assert "already bound" in str(error)
+    assert error.call_site is not None
+    assert (error.call_site.filename, error.call_site.line) == (__file__, line)
 
 
 def test_the_language_decides_the_rest() -> None:

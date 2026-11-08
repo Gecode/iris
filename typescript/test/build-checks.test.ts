@@ -27,6 +27,15 @@ import {
   type Field,
   type Scope,
 } from "gecode-iris/build";
+import { parseFrame } from "../dist/build/site.js";
+
+/** The line of the caller. */
+function here(): number {
+  const frame = new Error().stack?.split("\n")[2] ?? "";
+  const line = parseFrame(frame)?.line;
+  assert.ok(line !== undefined, frame);
+  return line;
+}
 
 /**
  * Runs `build` on a new builder and expects an error of `kind`, from a
@@ -679,6 +688,19 @@ test("a forward record binds once", () => {
       r.recordAs(record);
     });
   }, "binding");
+  let line = 0;
+  const error = failureOf((b) => {
+    const first = b.forwardRecord("first", "firsts");
+    const second = b.forwardRecord("second", "seconds");
+    b.repeat(1, (r) => {
+      r.recordAs(first);
+      line = here() + 1;
+      r.recordAs(second);
+    });
+    b.let("n", size(first));
+  }, "binding");
+  assert.match(error.message, /already bound/);
+  assert.deepEqual([error.callSite?.file, error.callSite?.line], [import.meta.url, line]);
 });
 
 test("the language decides the rest", () => {

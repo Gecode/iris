@@ -663,8 +663,15 @@ export class NestedScope<D extends HandleDepth = 1, P extends Presence = "requir
         site,
       );
     }
-    info.bound = true;
     const own = state.records[nestedRecord({ state, ...core })];
+    if (own !== undefined && own.link !== null) {
+      return state.fail(
+        "binding",
+        "this repeat is already bound to a forward record; a repeat takes one `recordAs`",
+        site,
+      );
+    }
+    info.bound = true;
     if (own !== undefined) {
       own.link = id;
     }

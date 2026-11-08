@@ -460,8 +460,15 @@ impl<D: Nested, O: Presence> Scope<D, O> {
             );
             return;
         }
-        state.records[record.id].bound = true;
         let own = self.record_id();
+        if state.records[own].link.is_some() {
+            state.report(
+                IssueKind::Binding,
+                "this repeat is already bound to a forward record; a repeat takes one `record_as`",
+            );
+            return;
+        }
+        state.records[record.id].bound = true;
         state.records[own].link = Some(record.id);
     }
 }

@@ -487,8 +487,14 @@ class _Nested(_Statements[N]):
                 "binding",
                 "`record_as` needs a record from `forward_record` that is not bound yet",
             )
+        own = state.records[self._record_id()]
+        if own.link is not None:
+            state.fail(
+                "binding",
+                "this repeat is already bound to a forward record; a repeat takes one `record_as`",
+            )
         info.bound = True
-        state.records[self._record_id()].link = record._id
+        own.link = record._id
 
 
 class Scope0(_Statements[N]):
