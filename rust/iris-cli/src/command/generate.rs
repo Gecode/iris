@@ -106,9 +106,9 @@ pub(super) fn run(arguments: Arguments) -> u8 {
         (Some(Command::Builder { lang, spec }), _, _) => print_code(&spec, |checked| {
             builder_code(&checked.parsed, &checked.analysis, lang).map_err(ViewError::Spec)
         }),
-        (None, Some(lang), Some(spec)) => {
-            print_code(&spec, |checked| view_code(&checked.analysis, lang))
-        }
+        (None, Some(lang), Some(spec)) => print_code(&spec, |checked| {
+            view_code(&checked.parsed, &checked.analysis, lang)
+        }),
         (None, _, _) => unreachable!("clap requires --lang and SPEC without a subcommand"),
     }
 }

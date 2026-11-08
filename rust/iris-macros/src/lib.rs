@@ -450,7 +450,8 @@ mod handle_field_tests {
     fn printed(source: &str) -> RustView {
         let parsed =
             gecode_iris_syntax::parse(source.as_bytes(), "x.iris", LanguageVersion::V0_1).unwrap();
-        declared_in(&view_code(&gecode_iris_sema::analyze(&parsed), Language::Rust).unwrap())
+        let analysis = gecode_iris_sema::analyze(&parsed);
+        declared_in(&view_code(&parsed, &analysis, Language::Rust).unwrap())
     }
 
     /// What a view module's `text` declares, as [`expanded`] gives it.

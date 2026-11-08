@@ -785,7 +785,7 @@ fn kotlin_has_builders_but_no_view_printer() {
     let parsed = parse(b"x: int\n", "test.iris", LanguageVersion::V0_1).unwrap();
     let analysis = analyze(&parsed);
     assert!(matches!(
-        view_code(&analysis, Language::Kotlin),
+        view_code(&parsed, &analysis, Language::Kotlin),
         Err(ViewError::NoPrinter(Language::Kotlin))
     ));
 }

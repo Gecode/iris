@@ -11,7 +11,8 @@ fn analysis(source: &str) -> Analysis {
 }
 
 fn code(source: &str) -> String {
-    view_code(&analysis(source), Language::Rust).expect("the spec is accepted")
+    let parsed = parse(source.as_bytes(), "test.iris", LanguageVersion::V0_1).unwrap();
+    view_code(&parsed, &analyze(&parsed), Language::Rust).expect("the spec is accepted")
 }
 
 /// The access of entry `name` in the view of `source`.
@@ -88,7 +89,8 @@ fn an_open_shape_gives_a_dynamic_handle() {
 fn an_invalid_spec_reports_the_first_error() {
     let error = view(&analysis("let x=nothing(1)")).unwrap_err();
     assert!(error.message.contains("nothing"), "{error}");
-    assert!(view_code(&analysis("let x=nothing(1)"), Language::Rust).is_err());
+    let parsed = parse(b"let x=nothing(1)", "test.iris", LanguageVersion::V0_1).unwrap();
+    assert!(view_code(&parsed, &analyze(&parsed), Language::Rust).is_err());
 }
 
 #[test]

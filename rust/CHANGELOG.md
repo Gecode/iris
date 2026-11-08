@@ -13,6 +13,10 @@
 
 ### Library
 
+- Add a C++ printer to `gecode_iris_gen::view_code`; `Language::has_view` is
+  true for C++. `view_code` now takes the `Parse` beside the `Analysis`, since
+  the C++ header's namespace is named after the spec's origin.
+
 - Add `gecode_iris_gen::rust_view`, `RustView` and `RustHandle`: the
   declarations that `view_code` prints for Rust, as data. gecode-iris-macros
   now depends on gecode-iris-gen, which is published before it.
@@ -69,7 +73,10 @@
   builder returns. Identifiers follow the builder program's rules without a
   leading underscore, and a depth above 8 gets an `ib.DynField`.
 - Add `iris gen builder --lang cpp SPEC`, which prints a C++ builder program.
-  `iris gen --lang cpp` says that C++ has no view generator yet.
+- Add `iris gen --lang cpp SPEC`, which prints a C++ header of
+  `inline constexpr` handles of the types the C++ spec builder returns, in a
+  namespace named after the spec's file, laid out as clang-format 22.1.8
+  writes them. Every depth gets a typed handle.
 - Add `iris gen builder --lang java SPEC`, which prints a Java builder program.
   `iris gen --lang java` says that Java has no view generator yet.
 - Add `iris gen builder --lang kotlin SPEC`, which prints a Kotlin builder

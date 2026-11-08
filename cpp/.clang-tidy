@@ -37,7 +37,7 @@ Checks: >
   cppcoreguidelines-special-member-functions,
   cppcoreguidelines-virtual-class-destructor
 WarningsAsErrors: '*'
-HeaderFilterRegex: '.*/cpp/(include|src|driver|tests)/.*'
+HeaderFilterRegex: '.*/cpp/(include|src|driver|tests|examples)/.*'
 CheckOptions:
   # An iterator is a pointer in libstdc++ and libc++ but a class in MSVC, so
   # `const auto *` does not compile there. Look no further than the alias.

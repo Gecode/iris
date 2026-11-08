@@ -164,24 +164,18 @@ const PROGRAM_NAMES: &[&str] = &[
     "untyped",
     "validate",
     "word",
-    // Macros of the C and POSIX headers and of compilers.
-    "assert",
-    "errno",
-    "linux",
-    "major",
-    "makedev",
-    "minor",
-    "offsetof",
-    "setjmp",
-    "stderr",
-    "stdin",
-    "stdout",
-    "unix",
-    "va_arg",
-    "va_copy",
-    "va_end",
-    "va_start",
 ];
+
+/// Macros of the C and POSIX headers and of compilers, which no identifier
+/// may spell.
+const MACROS: &[&str] = &[
+    "assert", "errno", "linux", "major", "makedev", "minor", "offsetof", "setjmp", "stderr",
+    "stdin", "stdout", "unix", "va_arg", "va_copy", "va_end", "va_start",
+];
+
+/// Names that a view's declarations use after the handles: a handle called
+/// `iris` would hide the namespace of the next handle's type.
+const HANDLE_NAMES: &[&str] = &["iris", "std"];
 
 /// The prefixes of numbered names that the program makes: temporaries, the
 /// scopes and arms of blocks, `if` chains, string constants and helpers.
@@ -203,8 +197,17 @@ fn suffixes_are_numbered(base: &str) -> bool {
         .any(|prefix| prefix.strip_suffix('_') == Some(base))
 }
 
+/// Whether a builder program may not use `name` for a name of the spec.
 fn reserved(name: &str) -> bool {
-    KEYWORDS.contains(&name) || PROGRAM_NAMES.contains(&name) || is_numbered(name)
+    KEYWORDS.contains(&name)
+        || MACROS.contains(&name)
+        || PROGRAM_NAMES.contains(&name)
+        || is_numbered(name)
+}
+
+/// Whether a view may not use `name` for a handle or its namespace.
+fn reserved_in_view(name: &str) -> bool {
+    KEYWORDS.contains(&name) || MACROS.contains(&name) || HANDLE_NAMES.contains(&name)
 }
 
 /// The widest identifier of a value, record or type before any suffix. A
@@ -257,9 +260,28 @@ pub(super) struct Identifiers {
     /// The first suffix of each base that `unused` has not tried.
     next_suffixes: HashMap<String, usize>,
     assigned: HashMap<(Role, String), String>,
+    /// Whether only the names that a view reserves are off limits, since no
+    /// builder program surrounds the names.
+    handles_only: bool,
 }
 
 impl Identifiers {
+    /// Identifiers for the handles of a view.
+    pub(super) fn for_handles() -> Self {
+        Self {
+            handles_only: true,
+            ..Self::default()
+        }
+    }
+
+    fn reserved(&self, name: &str) -> bool {
+        if self.handles_only {
+            reserved_in_view(name)
+        } else {
+            reserved(name)
+        }
+    }
+
     /// The identifier of `name`, the same one each time.
     pub(super) fn named(&mut self, role: Role, name: &str) -> String {
         if let Some(identifier) = self.assigned.get(&(role, name.to_owned())) {
@@ -286,16 +308,16 @@ impl Identifiers {
     /// whose every suffix is a numbered name, such as `block`, takes `_v`
     /// first, so the search ends.
     fn unused(&mut self, base: String) -> String {
-        if !reserved(&base) && !self.taken.contains(&base) {
+        if !self.reserved(&base) && !self.taken.contains(&base) {
             self.taken.insert(base.clone());
             return base;
         }
-        if suffixes_are_numbered(&base) {
+        if !self.handles_only && suffixes_are_numbered(&base) {
             return self.unused(format!("{base}_v"));
         }
         let mut number = self.next_suffixes.get(&base).copied().unwrap_or(2);
         let mut candidate = format!("{base}_{number}");
-        while reserved(&candidate) || self.taken.contains(&candidate) {
+        while self.reserved(&candidate) || self.taken.contains(&candidate) {
             number += 1;
             candidate = format!("{base}_{number}");
         }
@@ -345,6 +367,24 @@ mod tests {
             identifiers.named(Role::Variable, &"v".repeat(40)),
             "vvvvvvvvvvvv"
         );
+    }
+
+    #[test]
+    fn handles_avoid_only_keywords_macros_and_the_namespaces_they_use() {
+        let mut identifiers = Identifiers::for_handles();
+        for (name, expected) in [
+            ("if", "if_2"),
+            ("iris", "iris_2"),
+            ("std", "std_2"),
+            ("errno", "errno_2"),
+            ("count", "count"),
+            ("b", "b"),
+            ("e1", "e1"),
+            ("block", "block"),
+            ("nJobs", "n_jobs"),
+        ] {
+            assert_eq!(identifiers.named(Role::Value, name), expected);
+        }
     }
 
     #[test]

@@ -21,7 +21,7 @@ let code = builder_code(&parsed, &analysis, Language::Rust)?;
 A new language adds a `Language` variant, a backend module and one match arm in
 `builder_code`. There are backends for Rust, Python, C++, Java, Kotlin and
 TypeScript. `Language::has_view` says whether a language also has a view
-printer: Rust and Python have one, and C++, Java, Kotlin and TypeScript have
+printer: Rust, Python and C++ have one, and Java, Kotlin and TypeScript have
 none yet.
 
 ## The Rust backend
@@ -411,6 +411,18 @@ the three layouts `ruff format` gives a call of two arguments. The output
 passes `ruff format --check`, `ruff check` with B, I and UP, and ty, and its
 handles type-check under pyright and mypy.
 
+The C++ printer writes a header that includes `<iris/handle.hpp>` and declares
+one `inline constexpr` handle per entry, such as
+`inline constexpr iris::Field<std::int64_t, 2> machine{"machine"};`, in a
+namespace named after the file name of the spec's origin, so `jobshop.iris`
+gives `jobshop::machine`. Templates take any depth, so every depth has a typed
+handle. Identifiers are lower snake case with the builder program's 24-column
+cut, and avoid only keywords, macros and the namespaces `iris` and `std`, which
+a declaration names. A declaration takes the layout clang-format gives it in the
+style of `cpp/.clang-format`; a literal too wide for every layout would make
+clang-format split it, so that declaration stays on one line between
+`// clang-format off` and `// clang-format on`.
+
 `rust_view` gives the Rust declarations as data, a `RustView` of the imports
 from `gecode_iris::build` and one `RustHandle` per entry, with its identifier,
 type text and entry name. The printer writes it, and the `iris!` macro of
@@ -439,6 +451,24 @@ reserved names, depths and line widths, checks them with ruff and ty, checks
 each format case and a case of each spec through its view, comparing every
 entry with untyped access. It prints `Python views: M modules, R reads, E
 entries compared`.
+
+`tests/cpp_view.rs` checks the C++ text of each handle type, the namespace,
+the identifiers and the layouts. With CMake 3.28+ and a C++23 compiler,
+
+```sh
+cargo test --locked -p gecode-iris --test cpp_views -- --ignored --nocapture
+```
+
+writes C++ views of every format and of specs that exercise redefinitions,
+reserved names, a depth of 9 and line widths, and builds one program that
+includes them all with the warnings of `cpp/` as errors. The program pins the
+type of `data.get(handle)` for every handle with `static_assert`, reads each
+format case and a case of each spec, compares every entry with untyped access
+and checks that every entry has a handle. With `IRIS_CLANG_FORMAT` naming
+clang-format 22.1.8 the views must be what it writes, and with
+`IRIS_CLANG_TIDY` clang-tidy 22.1.8 must accept them. It prints `C++ views: V
+views, R reads, E entries compared`, and runs as the CTest test
+`generated-views` of `cpp/` with that build's compiler and flags.
 
 Both round trips print `compared C, skipped S, extra E, differences D`. They
 fail on any difference, when compared and skipped specs do not add up to the

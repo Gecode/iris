@@ -214,7 +214,9 @@ jobs:
 
   # Generates a C++ builder program for every accepted corpus spec, checks it
   # with clang-format and clang-tidy, builds it with the warnings as errors,
-  # and compares the spec it prints with the original.
+  # and compares the spec it prints with the original. Then checks the
+  # generated views of every format with the same tools, which ctest runs
+  # without them.
   builder-round-trip:
     name: Builder round trip (${{ matrix.compiler }})
     strategy:
@@ -264,6 +266,14 @@ jobs:
           IRIS_CLANG_FORMAT="$(command -v clang-format)" \
           IRIS_CLANG_TIDY="$(command -v clang-tidy)" \
             cargo test --locked -p gecode-iris --test builder_round_trip_cpp -- --ignored --nocapture
+      - name: Check the generated views
+        env:
+          CXX: ${{ matrix.cxx }}
+          CMAKE_GENERATOR: Ninja
+        run: |
+          IRIS_CLANG_FORMAT="$(command -v clang-format)" \
+          IRIS_CLANG_TIDY="$(command -v clang-tidy)" \
+            cargo test --locked -p gecode-iris --test cpp_views -- --ignored --nocapture
 
   fuzz:
     name: Fuzz (${{ matrix.target }})

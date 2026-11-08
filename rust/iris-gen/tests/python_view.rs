@@ -6,7 +6,7 @@ use gecode_iris_syntax::{LanguageVersion, parse};
 
 fn code(source: &str) -> String {
     let parsed = parse(source.as_bytes(), "test.iris", LanguageVersion::V0_1).unwrap();
-    view_code(&analyze(&parsed), Language::Python).expect("the spec is accepted")
+    view_code(&parsed, &analyze(&parsed), Language::Python).expect("the spec is accepted")
 }
 
 const HEADER: &str =

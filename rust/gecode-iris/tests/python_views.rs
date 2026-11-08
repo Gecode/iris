@@ -288,7 +288,7 @@ impl Project {
 
     fn write_view(&self, name: &str, spec: &[u8]) -> Module {
         let checked = check_spec(spec, name).unwrap();
-        let code = view_code(&checked.analysis, Language::Python).unwrap();
+        let code = view_code(&checked.parsed, &checked.analysis, Language::Python).unwrap();
         fs::write(self.source(name), code).unwrap();
         Module {
             name: name.to_owned(),

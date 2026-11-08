@@ -201,51 +201,89 @@ if(IRIS_CONFORMANCE_TESTS)
     set_tests_properties(${operation}-conformance PROPERTIES TIMEOUT ${timeout})
   endforeach()
 
-  # The C++ builder round trip of rust/: every accepted corpus spec through
-  # a generated builder program, built with this build's compiler. It needs
-  # clang-format 22.1.8, and checks with clang-tidy 22.1.8 when found;
-  # without that clang-format it is skipped.
+  # Every case of every format through the format's builder in examples/,
+  # answered by a driver that uses the builder's spec in place of the
+  # case's own.
+  add_executable(iris-format-builder-driver format_builder_driver.cpp
+    ../driver/driver.cpp ../driver/json.cpp)
+  target_include_directories(iris-format-builder-driver PRIVATE
+    "${PROJECT_SOURCE_DIR}/driver" "${PROJECT_SOURCE_DIR}/examples")
+  target_link_libraries(iris-format-builder-driver PRIVATE iris::iris)
+  set_target_properties(iris-format-builder-driver PROPERTIES
+    CXX_EXTENSIONS OFF)
+  iris_set_warnings(iris-format-builder-driver)
+  add_test(NAME format-builders
+    COMMAND "${CMAKE_COMMAND}"
+      "-DDRIVER=$<TARGET_FILE:iris-format-builder-driver>"
+      "-DREPOSITORY=${PROJECT_SOURCE_DIR}/.."
+      "-DCARGO=${IRIS_CARGO}"
+      "-DCASE_TIMEOUT=${IRIS_CONFORMANCE_CASE_TIMEOUT}"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/format-builders.cmake")
+  math(EXPR timeout "60 * ${IRIS_CONFORMANCE_CASE_TIMEOUT}")
+  set_tests_properties(format-builders PROPERTIES TIMEOUT ${timeout})
+
+  # Tests of rust/ that generate C++ and build it with this build's
+  # compiler: the builder round trip, every accepted corpus spec through a
+  # generated builder program, and the generated views of every format. Both
+  # check the generated code with clang-format 22.1.8 and clang-tidy 22.1.8
+  # when found; the round trip needs that clang-format and is skipped
+  # without it.
   find_program(IRIS_CLANG_FORMAT clang-format)
   find_program(IRIS_CLANG_TIDY clang-tidy)
   # The programs build with this build's compile and link flags, those of
   # its configuration included, so that a sanitizer preset builds them
   # sanitized.
-  set(round_trip_cxx_flags "${CMAKE_CXX_FLAGS}")
-  set(round_trip_linker_flags "${CMAKE_EXE_LINKER_FLAGS}")
+  set(program_cxx_flags "${CMAKE_CXX_FLAGS}")
+  set(program_linker_flags "${CMAKE_EXE_LINKER_FLAGS}")
   get_property(multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
   if(multi_config)
     foreach(config IN LISTS CMAKE_CONFIGURATION_TYPES)
       string(TOUPPER "${config}" upper)
-      string(APPEND round_trip_cxx_flags
+      string(APPEND program_cxx_flags
         "$<$<CONFIG:${config}>: ${CMAKE_CXX_FLAGS_${upper}}>")
-      string(APPEND round_trip_linker_flags
+      string(APPEND program_linker_flags
         "$<$<CONFIG:${config}>: ${CMAKE_EXE_LINKER_FLAGS_${upper}}>")
     endforeach()
   elseif(CMAKE_BUILD_TYPE)
     string(TOUPPER "${CMAKE_BUILD_TYPE}" upper)
-    string(APPEND round_trip_cxx_flags " ${CMAKE_CXX_FLAGS_${upper}}")
-    string(APPEND round_trip_linker_flags
+    string(APPEND program_cxx_flags " ${CMAKE_CXX_FLAGS_${upper}}")
+    string(APPEND program_linker_flags
       " ${CMAKE_EXE_LINKER_FLAGS_${upper}}")
   endif()
-  string(STRIP "${round_trip_cxx_flags}" round_trip_cxx_flags)
-  string(STRIP "${round_trip_linker_flags}" round_trip_linker_flags)
-  add_test(NAME builder-round-trip
-    COMMAND "${CMAKE_COMMAND}"
-      "-DREPOSITORY=${PROJECT_SOURCE_DIR}/.."
-      "-DCARGO=${IRIS_CARGO}"
-      "-DCXX=${CMAKE_CXX_COMPILER}"
-      "-DCXX_FLAGS=${round_trip_cxx_flags}"
-      "-DLINKER_FLAGS=${round_trip_linker_flags}"
-      "-DCMAKE=${CMAKE_COMMAND}"
-      "-DGENERATOR=${CMAKE_GENERATOR}"
-      "-DCLANG_FORMAT=${IRIS_CLANG_FORMAT}"
-      "-DCLANG_TIDY=${IRIS_CLANG_TIDY}"
-      "-DSDKROOT=${CMAKE_OSX_SYSROOT}"
-      -P "${CMAKE_CURRENT_SOURCE_DIR}/builder-round-trip.cmake")
-  # It builds about 2,400 programs in rust/target, which one run at a time
-  # may use.
+  string(STRIP "${program_cxx_flags}" program_cxx_flags)
+  string(STRIP "${program_linker_flags}" program_linker_flags)
+  foreach(test IN ITEMS builder-round-trip generated-views)
+    if(test STREQUAL "builder-round-trip")
+      set(rust_test builder_round_trip_cpp)
+      set(needs_clang_format ON)
+    else()
+      set(rust_test cpp_views)
+      set(needs_clang_format OFF)
+    endif()
+    add_test(NAME ${test}
+      COMMAND "${CMAKE_COMMAND}"
+        -DTEST=${rust_test}
+        -DNEEDS_CLANG_FORMAT=${needs_clang_format}
+        "-DREPOSITORY=${PROJECT_SOURCE_DIR}/.."
+        "-DCARGO=${IRIS_CARGO}"
+        "-DCXX=${CMAKE_CXX_COMPILER}"
+        "-DCXX_FLAGS=${program_cxx_flags}"
+        "-DLINKER_FLAGS=${program_linker_flags}"
+        "-DCMAKE=${CMAKE_COMMAND}"
+        "-DGENERATOR=${CMAKE_GENERATOR}"
+        "-DCLANG_FORMAT=${IRIS_CLANG_FORMAT}"
+        "-DCLANG_TIDY=${IRIS_CLANG_TIDY}"
+        "-DSDKROOT=${CMAKE_OSX_SYSROOT}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cpp-programs.cmake")
+  endforeach()
+  # The round trip builds about 2,400 programs in rust/target, which one run
+  # at a time may use; the views build one program in a directory of their
+  # own.
   set_tests_properties(builder-round-trip PROPERTIES
     TIMEOUT 3600
-    SKIP_REGULAR_EXPRESSION "Skipped: the round trip needs clang-format"
+    SKIP_REGULAR_EXPRESSION "Skipped: builder_round_trip_cpp needs clang-format"
     RESOURCE_LOCK iris-cpp-round-trip)
+  set_tests_properties(generated-views PROPERTIES
+    TIMEOUT 1800
+    RESOURCE_LOCK iris-cpp-views)
 endif()

@@ -152,7 +152,7 @@ cmake --build --preset dev
 ctest --preset dev
 ```
 
-`ctest` runs forty-eight tests. `spec-api` and `data-api` check the public
+`ctest` runs the tests below. `spec-api` and `data-api` check the public
 API; `data-api` also checks the driver's JSON of data, and both outputs
 under every rounding mode. `budget` checks the exact budget limits that no
 conformance case reaches. `memory` checks the allocation hook: it replaces
@@ -197,7 +197,17 @@ warnings as errors, and compares the spec it prints with the original (see
 [gecode-iris-gen](../rust/iris-gen/README.md#the-c-backend)). It needs
 clang-format 22.1.8 and is skipped without it; configure with
 `-DIRIS_CLANG_FORMAT=PATH` and `-DIRIS_CLANG_TIDY=PATH` to name the tools,
-and it skips clang-tidy unless that is 22.1.8 too. Run one alone with, for
+and it skips clang-tidy unless that is 22.1.8 too. `generated-views` runs
+the `cpp_views` test of `rust/` in the same way: it prints a view with
+`iris gen --lang cpp` for every format and for specs that exercise every
+handle type and layout, builds one program that includes them all, pins the
+type of `data.get` for each handle with `static_assert`, and compares what
+every handle reads with untyped access on each format case (see
+[gecode-iris-gen](../rust/iris-gen/README.md#views)). It runs without
+clang-format, and checks the views with clang-format and clang-tidy 22.1.8
+when they are found. `format-builders` reads every case of every format in
+`formats` through the format's builder in `examples/` (see
+[Guide examples](#guide-examples)) and fails unless each one passes. Run one alone with, for
 example, `ctest --preset dev -R read-conformance`. The first conformance run builds the
 runner with Cargo.
 
@@ -226,6 +236,23 @@ files disagree, so a new example needs a `.out` recording and a place in
 `site/scripts/cpp-examples.mjs` and on the page. After a change, write a
 recording from the root with `cpp/build/dev/tests/iris-example-read >
 cpp/examples/read.out`.
+
+`build_NAME.hpp` is the hand-written spec builder of the format `formats/NAME`,
+with `-` in the directory's name spelled `_`, and `build_NAME.cpp` a program
+that reads a case with it. `iris-format-builder-driver`, from
+`tests/format_builder_driver.cpp`, speaks the driver protocol with the format
+name as its first argument and answers with the spec of that builder in place
+of the case's own. The `format-builders` test runs the runner with it on each
+format directory and fails unless every case passes, as judged with the case's
+operation and parameters, and unless every format directory has a builder. By
+hand, from the root:
+
+```sh
+(cd rust && cargo run --locked -p gecode-iris-conformance -- run --driver "\"$PWD/../cpp/build/dev/tests/iris-format-builder-driver\" jobshop" ../formats/jobshop)
+```
+
+`view.sh` is the `iris gen --lang cpp` command the guide shows, and the
+site's check compares `view.out` with what the CLI prints.
 
 ## API reference
 
@@ -389,8 +416,8 @@ the `dev` preset and runs `ctest`, including the four conformance tests,
 with GCC 14 and Clang 20 on Ubuntu 24.04, Apple Clang on macOS, and MSVC on
 Windows; runs the `asan` preset with Clang 20 and the `tsan` preset with
 GCC 14 on Ubuntu;
-runs the builder round trip with GCC 14 and Clang 20, with clang-format
-and clang-tidy 22.1.8;
+runs the builder round trip and the generated views with GCC 14 and Clang
+20, with clang-format and clang-tidy 22.1.8;
 runs each fuzz target for two minutes with Clang 20; compares the Rust
 driver with the `asan` driver for five minutes, seeded with the run's ID;
 and checks the formatting, runs clang-tidy as above and builds `iris-docs`. A failing fuzz or
@@ -424,14 +451,19 @@ come from PyPI through uv.
   the table of call sites that a built spec keeps and the access that
   attaches it and records the statement an error belongs to.
 - `driver/`: `iris-driver`, the conformance driver. It speaks the protocol
-  in [`conformance/README.md`](../conformance/README.md).
+  in [`conformance/README.md`](../conformance/README.md). `driver.cpp` answers
+  a request with the spec that a loader gives, and `main.cpp` loads the
+  request's spec file.
 - `fuzz/`: the libFuzzer targets `parse.cpp` and `read.cpp`, the
   dictionary `iris.dict`, and `replay.cpp`, which runs a target without
   libFuzzer.
-- `examples/`: the guide's examples and their recorded output.
+- `examples/`: the guide's examples and their recorded output, including a
+  spec builder for each format.
 - `tests/`: the API, builder, budget and memory tests; `compile_fail/`,
   the programs the builder must reject; `conformance.cmake`, which
   selects the cases of one operation and runs them in batches;
   `example.cmake`, which runs an example and compares its output;
-  `builder-round-trip.cmake`, which runs the builder round trip;
+  `cpp-programs.cmake`, which runs the builder round trip and the generated
+  views of `rust/`; `format_builder_driver.cpp` and `format-builders.cmake`,
+  which read the format cases through the format builders;
   `no-gecode.cmake`; and `consumer/`, a project that uses the library.

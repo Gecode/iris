@@ -7,8 +7,8 @@
 //!
 //! [`view`](view::view) turns a checked spec into a language-independent
 //! [`View`](view::View) of typed handles, and [`view_code`] prints it for a
-//! language whose [`Language::has_view`] is true: Rust and Python. [`rust_view`] gives the Rust
-//! declarations that `view_code` prints as data, for the `iris!` macro.
+//! language whose [`Language::has_view`] is true: Rust, Python and C++. [`rust_view`] gives the
+//! Rust declarations that `view_code` prints as data, for the `iris!` macro.
 mod cpp;
 mod java;
 mod kotlin;
@@ -67,8 +67,8 @@ impl Language {
     /// Whether [`view_code`] has a printer for the language.
     pub fn has_view(self) -> bool {
         match self {
-            Self::Rust | Self::Python => true,
-            Self::Cpp | Self::Java | Self::Kotlin | Self::TypeScript => false,
+            Self::Rust | Self::Python | Self::Cpp => true,
+            Self::Java | Self::Kotlin | Self::TypeScript => false,
         }
     }
 }
@@ -151,11 +151,20 @@ impl From<gecode_iris_sema::Error> for ViewError {
 /// A module of the spec's typed handles. A spec that `iris check` rejects gives
 /// its first error, and a language without a printer gives
 /// [`ViewError::NoPrinter`].
-pub fn view_code(analysis: &Analysis, language: Language) -> Result<String, ViewError> {
+///
+/// A Rust or Python module takes its name from the file it is saved in. A C++
+/// header puts its handles in a namespace named after the spec's file, the
+/// origin of `parsed`: `formats/jobshop/jobshop.iris` gives `jobshop`.
+pub fn view_code(
+    parsed: &Parse,
+    analysis: &Analysis,
+    language: Language,
+) -> Result<String, ViewError> {
     match language {
         Language::Rust => Ok(rust::view::render(&rust_view(analysis)?)),
         Language::Python => Ok(python::view::render(&view::view(analysis)?)),
-        Language::Cpp | Language::Java | Language::Kotlin | Language::TypeScript => {
+        Language::Cpp => Ok(cpp::view::render(&view::view(analysis)?, parsed.origin())),
+        Language::Java | Language::Kotlin | Language::TypeScript => {
             Err(ViewError::NoPrinter(language))
         }
     }

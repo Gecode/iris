@@ -128,6 +128,123 @@ reports exhausted memory. The language's fixed
 that exhausts one fails with the code `E-BUDGET`, and the library has no budget
 settings.
 
+## Build a reader spec
+
+`iris/build.hpp` writes a reader spec from C++. Every statement that defines an
+entry returns a typed handle, an `iris::Field`, and `data.get(handle)` returns
+the entry as the handle's type: a `std::int64_t` for `n_jobs` and an
+`iris::Array<std::int64_t, 2>` for `machine`. A builder adds no features of its
+own: `build()` prints Iris text and parses it as `Spec::parse` does, so the
+language's checks decide what is valid, and `source()` returns the text.
+
+The builders below are headers in
+[`cpp/examples`](https://github.com/Gecode/iris/tree/main/cpp/examples), one
+for each format in the [format library](/formats/), each with a program that
+reads a case. A test reads every case of each format through its builder and
+compares the data or the error with the case's expected results, and the
+example tests run each program and compare its output with the output shown
+here.
+
+### The job shop builder
+
+This builder writes the [job shop](/formats/job-shop/) reader spec.
+
+<CheckedExample id="cpp-build_jobshop-hpp" title="build_jobshop.hpp" />
+
+Blocks take a lambda, which receives the block's scope: `b.instances`,
+`i.sections`, `s.arm` and `a.repeat` each open one, and the statements the
+lambda adds go into it. Each block returns what its lambda returns, so the
+handles leave the blocks as a `std::tuple`. `pattern("{} {}", n_jobs,
+n_machines)` is a pattern whose placeholders the compiler checks against its
+arguments. A range is `Range{.from = 0, .below = n_machines}` for Iris
+`0..<n_machines`, or `Range{.from = 0, .to = n}` for `0..n`.
+
+`job.record()` is the handle of each record of a repeat: `jobs.get(machine)`
+looks up a field, and `sum(jobs, ...)` writes a comprehension over the records.
+`job.as_name("jobs")` names the list of records, as in `repeat n_jobs as jobs`,
+for error messages. C++ operators build expressions, `&&`, `||` and `!`
+included, and `host::int_max` is Gecode's largest integer.
+
+### Typed data
+
+The program reads an instance selected by name, then a file whose check fails:
+
+<CheckedExample id="cpp-build_jobshop" title="build_jobshop.cpp" />
+
+`data.get` returns the view of the handle's value type and depth: a
+`std::int64_t` for `n_jobs`, a `std::optional<std::string_view>` for `name`,
+which only some files give, and an `iris::Array<std::int64_t, 2>` for
+`machine` and `duration`, whose rows are `std::span<const std::int64_t>`. As
+with untyped access, nothing is copied. A handle names its entry, value type
+and depth; a lookup checks them, and throws `AccessError` if the entry has
+another type or depth.
+
+Collecting the handles in a struct with the spec, as `Jobshop` does, gives the
+rest of a program one typed object to read with.
+
+### Errors name your code
+
+Every statement takes a `std::source_location`, which defaults to the line of
+the call. When a check fails while reading, the error has the input location,
+and `error.call_site()` names the line of the check in `build_jobshop.hpp`. A
+`BuildError` from `build()` has the same call site. A statement in a helper
+function records the line in the helper, unless the helper takes a
+`std::source_location` that defaults to its own caller's and passes it on, as
+`clue_lines` below does.
+
+### A helper used twice
+
+A function that takes a scope and returns handles is a reusable piece of a
+reader spec. The nonogram builder reads the clues of the rows and the columns
+with one helper, and builds two pairs of checks with two expression helpers.
+
+<CheckedExample id="cpp-build_nonogram-hpp" title="build_nonogram.hpp" />
+
+<CheckedExample id="cpp-build_nonogram" title="build_nonogram.cpp" />
+
+A builder rejects a second definition of a name, so a helper called twice by
+mistake fails `build()` instead of quietly replacing an entry. That is why
+`clue_lines` takes the entry name from its caller. The TSPLIB builder below
+uses the same idea for its two coordinate sections.
+
+### The other formats
+
+<CheckedExample id="cpp-build_dimacs_cnf-hpp" title="build_dimacs_cnf.hpp" />
+
+<CheckedExample id="cpp-build_dimacs_cnf" title="build_dimacs_cnf.cpp" />
+
+<CheckedExample id="cpp-build_sudoku-hpp" title="build_sudoku.hpp" />
+
+<CheckedExample id="cpp-build_sudoku" title="build_sudoku.cpp" />
+
+`define_type` gives a named type, used here for both ends of a time window:
+
+<CheckedExample id="cpp-build_tsptw-hpp" title="build_tsptw.hpp" />
+
+<CheckedExample id="cpp-build_tsptw" title="build_tsptw.cpp" />
+
+A TSPLIB file gives either a distance matrix or coordinates. `t.set` gives an
+optional entry a default while keeping its handle's type, `b.if_` and its
+`else_` take the checks that apply to each kind of file, and `one_of` is an
+ordinary C++ function template that builds an expression:
+
+<CheckedExample id="cpp-build_tsplib-hpp" title="build_tsplib.hpp" />
+
+<CheckedExample id="cpp-build_tsplib" title="build_tsplib.cpp" />
+
+### Typed handles for a text spec
+
+A reader spec written as an `.iris` file has no builder, but `iris gen --lang
+cpp SPEC` prints a header with a typed handle for each of its entries, in a
+namespace named after the spec's file:
+
+<CheckedExample id="cpp-view" />
+
+Save the output as a header, such as `jobshop_view.hpp`, and read data with
+`data.get(jobshop::machine)` as with a builder's handles. An entry whose value
+type or depth differs between the places that define it gets an
+`iris::DynField`, which returns an optional `ValueRef`.
+
 ## Supply the memory
 
 Every allocation the library makes comes from a `std::pmr::memory_resource`, so

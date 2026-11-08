@@ -740,7 +740,7 @@ fn java_has_builders_but_no_view_printer() {
     let parsed = parse(b"x: int\n", "test.iris", LanguageVersion::V0_1).unwrap();
     let analysis = analyze(&parsed);
     assert!(matches!(
-        view_code(&analysis, Language::Java),
+        view_code(&parsed, &analysis, Language::Java),
         Err(ViewError::NoPrinter(Language::Java))
     ));
 }

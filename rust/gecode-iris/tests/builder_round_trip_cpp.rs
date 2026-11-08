@@ -6,15 +6,14 @@
 //!
 //! `IRIS_CLANG_FORMAT` names `clang-format` 22.1.8, and `IRIS_CLANG_TIDY`, if
 //! set, `clang-tidy` 22.1.8 (on macOS, export `SDKROOT` for it). The programs
-//! build with CMake (`IRIS_CMAKE`, by default `cmake`) and the compiler that
-//! CMake finds, so `CXX` and `CMAKE_GENERATOR` choose them. `IRIS_CXX_FLAGS`
-//! and `IRIS_EXE_LINKER_FLAGS`, if set, replace the compile and link flags of
-//! the build, including those of its configuration, which is how the CTest
-//! test `builder-round-trip` passes on a sanitizer's flags. Each program is
+//! build as `cpp_build` describes, which is how the CTest test
+//! `builder-round-trip` passes on a sanitizer's flags. Each program is
 //! included into a shard of the build in a namespace of its own, and the first
 //! one also builds alone, with its `main`.
+mod cpp_build;
 mod round_trip;
 
+use cpp_build::{CmakeProject, cmake_path, expect_success, regex_escape};
 use gecode_iris_cli::check_spec;
 use gecode_iris_gen::{Language, builder_code};
 use round_trip::{Tally, corpus, extra_specs, limit_specs};
@@ -30,13 +29,6 @@ use std::{
 
 /// The number of programs in one shard of the build.
 const SHARD: usize = 24;
-
-/// The environment variables that replace the build's flags, with the cache
-/// variables they set.
-const FLAGS: [(&str, &str); 2] = [
-    ("IRIS_CXX_FLAGS", "CMAKE_CXX_FLAGS"),
-    ("IRIS_EXE_LINKER_FLAGS", "CMAKE_EXE_LINKER_FLAGS"),
-];
 
 /// The headers that every generated program may include, which a shard
 /// includes first so that their include guards keep them out of the
@@ -118,7 +110,7 @@ fn accepted_specs_round_trip_through_the_cpp_builder() {
     project.run(shards);
     println!("ran them in {:.1?}", step.elapsed());
 
-    let out = project.root.join("out");
+    let out = project.cmake.root.join("out");
     let mut differences = Vec::new();
     for (name, original, title) in &generated {
         if let Err(message) = round_trip::round_trip(&out, original, name) {
@@ -137,8 +129,7 @@ fn accepted_specs_round_trip_through_the_cpp_builder() {
 
 /// A CMake project of generated programs, outside the repository.
 struct Project {
-    root: PathBuf,
-    repo: PathBuf,
+    cmake: CmakeProject,
 }
 
 impl Project {
@@ -154,13 +145,15 @@ impl Project {
             fs::create_dir_all(path).unwrap();
         }
         Self {
-            root,
-            repo: repo.to_owned(),
+            cmake: CmakeProject {
+                root,
+                repo: repo.to_owned(),
+            },
         }
     }
 
     fn source(&self, name: &str) -> PathBuf {
-        self.root.join("src").join(format!("{name}.cpp"))
+        self.cmake.root.join("src").join(format!("{name}.cpp"))
     }
 
     /// The program of a spec beyond the corpus, which must pass `iris check`.
@@ -210,7 +203,7 @@ impl Project {
     fn format(&self, clang_format: &OsString, names: &[&str]) {
         let style = format!(
             "--style=file:{}",
-            self.repo.join("cpp/.clang-format").display()
+            self.cmake.repo.join("cpp/.clang-format").display()
         );
         let files: Vec<PathBuf> = names.iter().map(|name| self.source(name)).collect();
         self.each_chunk(&files, "clang-format --dry-run --Werror", || {
@@ -226,15 +219,18 @@ impl Project {
     fn tidy(&self, clang_tidy: &OsString, shards: usize, first: &str) {
         let config = format!(
             "--config-file={}",
-            self.repo.join("cpp/.clang-tidy").display()
+            self.cmake.repo.join("cpp/.clang-tidy").display()
         );
-        let include = format!("--extra-arg=-I{}", self.repo.join("cpp/include").display());
+        let include = format!(
+            "--extra-arg=-I{}",
+            self.cmake.repo.join("cpp/include").display()
+        );
         // Diagnostics in the programs that a shard includes, and none in the
         // library's headers.
-        let programs = self.root.join("src");
+        let programs = self.cmake.root.join("src");
         let filter = format!("--header-filter={}/", regex_escape(&cmake_path(&programs)));
         let mut files: Vec<PathBuf> = (0..shards)
-            .map(|index| self.root.join(format!("shard_{index}.cpp")))
+            .map(|index| self.cmake.root.join(format!("shard_{index}.cpp")))
             .collect();
         files.push(self.source(first));
         self.each_chunk(&files, "clang-tidy", || {
@@ -248,128 +244,38 @@ impl Project {
     /// Write the shards and the CMake project that builds them, and return
     /// the number of shards.
     fn write_shards(&self, names: &[&str]) -> usize {
-        let mut lists = String::new();
-        writeln!(
-            lists,
-            "cmake_minimum_required(VERSION 3.28)\n\
-             project(iris_cpp_round_trip LANGUAGES CXX)\n\
-             set(CMAKE_CXX_SCAN_FOR_MODULES OFF)\n\
-             set(IRIS_BUILD_TESTS OFF CACHE BOOL \"\" FORCE)\n\
-             set(IRIS_INSTALL OFF CACHE BOOL \"\" FORCE)\n\
-             add_subdirectory(\"{}\" iris)\n\
-             function(program target)\n  \
-               add_executable(${{target}} ${{ARGN}})\n  \
-               target_link_libraries(${{target}} PRIVATE iris::iris)\n  \
-               set_target_properties(${{target}} PROPERTIES CXX_EXTENSIONS OFF)\n  \
-               iris_set_warnings(${{target}})\n\
-             endfunction()\n\
-             program(standalone src/{}.cpp)",
-            cmake_path(&self.repo.join("cpp")),
-            names[0]
-        )
-        .unwrap();
+        let mut lists = self.cmake.lists_head("iris_cpp_round_trip");
+        writeln!(lists, "program(standalone src/{}.cpp)", names[0]).unwrap();
         let shards: Vec<&[&str]> = names.chunks(SHARD).collect();
         for (index, shard) in shards.iter().enumerate() {
             fs::write(
-                self.root.join(format!("shard_{index}.cpp")),
+                self.cmake.root.join(format!("shard_{index}.cpp")),
                 shard_source(shard),
             )
             .unwrap();
             writeln!(lists, "program(shard_{index} shard_{index}.cpp)").unwrap();
         }
-        fs::write(self.root.join("CMakeLists.txt"), lists).unwrap();
+        fs::write(self.cmake.root.join("CMakeLists.txt"), lists).unwrap();
         shards.len()
     }
 
     /// Configure and build the project, then run the first program alone.
     fn build(&self) {
-        let cmake = std::env::var_os("IRIS_CMAKE").unwrap_or_else(|| "cmake".into());
-        let build = self.build_directory();
-        let mut configure = Command::new(&cmake);
-        configure
-            .arg("-S")
-            .arg(&self.root)
-            .arg("-B")
-            .arg(&build)
-            .args([
-                "-DCMAKE_BUILD_TYPE=Debug",
-                "-DCMAKE_COMPILE_WARNING_AS_ERROR=ON",
-            ]);
-        // Given flags stand in for the configuration's own as well.
-        for (variable, cache) in FLAGS {
-            if let Some(flags) = std::env::var_os(variable) {
-                let mut flag = OsString::from(format!("-D{cache}="));
-                flag.push(flags);
-                configure.arg(flag).arg(format!("-D{cache}_DEBUG="));
-            }
-        }
-        expect_success(configure, "cmake configure");
-        let mut compile = Command::new(&cmake);
-        compile
-            .arg("--build")
-            .arg(&build)
-            .args(["--config", "Debug", "--parallel"]);
-        if let Ok(threads) = thread::available_parallelism() {
-            compile.arg(threads.to_string());
-        }
-        expect_success(compile, "cmake --build");
-
+        self.cmake.build();
         // The program alone prints the same spec as through its shard.
-        let output = Command::new(self.executable("standalone"))
+        let output = Command::new(self.cmake.executable("standalone"))
             .output()
             .unwrap();
         assert!(output.status.success(), "the standalone program failed");
-        fs::write(self.root.join("out/standalone.iris"), output.stdout).unwrap();
-    }
-
-    /// The build directory of the compiler, generator, CMake and flags that
-    /// the environment chooses, since CMake keeps the compiler of a
-    /// directory's first configuration, and flags that are no longer given
-    /// would stay in its cache. CMake reads `CXXFLAGS` and `LDFLAGS` only
-    /// at a directory's first configuration too.
-    fn build_directory(&self) -> PathBuf {
-        let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
-        let variables = [
-            "CXX",
-            "CXXFLAGS",
-            "LDFLAGS",
-            "CMAKE_GENERATOR",
-            "IRIS_CMAKE",
-        ]
-        .into_iter()
-        .chain(FLAGS.map(|(variable, _)| variable));
-        for variable in variables {
-            // An unset variable differs from an empty one: no flags at all
-            // are not CMake's defaults.
-            let value = std::env::var_os(variable);
-            let bytes = value
-                .as_ref()
-                .map_or(&[][..], |value| value.as_encoded_bytes());
-            let end = if value.is_some() { 0 } else { 1 };
-            for &byte in bytes.iter().chain([&end]) {
-                hash = (hash ^ u64::from(byte)).wrapping_mul(0x100_0000_01b3);
-            }
-        }
-        self.root.join(format!("build-{hash:016x}"))
-    }
-
-    fn executable(&self, target: &str) -> PathBuf {
-        let build = self.build_directory();
-        let name = format!("{target}{}", std::env::consts::EXE_SUFFIX);
-        // Multi-configuration generators put programs in a directory per
-        // configuration.
-        [build.join(&name), build.join("Debug").join(&name)]
-            .into_iter()
-            .find(|path| path.exists())
-            .unwrap_or_else(|| panic!("no program {name} in {}", build.display()))
+        fs::write(self.cmake.root.join("out/standalone.iris"), output.stdout).unwrap();
     }
 
     fn run(&self, shards: usize) {
-        let out = self.root.join("out");
+        let out = self.cmake.root.join("out");
         thread::scope(|scope| {
             let handles: Vec<_> = (0..shards)
                 .map(|index| {
-                    let program = self.executable(&format!("shard_{index}"));
+                    let program = self.cmake.executable(&format!("shard_{index}"));
                     let out = &out;
                     scope.spawn(move || {
                         let mut command = Command::new(program);
@@ -390,24 +296,6 @@ impl Project {
             "spec_0 prints differently alone"
         );
     }
-}
-
-/// `text` with the characters that a regular expression treats specially
-/// escaped.
-fn regex_escape(text: &str) -> String {
-    let mut escaped = String::with_capacity(text.len());
-    for character in text.chars() {
-        if "\\^$.|?*+()[]{}".contains(character) {
-            escaped.push('\\');
-        }
-        escaped.push(character);
-    }
-    escaped
-}
-
-/// A path as CMake reads it, with forward slashes.
-fn cmake_path(path: &Path) -> String {
-    path.display().to_string().replace('\\', "/")
 }
 
 /// A program that includes each named program into a namespace of its own
@@ -449,14 +337,4 @@ fn shard_source(names: &[&str]) -> String {
     }
     text.push_str("  return 0;\n}\n// NOLINTEND\n");
     text
-}
-
-fn expect_success(mut command: Command, name: &str) {
-    let output = command.output().unwrap();
-    assert!(
-        output.status.success(),
-        "{name} failed:\n{}\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
 }

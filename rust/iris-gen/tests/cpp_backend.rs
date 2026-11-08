@@ -1,6 +1,6 @@
 //! The C++ text of each production, each identifier rule and each layout rule
 //! that the backend takes from `clang-format` in LLVM style.
-use gecode_iris_gen::{Language, ViewError, builder_code, view_code};
+use gecode_iris_gen::{Language, builder_code};
 use gecode_iris_sema::analyze;
 use gecode_iris_syntax::{LanguageVersion, parse};
 
@@ -609,14 +609,7 @@ fn strings_are_ascii_and_long_ones_are_constants() {
 }
 
 #[test]
-fn cpp_has_builders_but_no_view_printer() {
-    assert!(!Language::Cpp.has_view());
+fn cpp_is_named_cpp() {
     assert_eq!(Language::Cpp.name(), "cpp");
     assert_eq!("cpp".parse::<Language>(), Ok(Language::Cpp));
-    let parsed = parse(b"x: int\n", "test.iris", LanguageVersion::V0_1).unwrap();
-    let analysis = analyze(&parsed);
-    assert!(matches!(
-        view_code(&analysis, Language::Cpp),
-        Err(ViewError::NoPrinter(Language::Cpp))
-    ));
 }

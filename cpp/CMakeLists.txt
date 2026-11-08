@@ -113,7 +113,7 @@ if(PROJECT_IS_TOP_LEVEL)
 endif()
 
 if(IRIS_BUILD_TESTS)
-  add_executable(iris-driver driver/main.cpp driver/json.cpp)
+  add_executable(iris-driver driver/main.cpp driver/driver.cpp driver/json.cpp)
   target_link_libraries(iris-driver PRIVATE iris::iris)
   set_target_properties(iris-driver PROPERTIES CXX_EXTENSIONS OFF)
   iris_set_warnings(iris-driver)

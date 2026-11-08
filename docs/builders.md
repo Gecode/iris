@@ -1051,13 +1051,16 @@ absence. That is enough to generate the same handles a builder returns:
 - **`iris gen --lang L SPEC`** prints a module of declared handles, in the
   style of the Java section, for Rust, Python, C++, Java, Kotlin, or
   TypeScript. A name whose facts are not a single value type and depth
-  gets a dynamic handle. Rust and Python have printers so far. Rust prints
-  one `pub const` per entry, named like the entry, to use by path
+  gets a dynamic handle. Rust, Python and C++ have printers so far. Rust
+  prints one `pub const` per entry, named like the entry, to use by path
   (`jobshop::n_jobs`). Python prints one module-level handle per entry,
   `machine = ib.declared("machine", ib.IntField[list[list[int]]])`, read as
   `data[jobshop.machine]`; a declared handle reads data, but no builder
-  accepts it. A name redefined with another value type, a depth that varies,
-  a depth above 8, and a parameter without a default are all dynamic. A name is `Maybe` when it is not always in the output,
+  accepts it. C++ prints a header of `inline constexpr` handles in a
+  namespace named after the spec's file, read as
+  `data.get(jobshop::machine)`. A name redefined with another value type, a
+  depth that varies, and a parameter without a default are all dynamic, and
+  so is a depth above 8 in Rust and Python; C++ templates take any depth. A name is `Maybe` when it is not always in the output,
   as in the builder. `repeat 0 {if 0 {x:int}}` runs no definition of `x`, but
   every read publishes its empty column, so `x` is not `Maybe`.
 - **The `iris!` macro** (PLAN.md §8.1) expands to a value with a `spec`
@@ -1119,7 +1122,9 @@ Each implementation's builder is tested in four ways:
 2. **Idiomatic format builders.** Each format in `formats/` gets a
    hand-written builder in every language. These are the site's examples.
    Their tests read the format's cases and compare the data with the
-   expected results.
+   expected results. Rust, Python and C++ have them so far; the C++ ones are
+   headers in `cpp/examples`, which the CTest test `format-builders` runs
+   on every format case.
 3. **Type tests.** Accesses must have the expected types, and misuse must
    fail to compile: Rust `trybuild`, TypeScript `@ts-expect-error` with
    a local type-equality helper, Python `assert_type` under pyright and mypy, C++

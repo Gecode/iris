@@ -80,7 +80,7 @@ export async function collectDocumentationExamples({ tools, formats, execute, co
   Object.assign(examples, await collectPythonExamples({ tools, execute }));
   Object.assign(examples, await collectTypescriptExamples());
   Object.assign(examples, await collectRustExamples());
-  Object.assign(examples, await collectCppExamples());
+  Object.assign(examples, await collectCppExamples({ tools, execute }));
   Object.assign(examples, await collectJavaExamples());
   return examples;
 
