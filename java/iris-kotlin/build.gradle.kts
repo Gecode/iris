@@ -5,6 +5,8 @@ plugins {
     id("iris.published")
 }
 
+description = "Kotlin extensions for dev.gecode:iris, the Java library of Iris"
+
 dependencies {
     api(project(":iris"))
     api(libs.kotlin.stdlib)

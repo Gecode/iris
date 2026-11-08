@@ -4,6 +4,8 @@ plugins {
     id("iris.published")
 }
 
+description = "Writes typed handles and a record for an Iris reader spec while javac compiles"
+
 // The processor checks a spec and finds its entries with the library, including its internal
 // syntax packages, so it has no module descriptor: it runs from the processor path, where the
 // library is not a named module. The generated code needs only dev.gecode:iris.

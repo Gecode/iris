@@ -4,6 +4,8 @@ plugins {
   id("iris.published")
 }
 
+description = "Read text instance files with Iris reader specs, in pure Java"
+
 dependencies { api(libs.jspecify) }
 
 // Only the exported package has a public API. The source path resolves the rest.
