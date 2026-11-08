@@ -122,3 +122,33 @@ packages, so `--locked` builds keep working without a `cargo update`.
 a Python or TypeScript tag it also requires the `rust-vVERSION` tag, and fails
 when the Rust sources the package builds in changed since it. The release
 workflows run it. [RELEASING.md](../RELEASING.md) describes the procedure.
+
+## Build the C++ release archive
+
+From any directory:
+
+```bash
+./scripts/cpp-dist.sh VERSION OUTDIR [REV]
+./scripts/check-cpp-dist.sh OUTDIR/iris-cpp-VERSION.tar.gz [WORKDIR]
+```
+
+`cpp-dist.sh` writes `iris-cpp-VERSION.tar.gz` and
+`iris-cpp-VERSION.tar.gz.sha256` to `OUTDIR`, in the format of `sha256sum`.
+It reads the tree of the commit `REV`, `HEAD` by default, and never the
+working tree, and fails unless `cpp/CMakeLists.txt` in that commit declares
+`project(iris VERSION VERSION ...)`. The archive holds one directory,
+`iris-cpp-VERSION/`, with `CHANGELOG.md`, `CMakeLists.txt`, `Doxyfile`,
+`README.md`, `cmake/`, `include/` and `src/` from `cpp/`, and the repository's
+`LICENSE`. Entries carry the commit's time and modes 644 and 755, and gzip
+records no name or time, so one commit gives the same bytes with the same Git
+and gzip. It needs Bash, Git 2.42 or newer, gzip, and `sha256sum` or `shasum`.
+
+`check-cpp-dist.sh` checks the archive's name, the checksum file beside it if
+there is one, and that the archive holds that one directory. It then
+configures, builds and installs the archive as a top-level project with
+warnings as errors, builds and runs `cpp/tests/consumer` against the installed
+package, and builds and runs it again through FetchContent of the archive by
+`file://` URL and SHA-256 hash. It uses `cmake` (3.28 or newer) and `ninja`
+from `PATH` and the compiler that `CXX` names, works in a temporary directory
+that it removes unless `WORKDIR` is given, and exits non-zero at the first
+failure. The C++ release workflow runs both scripts.

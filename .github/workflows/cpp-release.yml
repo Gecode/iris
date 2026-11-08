@@ -1,0 +1,99 @@
+name: C++ release
+
+# Runs the whole C++ workflow for a cpp-vVERSION tag, builds the source archive
+# and its checksum, checks that a consumer builds from the archive, and creates
+# the GitHub release with both files. See RELEASING.md.
+on:
+  push:
+    tags:
+      - 'cpp-v*'
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Check tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check the tag names the library version
+        run: |
+          version=$(sed -n 's/^project(iris VERSION \([^ ]*\) .*/\1/p' cpp/CMakeLists.txt)
+          test "$GITHUB_REF_NAME" = "cpp-v$version"
+      # The section of the changelog headed by the version, without its heading.
+      - name: Take the release notes from the changelog
+        run: |
+          awk -v version="${GITHUB_REF_NAME#cpp-v}" '
+            /^## / { if (found) exit; if ($2 == version) { found = 1; next } }
+            found { print }
+          ' cpp/CHANGELOG.md | sed '/./,$!d' > notes.md
+          if ! grep -q . notes.md; then
+            echo "cpp/CHANGELOG.md has no entries for ${GITHUB_REF_NAME#cpp-v}" >&2
+            exit 1
+          fi
+          cat notes.md
+      - uses: actions/upload-artifact@v6
+        with:
+          name: release-notes
+          path: notes.md
+          if-no-files-found: error
+
+  build:
+    name: Build and test
+    needs: version
+    uses: ./.github/workflows/cpp.yml
+
+  dist:
+    name: Source archive
+    needs: version
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install compiler
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends g++-14
+      - uses: astral-sh/setup-uv@v7
+      - name: Install CMake and Ninja
+        run: |
+          uv tool install cmake==4.4.4
+          uv tool install ninja==1.13.0
+          uv tool dir --bin >> "$GITHUB_PATH"
+      - name: Build the archive and its checksum
+        run: scripts/cpp-dist.sh "${GITHUB_REF_NAME#cpp-v}" dist
+      # Builds and installs the archive as a project of its own, then builds
+      # the consumer against the installed copy and through FetchContent of
+      # the archive by URL and hash.
+      - name: Build a consumer from the archive
+        env:
+          CXX: g++-14
+        run: scripts/check-cpp-dist.sh "dist/iris-cpp-${GITHUB_REF_NAME#cpp-v}.tar.gz"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: cpp-dist
+          path: dist
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub release
+    needs: [build, dist]
+    runs-on: ubuntu-latest
+    environment: github-release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: cpp-dist
+          path: dist
+      - uses: actions/download-artifact@v7
+        with:
+          name: release-notes
+          path: notes
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --verify-tag \
+            --title "Iris C++ ${GITHUB_REF_NAME#cpp-v}" --notes-file notes/notes.md \
+            dist/iris-cpp-*.tar.gz dist/iris-cpp-*.tar.gz.sha256

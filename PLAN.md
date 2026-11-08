@@ -501,6 +501,14 @@ reported upstream. Gecode itself needs no changes.
 - CMake 3.28+, a `find_package(iris)` config package, FetchContent support,
   and a vcpkg port and Conan recipe later. An optional C++ module
   (`import iris;`) where the compilers support it.
+- Distribution: a `cpp-vVERSION` tag creates a GitHub release with the
+  source archive `iris-cpp-VERSION.tar.gz` and its SHA-256 checksum. The
+  archive is built from the tag's tree and holds only what building,
+  installing and using the library needs: the headers, sources,
+  `CMakeLists.txt`, the package configuration template, the `Doxyfile`,
+  the README, the changelog and the license. It has no tests, so it needs
+  no Rust. Projects use it through FetchContent by URL and `URL_HASH`, or
+  build and install it for `find_package(iris)`.
 - CI on GCC, Clang, and MSVC, with ASan, UBSan, and TSan, libFuzzer, and
   the conformance driver.
 

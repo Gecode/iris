@@ -18,7 +18,7 @@ tags; [§11](PLAN.md#11-milestones) defines the release milestones.
 | Python | `python-vVERSION` | Ready: the release workflow needs the PyPI setup below |
 | TypeScript | `typescript-vVERSION` | Ready: the release workflow needs the npm setup below |
 | Java and Kotlin | `java-vVERSION` | Native library and Kotlin module ready; Maven Central publication planned for M7 |
-| C++ | `cpp-vVERSION` | Native library and CMake package ready; distribution planned for M7 |
+| C++ | `cpp-vVERSION` | Ready: the release workflow needs the GitHub setup below; vcpkg and Conan planned |
 | JetBrains plugin | `jetbrains-vVERSION` | Plugin built and verified; Marketplace publication planned for M7 |
 | VS Code extension | `vscode-vVERSION` | Not built yet |
 | Documentation site | No version tag; deploys from `main` | Deployment configured; production setup and live verification required |
@@ -123,6 +123,42 @@ environment `npm`, then delete the secret. npm 11.5.1 and later use trusted
 publishing whenever it is configured, so the workflow needs no change; it checks
 the npm version.
 
+## C++
+
+An authorized `cpp-vVERSION` tag starts the
+[release workflow](.github/workflows/cpp-release.yml). It checks that the tag
+names the version in `project(iris VERSION ...)` of `cpp/CMakeLists.txt` and
+that [cpp/CHANGELOG.md](cpp/CHANGELOG.md) has a section for that version, runs
+the whole [C++ workflow](.github/workflows/cpp.yml), and builds the source
+archive `iris-cpp-VERSION.tar.gz` and its checksum
+`iris-cpp-VERSION.tar.gz.sha256` with `scripts/cpp-dist.sh`. It then builds the
+archive as a project of its own, installs it, and builds a consumer against the
+installed package and through FetchContent of the archive by URL and hash. Last,
+it creates the GitHub release for the tag with both files, and with the
+changelog section as its notes. [cpp/README.md](cpp/README.md#install-and-use)
+says what the archive holds and how projects use it.
+
+To prepare a release, set the version in `cpp/CMakeLists.txt`, move the
+changelog's `Unreleased` entries into a `## VERSION - DATE` section, and check
+the archive on the source commit:
+
+```sh
+scripts/cpp-dist.sh VERSION /tmp/iris-dist
+scripts/check-cpp-dist.sh /tmp/iris-dist/iris-cpp-VERSION.tar.gz
+```
+
+An authorized release then pushes the tag alone:
+
+```sh
+git tag -a cpp-vVERSION -m "Iris C++ VERSION" COMMIT
+git push origin cpp-vVERSION
+```
+
+Set this up once before the first tag: create the `github-release` environment
+on GitHub with a required reviewer, so that a tag alone cannot publish. The
+release job uses the workflow's own token with `contents: write`, so it needs no
+secret. A vcpkg port and a Conan recipe come later.
+
 ## Documentation and future packages
 
 Follow [site/PUBLISHING.md](site/PUBLISHING.md) for production setup, deployment
@@ -131,7 +167,7 @@ deploy automatically once the secrets are configured, so authorization for
 such a push must cover the deployment. A configured workflow or a local dry
 run does not establish that production is live.
 
-The [Java and Kotlin](java/README.md), [C++](cpp/README.md) and
+The [Java and Kotlin](java/README.md) and
 [JetBrains](editors/jetbrains/README.md) guides describe components that have not
 been released. Before their first releases, add component changelogs and registry
 procedures. Their versions need not match Rust's.

@@ -106,7 +106,32 @@ opens it with the C library, whose `FILE` may come from `malloc`. With
 
 ## Install and use
 
-The library installs a CMake package. From `cpp/`:
+Each release publishes a source archive on the
+[GitHub releases page](https://github.com/Gecode/iris/releases), tagged
+`cpp-vVERSION`: `iris-cpp-VERSION.tar.gz`, with its SHA-256 checksum in
+`iris-cpp-VERSION.tar.gz.sha256`. The archive has one top-level directory,
+`iris-cpp-VERSION/`, which holds the library's headers and sources, its
+`CMakeLists.txt`, the template of the package configuration, the `Doxyfile`,
+this README, the changelog and the license. It leaves out the tests, the
+conformance driver, the fuzz targets, the examples and the presets, so it
+needs no Rust and builds no tests.
+
+A project can build the library with its own build through FetchContent of
+the archive, checked against the hash in the `.sha256` file of the release
+(the hash below is a placeholder):
+
+```cmake
+include(FetchContent)
+FetchContent_Declare(iris
+  URL https://github.com/Gecode/iris/releases/download/cpp-v0.1.0/iris-cpp-0.1.0.tar.gz
+  URL_HASH SHA256=0000000000000000000000000000000000000000000000000000000000000000)
+FetchContent_MakeAvailable(iris)
+target_link_libraries(app PRIVATE iris::iris)
+```
+
+Or it can build and install the library once, and find the installed CMake
+package. From the extracted archive, or from `cpp/` in a checkout of this
+repository:
 
 ```sh
 cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release -DIRIS_BUILD_TESTS=OFF
@@ -125,8 +150,8 @@ target_link_libraries(app PRIVATE iris::iris)
 ```
 
 The version file accepts a request for the same minor version. A project
-can also build the library with its own build, through FetchContent or
-`add_subdirectory`, here from a copy of this repository:
+can also build the library from a copy of this repository, through
+FetchContent or `add_subdirectory`:
 
 ```cmake
 include(FetchContent)
@@ -135,11 +160,20 @@ FetchContent_MakeAvailable(iris)
 target_link_libraries(app PRIVATE iris::iris)
 ```
 
-A Git or archive source works the same with `SOURCE_SUBDIR cpp`.
+A Git source of this repository works the same with `SOURCE_SUBDIR cpp`.
 
 A vendored copy builds no tests and has no install rules unless
 `-DIRIS_INSTALL=ON`, which a project that installs targets linking
 `iris::iris` needs.
+
+`scripts/cpp-dist.sh VERSION OUTDIR` at the repository root builds the
+archive and its checksum from the tree of a commit, `HEAD` unless a third
+argument names another, and fails unless `CMakeLists.txt` there declares
+`VERSION`. The same commit gives the same bytes. `scripts/check-cpp-dist.sh
+ARCHIVE` builds and installs the archive as a project of its own, then builds
+and runs `tests/consumer` against the installed copy and through FetchContent
+of the archive by URL and hash. [RELEASING.md](../RELEASING.md#c) describes a
+release.
 
 ## Requirements
 
@@ -433,13 +467,17 @@ runs each fuzz target for two minutes with Clang 20; compares the Rust
 driver with the `asan` driver for five minutes, seeded with the run's ID;
 and checks the formatting, runs clang-tidy as above and builds `iris-docs`. A failing fuzz or
 differential job uploads its failing inputs or reproducers. CMake 4.4.4 and Ninja
-come from PyPI through uv.
+come from PyPI through uv. For a `cpp-vVERSION` tag,
+[`.github/workflows/cpp-release.yml`](../.github/workflows/cpp-release.yml)
+runs this workflow, builds and checks the source archive, and creates the
+GitHub release (see [Install and use](#install-and-use)).
 
 ## Layout
 
 - `include/iris/`: the public headers. `iris.hpp` includes `spec.hpp`,
   `data.hpp`, `handle.hpp`, `params.hpp` and `error.hpp`; `build.hpp`, the
   spec builder, is included on its own. None depends on Gecode.
+- `CHANGELOG.md`: the changes of each release.
 - `Doxyfile`: the settings of the API reference.
 - `cmake/`: the template of the package's `iris-config.cmake`.
 - `src/`: the library. `lexer.cpp`, `parser.cpp` and `resolve.cpp` port
