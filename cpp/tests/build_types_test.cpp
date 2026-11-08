@@ -72,8 +72,8 @@ static_assert(
 static_assert(std::same_as<Got<DynField>, std::optional<ValueRef>>);
 
 // A handle is a literal type, so a declared one can be constexpr.
-constexpr Field<Int, 1> declared("x");
-static_assert(declared.name() == "x");
+constexpr Field<Int, 1> constant_handle("x");
+static_assert(constant_handle.name() == "x");
 static_assert(std::is_trivially_copyable_v<Field<Str, 2, maybe>>);
 static_assert(Field<Int, 1>::depth == 1);
 static_assert(Field<Int, 1, maybe>::presence == maybe);
@@ -86,7 +86,7 @@ using namespace iris::build;
 using MinOfStrings =
     decltype(min(std::declval<std::string>(), std::declval<std::string>()));
 static_assert(std::same_as<MinOfStrings, Expr<Int>>);
-static_assert(std::same_as<decltype(max(declared)), Expr<Int>>);
+static_assert(std::same_as<decltype(max(constant_handle)), Expr<Int>>);
 static_assert(std::is_object_v<std::remove_cvref_t<decltype(min)>>);
 static_assert(std::is_object_v<std::remove_cvref_t<decltype(count)>>);
 static_assert(std::is_object_v<std::remove_cvref_t<decltype(size)>>);
@@ -262,6 +262,6 @@ int main() { // NOLINT(bugprone-exception-escape)
   static_assert(std::same_as<decltype(record[0]), RecordExpr>);
   static_assert(std::same_as<decltype(record.list()), RecordList>);
 
-  (void)declared;
+  (void)constant_handle;
   return EXIT_SUCCESS;
 }
