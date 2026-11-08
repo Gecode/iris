@@ -1,0 +1,54 @@
+name: Java release
+
+# Runs the whole Java workflow for a java-vVERSION tag, then publishes dev.gecode:iris,
+# dev.gecode:iris-kotlin and dev.gecode:iris-processor to Maven Central through the
+# Central Portal, signed. See RELEASING.md.
+on:
+  push:
+    tags:
+      - 'java-v*'
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Check tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check the tag names the package version
+        run: |
+          version=$(sed -n 's/^version=//p' java/gradle.properties)
+          test "$GITHUB_REF_NAME" = "java-v$version"
+
+  build:
+    name: Build and test
+    needs: version
+    uses: ./.github/workflows/java.yml
+
+  # Builds the three jars with their sources and javadoc jars again from the tagged
+  # commit, signs them, uploads one deployment and waits until the Portal has
+  # validated it and started its release.
+  publish:
+    name: Publish to Maven Central
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    environment: maven-central
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: java
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '27'
+      - name: Publish and release
+        run: ./gradlew publishAndReleaseToMavenCentral
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_KEY_PASSWORD }}

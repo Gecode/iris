@@ -17,7 +17,7 @@ tags; [§11](PLAN.md#11-milestones) defines the release milestones.
 | Rust crates and CLI binaries | `rust-vVERSION` | Released: 0.1.0 on crates.io and GitHub; the crates.io workflow needs the trusted publishing setup below |
 | Python | `python-vVERSION` | Ready: the release workflow needs the PyPI setup below |
 | TypeScript | `typescript-vVERSION` | Ready: the release workflow needs the npm setup below |
-| Java and Kotlin | `java-vVERSION` | Native library and Kotlin module ready; Maven Central publication planned for M7 |
+| Java and Kotlin | `java-vVERSION` | Ready: the release workflow needs the Maven Central setup below |
 | C++ | `cpp-vVERSION` | Ready: the release workflow needs the GitHub setup below; vcpkg and Conan planned |
 | JetBrains plugin | `jetbrains-vVERSION` | Plugin built and verified; Marketplace publication planned for M7 |
 | VS Code extension | `vscode-vVERSION` | Not built yet |
@@ -159,6 +159,48 @@ on GitHub with a required reviewer, so that a tag alone cannot publish. The
 release job uses the workflow's own token with `contents: write`, so it needs no
 secret. A vcpkg port and a Conan recipe come later.
 
+## Java and Kotlin
+
+An authorized `java-vVERSION` tag starts the
+[release workflow](.github/workflows/java-release.yml). It checks that the tag
+names the version in `java/gradle.properties`, runs the whole
+[Java workflow](.github/workflows/java.yml) on Linux, macOS and Windows, and then
+publishes `dev.gecode:iris`, `dev.gecode:iris-kotlin` and
+`dev.gecode:iris-processor` to Maven Central through the Central Portal. The
+publish job builds each jar with its sources and javadoc jars, signs them, and
+runs `./gradlew publishAndReleaseToMavenCentral`, which uploads one deployment and
+waits until the Portal has validated it. The Portal then releases it, which can
+take a while to reach Maven Central. No other Gradle module is published.
+
+Check a release locally from `java/`: `./gradlew publishToMavenLocal` writes
+each artifact's jar, sources jar, javadoc jar, POM and Gradle module file to the
+local Maven repository and uploads nothing. The files are unsigned unless a key
+is set as below. `./gradlew publishToMavenCentral` does upload, a deployment that
+waits for a manual release in the Portal, so it needs the same authorization as a
+tag.
+
+Set this up once before the first tag:
+
+1. Create an account on the [Central Portal](https://central.sonatype.com) and
+   register the namespace `dev.gecode`. The Portal shows a verification key;
+   add it as a DNS TXT record on `gecode.dev` and verify the namespace.
+2. Generate a Portal user token. On GitHub, create the `maven-central`
+   environment with a required reviewer, so that a tag alone cannot publish, and
+   store the token's username and password as its `MAVEN_CENTRAL_USERNAME` and
+   `MAVEN_CENTRAL_PASSWORD` secrets.
+3. Create a GPG signing key for the project and upload its public key to
+   `keys.openpgp.org`, where Maven Central looks for it. Store the
+   ASCII-armored secret key (`gpg --armor --export-secret-keys KEYID`) as the
+   environment's `SIGNING_KEY` secret and its passphrase as
+   `SIGNING_KEY_PASSWORD`.
+
+The workflow passes these to Gradle as the `mavenCentralUsername`,
+`mavenCentralPassword`, `signingInMemoryKey` and `signingInMemoryKeyPassword`
+properties. Without a key, an upload to Maven Central fails before it starts.
+A version released to Maven Central can never be replaced, so a fix after that
+needs a new version and tag, as in
+[Recover after partial publication](#recover-after-partial-publication).
+
 ## Documentation and future packages
 
 Follow [site/PUBLISHING.md](site/PUBLISHING.md) for production setup, deployment
@@ -167,10 +209,9 @@ deploy automatically once the secrets are configured, so authorization for
 such a push must cover the deployment. A configured workflow or a local dry
 run does not establish that production is live.
 
-The [Java and Kotlin](java/README.md) and
-[JetBrains](editors/jetbrains/README.md) guides describe components that have not
-been released. Before their first releases, add component changelogs and registry
-procedures. Their versions need not match Rust's.
+The [JetBrains](editors/jetbrains/README.md) guide describes a component that
+has not been released. Before its first release, add a component changelog and
+registry procedure. Its version need not match Rust's.
 
 ## Recover after partial publication
 

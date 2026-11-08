@@ -141,8 +141,11 @@ dependency to `dev.gecode:iris`.
 
 ## Using it from another project
 
-`dev.gecode:iris` and `dev.gecode:iris-kotlin` are not on Maven Central yet. To
-use them from another project, install both in the local Maven repository:
+`dev.gecode:iris`, `dev.gecode:iris-kotlin` and `dev.gecode:iris-processor`
+are not on Maven Central yet. A `java-vVERSION` tag will publish them there under
+those coordinates, as [RELEASING.md](../RELEASING.md#java-and-kotlin) describes,
+and then `mavenLocal()` is no longer needed. Until then, install them in the
+local Maven repository to use them from another project:
 
 ```sh
 ./gradlew publishToMavenLocal
@@ -220,8 +223,9 @@ and the site check compares them with this file, so change both together.
 | `iris-kotlin-round-trip/` | The runner of the Kotlin builder round trip, which is not published. Its `roundTrip` task does for the programs of `iris gen builder --lang kotlin` what the Java one does, with ktfmt, detekt and kotlinc. |
 | `iris-jmh/` | The JMH benchmarks, which are not published. Nothing else depends on this module, so JMH stays out of `dev.gecode:iris`. |
 | `iris-kotlin/` | The Kotlin extensions, in the exported package `dev.gecode.iris.kotlin` of the module of that name, and the Kotlin spec builder in `dev.gecode.iris.kotlin.build`. |
-| `build-logic/` | The convention plugins `iris.java-conventions`, shared by the modules, `iris.kotlin-conventions`, `iris.kotlin-docs` for Dokka, and `iris.published` for the three published modules. |
+| `build-logic/` | The convention plugins `iris.java-conventions`, shared by the modules, `iris.kotlin-conventions`, `iris.kotlin-docs` for Dokka, and `iris.published` for the three published modules: their POM metadata, sources and javadoc jars, signing and the Central Portal through the vanniktech Maven publish plugin. |
 | `gradle/libs.versions.toml` | The pinned versions. |
+| `CHANGELOG.md` | The changes of each release of the three published modules. |
 | `detekt.yml` | The detekt configuration: what differs from the default rules. |
 
 The legal nesting of §5.12 needs up to about 900 KiB of stack on a JVM, so
@@ -394,12 +398,14 @@ Unix shell script; see [Windows](#windows).
 
 [`java.yml`](../.github/workflows/java.yml) runs `./gradlew build` on Ubuntu,
 macOS and Windows with Temurin 27 and stable Rust, and the Java builder round
-trip on Ubuntu. It runs when `java/`, `conformance/`, `formats/`, `rust/` or the
-workflow changes, and it uploads the test reports of a failed build. Lint it from
-the root:
+trip on Ubuntu. It runs on branch pushes and pull requests when `java/`,
+`conformance/`, `formats/`, `rust/` or the workflow changes, and it uploads the
+test reports of a failed build. A `java-vVERSION` tag runs it through
+[`java-release.yml`](../.github/workflows/java-release.yml), which then publishes
+the three artifacts to Maven Central. Lint both from the root:
 
 ```sh
-/tmp/iris-zdev/actionlint .github/workflows/java.yml
+/tmp/iris-zdev/actionlint .github/workflows/java.yml .github/workflows/java-release.yml
 ```
 
 ### Windows
