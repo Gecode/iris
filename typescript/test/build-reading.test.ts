@@ -84,6 +84,32 @@ test("numbers keep the type the data gave", () => {
   assert.deepEqual(built.read("1 2").get(row), [1, 2]);
 });
 
+test("parameters with handle defaults are scalars", () => {
+  const b = new SpecBuilder();
+  const n = b.read("n", int);
+  const x = b.read("x", num);
+  const w = b.read("w", word);
+  const limit = b.param("limit", n);
+  const number = b.param("number", x);
+  const label = b.param("label", w);
+  assert.equal(
+    b.source(),
+    "n: int\nx: num\nw: word\nparam limit = n\nparam number = x\nparam label = w\n",
+  );
+  assert.deepEqual([limit.depth, number.depth, label.depth], [0, 0, 0]);
+  const built = b.build();
+  const data = built.read("4 2.5 abc");
+  const value: number = data.get(limit);
+  assert.equal(value, 4);
+  assert.equal(data.get(number), 2.5);
+  assert.equal(data.get(label), "abc");
+  const params = { limit: "9", number: "7.25", label: "given" };
+  const given = built.read("4 2.5 abc", undefined, { params });
+  assert.equal(given.get(limit), 9);
+  assert.equal(given.get(number), 7.25);
+  assert.equal(given.get(label), "given");
+});
+
 test("integers read as bigints on request", () => {
   const b = new SpecBuilder();
   const big = b.read("big", int);

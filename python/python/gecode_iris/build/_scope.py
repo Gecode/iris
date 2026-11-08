@@ -122,6 +122,16 @@ def let_levels(value: Expr, depth: int) -> int | None:
     return None if value._open else 0
 
 
+def param_keeps_depth(default: Expr, depth: int) -> bool:
+    """Whether a ``param`` with ``default`` keeps the depth of a scope at
+    ``depth``. A caller's value is a scalar, so the handle keeps the scope's
+    depth when the default is a scalar there too: a scalar expression, or a
+    handle of depth 0 at the top level."""
+    if isinstance(default, Field):
+        return depth == 0 and default._levels == 0
+    return not default._open
+
+
 class Scope(Generic[N]):
     """An open block. ``N`` is ``None`` when its statements may not execute,
     and ``Required`` when they always do.
@@ -333,7 +343,7 @@ class _Statements(Scope[N]):
             required = self._required and not isinstance(target, Field)
             return DynField(name, self._state.id, None, required)
         expr = operand(default)
-        scalar = expr._tag != "dyn" and not expr._open
+        scalar = expr._tag != "dyn" and param_keeps_depth(expr, self._depth)
         default_ops = postfix(expr._node)
         return self._define(
             target,

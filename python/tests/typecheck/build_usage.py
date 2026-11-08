@@ -145,6 +145,8 @@ def definitions(data: iris.Data) -> None:
     label = b.let("label", "text")
     p = b.param("p")
     q = b.param("q", 3)
+    from_handle = b.param("from_handle", n)
+    from_array = b.param("from_array", a)
     loose = b.let(n, "now a string")
     b.set(total, ib.div(total, 2) + ib.rem(n, 3) - ib.pow(2, n))
     b.read(ib.discard(), ib.int_)
@@ -155,11 +157,15 @@ def definitions(data: iris.Data) -> None:
     assert_type(data[label], str)
     assert_type(data[p], iris.Value | None)
     assert_type(data[q], int)
+    assert_type(data[from_handle], int)
+    assert_type(data[from_array], iris.Value)
     assert_type(loose, ib.DynField)
 
     with b.repeat(n) as r:
         doubled = r.let("doubled", n * 2)
         same = r.let("same", doubled)
+        outer = r.param("outer", n)
+    assert_type(data[outer], iris.Value)
     assert_type(data[doubled], list[int])
     assert_type(data[same], iris.Value)
 

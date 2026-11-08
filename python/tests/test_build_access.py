@@ -66,6 +66,29 @@ def test_numbers_keep_the_type_the_data_gave() -> None:
     assert [type(v) for v in value] == [int, int]
 
 
+def test_parameters_with_handle_defaults_are_scalars() -> None:
+    b = ib.SpecBuilder()
+    n = b.read("n", ib.int_)
+    x = b.read("x", ib.num)
+    w = b.read("w", ib.word)
+    limit = b.param("limit", n)
+    number = b.param("number", x)
+    label = b.param("label", w)
+    assert b.source() == (
+        "n: int\nx: num\nw: word\nparam limit = n\nparam number = x\nparam label = w\n"
+    )
+    assert [handle._iris_key()[2] for handle in (limit, number, label)] == [0, 0, 0]
+    with b.repeat(n) as r:
+        outer = r.param("outer", n)
+        each = r.param("each", n + 1)
+    assert (outer._iris_key()[2], each._iris_key()[2]) == (None, 1)
+    spec = b.build()
+    data = spec.read(b"1 2.5 abc")
+    assert (data[limit], data[number], data[label], data[each]) == (1, 2.5, "abc", [2])
+    given = spec.read(b"1 2.5 abc", {"limit": "9", "number": "7.25", "label": "given"})
+    assert (given[limit], given[number], given[label]) == (9, 7.25, "given")
+
+
 def test_a_handle_of_another_spec_reports_what_went_wrong() -> None:
     data = read(lambda b: b.read("x", ib.int_), b"1")
     other = ib.SpecBuilder()

@@ -201,11 +201,15 @@ fn lines_and_patterns() {
         ("find \"x\"\n", &["b.find(\"x\");"]),
         (
             "line \"size {n:int} of {name:word}\"\n",
-            &["b.line(pattern(\"size {} of {}\", bind(n, int_), bind(name, word)));"],
+            &[
+                "auto e1 = pattern(\"size {} of {}\", iris::build::bind(n, int_),",
+                "                  iris::build::bind(name, word));",
+                "b.line(e1);",
+            ],
         ),
         (
             "line \"{x}\"\n",
-            &["b.line(pattern(\"{}\", bind(x, untyped)));"],
+            &["b.line(pattern(\"{}\", iris::build::bind(x, untyped)));"],
         ),
         (
             "n: int\nline \"{$n}\"\n",
@@ -214,8 +218,8 @@ fn lines_and_patterns() {
         (
             "line \"{x:int}{_}{_:int}{}{:int}...\"\n",
             &[
-                "auto e1 = pattern(\"{}{}{}{}{}{}\", bind(x, int_), discard, discard_as(int_),",
-                "                  blank, validate(int_), rest_of_line);",
+                "auto e1 = pattern(\"{}{}{}{}{}{}\", iris::build::bind(x, int_), discard,",
+                "                  discard_as(int_), blank, validate(int_), rest_of_line);",
                 "b.line(e1);",
             ],
         ),

@@ -159,6 +159,71 @@ class ReadingTest {
             .asString());
   }
 
+  @Test
+  void parametersWithHandleDefaultsAreScalars() {
+    var n = int0("n");
+    var x = num0("x");
+    var w = string0("w");
+    var limit = int0("limit");
+    var number = num0("number");
+    var label = string0("label");
+    var each = int1("each");
+    Builder builder =
+        PrintingTest.prints(
+            """
+            n: int
+            x: num
+            w: word
+            param limit = n
+            param number = x
+            param label = w
+            repeat n {
+              param each = n + 1
+            }
+            """,
+            () -> {
+              read(n, intType());
+              read(x, numType());
+              read(w, word());
+              param(limit, n);
+              param(number, x);
+              param(label, w);
+              repeat(n, () -> param(each, n.plus(1)));
+            });
+    Spec spec = builder.build();
+    Data data = spec.read("1 2.5 abc");
+    long value = data.get(limit);
+    assertEquals(1L, value);
+    assertEquals(2.5, data.get(number));
+    assertEquals("abc", data.get(label));
+    assertArrayEquals(new long[] {2}, data.get(each));
+    Data given =
+        spec.read(
+            "1 2.5 abc",
+            "input",
+            dev.gecode.iris.Params.of(
+                java.util.Map.of("limit", "9", "number", "7.25", "label", "given")));
+    assertEquals(9L, given.get(limit));
+    assertEquals(7.25, given.get(number));
+    assertEquals("given", given.get(label));
+  }
+
+  @Test
+  void aParameterInARepeatWithAHandleDefaultIsOpen() {
+    var n = int0("n");
+    var outer = int1("outer");
+    var failure =
+        assertThrows(
+            BuildException.class,
+            () ->
+                spec(() -> {
+                  read(n, intType());
+                  repeat(n, () -> param(outer, n));
+                }));
+    assertTrue(
+        String.valueOf(failure.getMessage()).contains("an unknown depth"), failure.getMessage());
+  }
+
   private static Value requireValue(@Nullable Value value) {
     return java.util.Objects.requireNonNull(value);
   }

@@ -12,7 +12,8 @@ use std::rc::Rc;
 use crate::check::check_bindings;
 use crate::error::{BuildError, IssueKind};
 use crate::expr::{
-    LetDepth, Name, Operand, SameDepth, ValueTag, ValueType, let_levels, scalar_levels,
+    LetDepth, Name, Operand, ParamDepth, ParamShape, SameDepth, ValueTag, ValueType, let_levels,
+    param_levels,
 };
 use crate::field::{BuilderId, DynField, Field, Forward, Shape};
 use crate::pattern::{CaptureType, Pattern};
@@ -169,14 +170,16 @@ impl<D: Depth, O: Presence> Scope<D, O> {
         })
     }
 
-    /// `param p = default`.
+    /// `param p = default`. A scalar default, including a handle of depth 0
+    /// outside every repeat, keeps the scope's depth; any other default gives
+    /// [`DynDepth`], since a caller's value replaces it with a scalar.
     #[track_caller]
-    pub fn param_default<T: Target, E: Operand>(
+    pub fn param_default<T: Target, E: Operand<Shape: ParamShape>>(
         &mut self,
         target: T,
         default: E,
-    ) -> T::Out<E::Value, LetDepth<E, D>, O> {
-        let levels = scalar_levels::<E>();
+    ) -> T::Out<E::Value, ParamDepth<E, D>, O> {
+        let levels = param_levels::<E, D>();
         let default = Some(default.into_expr().ops);
         self.define(target, E::Value::TAG, levels, |definition| Stmt::Param {
             definition,

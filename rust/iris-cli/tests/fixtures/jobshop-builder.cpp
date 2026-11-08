@@ -18,9 +18,9 @@ SpecBuilder builder() {
   b.comment({"#", "+++"});
   b.instances([&](auto &s1) {
     s1.sections({.skip_other = true}, [&](auto &a2) {
-      a2.optional_arm(pattern("instance {}", bind(name, word)));
-      auto e1 = pattern("{} {}", bind(n_jobs, Range{.from = 1}),
-                        bind(n_machines, Range{.from = 1}));
+      a2.optional_arm(pattern("instance {}", iris::build::bind(name, word)));
+      auto e1 = pattern("{} {}", iris::build::bind(n_jobs, Range{.from = 1}),
+                        iris::build::bind(n_machines, Range{.from = 1}));
       a2.arm(e1, {.last = true}, [&](auto &s3) {
         s3.check(n_jobs <= (host::int_max - 2) / 2 / n_machines,
                  "there are too many jobs and machines");

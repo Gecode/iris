@@ -548,7 +548,8 @@ using-declarations goes inside a function or namespace: at global scope it
 collides with the global declaration it is meant to hide.
 `<windows.h>` defines `min` and `max` as macros, which break every
 call of `min` and `max` unless `NOMINMAX` is defined first.
-Generated builders write `iris::build::pow`. `host::int_max` prints `gecode.int_max`;
+Generated builders write `iris::build::pow` and `iris::build::bind`.
+`host::int_max` prints `gecode.int_max`;
 the public headers never name Gecode. A host constant is an integer operand;
 `lit(host::int_max)` makes it an `Expr<std::int64_t>`, and
 `host::int_max.dynamic()` an `Expr<Dynamic>` that can be indexed or iterated,

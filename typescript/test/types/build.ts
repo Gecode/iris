@@ -117,6 +117,25 @@ export function handleTypes(): void {
   same<typeof param, Field<"dyn", null, "required">>(true);
   const withDefault = b.param("q", 3);
   same<typeof withDefault, Field<"int", 0, "required">>(true);
+  // A param keeps the scope's depth when its default is a scalar there,
+  // including a handle of depth 0 at the top level, since a caller's value is
+  // a scalar too.
+  const fromHandle = b.param("pn", n);
+  same<typeof fromHandle, Field<"int", 0, "required">>(true);
+  const fromString = b.param("pw", list.at(0));
+  same<typeof fromString, Field<"string", null, "required">>(true);
+  const fromNum = b.param("pu", b.read("u", num));
+  same<typeof fromNum, Field<"num", 0, "required">>(true);
+  const fromGrid = b.param("pgrid", grid);
+  same<typeof fromGrid, Field<"float", null, "required">>(true);
+  const fromLoose = b.param("ploose", n.dynamic());
+  same<typeof fromLoose, Field<"dyn", null, "required">>(true);
+  const inRepeat = b.repeat(n, (r) => {
+    const outer = r.param("rn", n);
+    same<typeof outer, Field<"int", null, "required">>(true);
+    return r.param("rs", n.plus(1));
+  });
+  same<typeof inRepeat, Field<"int", 1, "required">>(true);
 
   const later = b.forward("later");
   same<typeof later, DynField>(true);

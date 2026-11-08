@@ -63,6 +63,18 @@ pub trait ExprShape {
     type Depth<D: Depth>: Depth;
 }
 
+/// The depth a `param` keeps from a default of this shape whose own depth in
+/// the scope is `In`: the scope's depth when the default is a scalar there,
+/// and [`DynDepth`] otherwise. It is a trait of its own, apart from
+/// [`ExprShape`], so that no implementation of that trait needs it; [`Scalar`]
+/// and [`Open`] implement both, and code generic over an [`Operand`] that
+/// calls [`Scope::param_default`](crate::Scope::param_default) names it as a
+/// bound on the operand's shape.
+pub trait ParamShape: ExprShape {
+    /// The depth of the parameter's handle.
+    type ParamDepth<In: Depth>: Depth;
+}
+
 /// A literal, operator result, call, or comprehension.
 #[derive(Debug, Clone, Copy)]
 pub enum Scalar {}
@@ -75,6 +87,16 @@ impl ExprShape for Scalar {
 }
 impl ExprShape for Open {
     type Depth<D: Depth> = DynDepth;
+}
+
+impl ParamShape for Scalar {
+    type ParamDepth<In: Depth> = In;
+}
+/// A bare handle has its own depth only outside every repeat, so `In` is a
+/// scalar exactly when it is [`D0`]; `In::Lookup<D0>` is `D0` for `D0` and
+/// [`DynDepth`] for every other depth. An index or field has [`DynDepth`].
+impl ParamShape for Open {
+    type ParamDepth<In: Depth> = In::Lookup<D0>;
 }
 
 /// Value types that `+ - * / % ^`, `!`, `&` and `|` accept.
@@ -267,6 +289,22 @@ pub type LetDepth<E, D> = <<E as Operand>::Value as ValueType>::LetDepth<<E as O
 /// The array levels of `E`'s value when its type says it is a scalar.
 pub(crate) fn scalar_levels<E: Operand>() -> Option<usize> {
     <LetDepth<E, D0> as Depth>::LEVELS
+}
+
+/// The depth of a handle that `param` defines with a default of `E` in a scope
+/// at depth `D`. A caller's value is a scalar, so the handle keeps the scope's
+/// depth when the default is a scalar there too: a scalar expression, or a
+/// handle of depth 0 outside every repeat. Any other default, and any dynamic
+/// one, gives [`DynDepth`].
+pub type ParamDepth<E, D> = <<E as Operand>::Value as ValueType>::LetDepth<
+    Scalar,
+    <<E as Operand>::Shape as ParamShape>::ParamDepth<<E as Operand>::DepthIn<D>>,
+>;
+
+/// The array levels a `param` with a default of `E` adds in a scope at depth
+/// `D`: none when its depth is known, since a caller's value is a scalar.
+pub(crate) fn param_levels<E: Operand<Shape: ParamShape>, D: Depth>() -> Option<usize> {
+    <ParamDepth<E, D> as Depth>::LEVELS.map(|_| 0)
 }
 
 /// The array levels a `let` of `value` adds in a scope at depth `D`, when `E`'s

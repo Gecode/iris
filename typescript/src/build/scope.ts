@@ -103,9 +103,24 @@ export type Kept<E, HD extends HandleDepth, D extends HandleDepth> = null extend
       ? never
       : E;
 
-/** The depth of `param p = default`: a scalar's, or open for a lookup. */
+/**
+ * The depth of `param p = default` in a scope at depth `D`. A caller's value
+ * is a scalar, so the handle keeps the scope's depth when the default is a
+ * scalar there too: a scalar expression, or a handle of depth 0 at the top
+ * level. Any other lookup, and any dynamic default, gives an open depth.
+ */
 export type ParamDepth<E, D extends HandleDepth> =
-  E extends Expr<"dyn"> ? null : E extends Lookup ? null : D;
+  E extends Expr<"dyn">
+    ? null
+    : E extends Field<ValueTag, infer FD>
+      ? D extends 0
+        ? [FD] extends [0]
+          ? 0
+          : null
+        : null
+      : E extends Lookup
+        ? null
+        : D;
 
 /** The scope of a block at depth `D` with presence `P`. */
 export type In<D extends HandleDepth, P extends Presence> = D extends 0
@@ -342,7 +357,7 @@ export class Scope<D extends HandleDepth = 0, P extends Presence = "required"> {
       return createField(name, core.state.id, "dyn", null, required ? "required" : "maybe");
     }
     const expr = operand(rest[0]);
-    const scalar = expr.valueType !== "dyn" && !isOpen(expr);
+    const scalar = expr.valueType !== "dyn" && paramKeepsDepth(expr, core.depth);
     const ops = postfix(treeOf(expr));
     return define(
       core,
@@ -1091,6 +1106,18 @@ function letLevels(value: Expr, depth: number): number | null {
     return depth === 0 ? value.depth : null;
   }
   return isOpen(value) ? null : 0;
+}
+
+/**
+ * Whether a `param` with the default `value` keeps the depth of a scope at
+ * `depth`: a scalar expression does, and so does a handle of depth 0 at the
+ * top level.
+ */
+function paramKeepsDepth(value: Expr, depth: number): boolean {
+  if (value instanceof Field) {
+    return depth === 0 && value.depth === 0;
+  }
+  return !isOpen(value);
 }
 
 /** Resolves a definition's target: `null` for the discard. */

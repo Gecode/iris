@@ -1,7 +1,7 @@
 //! Typed access through handles: empty arrays, absence, and the errors a
 //! handle declared by hand can still meet.
 use gecode_iris_build::{
-    D1, D2, Field, Float, Int, Maybe, Num, Numbers, SpecBuilder, Str, float, int, num, word,
+    D1, D2, Field, Float, Int, Maybe, Num, Number, Numbers, SpecBuilder, Str, float, int, num, word,
 };
 use gecode_iris_core::{AccessError, Data, Params};
 
@@ -120,4 +120,33 @@ fn get_panics_with_a_pointer_to_try_get() {
     let data = read(|_| {}, b"");
     const MISSING: Field<Int> = Field::declared("missing");
     let _ = data.get(MISSING);
+}
+
+#[test]
+fn parameters_with_handle_defaults_are_scalars() {
+    let mut b = SpecBuilder::unnamed();
+    let n = b.read("n", int());
+    let x = b.read("x", num());
+    let w = b.read("w", word());
+    let limit: Field<Int> = b.param_default("limit", n);
+    let number: Field<Num> = b.param_default("number", x);
+    let label: Field<Str> = b.param_default("label", w);
+    assert_eq!(
+        b.source().unwrap(),
+        "n: int\nx: num\nw: word\nparam limit = n\nparam number = x\nparam label = w\n"
+    );
+    let spec = b.build().unwrap();
+    let data = spec.read(b"4 2.5 abc", "input", &Params::new()).unwrap();
+    let value: i64 = data.get(limit);
+    assert_eq!(value, 4);
+    assert_eq!(data.get(number), Number::Float(2.5));
+    assert_eq!(data.get(label), "abc");
+    let mut params = Params::new();
+    params.set(limit, 9);
+    params.set(number, 7.25);
+    params.set(label, "given");
+    let data = spec.read(b"4 2.5 abc", "input", &params).unwrap();
+    assert_eq!(data.get(limit), 9);
+    assert_eq!(data.get(number), Number::Float(7.25));
+    assert_eq!(data.get(label), "given");
 }

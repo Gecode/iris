@@ -774,7 +774,9 @@ public final class Iris {
   }
 
   /**
-   * {@code param p = default}.
+   * {@code param p = default}. A caller's value is a scalar, so the parameter is a scalar in its
+   * block when the default is one there: a scalar expression, or a handle of depth 0 at the top
+   * level. Any other default gives an open depth, which only {@code dynamic(name)} accepts.
    *
    * @param target the handle of the parameter
    * @param defaultValue the value when the caller gives none
@@ -786,7 +788,7 @@ public final class Iris {
     State state = block.state();
     String name = target(state, target, site);
     Tag tag = Exprs.tag(defaultValue);
-    boolean scalar = tag != Tag.DYN && !Exprs.open(defaultValue);
+    boolean scalar = tag != Tag.DYN && Exprs.paramKeepsDepth(defaultValue, block.depth());
     push(
         block,
         new Stmt.Param(new Stmt.Definition(name, tag, scalar ? 0 : null), ops(defaultValue)),

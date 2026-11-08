@@ -204,7 +204,8 @@ impl Renderer<'_> {
                     Some(ty) => self.reading(ty),
                     None => atom("untyped"),
                 };
-                self.part("bind", vec![handle, ty])
+                // `bind` alone may also find the socket function `::bind`.
+                self.part("iris::build::bind", vec![handle, ty])
             }
             Piece::Reference(name) => {
                 let handle = self.handle(*name);

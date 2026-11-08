@@ -78,8 +78,9 @@ mod types;
 pub use error::{BuildError, BuildErrorKind};
 pub use expr::{
     Args, Bound, Definable, Domain, Equatable, Expr, ExprShape, Host, Integral, LetDepth, Literal,
-    Numeric, Open, Operand, Over, RecordExpr, RecordList, SameDepth, Scalar, ValueType, all, any,
-    count, count_over, defined, distinct, gecode, lit, max, min, over, size, sum, sum_over,
+    Numeric, Open, Operand, Over, ParamDepth, ParamShape, RecordExpr, RecordList, SameDepth,
+    Scalar, ValueType, all, any, count, count_over, defined, distinct, gecode, lit, max, min, over,
+    size, sum, sum_over,
 };
 pub use field::{DynField, Field, Forward};
 pub use gecode_iris_core::handle::{

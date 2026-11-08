@@ -96,6 +96,18 @@ final class Exprs {
     return open(value) ? null : 0;
   }
 
+  /**
+   * Whether a {@code param} with the default {@code value} keeps the depth of a block at {@code
+   * depth}: a scalar expression does, and so does a handle of depth 0 at the top level.
+   */
+  static boolean paramKeepsDepth(Expr value, int depth) {
+    if (value instanceof Field<?> field) {
+      Integer levels = handle(field).levels();
+      return depth == 0 && levels != null && levels == 0;
+    }
+    return !open(value);
+  }
+
   static IntExpr intExpr(Node node) {
     return new IntImpl(node, false);
   }

@@ -375,6 +375,61 @@ class BuilderTest {
         assertEquals(2.5, data[handles.first]?.asDouble())
         assertNull(data.find("if"))
     }
+
+    @Test
+    fun parametersWithHandleDefaultsAreScalars() {
+        data class Params(
+            val limit: IntField<Long>,
+            val number: NumField<Number>,
+            val label: StringField<String>,
+            val each: IntField<LongArray>,
+        )
+        val built = irisBuilder {
+            val n = read("n", int())
+            val x = read("x", num())
+            val w = read("w", word())
+            Params(
+                param("limit", n),
+                param("number", x),
+                param("label", w),
+                repeat(n) { param("each", n + 1) },
+            )
+        }
+        assertEquals(
+            """
+            n: int
+            x: num
+            w: word
+            param limit = n
+            param number = x
+            param label = w
+            repeat n {
+              param each = n + 1
+            }
+
+            """
+                .trimIndent(),
+            built.source(),
+        )
+        val (spec, handles) = built.build()
+        val data = spec.read("1 2.5 abc")
+        val limit: Long = data[handles.limit]
+        assertEquals(1L, limit)
+        assertEquals(2.5, data[handles.number])
+        assertEquals("abc", data[handles.label])
+        assertArrayEquals(longArrayOf(2), data[handles.each])
+        val given =
+            spec.read(
+                "1 2.5 abc",
+                "input",
+                dev.gecode.iris.Params.of(
+                    mapOf("limit" to "9", "number" to "7.25", "label" to "given")
+                ),
+            )
+        assertEquals(9L, given[handles.limit])
+        assertEquals(7.25, given[handles.number])
+        assertEquals("given", given[handles.label])
+    }
 }
 
 /** What [BuilderTest.everyBlockPrintsItsStatement] prints. */
