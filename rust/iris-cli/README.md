@@ -240,7 +240,9 @@ lowercase, like their entries, so any import of one has a cost: after
 `use jobshop::*`, `use jobshop::n_jobs` or the third form above, a `let n_jobs = 3;`
 in that scope declares no variable. It becomes a pattern that matches the
 constant, and normally fails to compile with a type mismatch. A `match` arm of
-that name changes the same way. Each handle holds the entry's real name as a
+that name changes the same way. Each constant carries its own
+`#[allow(dead_code, non_upper_case_globals)]`, since an inner attribute of the
+file would be an error in the second and third forms. Each handle holds the entry's real name as a
 string; its identifier follows the rules of the builder program, so `fn` becomes
 `fn_2`.
 
