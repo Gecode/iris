@@ -12,13 +12,13 @@ is disabled until milestone M7, as for the other workspace crates.
 
 The crate-level example parses a reader spec, reads input, and accesses an
 integer scalar and a borrowed integer row. The `iris!` examples check a spec
-at compile time and read with it. From `rust/`:
+at compile time and read through its typed handles. From `rust/`:
 
 ```sh
 cargo test --locked -p gecode-iris --doc
 ```
 
-The `iris!` compile-fail and corpus tests are described in the
+The `iris!` compile-fail, handle and corpus tests are described in the
 [gecode-iris-macros README](../iris-macros/README.md). The builder's tests here are
 `build_jobshop`, `build_corpus` and `build_types`; see the
 [gecode-iris-build README](../iris-build/README.md).

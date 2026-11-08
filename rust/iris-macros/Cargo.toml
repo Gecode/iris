@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "Compile-time checking for the gecode-iris iris! macro"
+description = "Compile-time checking and typed handles for the gecode-iris iris! macro"
 repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
@@ -21,6 +21,7 @@ workspace = true
 [dependencies]
 gecode-iris-syntax = { version = "0.1.0", path = "../iris-syntax" }
 gecode-iris-sema = { version = "0.1.0", path = "../iris-sema" }
+gecode-iris-gen = { version = "0.1.0", path = "../iris-gen" }
 proc-macro2 = "1.0"
 quote = "1.0"
 syn = { version = "3", default-features = false, features = ["full", "parsing", "printing", "proc-macro"] }

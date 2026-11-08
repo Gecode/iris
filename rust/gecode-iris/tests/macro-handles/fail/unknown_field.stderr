@@ -1,0 +1,11 @@
+error[E0609]: no field `c` on type `TypedSpec`
+ --> tests/macro-handles/fail/unknown_field.rs:5:18
+  |
+5 |     let _ = pair.c;
+  |                  ^ unknown field
+  |
+help: a field with a similar name exists
+  |
+5 -     let _ = pair.c;
+5 +     let _ = pair.a;
+  |

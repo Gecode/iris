@@ -1,7 +1,8 @@
 //! Compiles every valid reader spec in the conformance cases and the format
-//! library through both forms of `iris!`, then runs the program. It checks
-//! that each expansion reads every case of its spec exactly as `Spec::parse`
-//! reads it.
+//! library through both forms of `iris!`, then runs the program. Each
+//! expansion declares the spec's typed handles, so every one of them compiles,
+//! and the program checks that each expansion's `spec` reads every case of its
+//! spec exactly as `Spec::parse` reads it.
 use gecode_iris::Spec;
 use gecode_iris_conformance::case::{self, Case, Operation};
 use std::{
@@ -182,7 +183,7 @@ fn corpus_program(specs: &BTreeMap<PathBuf, Vec<&Case>>) -> String {
 
 /// The one expression that turns an `iris!` expansion into a `Spec`.
 fn macro_spec(argument: &str) -> String {
-    format!("gecode_iris::iris!({argument})")
+    format!("gecode_iris::iris!({argument}).spec")
 }
 
 /// A Rust literal whose value is `text`: raw with the fewest hashes, or

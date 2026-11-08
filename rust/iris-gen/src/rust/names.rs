@@ -21,6 +21,10 @@ const KEYWORDS: &[&str] = &[
     "unsafe", "unsized", "use", "virtual", "where", "while", "yield",
 ];
 
+/// Names that a handle cannot have. The `iris!` macro of `gecode-iris` puts the
+/// handles beside a `spec` field, and `iris gen` names them the same way.
+const HANDLE_NAMES: &[&str] = &["spec"];
+
 /// Names that a builder program uses or that its local variables cannot have.
 const PROGRAM_NAMES: &[&str] = &[
     // The generated program's own names.
@@ -122,7 +126,8 @@ pub(super) struct Identifiers {
     /// `taken`, so a suffix it rejected once stays rejected.
     next_suffixes: HashMap<String, usize>,
     assigned: HashMap<(Role, String), String>,
-    /// Whether only keywords are off limits, since no program surrounds the names.
+    /// Whether only keywords and [`HANDLE_NAMES`] are off limits, since no
+    /// program surrounds the names.
     handles_only: bool,
     /// How many candidates `unused` has rejected.
     #[cfg(test)]
@@ -140,7 +145,11 @@ impl Identifiers {
 
     fn reserved(&self, name: &str) -> bool {
         KEYWORDS.contains(&name)
-            || (!self.handles_only && (PROGRAM_NAMES.contains(&name) || is_temporary(name)))
+            || if self.handles_only {
+                HANDLE_NAMES.contains(&name)
+            } else {
+                PROGRAM_NAMES.contains(&name) || is_temporary(name)
+            }
     }
 
     /// The identifier of `name`, the same one each time.

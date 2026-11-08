@@ -1,0 +1,7 @@
+error[E0308]: mismatched types
+ --> tests/macro-handles/fail/wrong_value_type.rs:6:19
+  |
+6 |     let _: &str = data.get(pair.a);
+  |            ----   ^^^^^^^^^^^^^^^^ expected `&str`, found `i64`
+  |            |
+  |            expected due to this

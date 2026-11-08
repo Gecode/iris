@@ -108,9 +108,9 @@ gecode-iris-syntax       lexer, lossless CST (rowan), error-tolerant parser, for
 gecode-iris-sema         name resolution, scopes, record names, types and shapes,
      │                   diagnostics with codes
      ├── iris-lint       lints and their fixes, if built (§8.13)
-     ├── gecode-iris-macros  the `iris!` proc macro, used through gecode-iris
      ├── gecode-iris-gen     generates spec builder programs and typed views
-     │                       from reader specs
+     │   │                   from reader specs
+     │   └── gecode-iris-macros  the `iris!` proc macro, used through gecode-iris
      │
 gecode-iris-core         reader, expression evaluator, data model, work budgets,
      │                   JSON and dzn output
@@ -124,8 +124,9 @@ gecode-iris-core         reader, expression evaluator, data model, work budgets,
 
 `iris-lint` depends on `gecode-iris-sema` only, so the reader and the Python
 binding do not carry it. The CLI, the LSP, and the WASM crate use it.
-`gecode-iris-macros` depends on `gecode-iris-syntax` and `gecode-iris-sema`, never on
-`gecode-iris-core`: it checks a spec at compile time, and the code it expands to
+`gecode-iris-macros` depends on `gecode-iris-syntax`, `gecode-iris-sema` and
+`gecode-iris-gen`, never on `gecode-iris-core`: it checks a spec at compile time,
+takes its typed handles from the view generator, and the code it expands to
 calls the reader through `gecode-iris`. `gecode-iris-build` depends on `gecode-iris-core`
 and `gecode-iris-macros`, for `pattern!`, and `gecode-iris` re-exports it as
 `gecode_iris::build`. `gecode-iris-gen` depends on `gecode-iris-syntax` and `gecode-iris-sema` only:
@@ -387,9 +388,9 @@ reported upstream. Gecode itself needs no changes.
   `gecode-iris-macros` that `gecode-iris` re-exports. It parses and checks an
   embedded spec at compile time with `gecode-iris-syntax` and `gecode-iris-sema`, turns
   their diagnostics into compile errors pointing into the spec text, and
-  expands to a ready `Spec`. It depends on `proc-macro2`, `quote` and
-  `syn`; small dependencies like these are acceptable throughout the Rust
-  crates.
+  expands to a ready `Spec` with its typed handles. It depends on
+  `proc-macro2`, `quote` and `syn`; small dependencies like these are
+  acceptable throughout the Rust crates.
   - Input: `iris!("...")`, usually a raw literal, so that Rust's tokenizer
     never sees Iris syntax such as `#` comments or `..<`; or
     `iris!(file = "PATH")`, with PATH relative to the calling package's
@@ -398,9 +399,17 @@ reported upstream. Gecode itself needs no changes.
     rebuilds the caller. Anything else, including macro calls such as
     `concat!`, is a usage error.
   - Origin: `iris!` for an inline spec, the path as written for a file.
-  - Expansion: `Spec::parse` on the same bytes and origin, so the spec is
-    parsed again at run time. A cheaper expansion would need `gecode-iris-core`
-    types, or a serialized form of them, in the macro.
+  - Expansion: a value of a struct that the expansion declares, with a
+    `spec` field and one field per typed handle (decided 2026-11-03).
+    `spec` is `Spec::parse` on the same bytes and origin, so the spec is
+    parsed again at run time. A cheaper expansion would need
+    `gecode-iris-core` types, or a serialized form of them, in the macro.
+    The handle fields are what `iris gen --lang rust` prints for the
+    spec, from `gecode-iris-gen`: the same names, types and depths. No
+    handle is named `spec`, in either, so an entry `spec` is the field
+    `spec_2`. Code outside the expansion cannot name the struct; it keeps
+    `spec` and copies the handles it needs. The released 0.1.0 expanded to a
+    plain `Spec`, so this is a breaking change for the pre-1.0 crates.
   - Diagnostics: the error code, then exactly what `iris check` prints.
     Stable Rust can only mark the whole literal or file path; on nightly the
     macro marks the error's position inside the literal.

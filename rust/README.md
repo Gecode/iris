@@ -19,18 +19,20 @@ dependency on implementation crates.
 with parse and resolution diagnostics (milestone M4b).
 
 [gecode-iris](gecode-iris/README.md) re-exports the public `gecode-iris-core` API and
-provides the `iris!` macro, which checks a reader spec at compile time. Its
-package name is `gecode-iris`; Rust imports it as `gecode_iris`. The macro's
-implementation crate, [gecode-iris-macros](iris-macros/README.md), depends on
-`gecode-iris-syntax` and `gecode-iris-sema` but not on `gecode-iris-core`.
+provides the `iris!` macro, which checks a reader spec at compile time and
+gives its typed handles. Its package name is `gecode-iris`; Rust imports it as
+`gecode_iris`. The macro's implementation crate,
+[gecode-iris-macros](iris-macros/README.md), depends on `gecode-iris-syntax`,
+`gecode-iris-sema` and `gecode-iris-gen` but not on `gecode-iris-core`.
 [gecode-iris-build](iris-build/README.md), re-exported as `gecode_iris::build`, builds
 reader specs in Rust with typed handles.
-[gecode-iris-gen](iris-gen/README.md) prints a builder program for a reader spec, which
-`iris gen builder` exposes; it depends on `gecode-iris-syntax` and `gecode-iris-sema` only.
+[gecode-iris-gen](iris-gen/README.md) prints a builder program or typed handles for a
+reader spec, which `iris gen builder` and `iris gen` expose; it depends on
+`gecode-iris-syntax` and `gecode-iris-sema` only.
 The ten `gecode-iris` crates are on crates.io, and
 [RELEASING.md](../RELEASING.md#rust) holds the publication procedure. The order is
-`gecode-iris-syntax`, `gecode-iris-sema`, `gecode-iris-core`, `gecode-iris-macros`,
-`gecode-iris-build`, `gecode-iris-gen`, `gecode-iris`, `gecode-iris-conformance`,
+`gecode-iris-syntax`, `gecode-iris-sema`, `gecode-iris-core`, `gecode-iris-gen`,
+`gecode-iris-macros`, `gecode-iris-build`, `gecode-iris`, `gecode-iris-conformance`,
 `gecode-iris-lsp`, then `gecode-iris-cli`. The standalone `gecode-iris-conformance`
 runner can be published at any point before `gecode-iris-cli`; it has no
 implementation dependencies. Each crate's `LICENSE` is a symbolic link to the
@@ -72,14 +74,16 @@ cargo test --locked -p gecode-iris-cli --test complete
 ```
 
 The `iris!` macro has its own checks. `macro_errors` compares compile errors
-with trybuild snapshots (bless with `TRYBUILD=overwrite`); `macro_corpus`
-compiles every valid conformance and format spec through the macro and
-compares its reads with `Spec::parse`. It takes about two minutes, mostly
-reading the work-budget cases in a debug build:
+with trybuild snapshots, and `macro_handles` checks typed reads through the
+handle fields and compile errors for misused ones (bless both with
+`TRYBUILD=overwrite`); `macro_corpus` compiles every valid conformance and
+format spec through the macro and compares its reads with `Spec::parse`. It
+takes about two minutes, mostly reading the work-budget cases in a debug
+build:
 
 ```sh
 cargo test --locked -p gecode-iris-macros
-cargo test --locked -p gecode-iris --test macro_errors
+cargo test --locked -p gecode-iris --test macro_errors --test macro_handles
 cargo test --locked -p gecode-iris --test macro_corpus -- --nocapture
 cargo test --locked -p gecode-iris-build
 cargo test --locked -p gecode-iris --test build_jobshop --test build_corpus --test build_types

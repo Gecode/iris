@@ -7,7 +7,8 @@
 //!
 //! [`view`](view::view) turns a checked spec into a language-independent
 //! [`View`](view::View) of typed handles, and [`view_code`] prints it for a
-//! language whose [`Language::has_view`] is true.
+//! language whose [`Language::has_view`] is true. [`rust_view`] gives the Rust
+//! declarations that `view_code` prints as data, for the `iris!` macro.
 mod cpp;
 mod java;
 mod kotlin;
@@ -26,6 +27,7 @@ use gecode_iris_syntax::Parse;
 
 pub use lower::lower;
 use program::Program;
+pub use rust::view::{RustHandle, RustView};
 
 /// An implementation language with a builder backend.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -151,11 +153,17 @@ impl From<gecode_iris_sema::Error> for ViewError {
 /// [`ViewError::NoPrinter`].
 pub fn view_code(analysis: &Analysis, language: Language) -> Result<String, ViewError> {
     match language {
-        Language::Rust => Ok(rust::view::render(&view::view(analysis)?)),
+        Language::Rust => Ok(rust::view::render(&rust_view(analysis)?)),
         Language::Python
         | Language::Cpp
         | Language::Java
         | Language::Kotlin
         | Language::TypeScript => Err(ViewError::NoPrinter(language)),
     }
+}
+
+/// The handles that [`view_code`] prints for Rust, as data, or the first error
+/// that `iris check` reports.
+pub fn rust_view(analysis: &Analysis) -> Result<RustView, gecode_iris_sema::Error> {
+    Ok(RustView::new(&view::view(analysis)?))
 }

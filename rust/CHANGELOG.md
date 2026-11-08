@@ -2,7 +2,20 @@
 
 ## Unreleased
 
+### Breaking changes
+
+- `gecode_iris::iris!` now expands to a value with a `spec` field, the `Spec`,
+  and one field per typed handle: the handles that `iris gen --lang rust`
+  prints for the spec, with the same names, types and depths. An entry named
+  `spec` is the field `spec_2`. To migrate, replace `iris!(...)` with
+  `iris!(...).spec` where a `Spec` is needed, or read through the handles:
+  `data.get(value.n)` in place of `data.int("n")?`.
+
 ### Library
+
+- Add `gecode_iris_gen::rust_view`, `RustView` and `RustHandle`: the
+  declarations that `view_code` prints for Rust, as data. gecode-iris-macros
+  now depends on gecode-iris-gen, which is published before it.
 
 - Add `SemanticModel::output_entries` and `OutputEntry` to gecode-iris-sema: each
   output entry's depth, value type, possible absence and definitions.
@@ -45,7 +58,8 @@
 
 - Add `iris gen --lang rust SPEC`, which prints a module of declared handles of
   a text spec, of the types the spec builder returns. A name without one value
-  type and depth gets a `DynField`.
+  type and depth gets a `DynField`. No handle is named `spec`, the field of
+  `iris!` that holds the `Spec`, so an entry `spec` is `spec_2`.
 - Add `iris gen builder --lang python SPEC`, which prints a Python builder
   program. `iris gen --lang` accepts only languages with a view printer, and
   `iris gen --lang python` says that Python has no view generator yet.

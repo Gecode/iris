@@ -396,6 +396,7 @@ dependencies = [
 name = "gecode-iris-macros"
 version = "0.1.0"
 dependencies = [
+ "gecode-iris-gen",
  "gecode-iris-sema",
  "gecode-iris-syntax",
  "proc-macro2",

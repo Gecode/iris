@@ -38,7 +38,7 @@ Build and publication commands belong in the component guides below.
 
 Follow [rust/README.md](rust/README.md) for development checks, API stability,
 MSRV, and publication preparation. The dependency order is `gecode-iris-syntax`, `gecode-iris-sema`,
-`gecode-iris-core`, `gecode-iris-macros`, `gecode-iris-build`, `gecode-iris-gen`,
+`gecode-iris-core`, `gecode-iris-gen`, `gecode-iris-macros`, `gecode-iris-build`,
 `gecode-iris`, `gecode-iris-conformance`, `gecode-iris-lsp`, then `gecode-iris-cli`.
 The independent `gecode-iris-conformance` runner can go anywhere before `gecode-iris-cli`.
 The M5 browser crate `iris-wasm` stays unpublished and does not enter CLI

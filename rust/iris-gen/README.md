@@ -392,9 +392,17 @@ comment and each constant has its own `#[allow]`, because `include!` rejects inn
 attributes and inner doc comments. It maps a depth above 8 to
 `DynField`, because `gecode_iris::build` stops at `D8`; the `View` keeps the real
 depth for languages without that limit. Identifiers follow the builder's rules,
-but only keywords are reserved, since a view has no generated names beside its
-own. An identifier stops at 40 columns, which gives a declaration three layouts.
-A new language adds a printer, not a change to `View`.
+but only keywords and `spec` are reserved, since a view has no generated names
+beside its own: `spec` is the field of the `iris!` macro that holds the `Spec`,
+so an entry `spec` is `spec_2` in both. An identifier stops at 40 columns, which
+gives a declaration three layouts. A new language adds a printer, not a change
+to `View`.
+
+`rust_view` gives the Rust declarations as data, a `RustView` of the imports
+from `gecode_iris::build` and one `RustHandle` per entry, with its identifier,
+type text and entry name. The printer writes it, and the `iris!` macro of
+gecode-iris declares the same handles as struct fields, so the two cannot
+differ.
 
 From `rust/`:
 

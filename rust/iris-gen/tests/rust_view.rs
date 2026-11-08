@@ -1,6 +1,6 @@
 //! Which handle each kind of entry gets, and the Rust text of a view.
 use gecode_iris_gen::view::{Access, Handle, Leaf, View, view};
-use gecode_iris_gen::{Language, view_code};
+use gecode_iris_gen::{Language, RustView, rust_view, view_code};
 use gecode_iris_sema::{Analysis, analyze};
 use gecode_iris_syntax::{LanguageVersion, parse};
 use std::{fs, path::Path, process::Command};
@@ -155,6 +155,36 @@ fn names_of_a_builder_program_stay_as_they_are() {
     for name in ["a", "b", "s", "int", "e1"] {
         assert!(text.contains(&format!("pub const {name}: ")), "{text}");
     }
+}
+
+#[test]
+fn spec_is_left_to_the_field_of_the_iris_macro() {
+    let text = code("spec:int spec_2:int");
+    assert!(text.contains("pub const spec_2: Field<Int> = Field::declared(\"spec\");"));
+    assert!(text.contains("pub const spec_2_2: Field<Int> = Field::declared(\"spec_2\");"));
+}
+
+#[test]
+fn the_rust_view_is_what_the_view_prints() {
+    let RustView { imports, handles } =
+        rust_view(&analysis("n:int if n {s:word} x:int x:word")).unwrap();
+    assert_eq!(imports, ["D0", "DynField", "Field", "Int", "Maybe", "Str"]);
+    let declared: Vec<_> = handles
+        .iter()
+        .map(|handle| (&*handle.identifier, &*handle.handle_type, &*handle.entry))
+        .collect();
+    assert_eq!(
+        declared,
+        [
+            ("n", "Field<Int>", "n"),
+            ("s", "Field<Str, D0, Maybe>", "s"),
+            ("x", "DynField", "x"),
+        ]
+    );
+    assert_eq!(
+        rust_view(&analysis("skip line\n")).unwrap(),
+        RustView::default()
+    );
 }
 
 /// Every set of imports long enough to reach the end of a line. Which types a

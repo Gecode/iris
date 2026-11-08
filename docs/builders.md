@@ -363,8 +363,8 @@ For brevity the sketches shorten the two long check messages to `MSG_*`
 
 Builders suit specs assembled at run time. For a spec fixed at compile
 time, the `iris!` macro (PLAN.md §8.1) is the more natural route in Rust:
-it checks the spec when the program compiles. The macro is also planned to
-generate the same typed handles from the text, as described in
+it checks the spec when the program compiles and gives the same typed
+handles, generated from the text, as described in
 [Type safety for text specs](#type-safety-for-text-specs).
 
 `rust/gecode-iris/tests/build_jobshop.rs` compiles this program.
@@ -1058,9 +1058,19 @@ absence. That is enough to generate the same handles a builder returns:
   are all dynamic. A name is `Maybe` when it is not always in the output,
   as in the builder. `repeat 0 {if 0 {x:int}}` runs no definition of `x`, but
   every read publishes its empty column, so `x` is not `Maybe`.
-- **The `iris!` macro** (PLAN.md §8.1) expands to a plain `Spec` today.
-  It will instead expand to a value with a `spec` field and one field per
-  handle, generated at compile time, so that Rust needs no generated file.
+- **The `iris!` macro** (PLAN.md §8.1) expands to a value with a `spec`
+  field and one field per handle, the handles that `iris gen --lang rust`
+  prints, generated at compile time, so that Rust needs no generated file.
+  Neither form names a handle `spec`, so an entry `spec` is `spec_2`. The
+  value's struct is declared inside the expansion and has no name outside
+  it; code that keeps the parts stores `spec` and copies the handles.
+
+  ```rust
+  let jobshop = iris!(file = "formats/jobshop/jobshop.iris");
+  let data = jobshop.spec.read_path("jobshop1.txt", &params)?;
+  let jobs: i64 = data.get(jobshop.n_jobs);
+  let label: Option<&str> = data.get(jobshop.name);
+  ```
 - **In Java, an annotation processor** does the same at compile time.
   `@IrisSpec("jobshop.iris")` on a class generates its handle constants
   and a matching record.

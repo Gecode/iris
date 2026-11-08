@@ -6,8 +6,11 @@
 //!
 //! The macro checks a reader spec at compile time with `gecode-iris-syntax` and
 //! `gecode-iris-sema`, exactly as `iris check` does, and reports the first language
-//! error as a compile error. A valid spec expands to `Spec::parse` on the same
-//! bytes and origin. This crate never depends on `gecode-iris-core`.
+//! error as a compile error. A valid spec expands to a value with a `spec`
+//! field, `Spec::parse` on the same bytes and origin, and one field per typed
+//! handle, the declarations that `gecode-iris-gen` prints for `iris gen --lang
+//! rust`. This crate never depends on `gecode-iris-core`.
+use gecode_iris_gen::{RustView, rust_view};
 use gecode_iris_syntax::{LanguageVersion, ParseError};
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
@@ -18,10 +21,11 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
-/// Check a reader spec and expand to a `Spec`.
+/// Check a reader spec and expand to its `Spec` and typed handles.
 ///
 /// The input is `[CRATE_PATH] SOURCE`, where `CRATE_PATH` names the crate
-/// that provides `Spec` and `SOURCE` is a string literal or `file = "PATH"`.
+/// that provides `Spec` and `build`, and `SOURCE` is a string literal or
+/// `file = "PATH"`.
 #[proc_macro]
 pub fn iris(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     expand_invocation(input.into())
@@ -43,11 +47,12 @@ pub fn pattern(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 fn expand_invocation(input: TokenStream) -> syn::Result<TokenStream> {
     let invocation: Invocation = syn::parse2(input)?;
     let spec = load(&invocation.source)?;
-    check(&spec)?;
-    Ok(expand(&invocation.krate, &spec))
+    let view = checked_view(&spec)?;
+    Ok(expand(&invocation.krate, &spec, &view))
 }
 
-/// One macro call: the path of the crate that provides `Spec`, and the spec.
+/// One macro call: the path of the crate that provides `Spec` and `build`, and
+/// the spec.
 struct Invocation {
     krate: TokenStream,
     source: SpecSource,
@@ -157,8 +162,8 @@ fn load(source: &SpecSource) -> syn::Result<LoadedSpec<'_>> {
     }
 }
 
-/// Reject the spec with its first error, in the order `iris check` uses.
-fn check(spec: &LoadedSpec) -> syn::Result<()> {
+/// The spec's typed handles, or its first error in the order `iris check` uses.
+fn checked_view(spec: &LoadedSpec) -> syn::Result<RustView> {
     let parsed = match gecode_iris_syntax::parse(&spec.bytes, &spec.origin, LanguageVersion::V0_1) {
         Ok(parsed) => parsed,
         Err(ParseError::InvalidUtf8(diagnostic)) => {
@@ -171,10 +176,7 @@ fn check(spec: &LoadedSpec) -> syn::Result<()> {
             ));
         }
     };
-    match gecode_iris_sema::analyze(&parsed).first_error() {
-        Some(error) => Err(spec.language_error(error)),
-        None => Ok(()),
-    }
+    rust_view(&gecode_iris_sema::analyze(&parsed)).map_err(|error| spec.language_error(&error))
 }
 
 impl LoadedSpec<'_> {
@@ -221,15 +223,43 @@ fn token_range(token: &str, range: Range<usize>) -> Option<Range<usize>> {
     Some(start..end)
 }
 
-/// The spec as a run-time value. builders-005 extends this expansion with
-/// typed handles; keep it the only place that shapes the result.
-fn expand(krate: &TokenStream, spec: &LoadedSpec) -> TokenStream {
+/// The value of the macro: a struct declared in the expansion, with the spec in
+/// `spec` and one field per handle. The handle types name the imported items of
+/// `build` exactly as the view text does.
+fn expand(krate: &TokenStream, spec: &LoadedSpec, view: &RustView) -> TokenStream {
     let bytes = &spec.bytes_expr;
     let origin = &spec.origin;
+    let imports = view.imports.iter().map(|name| identifier(name));
+    let fields: Vec<Ident> = view
+        .handles
+        .iter()
+        .map(|handle| identifier(&handle.identifier))
+        .collect();
+    let types = view.handles.iter().map(|handle| {
+        syn::parse_str::<syn::Type>(&handle.handle_type)
+            .expect("the view generator prints Rust types")
+    });
+    let entries = view.handles.iter().map(|handle| &handle.entry);
+    let import = (!view.imports.is_empty()).then(|| quote!(use #krate::build::{#(#imports),*};));
     quote! {
-        #krate::Spec::parse(#bytes, #origin)
-            .expect("iris! checked this reader spec at compile time")
+        {
+            #import
+            struct TypedSpec {
+                pub spec: #krate::Spec,
+                #(pub #fields: #types,)*
+            }
+            TypedSpec {
+                spec: #krate::Spec::parse(#bytes, #origin)
+                    .expect("iris! checked this reader spec at compile time"),
+                #(#fields: Field::declared(#entries),)*
+            }
+        }
     }
+}
+
+/// An identifier that the view generator chose, which is never a keyword.
+fn identifier(name: &str) -> Ident {
+    Ident::new(name, Span::call_site())
 }
 
 #[cfg(test)]
@@ -362,4 +392,169 @@ fn expand_pattern(input: TokenStream) -> syn::Result<TokenStream> {
         ));
     }
     Ok(quote!(#krate::__private::Pattern::new() #(#calls)*))
+}
+
+/// The handle fields of an expansion against the declarations that `iris gen
+/// --lang rust` prints for the same spec.
+#[cfg(test)]
+mod handle_field_tests {
+    use super::expand_invocation;
+    use gecode_iris_gen::{Language, RustHandle, RustView, view_code};
+    use gecode_iris_syntax::LanguageVersion;
+    use quote::{ToTokens, quote};
+    use std::path::Path;
+
+    /// What the expansion of an inline `source` declares beside `spec`, with
+    /// each handle type as the text of its tokens.
+    fn expanded(source: &str) -> RustView {
+        let tokens = expand_invocation(quote!([::gecode_iris] #source)).unwrap();
+        let syn::Expr::Block(block) = syn::parse2(tokens).unwrap() else {
+            panic!("the expansion is a block");
+        };
+        let mut imports = Vec::new();
+        let mut fields = Vec::new();
+        let mut entries = Vec::new();
+        for statement in block.block.stmts {
+            match statement {
+                syn::Stmt::Item(syn::Item::Use(item)) => imports = imported(&item.tree),
+                syn::Stmt::Item(syn::Item::Struct(item)) => {
+                    fields = item.fields.into_iter().collect()
+                }
+                syn::Stmt::Expr(syn::Expr::Struct(value), None) => {
+                    entries = value.fields.into_iter().map(|field| field.expr).collect();
+                }
+                other => panic!("unexpected statement {}", other.to_token_stream()),
+            }
+        }
+        let spec = fields.remove(0);
+        assert_eq!(spec.ident.unwrap(), "spec");
+        assert_eq!(type_text(&spec.ty), ":: gecode_iris :: Spec");
+        entries.remove(0);
+        let handles = fields
+            .iter()
+            .zip(&entries)
+            .map(|(field, value)| RustHandle {
+                identifier: field
+                    .ident
+                    .as_ref()
+                    .expect("the fields are named")
+                    .to_string(),
+                handle_type: type_text(&field.ty),
+                entry: entry(value),
+            })
+            .collect();
+        RustView { imports, handles }
+    }
+
+    /// What `iris gen --lang rust` declares for `source`.
+    fn printed(source: &str) -> RustView {
+        let parsed =
+            gecode_iris_syntax::parse(source.as_bytes(), "x.iris", LanguageVersion::V0_1).unwrap();
+        declared_in(&view_code(&gecode_iris_sema::analyze(&parsed), Language::Rust).unwrap())
+    }
+
+    /// What a view module's `text` declares, as [`expanded`] gives it.
+    fn declared_in(text: &str) -> RustView {
+        let mut view = RustView::default();
+        for item in syn::parse_file(text).unwrap().items {
+            match item {
+                syn::Item::Use(item) => view.imports = imported(&item.tree),
+                syn::Item::Const(item) => view.handles.push(RustHandle {
+                    identifier: item.ident.to_string(),
+                    handle_type: type_text(&item.ty),
+                    entry: entry(&item.expr),
+                }),
+                other => panic!("unexpected item {}", other.to_token_stream()),
+            }
+        }
+        view
+    }
+
+    /// The names a `use` brings in from its last path segment.
+    fn imported(tree: &syn::UseTree) -> Vec<String> {
+        match tree {
+            syn::UseTree::Path(path) => imported(&path.tree),
+            syn::UseTree::Group(group) => group.items.iter().flat_map(imported).collect(),
+            syn::UseTree::Name(name) => vec![name.ident.to_string()],
+            other => panic!("unexpected import {}", other.to_token_stream()),
+        }
+    }
+
+    fn type_text(handle_type: &syn::Type) -> String {
+        handle_type.to_token_stream().to_string()
+    }
+
+    /// The entry of `Field::declared("entry")`.
+    fn entry(expr: &syn::Expr) -> String {
+        if let syn::Expr::Call(call) = expr
+            && call.func.to_token_stream().to_string() == "Field :: declared"
+            && let Some(syn::Expr::Lit(syn::ExprLit {
+                lit: syn::Lit::Str(entry),
+                ..
+            })) = call.args.first()
+        {
+            return entry.value();
+        }
+        panic!("not a declared handle: {}", expr.to_token_stream());
+    }
+
+    #[test]
+    fn the_fields_of_every_format_are_the_handles_iris_gen_prints() {
+        let formats = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../formats");
+        for name in [
+            "dimacs-cnf",
+            "jobshop",
+            "nonogram",
+            "sudoku",
+            "tsplib",
+            "tsptw",
+        ] {
+            let source =
+                std::fs::read_to_string(formats.join(name).join(format!("{name}.iris"))).unwrap();
+            let declarations = expanded(&source);
+            assert!(!declarations.handles.is_empty(), "{name}");
+            assert_eq!(declarations, printed(&source), "{name}");
+        }
+    }
+
+    /// `iris-cli/tests/fixtures/jobshop-view.rs` records what the `iris` binary
+    /// prints for jobshop, and the CLI's `gen` tests keep it current.
+    #[test]
+    fn the_fields_of_jobshop_are_the_recorded_iris_gen_output() {
+        let rust = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let read = |path: &str| std::fs::read_to_string(rust.join(path)).unwrap();
+        assert_eq!(
+            expanded(&read("../formats/jobshop/jobshop.iris")),
+            declared_in(&read("iris-cli/tests/fixtures/jobshop-view.rs"))
+        );
+    }
+
+    #[test]
+    fn open_shapes_and_unusual_names_match_iris_gen() {
+        let specs = [
+            "x:int let x=\"s\" y:int y:float z:word u:num",
+            "n:int param p a[1]:int param q=a repeat n {let r=a}",
+            "x:int if x {y:float} if x {m[1][1]:num}",
+            "fn:int self:int Self:int a_b:int aB:int spec:int spec_2:int crate:int \
+             repeat until \"END\" store _ {t:int}",
+            &("repeat 1 {".repeat(9) + "v:int w:int" + &"}".repeat(9)),
+            "skip line\n",
+        ];
+        for source in specs {
+            assert_eq!(expanded(source), printed(source), "{source}");
+        }
+    }
+
+    #[test]
+    fn an_entry_named_spec_leaves_the_field_to_the_spec() {
+        let handles = expanded("spec:int").handles;
+        assert_eq!(
+            handles,
+            [RustHandle {
+                identifier: "spec_2".into(),
+                handle_type: "Field < Int >".into(),
+                entry: "spec".into(),
+            }]
+        );
+    }
 }
