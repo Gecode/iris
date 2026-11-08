@@ -434,14 +434,14 @@ TypeName define_type(State &state, std::size_t block, std::string_view name,
 }
 
 std::size_t repeat(State &state, std::size_t block, RepeatKind kind,
-                   Ops &&count, std::vector<std::string> terminators,
+                   Ops &&times, std::vector<std::string> terminators,
                    const Target &store, Site site) {
   const std::size_t record = new_record(state);
   Stmt stmt = make(StmtKind::Repeat);
   stmt.repeat = kind;
   stmt.record = record;
   if (kind == RepeatKind::Times)
-    stmt.ops = std::move(count);
+    stmt.ops = std::move(times);
   stmt.strings = std::move(terminators);
   if (store.kind != Target::Kind::None)
     stmt.store = store_definition(state, store, site);

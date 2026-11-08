@@ -364,7 +364,7 @@ HandleName param(State &state, std::size_t block, const Target &target,
 TypeName define_type(State &state, std::size_t block, std::string_view name,
                      Declared &&declared, Site site);
 std::size_t repeat(State &state, std::size_t block, RepeatKind kind,
-                   Ops &&count, std::vector<std::string> terminators,
+                   Ops &&times, std::vector<std::string> terminators,
                    const Target &store, Site site);
 void sections(State &state, std::size_t block, std::vector<Clause> clauses,
               Site site);

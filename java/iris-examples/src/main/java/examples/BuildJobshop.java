@@ -12,7 +12,9 @@ import dev.gecode.iris.build.Gecode;
 import dev.gecode.iris.build.IntField;
 import dev.gecode.iris.build.RecordName;
 import dev.gecode.iris.build.StringField;
+import java.io.IOException;
 import java.lang.invoke.MethodHandles;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
@@ -83,7 +85,7 @@ public final class BuildJobshop {
 
   private BuildJobshop() {}
 
-  public static void main(String[] args) {
+  public static void main(String[] args) throws IOException {
     Path orLibrary = Path.of("formats/jobshop/cases/or-library/input.txt");
     Data data = spec.read(orLibrary, Params.of("instance", "handmade-or"));
     String shop = data.get(name);
@@ -106,9 +108,15 @@ public final class BuildJobshop {
         jsplib.nJobs(),
         Arrays.toString(jsplib.machine().get(0)));
 
-    Path invalid = Path.of("formats/jobshop/cases/duplicate-machine/input.txt");
+    // Errors name a path's input with the platform's separators, so this read
+    // names the input itself to print the same on every platform.
+    String invalid = "formats/jobshop/cases/duplicate-machine/input.txt";
     try {
-      var _ = spec.read(invalid, Params.of("instance", "handmade-invalid"));
+      var _ =
+          spec.read(
+              Files.readAllBytes(Path.of(invalid)),
+              invalid,
+              Params.of("instance", "handmade-invalid"));
     } catch (IrisException error) {
       System.out.printf(
           "%n%s at %s:%d:%d%n", error.code().code(), error.origin(), error.line(), error.column());

@@ -14,6 +14,7 @@ import dev.gecode.iris.kotlin.build.range
 import dev.gecode.iris.kotlin.build.recordName
 import dev.gecode.iris.kotlin.build.sum
 import dev.gecode.iris.kotlin.build.word
+import java.nio.file.Files
 import java.nio.file.Path
 
 private const val TWICE = "a job uses a machine twice; each job must use every machine once"
@@ -81,9 +82,15 @@ fun main() {
         )
     }
 
-    val invalid = Path.of("formats/jobshop/cases/duplicate-machine/input.txt")
+    // Errors name a path's input with the platform's separators, so this read
+    // names the input itself to print the same on every platform.
+    val invalid = "formats/jobshop/cases/duplicate-machine/input.txt"
     try {
-        spec.read(invalid, Params.of("instance", "handmade-invalid"))
+        spec.read(
+            Files.readAllBytes(Path.of(invalid)),
+            invalid,
+            Params.of("instance", "handmade-invalid"),
+        )
     } catch (error: IrisException) {
         println()
         println("${error.code().code()} at ${error.origin()}:${error.line()}:${error.column()}")

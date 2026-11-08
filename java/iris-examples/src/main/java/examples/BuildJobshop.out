@@ -7,4 +7,4 @@ unnamed: 3 jobs, first job on machines [0, 2, 1]
 
 E-CHECK-FAILED at formats/jobshop/cases/duplicate-machine/input.txt:3:1
 check failed for record 1 of 'jobs': a job uses a machine twice; each job must use every machine once
-call site: BuildJobshop.java:67
+call site: BuildJobshop.java:69

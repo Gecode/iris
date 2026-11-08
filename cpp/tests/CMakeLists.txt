@@ -80,9 +80,11 @@ add_test(NAME build-types COMMAND iris-build-types-test)
 # Programs the builder rejects at compile time. Each file compiles as it is,
 # and fails with IRIS_EXPECT_FAILURE defined, with a diagnostic that matches
 # its pattern: either test builds one object target in this build tree.
+# In a UTF-8 locale GCC quotes names with multibyte quotes, so a pattern
+# matches a quote with `.*`, never with a single `.`.
 set(iris_compile_failures
   "set_wrong_type|no matching.*set|C2672"
-  "operator_wrong_type|invalid operands|no match for .operator|C267[0-9]"
+  "operator_wrong_type|invalid operands|no match for .*operator|C267[0-9]"
   "get_wrong_type|conversion|cannot convert|C2440"
   "set_wrong_depth|no matching.*set|C2672"
   "param_wrong_type|no matching.*set|C2672"
@@ -175,6 +177,17 @@ if(iris_has_conformance)
   endforeach()
 endif()
 
+# A driver that answers with the spec of the format's builder in examples/
+# in place of the case's own, for the format-builders test below. It builds
+# without that test too, so that clang-tidy finds it in the compile database.
+add_executable(iris-format-builder-driver format_builder_driver.cpp
+  ../driver/driver.cpp ../driver/json.cpp)
+target_include_directories(iris-format-builder-driver PRIVATE
+  "${PROJECT_SOURCE_DIR}/driver" "${PROJECT_SOURCE_DIR}/examples")
+target_link_libraries(iris-format-builder-driver PRIVATE iris::iris)
+set_target_properties(iris-format-builder-driver PROPERTIES CXX_EXTENSIONS OFF)
+iris_set_warnings(iris-format-builder-driver)
+
 if(IRIS_CONFORMANCE_TESTS)
   find_program(IRIS_CARGO cargo)
   if(NOT IRIS_CARGO)
@@ -201,17 +214,7 @@ if(IRIS_CONFORMANCE_TESTS)
     set_tests_properties(${operation}-conformance PROPERTIES TIMEOUT ${timeout})
   endforeach()
 
-  # Every case of every format through the format's builder in examples/,
-  # answered by a driver that uses the builder's spec in place of the
-  # case's own.
-  add_executable(iris-format-builder-driver format_builder_driver.cpp
-    ../driver/driver.cpp ../driver/json.cpp)
-  target_include_directories(iris-format-builder-driver PRIVATE
-    "${PROJECT_SOURCE_DIR}/driver" "${PROJECT_SOURCE_DIR}/examples")
-  target_link_libraries(iris-format-builder-driver PRIVATE iris::iris)
-  set_target_properties(iris-format-builder-driver PROPERTIES
-    CXX_EXTENSIONS OFF)
-  iris_set_warnings(iris-format-builder-driver)
+  # Every case of every format through the format's builder in examples/.
   add_test(NAME format-builders
     COMMAND "${CMAKE_COMMAND}"
       "-DDRIVER=$<TARGET_FILE:iris-format-builder-driver>"

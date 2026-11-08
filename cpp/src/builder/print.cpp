@@ -211,8 +211,9 @@ std::string_view first_word(std::string_view text) {
   return text.substr(0, end);
 }
 
-bool contains(std::span<const std::string_view> words, std::string_view word) {
-  return std::ranges::find(words, word) != words.end();
+bool contains(std::span<const std::string_view> words,
+              std::string_view candidate) {
+  return std::ranges::find(words, candidate) != words.end();
 }
 
 /// Whether a format name can be written without quotes: names and integers
@@ -721,8 +722,8 @@ private:
 
   void lower_bound(const Ops &ops) {
     const std::string text = expression_text(ops);
-    const std::string_view word = first_word(text);
-    if (contains(type_words, word) || state_.types.contains(word))
+    const std::string_view leading = first_word(text);
+    if (contains(type_words, leading) || state_.types.contains(leading))
       out_ += "(" + text + ")";
     else
       out_ += text;

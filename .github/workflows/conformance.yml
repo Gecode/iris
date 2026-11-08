@@ -102,11 +102,12 @@ jobs:
           version=$(sed -n 's/^rust-version = "\([^"]*\)"$/\1/p' Cargo.toml)
           test -n "$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
+      # The view tests check the generated code with rustfmt and clippy.
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ steps.msrv.outputs.version }}
           targets: wasm32-unknown-unknown
-          components: rustfmt
+          components: rustfmt, clippy
       # rust/rust-toolchain.toml selects stable, so name the toolchain explicitly.
       - name: Build Rust workspace
         run: cargo "+${{ steps.msrv.outputs.version }}" build --workspace --locked
