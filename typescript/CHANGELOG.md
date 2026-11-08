@@ -11,3 +11,6 @@
   patterns, and names the caller's line in its errors and in the errors of
   reading a built spec. `data.get(handle)` reads an entry with the handle's
   type, and `IrisError` gains `callSite`.
+- Add a builder for each format of the format library to the examples, and
+  typed handles for `.iris` specs through `iris gen --lang typescript`, which
+  prints a module of `Handle` object literals.

@@ -127,7 +127,9 @@ jobs:
   # Generates a TypeScript builder program for every accepted corpus spec,
   # checks every program in one run each of oxfmt, oxlint and tsc with the
   # package's settings, runs them in one Node process against the built
-  # package, and compares the spec each prints with the original.
+  # package, and compares the spec each prints with the original. Then checks
+  # the views that `iris gen --lang typescript` prints for every format the
+  # same way, pins their types with tsc, and reads each case through them.
   builder-round-trip:
     name: Builder round trip
     runs-on: ubuntu-24.04
@@ -173,3 +175,6 @@ jobs:
       - name: Round trip
         working-directory: rust
         run: cargo test --locked -p gecode-iris --test builder_round_trip_typescript -- --ignored --nocapture
+      - name: Views
+        working-directory: rust
+        run: cargo test --locked -p gecode-iris --test typescript_views -- --ignored --nocapture

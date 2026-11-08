@@ -1,0 +1,9 @@
+handmade-explicit-five: 5 cities, EXPLICIT
+  0 2 4 6 3
+  2 0 5 4 7
+  4 5 0 3 6
+  6 4 3 0 2
+  3 7 6 2 0
+handmade-euc-2d-five: 5 cities, EUC_2D
+  x 0 3 3 0 1.5
+  y 0 0 4 4 2

@@ -1051,7 +1051,7 @@ absence. That is enough to generate the same handles a builder returns:
 - **`iris gen --lang L SPEC`** prints a module of declared handles, in the
   style of the Java section, for Rust, Python, C++, Java, Kotlin, or
   TypeScript. A name whose facts are not a single value type and depth
-  gets a dynamic handle. All but TypeScript have printers so far. Rust
+  gets a dynamic handle. Every language has a printer. Rust
   prints one `pub const` per entry, named like the entry, to use by path
   (`jobshop::n_jobs`). Python prints one module-level handle per entry,
   `machine = ib.declared("machine", ib.IntField[list[list[int]]])`, read as
@@ -1062,7 +1062,11 @@ absence. That is enough to generate the same handles a builder returns:
   final` handles named after the spec's file, read as
   `data.get(Jobshop.machine)`, and Kotlin an object of the same handles,
   read as `data[Jobshop.machine]`; above depth 3 their handles read a
-  `Value`. A name redefined with another value type, a
+  `Value`. TypeScript prints a module of object literals typed as
+  `Handle`, `export const machine: Handle<"int", 2, "required"> = {...}`,
+  read as `data.get(jobshop.machine)` after a namespace import; it imports
+  only the `Handle` type, and a depth above 8 keeps its value type with the
+  depth `null`, as the builder's handles do. A name redefined with another value type, a
   depth that varies, and a parameter without a default are all dynamic, and
   so is a depth above 8 in Rust and Python; C++ templates take any depth. A name is `Maybe` when it is not always in the output,
   as in the builder. `repeat 0 {if 0 {x:int}}` runs no definition of `x`, but
@@ -1128,11 +1132,13 @@ Each implementation's builder is tested in four ways:
 2. **Idiomatic format builders.** Each format in `formats/` gets a
    hand-written builder in every language. These are the site's examples.
    Their tests read the format's cases and compare the data with the
-   expected results. Rust, Python, C++, Java and Kotlin have them so far;
-   the C++ ones are headers in `cpp/examples`, which the CTest test
-   `format-builders` runs on every format case, and the Java and Kotlin
-   ones are in `java/iris-examples`, whose `FormatBuildersTest` does the
-   same inside `./gradlew build`.
+   expected results. Every language has them: the C++ ones are headers in
+   `cpp/examples`, which the CTest test `format-builders` runs on every
+   format case, the Java and Kotlin ones are in `java/iris-examples`, whose
+   `FormatBuildersTest` does the same inside `./gradlew build`, and the
+   TypeScript ones are in `typescript/examples`, which
+   `test/format-builders.test.ts` runs on every format case inside
+   `npm test`.
 3. **Type tests.** Accesses must have the expected types, and misuse must
    fail to compile: Rust `trybuild`, TypeScript `@ts-expect-error` with
    a local type-equality helper, Python `assert_type` under pyright and mypy, C++

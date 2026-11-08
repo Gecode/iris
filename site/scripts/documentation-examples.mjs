@@ -78,7 +78,7 @@ export async function collectDocumentationExamples({ tools, formats, execute, co
   add('install-cargo', 'cargo install gecode-iris-cli --locked');
   Object.assign(examples, await collectLearningExamples({ tools, execute, command }));
   Object.assign(examples, await collectPythonExamples({ tools, execute }));
-  Object.assign(examples, await collectTypescriptExamples());
+  Object.assign(examples, await collectTypescriptExamples({ tools, execute }));
   Object.assign(examples, await collectRustExamples());
   Object.assign(examples, await collectCppExamples({ tools, execute }));
   Object.assign(examples, await collectJavaExamples({ tools, execute }));

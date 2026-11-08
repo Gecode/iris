@@ -21,8 +21,7 @@ let code = builder_code(&parsed, &analysis, Language::Rust)?;
 A new language adds a `Language` variant, a backend module and one match arm in
 `builder_code`. There are backends for Rust, Python, C++, Java, Kotlin and
 TypeScript. `Language::has_view` says whether a language also has a view
-printer: Rust, Python, C++, Java and Kotlin have one, and TypeScript has none
-yet.
+printer; every language has one.
 
 ## The Rust backend
 
@@ -370,7 +369,9 @@ The TypeScript round trip needs Node 22.18 or later and `npm ci` and
 the one of `typescript/` and a link to it as `gecode-iris`. It checks them in
 batches with oxfmt and oxlint and in one tsc run, and runs them all in one
 Node process with `typescript/test/round-trip-runner.ts`, which the package
-does not ship. From `rust/`:
+does not ship. `tests/typescript_project/mod.rs` in gecode-iris holds the
+project setup and the checks, which the `typescript_views` test shares. From
+`rust/`:
 
 ```sh
 cargo test --locked -p gecode-iris --test builder_round_trip_typescript -- --ignored --nocapture
@@ -447,6 +448,22 @@ the standard library's types that it names, such as `kotlin.Long`, since a
 class of the same name in the user's package would take the place of a default
 import but not of an explicit one.
 
+The TypeScript printer writes a module that imports only the type `Handle`
+from `gecode-iris` and exports one object literal per entry, typed by the
+handle it is, such as
+`export const machine: Handle<"int", 2, "required"> = { ... }` with the fields
+`name`, `valueType`, `depth` and `presence` on lines of their own, which is
+the layout oxfmt keeps. `data.get` takes any object of that shape, so a view
+loads no code and works with every entry point of the package. It maps a
+depth above 8 to the depth `null` with the value type kept, as the builder
+does, and an entry without one value type and depth to `"dyn"`, which may be
+absent. Identifiers follow the builder program's rules, including the
+24-column cut, without its temporary names, and avoid the keywords and globals
+it avoids, `Handle`, and `then`, which would make the module namespace look
+like a promise to `await import(...)`. A spec without entries gives a module
+that re-exports the `Handle` type, since an empty file, a script and
+`export {}` all fail oxlint or an import.
+
 `rust_view` gives the Rust declarations as data, a `RustView` of the imports
 from `gecode_iris::build` and one `RustHandle` per entry, with its identifier,
 type text and entry name. The printer writes it, and the `iris!` macro of
@@ -506,7 +523,26 @@ the CLI's identifiers and types, and reads each format case and a case of each
 spec through the Java view, the Kotlin view, the processor's handles and its
 record, comparing every entry with untyped access. `./gradlew build` runs it.
 
-Both round trips print `compared C, skipped S, extra E, differences D`. They
+`tests/typescript_view.rs` checks the TypeScript text of each handle type,
+the empty module, the identifiers and the widest line. After `npm ci` and
+`npm run build` in `typescript/`,
+
+```sh
+cargo test --locked -p gecode-iris --test typescript_views -- --ignored --nocapture
+```
+
+writes TypeScript views of every format and of specs that exercise
+redefinitions, parameters, absence, an empty spec, reserved names, depths of 9
+and line widths, and checks them with oxfmt and oxlint as `typescript/`
+configures them. One tsc run accepts them and a program that pins the type of
+`data.get(handle)` and `data.get(handle, { bigint: true })` for every handle;
+the program then reads each format case and a case of each spec, compares
+every entry with untyped access, both ways, and checks that every entry has a
+handle. It prints `TypeScript views: M modules, R reads, E entries compared`.
+It is ignored, as the TypeScript round trip is, because it needs Node and the
+built package; `.github/workflows/typescript.yml` runs it.
+
+The round trips print `compared C, skipped S, extra E, differences D`. They
 fail on any difference, when compared and skipped specs do not add up to the
 corpus, or when fewer than 770 specs are compared. `tests/round_trip/mod.rs` in
 gecode-iris holds what they share: the corpus, the extra specs of the layout

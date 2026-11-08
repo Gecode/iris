@@ -359,6 +359,17 @@ matrix.source; // the reader spec as Iris text
   `callSite`. Wrap a helper that writes statements for its caller in
   `trackCaller` to record the caller's line instead of the helper's.
 
+`iris gen --lang typescript SPEC` prints typed handles for a reader spec
+written as `.iris` text: a module of object literals typed as `Handle`, read
+with `data.get(view.machine)` after `import * as view from "./view.ts"`. The
+module imports only the `Handle` type, so it works with every entry point.
+[`examples/view.sh`](examples/view.sh) shows the command and `view.out` its
+output for the jobshop format.
+
+Each format in [`formats/`](../formats/README.md) has a builder in
+[`examples/`](examples/), `build-FORMAT.ts`, which exports a function that
+returns the built spec and reads a case when Node runs the file.
+
 The [design brief](../docs/builders.md#typescript) explains the choices.
 
 ## Tests
@@ -412,6 +423,14 @@ catalog failure names (`build-call-sites`), and typed reads through handles,
 including a jobshop builder and the jobshop example of the design brief
 judged against [`formats/jobshop`](../formats/jobshop/README.md)
 (`build-reading`).
+[`test/format-builders.test.ts`](test/format-builders.test.ts) checks that
+every format has a builder in `examples/`, and reads every case of each format
+through it: it runs the Rust conformance runner, through Cargo, with
+[`test/format-builder-driver.ts`](test/format-builder-driver.ts), which
+answers each request with the spec of the format's builder instead of the
+case's, so each case is judged, with its parameters and operation, by the
+data or error it expects. It needs Cargo, and builds the runner on its first
+run.
 `npm run test:types` type-checks the sources, the tests,
 [`test/types/api.ts`](test/types/api.ts) and
 [`test/types/build.ts`](test/types/build.ts) against the published

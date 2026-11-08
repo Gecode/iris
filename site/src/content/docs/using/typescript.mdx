@@ -214,6 +214,111 @@ Worker the same way.
 newer run TypeScript directly; if you compile to JavaScript, point the URL at
 the compiled file.
 
+## Build a reader spec
+
+`gecode-iris/build` writes a reader spec from TypeScript. Every statement that
+defines an entry returns a typed handle, and `read` returns each entry with the
+type of its handle: a `number` for `n_jobs` and a `number[][]` for `machine`. A
+builder adds no features of its own: it prints Iris text and parses it as
+`Spec.parse` does, so the language's checks decide what is valid, and `source`
+holds the text. Like the package itself, `gecode-iris/build` has `inline` and
+`manual` entry points.
+
+The builders below are in
+[`typescript/examples`](https://github.com/Gecode/iris/tree/main/typescript/examples),
+one for each format in the [format library](/formats/), each with a `main`
+that reads a case when Node runs the file. A test reads every case of each
+format through its builder and compares the data or the error with the case's
+expected results, and the examples test runs each file and compares its output
+with the output shown here.
+
+### The job shop builder
+
+This builder writes the [job shop](/formats/job-shop/) reader spec, and the
+program reads an instance selected by name, then a file whose check fails:
+
+<CheckedExample id="typescript-build-jobshop" title="build-jobshop.ts" />
+
+`spec("jobshop", (b) => ...)` builds the spec of a format. Blocks take a
+callback, which receives the block's scope: `b.instances`, `i.sections`,
+`s.arm` and `r.repeat` each open one, and the statements the callback adds go
+into it. Each block returns what its callback returns, so the handles leave
+the blocks as objects to destructure. `` p`${nJobs} ${nMachines}` `` is a
+pattern with entries in its placeholders. A range is `range(0).below(nMachines)`
+for Iris `0..<n_machines`, `range(0, n)` for `0..n` and `atLeast(1)` for
+`1..`.
+
+`r.record` is the handle of each record of a repeat: `job.get(machine)` looks
+up a field, and `sum(job, (j) => ...)` writes a comprehension over the
+records. `r.asName("jobs")` names the list of records, as in
+`repeat n_jobs as jobs`, for error messages. Methods build expressions, such
+as `nJobs.le(...)`, `a.and(b)` and `a.not()`, and `gecode.intMax` is Gecode's
+largest integer.
+
+### Typed data
+
+`read` returns an object with the handles that the callback returned, each
+typed by its handle: a `number` for `nJobs`, `string | undefined` for `name`,
+which only some files give, and `number[][]` for `machine` and `duration`. A
+handle names its entry, value type, depth and presence, and reading checks
+them. For integers beyond `Number.MAX_SAFE_INTEGER`, read with `jobshop().spec`
+and use `data.get(handle, { bigint: true })`, which gives `bigint`s.
+
+### Errors name your code
+
+Every statement records the line that calls it. When a check fails while
+reading, the `IrisError` has the input location, and `error.callSite` names
+the line of the check in `build-jobshop.ts`. A `BuildError` from a builder has
+the same call site. A statement in a helper function records the line in the
+helper, unless the helper is wrapped in `trackCaller`, which makes its
+statements record the helper's caller, as `clueLines` below does.
+
+### A helper used twice
+
+A function that takes a scope and returns handles is a reusable piece of a
+reader spec. The nonogram builder reads the clues of the rows and the columns
+with one helper, and builds two pairs of checks with two expression helpers.
+
+<CheckedExample id="typescript-build-nonogram" title="build-nonogram.ts" />
+
+A builder rejects a second definition of a name, so a helper called twice by
+mistake fails instead of quietly replacing an entry. That is why `clueLines`
+takes the entry name from its caller. The TSPLIB builder below uses the same
+idea for its two coordinate sections.
+
+### The other formats
+
+<CheckedExample id="typescript-build-dimacs-cnf" title="build-dimacs-cnf.ts" />
+
+<CheckedExample id="typescript-build-sudoku" title="build-sudoku.ts" />
+
+`defineType` gives a named type, used here for both ends of a time window:
+
+<CheckedExample id="typescript-build-tsptw" title="build-tsptw.ts" />
+
+A TSPLIB file gives either a distance matrix or coordinates. `t.set` gives an
+optional entry a default while keeping its handle's type, `b.if` and its
+`else` take the checks that apply to each kind of file, and `oneOf` is an
+ordinary function that builds an expression:
+
+<CheckedExample id="typescript-build-tsplib" title="build-tsplib.ts" />
+
+### Typed handles for a text spec
+
+A reader spec written as an `.iris` file has no builder, but
+`iris gen --lang typescript SPEC` prints a module with a typed handle for each
+of its entries:
+
+<CheckedExample id="typescript-view" />
+
+Save the output as a module, such as `jobshop-view.ts`, import it with
+`import * as jobshop from "./jobshop-view.ts"`, and read data from
+`Spec.parse` with `data.get(jobshop.machine)`, which returns a `number[][]`.
+The module imports only the `Handle` type, so it adds nothing to a bundle but
+the handles. An entry whose value type or depth differs between the places
+that define it gets a handle with the value type `"dyn"`, which returns a
+`Value | undefined`.
+
 ## Release memory early
 
 Only a `Spec` holds WebAssembly memory, and garbage collection releases it. To

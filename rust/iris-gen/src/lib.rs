@@ -7,8 +7,8 @@
 //!
 //! [`view`](view::view) turns a checked spec into a language-independent
 //! [`View`](view::View) of typed handles, and [`view_code`] prints it for a
-//! language whose [`Language::has_view`] is true: Rust, Python, C++, Java and
-//! Kotlin. [`rust_view`] gives the Rust declarations that `view_code` prints as data, for the `iris!` macro.
+//! language whose [`Language::has_view`] is true, which every language is.
+//! [`rust_view`] gives the Rust declarations that `view_code` prints as data, for the `iris!` macro.
 mod cpp;
 mod java;
 mod kotlin;
@@ -64,11 +64,16 @@ impl Language {
         }
     }
 
-    /// Whether [`view_code`] has a printer for the language.
+    /// Whether [`view_code`] has a printer for the language. Every language
+    /// has one; a new language says whether it does here.
     pub fn has_view(self) -> bool {
         match self {
-            Self::Rust | Self::Python | Self::Cpp | Self::Java | Self::Kotlin => true,
-            Self::TypeScript => false,
+            Self::Rust
+            | Self::Python
+            | Self::Cpp
+            | Self::Java
+            | Self::Kotlin
+            | Self::TypeScript => true,
         }
     }
 }
@@ -156,7 +161,8 @@ impl From<gecode_iris_sema::Error> for ViewError {
 /// header puts its handles in a namespace named after the spec's file, the
 /// origin of `parsed`: `formats/jobshop/jobshop.iris` gives `jobshop`. A Java
 /// class and a Kotlin object take the same name in upper camel case,
-/// `Jobshop`, and have no package.
+/// `Jobshop`, and have no package. A TypeScript module exports its handles
+/// and takes its name from the file it is saved in.
 pub fn view_code(
     parsed: &Parse,
     analysis: &Analysis,
@@ -171,7 +177,7 @@ pub fn view_code(
             &view::view(analysis)?,
             parsed.origin(),
         )),
-        Language::TypeScript => Err(ViewError::NoPrinter(language)),
+        Language::TypeScript => Ok(typescript::view::render(&view::view(analysis)?)),
     }
 }
 

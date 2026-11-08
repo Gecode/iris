@@ -6,35 +6,26 @@
 //! round trip go the same way.
 //!
 //! The programs go to one directory outside the repository, which resolves
-//! `gecode-iris` to `typescript/` through a link, so oxfmt, oxlint and tsc
-//! each check every program in one run, and `typescript/test/round-trip-runner.ts`
-//! runs them all in one Node process. It needs Node 22.18 or later, `npm ci`
-//! and `npm run build` in `typescript/`.
+//! `gecode-iris` to `typescript/` through a link (see `typescript_project`),
+//! so oxfmt, oxlint and tsc each check every program in one run, and
+//! `typescript/test/round-trip-runner.ts` runs them all in one Node process.
+//! It needs Node 22.18 or later, `npm ci` and `npm run build` in `typescript/`.
 mod round_trip;
+mod typescript_project;
 
 use gecode_iris_cli::check_spec;
 use gecode_iris_gen::{Language, builder_code};
 use round_trip::{Tally, corpus, extra_specs, limit_specs};
-use std::{
-    fs,
-    path::{Path, PathBuf},
-    process::Command,
-    time::Instant,
-};
+use std::{fs, path::PathBuf, time::Instant};
+use typescript_project::TypeScriptProject;
 
 #[test]
 #[ignore = "needs Node and the built package in typescript/"]
 fn accepted_specs_round_trip_through_the_typescript_builder() {
     let started = Instant::now();
-    let repo = fs::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")).unwrap();
-    let package = repo.join("typescript");
-    assert!(
-        package.join("dist/build/node.js").exists() && package.join("node_modules").exists(),
-        "run `npm ci` and `npm run build` in {} first",
-        package.display()
-    );
+    let project = Project(TypeScriptProject::new("typescript-round-trip", &["out"]));
+    let repo = project.0.package.parent().unwrap().to_owned();
     let specs = corpus(&repo);
-    let project = Project::new(&package);
 
     // Each program with the spec it must print.
     let mut generated: Vec<(String, Vec<u8>, String)> = Vec::new();
@@ -79,13 +70,13 @@ fn accepted_specs_round_trip_through_the_typescript_builder() {
     );
 
     let step = Instant::now();
-    project.check(&package);
+    project.check();
     println!("oxfmt, oxlint and tsc clean in {:.1?}", step.elapsed());
     let step = Instant::now();
-    project.run(&package);
+    project.run();
     println!("ran in {:.1?}", step.elapsed());
 
-    let out = project.root.join("out");
+    let out = project.0.root.join("out");
     let mut differences = Vec::new();
     for (name, original, title) in &generated {
         if let Err(message) = round_trip::round_trip(&out, original, name) {
@@ -101,9 +92,6 @@ fn accepted_specs_round_trip_through_the_typescript_builder() {
     println!("wall time {:.1?}", started.elapsed());
     tally.report("TypeScript builder", &differences);
 }
-
-/// The most programs that one run of oxfmt or oxlint checks.
-const BATCH: usize = 500;
 
 /// The name of the program at `index`, which is also its file's and its
 /// output's stem.
@@ -212,49 +200,12 @@ fn typescript_specs() -> Vec<(String, String)> {
 }
 
 /// The generated programs and what they print, outside the repository.
-struct Project {
-    root: PathBuf,
-}
+struct Project(TypeScriptProject);
 
 impl Project {
-    /// A directory whose programs import `gecode-iris/build` from `package`
-    /// and are checked with its TypeScript settings.
-    fn new(package: &Path) -> Self {
-        let root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("typescript-round-trip");
-        // Files of an earlier run must not survive.
-        for directory in ["src", "out"] {
-            let path = root.join(directory);
-            if path.exists() {
-                fs::remove_dir_all(&path).unwrap();
-            }
-            fs::create_dir_all(path).unwrap();
-        }
-        fs::write(root.join("package.json"), "{ \"type\": \"module\" }\n").unwrap();
-        let tsconfig = format!(
-            "{{\n  \"extends\": {},\n  \"compilerOptions\": {{ \"typeRoots\": [{}] }},\n  \
-             \"include\": [\"src\"]\n}}\n",
-            json_string(&package.join("tsconfig.json")),
-            json_string(&package.join("node_modules/@types")),
-        );
-        fs::write(root.join("tsconfig.json"), tsconfig).unwrap();
-        let modules = root.join("node_modules");
-        fs::create_dir_all(&modules).unwrap();
-        let link = modules.join("gecode-iris");
-        if fs::symlink_metadata(&link).is_ok() {
-            fs::remove_file(&link)
-                .or_else(|_| fs::remove_dir(&link))
-                .unwrap();
-        }
-        #[cfg(unix)]
-        std::os::unix::fs::symlink(package, &link).unwrap();
-        #[cfg(windows)]
-        std::os::windows::fs::symlink_dir(package, &link).unwrap();
-        Self { root }
-    }
-
     /// Save the program `code` as `src/NAME.ts`.
     fn save(&self, name: &str, code: &str) {
-        fs::write(self.root.join("src").join(format!("{name}.ts")), code).unwrap();
+        fs::write(self.0.source(name), code).unwrap();
     }
 
     /// The program `program` of the spec `name` beyond the corpus, which
@@ -266,96 +217,23 @@ impl Project {
         self.save(program, &code);
     }
 
-    /// Check every program with oxfmt, oxlint and tsc, as `typescript/`
-    /// configures them. oxfmt and oxlint skip what git ignores, as the
-    /// target directory, in a directory they walk, so they get the programs
-    /// as files, in batches that a command line holds; oxlint runs in
-    /// `package` to find its type-aware linter there.
-    fn check(&self, package: &Path) {
-        let mut programs: Vec<PathBuf> = fs::read_dir(self.root.join("src"))
+    /// Check every program with oxfmt, oxlint and tsc.
+    fn check(&self) {
+        let mut programs: Vec<PathBuf> = fs::read_dir(self.0.root.join("src"))
             .unwrap()
             .map(|entry| entry.unwrap().path())
             .collect();
         programs.sort();
-        let tsconfig = self.root.join("tsconfig.json");
-        for (batch, files) in programs.chunks(BATCH).enumerate() {
-            let mut oxfmt = Command::new(tool(package, "oxfmt"));
-            oxfmt
-                .current_dir(package)
-                .arg("--check")
-                .arg("-c")
-                .arg(package.join(".oxfmtrc.json"))
-                .args(files);
-            self.expect_success(&format!("oxfmt-{batch}"), oxfmt);
-            let mut oxlint = Command::new(tool(package, "oxlint"));
-            oxlint
-                .current_dir(package)
-                .args(["--type-aware", "--deny-warnings", "-c"])
-                .arg(package.join(".oxlintrc.json"))
-                .arg("--tsconfig")
-                .arg(&tsconfig)
-                .args(files);
-            self.expect_success(&format!("oxlint-{batch}"), oxlint);
-        }
-        let mut tsc = Command::new(tool(package, "tsc"));
-        tsc.current_dir(package)
-            .arg("-p")
-            .arg(&tsconfig)
-            .arg("--noEmit");
-        self.expect_success("tsc", tsc);
+        self.0.check_style(&programs);
+        self.0.check_types();
     }
 
     /// Run every program with `typescript/test/round-trip-runner.ts`, which
     /// writes what each prints to `out`.
-    fn run(&self, package: &Path) {
-        let mut node = Command::new("node");
-        node.current_dir(package)
-            .arg(package.join("test/round-trip-runner.ts"))
-            .arg(self.root.join("src"))
-            .arg(self.root.join("out"));
-        self.expect_success("node", node);
+    fn run(&self) {
+        let project = &self.0;
+        let runner = project.package.join("test/round-trip-runner.ts");
+        let (src, out) = (project.root.join("src"), project.root.join("out"));
+        project.node("node", &runner, &[&src, &out]);
     }
-
-    /// Run `command`, with its output in `NAME.log`, which a failure prints.
-    fn expect_success(&self, name: &str, mut command: Command) {
-        let log = self.root.join(format!("{name}.log"));
-        let output = command
-            .output()
-            .unwrap_or_else(|error| panic!("cannot run {name}: {error}"));
-        let mut text = output.stdout;
-        text.extend_from_slice(&output.stderr);
-        fs::write(&log, &text).unwrap();
-        assert!(
-            output.status.success(),
-            "{name} failed (log in {}):\n{}",
-            log.display(),
-            String::from_utf8_lossy(&text)
-        );
-    }
-}
-
-/// The executable `name` that `npm ci` installs in `package`.
-fn tool(package: &Path, name: &str) -> PathBuf {
-    let bin = package.join("node_modules/.bin");
-    if cfg!(windows) {
-        bin.join(format!("{name}.cmd"))
-    } else {
-        bin.join(name)
-    }
-}
-
-/// `path` as a JSON string.
-fn json_string(path: &Path) -> String {
-    let mut text = String::from("\"");
-    for character in path.to_string_lossy().chars() {
-        match character {
-            '"' | '\\' => {
-                text.push('\\');
-                text.push(character);
-            }
-            character => text.push(character),
-        }
-    }
-    text.push('"');
-    text
 }

@@ -13,6 +13,8 @@
 
 ### Library
 
+- Add a TypeScript printer to `gecode_iris_gen::view_code`;
+  `Language::has_view` is true for every language.
 - Add Java and Kotlin printers to `gecode_iris_gen::view_code`;
   `Language::has_view` is true for Java and Kotlin, and false only for
   TypeScript.
@@ -95,6 +97,11 @@
 - Add `iris gen builder --lang typescript SPEC`, which prints a TypeScript
   builder program. `iris gen --lang typescript` says that TypeScript has no
   view generator yet.
+- Add `iris gen --lang typescript SPEC`, which prints a TypeScript module of
+  object literals typed as the `Handle` of `gecode-iris`, the types the
+  TypeScript spec builder returns, laid out as oxfmt writes it. It imports
+  only the `Handle` type, and an entry named `then` gets the identifier
+  `then2`.
 
 ## 0.1.0 - 2026-11-06
 

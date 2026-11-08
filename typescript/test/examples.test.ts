@@ -1,7 +1,8 @@
 // The examples of the site's TypeScript guide, type-checked and run against the
 // built package. The site renders each file in examples/ with its recorded
 // output, so these tests keep the guide true. Examples run from the repository
-// root, since they read files under formats/.
+// root, since they read files under formats/. A `.sh` file holds an iris
+// command, whose recorded output the site's checks compare with the CLI.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
@@ -21,15 +22,16 @@ const notRun = new Map([
 const files = readdirSync(directory);
 const sources = files.filter((file) => /\.(ts|cjs)$/.test(file)).toSorted();
 const runnable = sources.filter((source) => !notRun.has(source));
+const commands = files.filter((file) => file.endsWith(".sh"));
 
 function recording(source: string): string {
   return source.replace(/\.\w+$/, ".out");
 }
 
-test("exactly the runnable examples have a recorded output", () => {
+test("exactly the runnable examples and the commands have a recorded output", () => {
   assert.deepEqual(
     files.filter((file) => file.endsWith(".out")).toSorted(),
-    runnable.map(recording).toSorted(),
+    [...runnable, ...commands].map(recording).toSorted(),
   );
   for (const source of notRun.keys()) {
     assert.ok(sources.includes(source), `examples/${source} is missing`);

@@ -156,8 +156,19 @@ fn is_numbered(name: &str) -> bool {
     })
 }
 
+/// Whether a builder program may not use `name` for a name of the spec.
 fn reserved(name: &str) -> bool {
     KEYWORDS.contains(&name) || PROGRAM_NAMES.contains(&name) || is_numbered(name)
+}
+
+/// The names that a view may not export: the type it imports, and `then`,
+/// which makes a module namespace look like a promise to `await import(...)`
+/// (oxlint's `unicorn/no-thenable`).
+const VIEW_NAMES: &[&str] = &["Handle", "then"];
+
+/// Whether a view may not use `name` for a handle.
+fn reserved_in_view(name: &str) -> bool {
+    KEYWORDS.contains(&name) || VIEW_NAMES.contains(&name)
 }
 
 /// The widest identifier of a value, record or type before any suffix. A
@@ -176,9 +187,34 @@ pub(super) struct Identifiers {
     /// The first suffix of each base that `unused` has not tried.
     next_suffixes: HashMap<String, usize>,
     assigned: HashMap<(Role, String), String>,
+    /// Whether only the names that a view reserves are off limits, since no
+    /// builder program surrounds the names.
+    handles_only: bool,
 }
 
 impl Identifiers {
+    /// Identifiers for the handles of a view.
+    pub(super) fn for_handles() -> Self {
+        Self {
+            handles_only: true,
+            ..Self::default()
+        }
+    }
+
+    fn reserved(&self, name: &str) -> bool {
+        if self.handles_only {
+            reserved_in_view(name)
+        } else {
+            reserved(name)
+        }
+    }
+
+    /// Whether `name` is one of a builder program's numbered names, which a
+    /// view does not have.
+    fn is_numbered(&self, name: &str) -> bool {
+        !self.handles_only && is_numbered(name)
+    }
+
     /// The identifier of `name`, the same one each time.
     pub(super) fn named(&mut self, role: Role, name: &str) -> String {
         if let Some(identifier) = self.assigned.get(&(role, name.to_owned())) {
@@ -206,22 +242,22 @@ impl Identifiers {
     fn unused(&mut self, base: String) -> String {
         // Every name of the form `e1` or `s12` is the program's own, so no
         // suffix frees one.
-        let base = if is_numbered(&base) {
+        let base = if self.is_numbered(&base) {
             format!("{base}v")
         } else {
             base
         };
-        if !reserved(&base) && !self.taken.contains(&base) {
+        if !self.reserved(&base) && !self.taken.contains(&base) {
             self.taken.insert(base.clone());
             return base;
         }
         // Every suffix of a bare prefix such as `e` makes a numbered name.
-        if NUMBERED.contains(&base.as_str()) {
+        if !self.handles_only && NUMBERED.contains(&base.as_str()) {
             return self.unused(format!("{base}v"));
         }
         let mut number = self.next_suffixes.get(&base).copied().unwrap_or(2);
         let mut candidate = format!("{base}{number}");
-        while reserved(&candidate) || self.taken.contains(&candidate) {
+        while self.reserved(&candidate) || self.taken.contains(&candidate) {
             number += 1;
             candidate = format!("{base}{number}");
         }
@@ -281,6 +317,27 @@ mod tests {
             identifiers.named(Role::Variable, &"v".repeat(40)),
             "vvvvvvvvvvvv"
         );
+    }
+
+    #[test]
+    fn handles_avoid_only_keywords_and_what_a_view_must_not_export() {
+        let mut identifiers = Identifiers::for_handles();
+        for (name, expected) in [
+            ("if", "if2"),
+            ("globalThis", "globalThis2"),
+            ("Handle", "Handle2"),
+            ("Handle2", "Handle22"),
+            ("then", "then2"),
+            ("int", "int"),
+            ("b", "b"),
+            ("e1", "e1"),
+            ("e", "e"),
+            ("_name", "name"),
+            ("name", "name2"),
+            ("n_jobs", "n_jobs"),
+        ] {
+            assert_eq!(identifiers.named(Role::Value, name), expected);
+        }
     }
 
     #[test]

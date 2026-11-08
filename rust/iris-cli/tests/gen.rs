@@ -248,20 +248,14 @@ fn the_kotlin_jobshop_view_matches_its_recording() {
 }
 
 #[test]
-fn typescript_has_no_view_generator_yet() {
-    let output = iris(&["gen", "--lang", "typescript", "spec.iris"]);
-    assert_eq!(output.status.code(), Some(2));
-    assert_eq!(output.stdout, b"");
-    assert!(
-        stderr(&output).contains("typescript has no view generator yet"),
-        "{}",
-        stderr(&output)
-    );
-    assert!(
-        stderr(&output).contains("iris gen builder --lang typescript SPEC"),
-        "{}",
-        stderr(&output)
-    );
+fn the_typescript_jobshop_view_matches_its_recording() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let spec = root.join("../../formats/jobshop/jobshop.iris");
+    let output = iris(&["gen", "--lang", "typescript", spec.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    assert_eq!(stderr(&output), "");
+    let recording = fs::read_to_string(root.join("tests/fixtures/jobshop-view.ts")).unwrap();
+    assert_eq!(String::from_utf8(output.stdout).unwrap(), recording);
 }
 
 #[test]
@@ -270,7 +264,7 @@ fn an_unknown_view_language_names_only_languages_with_views() {
     assert_eq!(output.status.code(), Some(2));
     let message = stderr(&output);
     assert!(
-        message.contains("[possible values: rust, python, cpp, java, kotlin]"),
+        message.contains("[possible values: rust, python, cpp, java, kotlin, typescript]"),
         "{message}"
     );
 }

@@ -5,6 +5,8 @@
 // python/tests/conformance_driver.py and rust/iris-cli's iris-driver:
 //
 //   node test/conformance-driver.ts read SPEC INPUT --params '{"n": "3"}'
+//
+// test/format-builder-driver.ts runs `main` with another way to load a spec.
 import { readFileSync } from "node:fs";
 import { IrisError, Spec } from "gecode-iris";
 
@@ -13,7 +15,7 @@ const SUPPORTED_VERSION = "0.1";
 const INPUT_OPERATIONS: ReadonlySet<string> = new Set(["read", "catalog", "dzn"]);
 
 const EXIT_LANGUAGE_ERROR = 1;
-const EXIT_MISUSE = 2;
+export const EXIT_MISUSE = 2;
 const EXIT_HOST_FAILURE = 3;
 
 /** The command line breaks the protocol. */
@@ -28,7 +30,16 @@ interface Request {
   readonly dzn: boolean;
 }
 
-function main(args: readonly string[]): void {
+/** Loads the reader spec at a path. */
+export type SpecLoader = (path: string) => Spec;
+
+/** Parses the reader spec at `path`, as `Spec.parse` reads a file. */
+function parseFile(path: string): Spec {
+  return Spec.parse(readFileSync(path), path);
+}
+
+/** Answers one request, reading its reader spec with `load`. */
+export function main(args: readonly string[], load: SpecLoader = parseFile): void {
   let request: Request;
   try {
     request = parseRequest(args);
@@ -40,7 +51,7 @@ function main(args: readonly string[]): void {
     throw error;
   }
   try {
-    process.stdout.write(successDocument(request));
+    process.stdout.write(successDocument(request, load));
   } catch (error) {
     if (error instanceof IrisError) {
       process.stdout.write(error.toJSON());
@@ -55,8 +66,8 @@ function main(args: readonly string[]): void {
 }
 
 /** The success document: parse JSON, data JSON or dzn text. */
-function successDocument(request: Request): string {
-  const spec = Spec.parse(readFileSync(request.spec), request.spec);
+function successDocument(request: Request, load: SpecLoader): string {
+  const spec = load(request.spec);
   if (request.input === undefined) {
     return PARSE_SUCCESS;
   }
@@ -224,10 +235,12 @@ class JsonTokens {
   }
 }
 
-function report(status: number, message: string): void {
+export function report(status: number, message: string): void {
   process.stderr.write(`conformance-driver: ${message}\n`);
   process.exitCode = status;
 }
 
 // Runs last, once the class declarations above are initialized.
-main(process.argv.slice(2));
+if (import.meta.main) {
+  main(process.argv.slice(2));
+}

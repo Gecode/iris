@@ -1,7 +1,7 @@
 //! The TypeScript text of each production, each identifier rule and each
 //! layout rule that the backend takes from oxfmt, oxlint and the types of
 //! `gecode-iris/build`.
-use gecode_iris_gen::{Language, ViewError, builder_code, view_code};
+use gecode_iris_gen::{Language, builder_code, view_code};
 use gecode_iris_sema::analyze;
 use gecode_iris_syntax::{LanguageVersion, parse};
 
@@ -776,16 +776,13 @@ fn strings_are_ascii_with_the_quotes_oxfmt_chooses() {
 }
 
 #[test]
-fn typescript_has_builders_but_no_view_printer() {
-    assert!(!Language::TypeScript.has_view());
+fn typescript_has_builders_and_a_view_printer() {
+    assert!(Language::TypeScript.has_view());
     assert_eq!(Language::TypeScript.name(), "typescript");
     assert_eq!("typescript".parse::<Language>(), Ok(Language::TypeScript));
     let parsed = parse(b"x: int\n", "test.iris", LanguageVersion::V0_1).unwrap();
     let analysis = analyze(&parsed);
-    assert!(matches!(
-        view_code(&parsed, &analysis, Language::TypeScript),
-        Err(ViewError::NoPrinter(Language::TypeScript))
-    ));
+    assert!(view_code(&parsed, &analysis, Language::TypeScript).is_ok());
 }
 
 /// oxlint refuses an unused import, so the program imports what it names
