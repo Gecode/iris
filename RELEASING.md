@@ -185,15 +185,17 @@ Set this up once before the first tag:
 1. Create an account on the [Central Portal](https://central.sonatype.com) and
    register the namespace `dev.gecode`. The Portal shows a verification key;
    add it as a DNS TXT record on `gecode.dev` and verify the namespace.
-2. Generate a Portal user token. On GitHub, create the `maven-central`
-   environment with a required reviewer, so that a tag alone cannot publish, and
-   store the token's username and password as its `MAVEN_CENTRAL_USERNAME` and
-   `MAVEN_CENTRAL_PASSWORD` secrets.
-3. Create a GPG signing key for the project and upload its public key to
-   `keys.openpgp.org`, where Maven Central looks for it. Store the
-   ASCII-armored secret key (`gpg --armor --export-secret-keys KEYID`) as the
-   environment's `SIGNING_KEY` secret and its passphrase as
-   `SIGNING_KEY_PASSWORD`.
+2. Generate a Portal user token and store its username and password as the
+   `MAVEN_CENTRAL_USERNAME` and `MAVEN_CENTRAL_PASSWORD` secrets of the GitHub
+   `maven-central` environment, which exists with a required reviewer so that a
+   tag alone cannot publish.
+3. Done: the signing key `Gecode Iris <iris@gecode.dev>`, fingerprint
+   `3414 4DF8 320C 6D83 F23A  B876 5A56 2D4D C94A 6A31` (RSA 4096, no expiry),
+   is on `keys.openpgp.org` and `keyserver.ubuntu.com`, where Maven Central
+   looks for it. Its ASCII-armored secret key is the environment's `SIGNING_KEY`
+   secret and its passphrase is `SIGNING_KEY_PASSWORD`; the maintainer keeps
+   copies and the revocation certificate. To replace it, create a new key,
+   upload its public key, and replace both secrets.
 
 The workflow passes these to Gradle as the `mavenCentralUsername`,
 `mavenCentralPassword`, `signingInMemoryKey` and `signingInMemoryKeyPassword`
