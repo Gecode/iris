@@ -18,7 +18,7 @@ tags; [§11](PLAN.md#11-milestones) defines the release milestones.
 | Python | `python-vVERSION` | Released: 0.1.0 on PyPI |
 | TypeScript | `typescript-vVERSION` | Released: 0.1.0 on npm; trusted publishing is set up after the first release, below |
 | Java and Kotlin | `java-vVERSION` | Ready: the release workflow needs the Maven Central setup below |
-| C++ | `cpp-vVERSION` | Ready: the release workflow needs the GitHub setup below; vcpkg and Conan planned |
+| C++ | `cpp-vVERSION` | Released: 0.1.0 as a source archive on GitHub; vcpkg and Conan planned |
 | JetBrains plugin | `jetbrains-vVERSION` | Plugin built and verified; Marketplace publication planned for M7 |
 | VS Code extension | `vscode-vVERSION` | Not built yet |
 | Documentation site | No version tag; deploys from `main` | Deployment configured; production setup and live verification required |

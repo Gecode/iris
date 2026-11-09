@@ -117,14 +117,14 @@ conformance driver, the fuzz targets, the examples and the presets, so it
 needs no Rust and builds no tests.
 
 A project can build the library with its own build through FetchContent of
-the archive, checked against the hash in the `.sha256` file of the release
-(the hash below is a placeholder):
+the archive, checked against the hash in the `.sha256` file of the release.
+For 0.1.0:
 
 ```cmake
 include(FetchContent)
 FetchContent_Declare(iris
   URL https://github.com/Gecode/iris/releases/download/cpp-v0.1.0/iris-cpp-0.1.0.tar.gz
-  URL_HASH SHA256=0000000000000000000000000000000000000000000000000000000000000000)
+  URL_HASH SHA256=2b254835daa29a896ebb80db49a264941f4529bff0085cc076a6696fcd328f6d)
 FetchContent_MakeAvailable(iris)
 target_link_libraries(app PRIVATE iris::iris)
 ```
