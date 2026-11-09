@@ -30,6 +30,29 @@ pub(crate) fn is_expression(kind: K) -> bool {
             | K::Field
     )
 }
+/// Whether an expression of `kind` has a left operand that may nest without
+/// limit. Specification §5.12 releases the entries of a parenthesized left
+/// operand, so `((1+1)+1)+1` can continue for tens of thousands of operators,
+/// while every other operand holds an entry. Walks therefore loop over
+/// [`left_spine`] and recurse only into the other operands, at most 256 deep.
+pub(crate) fn has_left_operand(kind: K) -> bool {
+    matches!(
+        kind,
+        K::Binary | K::Power | K::IndexExpression | K::Field | K::Parenthesized
+    )
+}
+/// Returns `node` and its chain of left operands, outermost first. The last
+/// node has no left operand.
+pub(crate) fn left_spine(node: &SyntaxNode) -> Vec<SyntaxNode> {
+    let mut spine = vec![node.clone()];
+    while let Some(last) = spine.last()
+        && has_left_operand(last.kind())
+        && let Some(left) = last.children().find(|n| is_expression(n.kind()))
+    {
+        spine.push(left);
+    }
+    spine
+}
 pub(crate) fn unparenthesized(node: &SyntaxNode) -> SyntaxNode {
     let mut node = node.clone();
     while node.kind() == K::Parenthesized {
@@ -259,12 +282,58 @@ fn add_definition(
     });
     id
 }
-fn collect_children(node: &SyntaxNode, scope: ScopeId, model: &mut SemanticModel) {
-    for child in node.children() {
-        collect_node(&child, scope, model);
+/// One step of the definition walk: a node to visit in a scope, or the body
+/// of a repeat, which opens the repeat's own scope when it is reached.
+enum Collect {
+    Node(SyntaxNode, ScopeId),
+    RepeatBody {
+        body: SyntaxNode,
+        scope: ScopeId,
+        repeat: RepeatId,
+    },
+}
+
+/// Visits the nodes below `root` in preorder. The walk keeps its own stack, as
+/// left operands nest far deeper than any thread's stack (Specification §5.12
+/// releases the entries of a parenthesized left operand).
+fn collect_children(root: &SyntaxNode, scope: ScopeId, model: &mut SemanticModel) {
+    let mut work = vec![];
+    push_children(&mut work, root, scope);
+    while let Some(step) = work.pop() {
+        match step {
+            Collect::Node(node, scope) => collect_node(&node, scope, model, &mut work),
+            Collect::RepeatBody {
+                body,
+                scope,
+                repeat,
+            } => {
+                let chain = model.repeats[repeat.0].chain.clone();
+                let body_scope = add_scope(&body, scope, true, chain, model);
+                model.repeats[repeat.0].body_scope = Some(body_scope);
+                if let Some(each) = body.children().find(|n| n.kind() == K::Each)
+                    && let Some(token) = definition_token(&each)
+                {
+                    let each_id =
+                        add_definition(model, &each, token, DefinitionKind::EachRecord, body_scope);
+                    model.repeats[repeat.0].each_definition = Some(each_id);
+                }
+                push_children(&mut work, &body, body_scope);
+            }
+        }
     }
 }
-fn collect_node(node: &SyntaxNode, scope: ScopeId, model: &mut SemanticModel) {
+/// Schedules the children of `node` so that they are visited in order.
+fn push_children(work: &mut Vec<Collect>, node: &SyntaxNode, scope: ScopeId) {
+    let start = work.len();
+    work.extend(node.children().map(|child| Collect::Node(child, scope)));
+    work[start..].reverse();
+}
+fn collect_node(
+    node: &SyntaxNode,
+    scope: ScopeId,
+    model: &mut SemanticModel,
+    work: &mut Vec<Collect>,
+) {
     let kind = match node.kind() {
         K::Declaration | K::List => Some(DefinitionKind::Read),
         K::Let => Some(DefinitionKind::Let),
@@ -306,28 +375,25 @@ fn collect_node(node: &SyntaxNode, scope: ScopeId, model: &mut SemanticModel) {
         model.repeats.push(RepeatInfo {
             node: node.clone(),
             parent,
-            chain: chain.clone(),
+            chain,
             body_scope: None,
             list_definition: list,
             each_definition: None,
             fields: vec![],
         });
-        for child in node.children() {
+        let start = work.len();
+        work.extend(node.children().map(|child| {
             if child.kind() == K::Block {
-                let body_scope = add_scope(&child, scope, true, chain.clone(), model);
-                model.repeats[id.0].body_scope = Some(body_scope);
-                if let Some(each) = child.children().find(|n| n.kind() == K::Each)
-                    && let Some(token) = definition_token(&each)
-                {
-                    let each_id =
-                        add_definition(model, &each, token, DefinitionKind::EachRecord, body_scope);
-                    model.repeats[id.0].each_definition = Some(each_id);
+                Collect::RepeatBody {
+                    body: child,
+                    scope,
+                    repeat: id,
                 }
-                collect_children(&child, body_scope, model);
             } else {
-                collect_node(&child, scope, model);
+                Collect::Node(child, scope)
             }
-        }
+        }));
+        work[start..].reverse();
         return;
     }
     if node.kind() == K::Block {
@@ -339,9 +405,9 @@ fn collect_node(node: &SyntaxNode, scope: ScopeId, model: &mut SemanticModel) {
             model.scopes[scope.0].repeats.clone(),
             model,
         );
-        collect_children(node, child_scope, model);
+        push_children(work, node, child_scope);
     } else {
-        collect_children(node, scope, model);
+        push_children(work, node, scope);
     }
 }
 fn add_scope(

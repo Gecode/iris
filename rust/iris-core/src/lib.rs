@@ -24,10 +24,12 @@ pub use value::{AccessError, ColumnError, Data, Entry, Leaves, Value, ValueRef};
 
 #[derive(Debug)]
 pub struct Spec {
-    parsed: Parse,
     analysis: Analysis,
     index: reader::ModelIndex,
     call_sites: CallSites,
+    /// Declared last, so that it is dropped after the syntax nodes of `index`
+    /// and frees a deep tree without recursion.
+    parsed: Parse,
 }
 impl Spec {
     pub fn parse(source: &[u8], origin: &str) -> Result<Self, Failure> {

@@ -21,18 +21,90 @@ pub enum LanguageVersion {
     V0_1,
 }
 
+/// A parsed reader spec: its concrete syntax tree, diagnostics and checks.
 #[derive(Debug, Clone)]
 pub struct Parse {
-    green: rowan::GreenNode,
+    tree: SyntaxTree,
     diagnostics: Vec<Diagnostic>,
     checks: Vec<ParseCheck>,
     version: LanguageVersion,
     origin: Arc<str>,
 }
 
+/// A concrete syntax tree, shared by its [`Parse`] and by whatever keeps
+/// syntax nodes from it, such as a semantic model.
+///
+/// Left operands can nest tens of thousands of nodes deep (Specification
+/// §5.12), and rowan frees a tree recursively once its last owner is gone.
+/// The last clone of a deep `SyntaxTree` frees the tree without recursion,
+/// so a value that keeps syntax nodes keeps a clone and drops it after them.
+#[derive(Clone)]
+pub struct SyntaxTree(Arc<GreenTree>);
+
+struct GreenTree {
+    root: rowan::GreenNode,
+    depth: usize,
+}
+
+/// The deepest tree that rowan frees by recursion. A level takes about 430
+/// bytes of stack in a debug build and 85 in a release build, so this needs
+/// at most about 110 KiB. Ordinary specs are much shallower and cost nothing
+/// more to free.
+const RECURSIVE_FREE_DEPTH: usize = 256;
+
+impl SyntaxTree {
+    /// The root node. Keep the tree for as long as the node or any node
+    /// reached from it.
+    pub fn root(&self) -> SyntaxNode {
+        SyntaxNode::new_root(self.0.root.clone())
+    }
+}
+
+impl fmt::Debug for SyntaxTree {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SyntaxTree")
+            .field("root", &self.0.root)
+            .finish()
+    }
+}
+
+impl Drop for GreenTree {
+    fn drop(&mut self) {
+        if self.depth > RECURSIVE_FREE_DEPTH {
+            let placeholder = rowan::GreenNode::new(SyntaxKind::Root.into(), []);
+            free_without_recursion(std::mem::replace(&mut self.root, placeholder));
+        }
+    }
+}
+
+/// Frees `root` with constant stack depth if no other owner keeps it alive.
+///
+/// Every node is first held once more for each place it has in the tree,
+/// parents before children. Releasing them in that order frees each node
+/// while its children are still held, so no node frees another.
+fn free_without_recursion(root: rowan::GreenNode) {
+    let mut nodes = vec![root];
+    let mut next = 0;
+    while let Some(node) = nodes.get(next).cloned() {
+        nodes.extend(
+            node.children()
+                .filter_map(|child| child.into_node().map(ToOwned::to_owned)),
+        );
+        next += 1;
+    }
+    for node in nodes {
+        drop(node);
+    }
+}
+
 impl Parse {
+    /// The root node. Keep the `Parse`, or its [`tree`](Self::tree), for as
+    /// long as the node or any node reached from it.
     pub fn syntax(&self) -> SyntaxNode {
-        SyntaxNode::new_root(self.green.clone())
+        self.tree.root()
+    }
+    pub fn tree(&self) -> &SyntaxTree {
+        &self.tree
     }
     pub fn diagnostics(&self) -> &[Diagnostic] {
         &self.diagnostics
@@ -124,9 +196,12 @@ pub fn parse(source: &[u8], origin: &str, version: LanguageVersion) -> Result<Pa
         })
     })?;
     let lexed = lexer::lex(source, origin.clone());
-    let (green, diagnostics, checks) = parser::parse(source, origin.clone(), lexed);
+    let (tree, diagnostics, checks) = parser::parse(source, origin.clone(), lexed);
     Ok(Parse {
-        green,
+        tree: SyntaxTree(Arc::new(GreenTree {
+            root: tree.root,
+            depth: tree.depth,
+        })),
         diagnostics,
         checks,
         version,

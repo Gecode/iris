@@ -35,10 +35,33 @@ pub(super) fn atoms<'a>(source: &'a str, root: &SyntaxNode) -> Vec<Atom<'a>> {
     result
 }
 
-fn collect<'a>(source: &'a str, node: &SyntaxNode, result: &mut Vec<Atom<'a>>) {
+/// Collects the atoms of `root` in source order. The walk keeps its own stack,
+/// as left operands nest far deeper than any thread's stack.
+fn collect<'a>(source: &'a str, root: &SyntaxNode, result: &mut Vec<Atom<'a>>) {
+    let mut pending = vec![SyntaxElement::Node(root.clone())];
+    while let Some(element) = pending.pop() {
+        match element {
+            SyntaxElement::Node(node) => {
+                if !collect_indivisible(source, &node, result) {
+                    let start = pending.len();
+                    pending.extend(node.children_with_tokens());
+                    pending[start..].reverse();
+                }
+            }
+            SyntaxElement::Token(token) if token.kind() != K::Whitespace => {
+                push(source, token.text_range(), token.kind(), result);
+            }
+            SyntaxElement::Token(_) => {}
+        }
+    }
+}
+
+/// Collects a pattern or a format setting with a name as indivisible atoms,
+/// and returns whether `node` was one.
+fn collect_indivisible<'a>(source: &'a str, node: &SyntaxNode, result: &mut Vec<Atom<'a>>) -> bool {
     if node.kind() == K::Pattern {
         push(source, node.text_range(), K::Pattern, result);
-        return;
+        return true;
     }
     if node.kind() == K::Format {
         let tokens: Vec<_> = node
@@ -63,18 +86,10 @@ fn collect<'a>(source: &'a str, node: &SyntaxNode, result: &mut Vec<Atom<'a>>) {
                     }
                 }
             }
-            return;
+            return true;
         }
     }
-    for element in node.children_with_tokens() {
-        match element {
-            SyntaxElement::Node(child) => collect(source, &child, result),
-            SyntaxElement::Token(token) if token.kind() != K::Whitespace => {
-                push(source, token.text_range(), token.kind(), result);
-            }
-            _ => {}
-        }
-    }
+    false
 }
 
 fn push<'a>(source: &'a str, range: TextRange, kind: K, result: &mut Vec<Atom<'a>>) {

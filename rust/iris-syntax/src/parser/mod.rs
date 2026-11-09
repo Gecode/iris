@@ -1,5 +1,6 @@
 mod expressions;
 mod patterns;
+mod tree;
 mod types;
 mod work;
 
@@ -9,8 +10,9 @@ use crate::{
     diagnostic::text_range,
     lexer::{Lexed, Token},
 };
-use rowan::{GreenNode, GreenNodeBuilder};
 use std::{borrow::Borrow, collections::HashMap, ops::Range, sync::Arc};
+pub(crate) use tree::BuiltTree;
+use tree::TreeBuilder;
 
 type PResult<T = ()> = Result<T, ()>;
 
@@ -53,7 +55,7 @@ struct Parser<'a> {
     source: &'a str,
     origin: Arc<str>,
     stream: Stream,
-    builder: GreenNodeBuilder<'static>,
+    builder: TreeBuilder,
     diagnostics: Vec<Diagnostic>,
     checks: Vec<ParseCheck>,
     /// Where the statement or section arm being parsed starts.
@@ -86,12 +88,12 @@ pub(crate) fn parse(
     source: &str,
     origin: Arc<str>,
     lexed: Lexed,
-) -> (GreenNode, Vec<Diagnostic>, Vec<ParseCheck>) {
+) -> (BuiltTree, Vec<Diagnostic>, Vec<ParseCheck>) {
     let mut parser = Parser {
         source,
         origin,
         stream: Stream::new(source.into(), lexed.tokens),
-        builder: GreenNodeBuilder::new(),
+        builder: TreeBuilder::default(),
         diagnostics: lexed.diagnostics,
         checks: Vec::new(),
         owner: TextSize::new(0),

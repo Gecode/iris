@@ -6,7 +6,9 @@ use crate::{
 use gecode_iris_sema::{
     DefinitionKind, Possibilities, Resolution, ScopeId, SemanticModel, ValueFacts, ValueType,
 };
-use gecode_iris_syntax::{SyntaxKind as K, SyntaxNode, SyntaxToken, TextRange, TextSize};
+use gecode_iris_syntax::{
+    SyntaxElement, SyntaxKind as K, SyntaxNode, SyntaxToken, TextRange, TextSize,
+};
 use lsp_server::{ErrorCode, Request, Response, ResponseError};
 use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionResponse, CompletionTextEdit, Documentation,
@@ -136,7 +138,7 @@ fn hover(
         });
     }
     let root = document.cached_syntax()?;
-    let token = root.token_at_offset(offset).right_biased()?;
+    let token = token_at_offset(&root, offset)?;
     if token.kind() != K::Ident || !token.text_range().contains(offset) {
         return None;
     }
@@ -155,6 +157,31 @@ fn hover(
         contents: HoverContents::Markup(documentation.markup(markdown)),
         range: Some(positions.range(token.text_range())),
     })
+}
+
+/// The token at `offset`, preferring the right one where two tokens meet: what
+/// rowan's `token_at_offset(offset).right_biased()` returns. Rowan recurses
+/// once per level, and left operands nest far deeper than any thread's stack
+/// (§5.12), so this descends in a loop.
+fn token_at_offset(root: &SyntaxNode, offset: TextSize) -> Option<SyntaxToken> {
+    let range = root.text_range();
+    if range.is_empty() || !range.contains_inclusive(offset) {
+        return None;
+    }
+    let mut node = root.clone();
+    loop {
+        let child = node
+            .children_with_tokens()
+            .filter(|child| {
+                let range = child.text_range();
+                !range.is_empty() && range.contains_inclusive(offset)
+            })
+            .last()?;
+        match child {
+            SyntaxElement::Node(child) => node = child,
+            SyntaxElement::Token(token) => return Some(token),
+        }
+    }
 }
 
 fn name_description(

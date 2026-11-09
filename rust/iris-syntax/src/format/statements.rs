@@ -97,7 +97,25 @@ impl Layout<'_> {
         }
     }
 
-    fn prepare_punctuation(&mut self, node: &SyntaxNode) {
+    /// Tightens punctuation in `root` and the nodes below it, in preorder,
+    /// without entering nested statements or bodies. The walk keeps its own
+    /// stack, as left operands nest far deeper than any thread's stack.
+    fn prepare_punctuation(&mut self, root: &SyntaxNode) {
+        let mut pending = vec![root.clone()];
+        while let Some(node) = pending.pop() {
+            if self.prepare_node_punctuation(&node) {
+                let start = pending.len();
+                pending.extend(node.children().filter(|child| {
+                    !is_statement(child.kind()) && !matches!(child.kind(), K::Block | K::Arm)
+                }));
+                pending[start..].reverse();
+            }
+        }
+    }
+
+    /// Tightens the punctuation of `node` itself, and returns whether its
+    /// children need the same.
+    fn prepare_node_punctuation(&mut self, node: &SyntaxNode) -> bool {
         let sig = if matches!(
             node.kind(),
             K::Call
@@ -160,14 +178,10 @@ impl Layout<'_> {
                 }
             }
             // Pattern contents and format-name components are already atoms.
-            K::Pattern | K::Capture | K::Format => return,
+            K::Pattern | K::Capture | K::Format => return false,
             _ => {}
         }
-        for child in node.children().filter(|child| {
-            !is_statement(child.kind()) && !matches!(child.kind(), K::Block | K::Arm)
-        }) {
-            self.prepare_punctuation(&child);
-        }
+        true
     }
 
     fn set_field_spacing(&mut self, sig: &[usize]) {

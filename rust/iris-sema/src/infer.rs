@@ -332,9 +332,60 @@ impl Inference<'_> {
             }
         }
     }
+    /// Infers the facts of an expression in post-order, left to right. Left
+    /// operands are visited by a loop over the [`left_spine`]; only other
+    /// operands recurse.
     fn infer_expression(&mut self, node: &SyntaxNode, env: &mut Environment) -> ValueFacts {
+        let spine = left_spine(node);
+        let (leaf, chain) = spine.split_last().expect("nonempty spine");
+        let mut facts = self.infer_operand(leaf, env);
+        self.record_facts(leaf, &facts);
+        for node in chain.iter().rev() {
+            facts = self.infer_left_operated(node, facts, env);
+            self.record_facts(node, &facts);
+        }
+        facts
+    }
+    fn record_facts(&mut self, node: &SyntaxNode, facts: &ValueFacts) {
+        crate::work::record();
+        if let Some(&index) = self.expressions.get(node) {
+            let info = &mut self.model.expressions[index];
+            info.facts = if info.denotation == Denotation::Value {
+                facts.clone()
+            } else {
+                ValueFacts::unknown()
+            };
+        }
+    }
+    /// Infers the facts of an expression whose left operand has `base`.
+    fn infer_left_operated(
+        &mut self,
+        node: &SyntaxNode,
+        base: ValueFacts,
+        env: &mut Environment,
+    ) -> ValueFacts {
+        match node.kind() {
+            K::Parenthesized => base,
+            K::IndexExpression => {
+                self.infer_expression(&expressions(node)[1], env);
+                base.shifted(-1)
+            }
+            K::Field => {
+                let token = first_ident(node).expect("field");
+                self.infer_reference(token.text_range(), env)
+            }
+            _ => {
+                for argument in expressions(node).iter().skip(1) {
+                    self.infer_expression(argument, env);
+                }
+                ValueFacts::known(ValueType::Int, 0)
+            }
+        }
+    }
+    /// Infers the facts of an expression without a left operand.
+    fn infer_operand(&mut self, node: &SyntaxNode, env: &mut Environment) -> ValueFacts {
         let args = expressions(node);
-        let facts = match node.kind() {
+        match node.kind() {
             K::Literal => {
                 let token = tokens(node).into_iter().next().expect("literal");
                 ValueFacts::known(
@@ -351,7 +402,6 @@ impl Inference<'_> {
                 let token = first_ident(node).expect("name");
                 self.infer_reference(token.text_range(), env)
             }
-            K::Parenthesized => self.infer_expression(&args[0], env),
             K::Comprehension => {
                 let domain = self.infer_expression(&args[0], env);
                 let id = self.index.definition_for(node).expect("binding");
@@ -362,16 +412,6 @@ impl Inference<'_> {
                 self.infer_expression(&args[1], env);
                 env.rollback(checkpoint);
                 ValueFacts::known(ValueType::Int, 0)
-            }
-            K::IndexExpression => {
-                let base = self.infer_expression(&args[0], env);
-                self.infer_expression(&args[1], env);
-                base.shifted(-1)
-            }
-            K::Field => {
-                self.infer_expression(&args[0], env);
-                let token = first_ident(node).expect("field");
-                self.infer_reference(token.text_range(), env)
             }
             K::Unary => {
                 let facts = self.infer_expression(&args[0], env);
@@ -390,17 +430,7 @@ impl Inference<'_> {
                 }
                 ValueFacts::known(ValueType::Int, 0)
             }
-        };
-        crate::work::record();
-        if let Some(&index) = self.expressions.get(node) {
-            let info = &mut self.model.expressions[index];
-            info.facts = if info.denotation == Denotation::Value {
-                facts.clone()
-            } else {
-                ValueFacts::unknown()
-            };
         }
-        facts
     }
     fn infer_reference(
         &mut self,

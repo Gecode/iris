@@ -18,8 +18,63 @@ pub(super) fn is_expression(kind: K) -> bool {
     )
 }
 
+/// One step of laying out an expression. Steps run in the order in which a
+/// recursive walk would reach them; the walk keeps its own stack, as left
+/// operands nest far deeper than any thread's stack (Specification §5.12).
+enum Step {
+    Format(SyntaxNode, usize),
+    /// After a dimension's children: wrap it if it still overflows.
+    WrapDimension(SyntaxNode, usize),
+    /// After an index expression's children: break around a complex index.
+    WrapIndex(SyntaxNode, usize),
+}
+
+/// Schedules `nodes` to be formatted in order, after the steps above them.
+fn push_in_order(
+    pending: &mut Vec<Step>,
+    nodes: impl IntoIterator<Item = SyntaxNode>,
+    indent: usize,
+) {
+    let start = pending.len();
+    pending.extend(nodes.into_iter().map(|node| Step::Format(node, indent)));
+    pending[start..].reverse();
+}
+
 impl Layout<'_> {
     pub fn format_expression(&mut self, node: &SyntaxNode, indent: usize) {
+        let mut pending = vec![Step::Format(node.clone(), indent)];
+        while let Some(step) = pending.pop() {
+            match step {
+                Step::Format(node, indent) => {
+                    self.format_expression_step(&node, indent, &mut pending)
+                }
+                Step::WrapDimension(node, indent) => {
+                    if self.overflows(self.atom_range(&node))
+                        && node.children().any(|child| !is_atomic(&child))
+                    {
+                        self.wrap_delimited(&node, indent, &mut pending);
+                    }
+                }
+                Step::WrapIndex(node, indent) => {
+                    let span = self.atom_range(&node);
+                    let index = node.children().nth(1).expect("clean index has subscript");
+                    if self.overflows(span.clone()) && !is_atomic(&index) {
+                        let sig = self.significant(span);
+                        self.set_line(self.atom_range(&index).start, indent + 2);
+                        self.set_line(*sig.last().unwrap(), indent);
+                        pending.push(Step::Format(index, indent + 2));
+                    }
+                }
+            }
+        }
+    }
+
+    fn format_expression_step(
+        &mut self,
+        node: &SyntaxNode,
+        indent: usize,
+        pending: &mut Vec<Step>,
+    ) {
         let span = self.atom_range(node);
         if !self.overflows(span.clone()) {
             return;
@@ -35,9 +90,7 @@ impl Layout<'_> {
                         self.set_line(next, indent + 2);
                     }
                 }
-                for operand in operands {
-                    self.format_expression(&operand, indent + 2);
-                }
+                push_in_order(pending, operands, indent + 2);
             }
             K::Range => {
                 let bounds: Vec<_> = node
@@ -47,40 +100,22 @@ impl Layout<'_> {
                 if bounds.len() == 2 {
                     self.set_line(self.atom_range(&bounds[1]).start, indent + 2);
                 }
-                for bound in bounds {
-                    self.format_expression(&bound, indent + 2);
-                }
+                push_in_order(pending, bounds, indent + 2);
             }
-            K::Call => self.wrap_call(node, indent),
-            K::Comprehension => self.wrap_comprehension(node, indent),
-            K::Parenthesized => self.wrap_delimited(node, indent),
+            K::Call => self.wrap_call(node, indent, pending),
+            K::Comprehension => self.wrap_comprehension(node, indent, pending),
+            K::Parenthesized => self.wrap_delimited(node, indent, pending),
             K::Dimension => {
-                for child in node.children() {
-                    self.format_expression(&child, indent);
-                }
-                if self.overflows(span.clone()) && node.children().any(|child| !is_atomic(&child)) {
-                    self.wrap_delimited(node, indent);
-                }
+                pending.push(Step::WrapDimension(node.clone(), indent));
+                push_in_order(pending, node.children(), indent);
             }
             K::IndexExpression => {
                 // An atomic suffix stays attached. A complex index may use its
                 // own internal breaks, retaining the postfix chain's tokens.
-                for child in node.children() {
-                    self.format_expression(&child, indent);
-                }
-                let index = node.children().nth(1).expect("clean index has subscript");
-                if self.overflows(span.clone()) && !is_atomic(&index) {
-                    let sig = self.significant(span.clone());
-                    self.set_line(self.atom_range(&index).start, indent + 2);
-                    self.set_line(*sig.last().unwrap(), indent);
-                    self.format_expression(&index, indent + 2);
-                }
+                pending.push(Step::WrapIndex(node.clone(), indent));
+                push_in_order(pending, node.children(), indent);
             }
-            K::Unary | K::Field => {
-                for child in node.children() {
-                    self.format_expression(&child, indent);
-                }
-            }
+            K::Unary | K::Field => push_in_order(pending, node.children(), indent),
             _ => {}
         }
     }
@@ -105,19 +140,17 @@ impl Layout<'_> {
         }
     }
 
-    fn wrap_call(&mut self, node: &SyntaxNode, indent: usize) {
+    fn wrap_call(&mut self, node: &SyntaxNode, indent: usize, pending: &mut Vec<Step>) {
         let span = self.atom_range(node);
         let close = *self.significant(span.clone()).last().unwrap();
         for argument in node.children() {
             self.set_line(self.atom_range(&argument).start, indent + 2);
         }
         self.set_line(close, indent);
-        for argument in node.children() {
-            self.format_expression(&argument, indent + 2);
-        }
+        push_in_order(pending, node.children(), indent + 2);
     }
 
-    fn wrap_comprehension(&mut self, node: &SyntaxNode, indent: usize) {
+    fn wrap_comprehension(&mut self, node: &SyntaxNode, indent: usize, pending: &mut Vec<Step>) {
         let span = self.atom_range(node);
         let expressions: Vec<_> = node.children().collect();
         let domain = &expressions[0];
@@ -127,14 +160,14 @@ impl Layout<'_> {
         self.set_line(body_span.start, indent + 2);
         self.set_line(*sig.last().unwrap(), indent);
         let head_end = body_span.start;
+        pending.push(Step::Format(body.clone(), indent + 2));
         if self.overflows(span.start..head_end) {
             self.set_line(sig[2], indent + 2);
-            self.format_expression(domain, indent + 2);
+            pending.push(Step::Format(domain.clone(), indent + 2));
         }
-        self.format_expression(body, indent + 2);
     }
 
-    fn wrap_delimited(&mut self, node: &SyntaxNode, indent: usize) {
+    fn wrap_delimited(&mut self, node: &SyntaxNode, indent: usize, pending: &mut Vec<Step>) {
         let span = self.atom_range(node);
         let sig = self.significant(span.clone());
         if sig.len() < 3
@@ -147,9 +180,7 @@ impl Layout<'_> {
         }
         self.set_line(sig[1], indent + 2);
         self.set_line(*sig.last().unwrap(), indent);
-        for child in node.children() {
-            self.format_expression(&child, indent + 2);
-        }
+        push_in_order(pending, node.children(), indent + 2);
     }
 
     pub fn move_expression(&mut self, node: &SyntaxNode, indent: usize) {

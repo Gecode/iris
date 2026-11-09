@@ -153,7 +153,7 @@ fn collect_symbols(
         let selection = selection.unwrap_or_else(|| TextRange::empty(node.text_range().start()));
         let header = &source[usize::from(node.text_range().start())..usize::from(header_end)];
         let mut children = Vec::new();
-        for child in node.children() {
+        for child in node.children().filter(|child| !is_expression(child.kind())) {
             collect_symbols(&child, source, positions, arm_kind, &mut children);
         }
         #[allow(deprecated)]
@@ -168,10 +168,30 @@ fn collect_symbols(
             children: (!children.is_empty()).then_some(children),
         });
     } else {
-        for child in node.children() {
+        for child in node.children().filter(|child| !is_expression(child.kind())) {
             collect_symbols(&child, source, positions, arm_kind, symbols);
         }
     }
+}
+
+/// Expressions hold no symbols, and their left operands can nest far deeper
+/// than any thread's stack (Specification §5.12), so the walk skips them.
+/// What remains nests only as deep as blocks.
+fn is_expression(kind: K) -> bool {
+    matches!(
+        kind,
+        K::Literal
+            | K::Name
+            | K::HostConstant
+            | K::Parenthesized
+            | K::Unary
+            | K::Binary
+            | K::Power
+            | K::Call
+            | K::Comprehension
+            | K::IndexExpression
+            | K::Field
+    )
 }
 
 fn flatten_symbols(symbols: Vec<DocumentSymbol>, uri: &Uri, flat: &mut Vec<SymbolInformation>) {

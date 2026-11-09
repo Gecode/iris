@@ -1,4 +1,5 @@
-use gecode_iris_syntax::{SyntaxNode, TextRange, TextSize};
+use gecode_iris_syntax::{SyntaxNode, SyntaxTree, TextRange, TextSize};
+use std::fmt;
 
 macro_rules! ids {
     ($($name:ident),*) => { $(
@@ -252,7 +253,7 @@ pub struct OutputEntry {
     /// `true` can also mean only that the analysis found no proof.
     pub possibly_absent: bool,
 }
-#[derive(Debug, Default, Clone)]
+#[derive(Default, Clone)]
 pub struct SemanticModel {
     pub(crate) definitions: Vec<Definition>,
     pub(crate) references: Vec<Reference>,
@@ -263,6 +264,25 @@ pub struct SemanticModel {
     pub(crate) checks: Vec<CheckInfo>,
     pub(crate) comprehensions: Vec<ComprehensionInfo>,
     pub(crate) output_entries: Vec<OutputEntry>,
+    /// The tree of the syntax nodes above. Declared last, so that it is
+    /// dropped after them and can free a deep tree without recursion when
+    /// the model outlives its `Parse`.
+    pub(crate) tree: Option<SyntaxTree>,
+}
+impl fmt::Debug for SemanticModel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SemanticModel")
+            .field("definitions", &self.definitions)
+            .field("references", &self.references)
+            .field("scopes", &self.scopes)
+            .field("repeats", &self.repeats)
+            .field("named_types", &self.named_types)
+            .field("expressions", &self.expressions)
+            .field("checks", &self.checks)
+            .field("comprehensions", &self.comprehensions)
+            .field("output_entries", &self.output_entries)
+            .finish()
+    }
 }
 impl SemanticModel {
     pub fn definitions(&self) -> &[Definition] {

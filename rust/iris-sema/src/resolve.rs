@@ -258,9 +258,60 @@ impl Resolver<'_> {
             }
         }
     }
+    /// Resolves an expression in post-order, left to right. Left operands are
+    /// resolved by a loop over the [`left_spine`]; only other operands recurse.
     fn resolve_expression(&mut self, node: &SyntaxNode, whole: bool) -> Result<Denotation> {
-        let denotation = match node.kind() {
-            K::Parenthesized => self.resolve_expression(&expressions(node)[0], whole)?,
+        let spine = left_spine(node);
+        let (leaf, chain) = spine.split_last().expect("nonempty spine");
+        // Only parentheses pass on that the expression is the whole argument.
+        let leaf_whole = whole && chain.iter().all(|n| n.kind() == K::Parenthesized);
+        let mut denotation = self.resolve_operand(leaf, leaf_whole)?;
+        self.record_expression(leaf, &denotation);
+        for node in chain.iter().rev() {
+            denotation = self.resolve_left_operated(node, denotation)?;
+            self.record_expression(node, &denotation);
+        }
+        Ok(denotation)
+    }
+    fn record_expression(&mut self, node: &SyntaxNode, denotation: &Denotation) {
+        self.model.expressions.push(ExpressionInfo {
+            node: node.clone(),
+            facts: ValueFacts::unknown(),
+            denotation: denotation.clone(),
+        });
+    }
+    /// Resolves the rest of an expression whose left operand denotes `base`.
+    fn resolve_left_operated(&mut self, node: &SyntaxNode, base: Denotation) -> Result<Denotation> {
+        Ok(match node.kind() {
+            K::Parenthesized => base,
+            K::Field => self.resolve_field(node, base)?,
+            K::IndexExpression => {
+                self.resolve_value(&expressions(node)[1])?;
+                match base {
+                    Denotation::Record(r) => return self.fail(
+                        E::RecordValue,
+                        format!(
+                            "a record of '{}' cannot be indexed; use one of its fields, as in '{}'",
+                            self.records_name(r),
+                            self.example(r, false)
+                        ),
+                    ),
+                    Denotation::RecordList(r) => Denotation::Record(r),
+                    Denotation::Value => Denotation::Value,
+                }
+            }
+            _ => {
+                self.require_value(&base)?;
+                for argument in expressions(node).iter().skip(1) {
+                    self.resolve_value(argument)?;
+                }
+                Denotation::Value
+            }
+        })
+    }
+    /// Resolves an expression without a left operand.
+    fn resolve_operand(&mut self, node: &SyntaxNode, whole: bool) -> Result<Denotation> {
+        Ok(match node.kind() {
             K::Name => self.resolve_name(node, whole)?,
             K::HostConstant => {
                 let token = first_ident(node).expect("host name");
@@ -276,24 +327,6 @@ impl Resolver<'_> {
                     facts: ValueFacts::known(ValueType::Int, 0),
                 });
                 Denotation::Value
-            }
-            K::Field => self.resolve_field(node)?,
-            K::IndexExpression => {
-                let args = expressions(node);
-                let base = self.resolve_expression(&args[0], false)?;
-                self.resolve_value(&args[1])?;
-                match base {
-                    Denotation::Record(r) => return self.fail(
-                        E::RecordValue,
-                        format!(
-                            "a record of '{}' cannot be indexed; use one of its fields, as in '{}'",
-                            self.records_name(r),
-                            self.example(r, false)
-                        ),
-                    ),
-                    Denotation::RecordList(r) => Denotation::Record(r),
-                    Denotation::Value => Denotation::Value,
-                }
             }
             K::Comprehension => self.resolve_comprehension(node)?,
             K::Call => {
@@ -315,13 +348,7 @@ impl Resolver<'_> {
                 }
                 Denotation::Value
             }
-        };
-        self.model.expressions.push(ExpressionInfo {
-            node: node.clone(),
-            facts: ValueFacts::unknown(),
-            denotation: denotation.clone(),
-        });
-        Ok(denotation)
+        })
     }
     fn resolve_name(&mut self, node: &SyntaxNode, whole: bool) -> Result<Denotation> {
         let token = first_ident(node).expect("name");
@@ -455,8 +482,7 @@ impl Resolver<'_> {
             .first()
             .map_or(prefix.clone(), |f| format!("{prefix}.{f}"))
     }
-    fn resolve_field(&mut self, node: &SyntaxNode) -> Result<Denotation> {
-        let base = self.resolve_expression(&expressions(node)[0], false)?;
+    fn resolve_field(&mut self, node: &SyntaxNode, base: Denotation) -> Result<Denotation> {
         let token = tokens(node)
             .into_iter()
             .find(|t| t.kind() == K::Ident)

@@ -31,7 +31,8 @@ impl Analysis {
 }
 
 /// Apply Specification §11.2 without executing expressions or reading input.
-/// IDs and cloned CST handles belong to this analysis snapshot.
+/// IDs and cloned CST handles belong to this analysis snapshot, which shares
+/// the tree of `parsed` and can outlive it.
 pub fn analyze(parsed: &Parse) -> Analysis {
     let mut model = syntax::collect(&parsed.syntax());
     let index = syntax::SyntaxIndex::new(&model);
@@ -46,6 +47,7 @@ pub fn analyze(parsed: &Parse) -> Analysis {
         infer::infer(&mut model, &index);
         output::collect(&mut model, &index);
     }
+    model.tree = Some(parsed.tree().clone());
     Analysis {
         model,
         diagnostics: error.into_iter().collect(),
