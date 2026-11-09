@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.0 - 2026-11-09
+
 - Add the C++23 library `iris`, a native port of Gecode 6.5.0's reader that
   does not depend on Gecode. `iris::Spec` parses and loads reader specs and
   reads and catalogs data files and text; each operation that throws
