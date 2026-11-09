@@ -26,15 +26,15 @@ browsers, workerd (Cloudflare Workers) and other edge runtimes; see
 
 ## Install
 
-npm publication is planned for milestone M7. Once the package is published,
-install it with:
+The package is on [npm](https://www.npmjs.com/package/gecode-iris). Install it
+with:
 
 ```sh
 npm install gecode-iris
 ```
 
-Until then, build it from a checkout as described in [Build](#build). In an npm
-project beside an Iris checkout named `iris`:
+To use unreleased changes, build it from a checkout as described in
+[Build](#build). In an npm project beside an Iris checkout named `iris`:
 
 ```sh
 (cd ../iris/typescript && npm ci && npm run build)

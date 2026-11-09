@@ -15,8 +15,8 @@ tags; [§11](PLAN.md#11-milestones) defines the release milestones.
 | Component | Tag | Current release support |
 |---|---|---|
 | Rust crates and CLI binaries | `rust-vVERSION` | Released: 0.1.0 on crates.io and GitHub; the crates.io workflow needs the trusted publishing setup below |
-| Python | `python-vVERSION` | Ready: the release workflow needs the PyPI setup below |
-| TypeScript | `typescript-vVERSION` | Ready: the release workflow needs the npm setup below |
+| Python | `python-vVERSION` | Released: 0.1.0 on PyPI |
+| TypeScript | `typescript-vVERSION` | Released: 0.1.0 on npm; trusted publishing is set up after the first release, below |
 | Java and Kotlin | `java-vVERSION` | Ready: the release workflow needs the Maven Central setup below |
 | C++ | `cpp-vVERSION` | Ready: the release workflow needs the GitHub setup below; vcpkg and Conan planned |
 | JetBrains plugin | `jetbrains-vVERSION` | Plugin built and verified; Marketplace publication planned for M7 |
@@ -115,13 +115,14 @@ tag names the version in `typescript/package.json`, runs the whole
 [TypeScript workflow](.github/workflows/typescript.yml) and publishes the tarball
 that workflow packed, with provenance.
 
-npm trusted publishing is configured on a package that already exists, so the
-first release used a granular access token, the `NPM_TOKEN` secret of the `npm`
-environment. After it, on npmjs.com add a trusted publisher to `gecode-iris` with
-owner `Gecode`, repository `iris`, workflow `typescript-release.yml` and
-environment `npm`, then delete the secret. npm 11.5.1 and later use trusted
-publishing whenever it is configured, so the workflow needs no change; it checks
-the npm version.
+npm trusted publishing is configured on a package that already exists. The
+first release, 0.1.0, was published by hand from the tarball its release run
+built: that run's publish step named the tarball without `./`, so npm read the
+path as a GitHub repository. Before the next release, add a trusted publisher to
+`gecode-iris` on npmjs.com with owner `Gecode`, repository `iris`, workflow
+`typescript-release.yml` and environment `npm`, then delete the `NPM_TOKEN`
+secret of the `npm` environment. npm 11.5.1 and later use trusted publishing
+whenever it is configured, and the workflow checks the npm version.
 
 ## C++
 

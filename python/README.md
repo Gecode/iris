@@ -19,9 +19,9 @@ print(data.to_json())
 
 ## Install
 
-PyPI publication is planned for milestone M7. Once the package is
-published, add it to a uv project, install it into an existing environment,
-or run the `iris` command without installing it:
+The package is on [PyPI](https://pypi.org/project/gecode-iris/). Add it to a uv
+project, install it into an existing environment, or run the `iris` command
+without installing it:
 
 ```sh
 uv add gecode-iris
@@ -29,8 +29,8 @@ uv pip install gecode-iris
 uvx --from gecode-iris iris --help
 ```
 
-Until then, build it from a checkout, which needs the Rust toolchain. In a uv
-project beside an Iris checkout named `iris`:
+To use unreleased changes, build it from a checkout instead, which needs the
+Rust toolchain. In a uv project beside an Iris checkout named `iris`:
 
 ```sh
 uv add ../iris/python
